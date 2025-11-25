@@ -49,7 +49,8 @@ func (e *PluginError) Error() string {
 // ConfigSchema represents the JSON Schema for plugin configuration
 // Maps to the WIT config-schema record
 type ConfigSchema struct {
-	Fields []FieldDef
+	Fields    []FieldDef
+	RawSchema []byte // Raw JSON Schema data from plugin
 }
 
 // FieldDef represents a configuration field definition
