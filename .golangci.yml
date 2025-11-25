@@ -1,0 +1,119 @@
+# golangci-lint configuration
+# See: https://golangci-lint.run/usage/configuration/
+version: 2
+run:
+  timeout: 5m
+  issues-exit-code: 1
+  tests: true
+  modules-download-mode: readonly
+linters:
+  enable:
+    - bodyclose
+    - errorlint
+    - errcheck
+    - gocritic
+    - gocyclo
+    - gosec
+    - govet
+    - ineffassign
+    - misspell
+    - nakedret
+    - nilerr
+    - revive
+    - staticcheck
+    - unconvert
+    - unused
+  disable:
+    # Style/formatting
+    - godot
+    - wsl_v5
+
+    # Too strict for this codebase
+    - noctx          # Context-aware network calls are overkill
+    - unparam        # Unused params often required by interfaces
+    - dogsled        # Multiple blank identifiers are fine in tests
+    - exhaustive     # Don't need exhaustive switch checks
+    - gochecknoinits # Init functions are sometimes necessary
+    - prealloc       # Premature optimization
+
+    # Duplicate detection
+    - dupl           # Similar config structures are intentional
+    - goconst        # Version strings intentionally not constants
+
+    # Complexity
+    - gocognit       # Prefer gocyclo for complexity checking
+    - funlen         # Long initialization functions are acceptable
+
+    # Other
+    - testpackage        # Tests don't need separate packages
+    - goprintffuncname   # Function names clearer without 'f' suffix
+    - gochecknoglobals   # Some legitimate global variables
+    - rowserrcheck       # Covered by errcheck
+  # ----------------------------------------------------------------------
+  # THIS IS THE NEW, CORRECT V2 LOCATION FOR EXCLUSIONS
+  # ----------------------------------------------------------------------
+  exclusions:
+    rules:
+      # Exclude specific linters from test files
+      - path: _test\.go$  # Regex to match files ending in _test.go
+        linters:
+          - errcheck
+          - gosec
+          - gocyclo
+          - staticcheck
+          - govet
+          - revive # Also excluding revive from tests, as discussed
+      # Exclude generated protobuf files
+      - path: \.pb\.go$
+        linters:
+          - all
+      # Exclude generated connect files
+      - path: \.connect\.go$
+        linters:
+          - all
+linters-settings:
+  errcheck:
+    check-type-assertions: false
+    check-blank: false
+
+  govet:
+    enable-all: true
+    disable:
+      - shadow  # We'll handle specific shadow cases
+
+  gocyclo:
+    min-complexity: 20  # Increased from default 15
+
+  misspell:
+    locale: US
+
+  nakedret:
+    max-func-lines: 30
+
+  revive:
+    confidence: 0.8
+    # Only enable specific rules
+    enable-all-rules: false
+    rules:
+      - name: var-naming
+      - name: error-return
+      - name: error-strings
+      - name: error-naming
+      - name: if-return
+      - name: increment-decrement
+      - name: var-declaration
+      - name: range
+      - name: receiver-naming
+      - name: indent-error-flow
+      - name: empty-block
+      - name: superfluous-else
+      - name: unreachable-code
+      - name: redefines-builtin-id
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  # ----------------------------------------------------------------------
+  # THE 'exclude-rules' SECTION HAS BEEN REMOVED FROM HERE
+  # ----------------------------------------------------------------------
+severity:
+  default-severity: error
