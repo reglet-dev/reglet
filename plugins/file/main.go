@@ -14,24 +14,36 @@ import (
 // It's compiled to WASM using: GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared
 
 // Memory management for passing data between host and plugin.
-// We'll use a simple approach: allocate memory, return pointer to host.
+// allocations keeps a reference to allocated memory to prevent the GC from collecting it.
+// This effectively "pins" the memory until the host explicitly releases it.
+var allocations = make(map[uint32][]byte)
 
 // allocate reserves memory in the WASM linear memory and returns a pointer.
 // The host can read from this pointer.
 //
 //go:wasmexport allocate
 func allocate(size uint32) uint32 {
-	// Allocate a byte slice of the requested size
+	if size == 0 {
+		return 0
+	}
+
+	// Allocate the slice
 	buf := make([]byte, size)
-	// Return pointer to the first element
-	return uint32(uintptr(unsafe.Pointer(&buf[0])))
+
+	// Get the pointer to the underlying array
+	ptr := uint32(uintptr(unsafe.Pointer(&buf[0])))
+
+	// PIN THE MEMORY: Store the slice in a global map so the GC sees it as "in use"
+	allocations[ptr] = buf
+
+	return ptr
 }
 
-// deallocate frees memory (no-op in Go due to GC, but kept for interface compatibility)
+// deallocate frees memory by removing the reference, allowing the GC to collect it.
 //
 //go:wasmexport deallocate
 func deallocate(ptr uint32, size uint32) {
-	// Go's GC handles this, but we keep the function for API compatibility
+	delete(allocations, ptr)
 }
 
 // describe returns plugin metadata as JSON in WASM memory.

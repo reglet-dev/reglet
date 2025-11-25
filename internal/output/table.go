@@ -106,7 +106,10 @@ func (f *TableFormatter) formatObservation(obs engine.ObservationResult, index i
 	if obs.Evidence != nil {
 		fmt.Fprintf(f.writer, "       Evidence: collected at %s\n", obs.Evidence.Timestamp.Format(time.RFC3339))
 		if len(obs.Evidence.Data) > 0 {
-			fmt.Fprintf(f.writer, "       Data fields: %d\n", len(obs.Evidence.Data))
+			// Show evidence data fields
+			for key, value := range obs.Evidence.Data {
+				fmt.Fprintf(f.writer, "       - %s: %v\n", key, value)
+			}
 		}
 	}
 

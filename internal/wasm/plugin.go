@@ -2,9 +2,9 @@ package wasm
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"os"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
@@ -40,12 +40,16 @@ func (p *Plugin) getInstance() (api.Module, error) {
 
 	// Configure WASI with filesystem access
 	// TODO Phase 2: Implement proper capability-based restrictions
-	// TODO Phase 2: Fix WASI directory stat issue - os.Stat() on directories fails
-	//               with memory corruption. Works fine for regular files.
-	//               Likely related to WASI preview1 limitations or wazero config.
 	// For now, grant full filesystem access for testing
 	config := wazero.NewModuleConfig().
-		WithFS(os.DirFS("/"))
+		// Mount host root "/" to guest root "/" for filesystem access
+		WithFSConfig(wazero.NewFSConfig().WithDirMount("/", "/")).
+		// Enable time-related syscalls (needed for file timestamps)
+		WithSysWalltime().
+		WithSysNanotime().
+		WithSysNanosleep().
+		// Enable random number generation
+		WithRandSource(rand.Reader)
 
 	// Instantiate the module with WASI filesystem access
 	instance, err := p.runtime.InstantiateModule(p.ctx, p.module, config)
@@ -170,13 +174,7 @@ func (p *Plugin) Schema() (*ConfigSchema, error) {
 
 // Observe calls the plugin's observe() function with the given config
 func (p *Plugin) Observe(cfg Config) (*ObservationResult, error) {
-	// Phase 1b workaround: Close and recreate instance for each observation
-	// This avoids memory corruption from Go GC moving allocated slices
-	if p.instance != nil {
-		p.instance.Close(p.ctx)
-		p.instance = nil
-	}
-
+	// Get or create instance - memory is now properly pinned via allocations map
 	instance, err := p.getInstance()
 	if err != nil {
 		return nil, err
@@ -210,6 +208,12 @@ func (p *Plugin) Observe(cfg Config) (*ObservationResult, error) {
 		return nil, fmt.Errorf("failed to call observe(): %w", err)
 	}
 
+	// Deallocate config memory after observe() has read it
+	deallocateFn := instance.ExportedFunction("deallocate")
+	if deallocateFn != nil {
+		deallocateFn.Call(p.ctx, uint64(configPtr), uint64(len(configData)))
+	}
+
 	if len(results) == 0 {
 		return nil, fmt.Errorf("observe() returned no results")
 	}
@@ -219,7 +223,7 @@ func (p *Plugin) Observe(cfg Config) (*ObservationResult, error) {
 		return nil, fmt.Errorf("observe() returned null pointer")
 	}
 
-	// Read result from WASM memory
+	// Read result from WASM memory (readString will deallocate resultPtr)
 	resultData, err := p.readString(instance, resultPtr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read observe() result: %w", err)
@@ -264,7 +268,7 @@ func (p *Plugin) Close() error {
 }
 
 // readString reads a null-terminated string from WASM memory starting at ptr
-// For now, we read a fixed size and look for JSON structure
+// and calls deallocate to free the memory after reading
 func (p *Plugin) readString(instance api.Module, ptr uint32) ([]byte, error) {
 	// Read up to 64KB (reasonable limit for plugin metadata)
 	maxSize := uint32(64 * 1024)
@@ -284,12 +288,23 @@ func (p *Plugin) readString(instance api.Module, ptr uint32) ([]byte, error) {
 		}
 	}
 
+	var result []byte
 	if end == 0 {
 		// No null terminator found in first maxSize bytes, try to use all data
-		return data, nil
+		result = make([]byte, len(data))
+		copy(result, data)
+	} else {
+		result = make([]byte, end)
+		copy(result, data[:end])
 	}
 
-	return data[:end], nil
+	// Call deallocate to free the plugin's memory
+	deallocateFn := instance.ExportedFunction("deallocate")
+	if deallocateFn != nil {
+		deallocateFn.Call(p.ctx, uint64(ptr), uint64(len(result)))
+	}
+
+	return result, nil
 }
 
 // writeToMemory allocates memory in the WASM module and writes data to it

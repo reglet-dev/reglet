@@ -33,6 +33,15 @@ controls:
             path: "{{ .vars.test_path }}/passwd"
             mode: exists
 
+    - id: tmp-dir-test
+      name: Test Directory Check
+      description: Verify that /tmp directory exists (tests directory stat)
+      observations:
+        - plugin: file
+          config:
+            path: /tmp
+            mode: exists
+
     - id: missing-file-test
       name: Test Missing File
       description: This should fail - file does not exist
