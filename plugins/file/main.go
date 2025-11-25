@@ -1,89 +1,217 @@
 // Package main provides a file plugin for Reglet that checks file existence and content.
 // This is compiled to WASM and loaded by the Reglet runtime.
+//
+// Uses Go 1.24+ //go:wasmexport directive for function exports.
 package main
 
 import (
-	"fmt"
+	"encoding/json"
 	"os"
+	"unsafe"
 )
 
-// This is a simple file plugin that checks file existence and reads content
-// It will be compiled to WASM and loaded by the Reglet runtime
+// This is a file plugin that checks file existence and reads content.
+// It's compiled to WASM using: GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared
 
-// TODO: Use wit-bindgen-go to generate proper bindings
-// For now, this is a placeholder structure to understand what we need
+// Memory management for passing data between host and plugin.
+// We'll use a simple approach: allocate memory, return pointer to host.
 
-// describe returns plugin metadata
+// allocate reserves memory in the WASM linear memory and returns a pointer.
+// The host can read from this pointer.
 //
-//export describe
-//
-//nolint:unused // WASM export - called by host
-func describe() {
-	// TODO: Implement proper WIT response
-	// Should return PluginInfo with:
-	// - name: "file"
-	// - version: "1.0.0"
-	// - description: "File existence and content checks"
-	// - capabilities: [{ kind: "fs", pattern: "read:**" }]
-	fmt.Println("file plugin describe called")
+//go:wasmexport allocate
+func allocate(size uint32) uint32 {
+	// Allocate a byte slice of the requested size
+	buf := make([]byte, size)
+	// Return pointer to the first element
+	return uint32(uintptr(unsafe.Pointer(&buf[0])))
 }
 
-// schema returns configuration schema
+// deallocate frees memory (no-op in Go due to GC, but kept for interface compatibility)
 //
-//export schema
-//
-//nolint:unused // WASM export - called by host
-func schema() {
-	// TODO: Implement proper WIT response
-	// Should return ConfigSchema with fields:
-	// - path (string, required): Path to file
-	// - mode (string, optional): Check mode (exists, readable, content)
-	fmt.Println("file plugin schema called")
+//go:wasmexport deallocate
+func deallocate(ptr uint32, size uint32) {
+	// Go's GC handles this, but we keep the function for API compatibility
 }
 
-// observe executes the file check
+// describe returns plugin metadata as JSON in WASM memory.
+// Returns a pointer to the JSON-encoded PluginInfo.
 //
-//export observe
-//
-//nolint:unused // WASM export - called by host
-func observe() {
-	// TODO: Implement proper WIT request/response
-	// Should:
-	// 1. Parse Config from WASM memory
-	// 2. Extract path from config
-	// 3. Check if file exists
-	// 4. Read file content if needed
-	// 5. Return Evidence with results
-	fmt.Println("file plugin observe called")
+//go:wasmexport describe
+func describe() uint32 {
+	info := map[string]interface{}{
+		"name":        "file",
+		"version":     "1.0.0",
+		"description": "File existence and content checks",
+		"capabilities": []map[string]string{
+			{
+				"kind":    "fs",
+				"pattern": "read:**",
+			},
+		},
+	}
+
+	// Marshal to JSON
+	data, err := json.Marshal(info)
+	if err != nil {
+		return 0 // Error
+	}
+
+	// Allocate memory and copy data
+	ptr := allocate(uint32(len(data)))
+	copyToMemory(ptr, data)
+	return ptr
 }
 
-// observeWithPath is a simpler version that takes a path parameter
-// This is easier to test before we implement full WIT bindings
+// schema returns configuration schema as JSON.
+// Returns a pointer to the JSON-encoded ConfigSchema.
 //
-//export observeWithPath
-//
-//nolint:unused // WASM export - called by host
-func observeWithPath(pathPtr, pathLen int32) int32 {
-	// Read path from WASM memory
-	// For now, just demonstrate the concept
-	fmt.Printf("observing file at path ptr=%d len=%d\n", pathPtr, pathLen)
+//go:wasmexport schema
+func schema() uint32 {
+	configSchema := map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"path": map[string]interface{}{
+				"type":        "string",
+				"description": "Path to file to check",
+			},
+			"mode": map[string]interface{}{
+				"type":        "string",
+				"description": "Check mode: exists, readable, or content",
+				"enum":        []string{"exists", "readable", "content"},
+				"default":     "exists",
+			},
+		},
+		"required": []string{"path"},
+	}
 
-	// In a real implementation:
-	// 1. Read string from WASM memory using pathPtr and pathLen
-	// 2. Check if file exists: os.Stat(path)
-	// 3. Read file if needed: os.ReadFile(path)
-	// 4. Marshal result to WASM memory
-	// 5. Return pointer to result
+	data, err := json.Marshal(configSchema)
+	if err != nil {
+		return 0
+	}
 
-	return 0 // Success
+	ptr := allocate(uint32(len(data)))
+	copyToMemory(ptr, data)
+	return ptr
 }
 
-// fileExists checks if a file exists
+// observe executes the file check.
+// Takes a pointer to JSON config, returns pointer to JSON result.
 //
-//nolint:unused // Will be used when WIT bindings are implemented
-func fileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
+//go:wasmexport observe
+func observe(configPtr uint32, configLen uint32) uint32 {
+	// Read config from WASM memory
+	config := readFromMemory(configPtr, configLen)
+
+	// Parse config
+	var cfg map[string]interface{}
+	if err := json.Unmarshal(config, &cfg); err != nil {
+		return errorResult("failed to parse config: " + err.Error())
+	}
+
+	path, ok := cfg["path"].(string)
+	if !ok {
+		return errorResult("path field is required and must be a string")
+	}
+
+	mode := "exists"
+	if m, ok := cfg["mode"].(string); ok {
+		mode = m
+	}
+
+	// Execute the check
+	var result map[string]interface{}
+
+	switch mode {
+	case "exists":
+		_, err := os.Stat(path)
+		result = map[string]interface{}{
+			"status": err == nil,
+			"path":   path,
+			"mode":   mode,
+		}
+		if err != nil {
+			result["error"] = err.Error()
+		}
+
+	case "readable":
+		file, err := os.Open(path)
+		if err == nil {
+			file.Close()
+			result = map[string]interface{}{
+				"status": true,
+				"path":   path,
+				"mode":   mode,
+			}
+		} else {
+			result = map[string]interface{}{
+				"status": false,
+				"path":   path,
+				"mode":   mode,
+				"error":  err.Error(),
+			}
+		}
+
+	case "content":
+		content, err := os.ReadFile(path)
+		if err == nil {
+			result = map[string]interface{}{
+				"status":  true,
+				"path":    path,
+				"mode":    mode,
+				"content": string(content),
+				"size":    len(content),
+			}
+		} else {
+			result = map[string]interface{}{
+				"status": false,
+				"path":   path,
+				"mode":   mode,
+				"error":  err.Error(),
+			}
+		}
+
+	default:
+		return errorResult("invalid mode: " + mode)
+	}
+
+	// Marshal result to JSON
+	data, err := json.Marshal(result)
+	if err != nil {
+		return errorResult("failed to marshal result: " + err.Error())
+	}
+
+	ptr := allocate(uint32(len(data)))
+	copyToMemory(ptr, data)
+	return ptr
+}
+
+// Helper functions
+
+// copyToMemory copies data to WASM linear memory at the given pointer.
+func copyToMemory(ptr uint32, data []byte) {
+	dest := unsafe.Slice((*byte)(unsafe.Pointer(uintptr(ptr))), len(data))
+	copy(dest, data)
+}
+
+// readFromMemory reads data from WASM linear memory.
+func readFromMemory(ptr uint32, length uint32) []byte {
+	src := unsafe.Slice((*byte)(unsafe.Pointer(uintptr(ptr))), length)
+	data := make([]byte, length)
+	copy(data, src)
+	return data
+}
+
+// errorResult creates an error result and returns a pointer to it.
+func errorResult(message string) uint32 {
+	result := map[string]interface{}{
+		"status": false,
+		"error":  message,
+	}
+	data, _ := json.Marshal(result)
+	ptr := allocate(uint32(len(data)))
+	copyToMemory(ptr, data)
+	return ptr
 }
 
 // main is required for WASM compilation but won't be called
