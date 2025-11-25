@@ -1,0 +1,88 @@
+// reglet.wit
+// WebAssembly Interface Types definition for Reglet plugins
+// This defines the contract between the Reglet host and WASM plugins
+
+package reglet:plugin@1.0.0;
+
+/// Core types used across the plugin interface
+interface types {
+    /// Plugin configuration passed to observe()
+    /// Represents key-value pairs from the profile YAML
+    record config {
+        values: list<tuple<string, string>>,
+    }
+
+    /// Evidence returned by a plugin observation
+    /// Contains the observation results and collected data
+    record evidence {
+        timestamp: string,                          // ISO 8601 timestamp
+        data: list<tuple<string, value>>,          // Structured key-value evidence
+        raw: option<string>,                       // Optional raw data (logs, file contents, etc.)
+    }
+
+    /// Value type for evidence data - supports common types
+    variant value {
+        string(string),
+        int(s64),
+        float(f64),
+        bool(bool),
+        list(list<value>),
+    }
+
+    /// Error returned when observation fails
+    record error {
+        code: string,                              // Error code (e.g., "connection_refused", "file_not_found")
+        message: string,                           // Human-readable error message
+    }
+
+    /// Capability declaration - what permissions the plugin needs
+    record capability {
+        kind: string,                              // Capability type: fs, network, env, exec
+        pattern: string,                           // Pattern: e.g., "/etc/**", "80,443", "AWS_*"
+    }
+
+    /// Plugin metadata returned by describe()
+    record plugin-info {
+        name: string,                              // Plugin name (e.g., "file", "http")
+        version: string,                           // Semantic version (e.g., "1.0.0")
+        description: string,                       // Human-readable description
+        capabilities: list<capability>,            // Required capabilities
+    }
+
+    /// JSON Schema for plugin configuration
+    /// Used for pre-flight validation
+    record config-schema {
+        fields: list<field-def>,
+    }
+
+    /// Field definition for configuration schema
+    record field-def {
+        name: string,                              // Field name
+        field-type: string,                        // JSON Schema type: string, integer, boolean, object, array
+        required: bool,                            // Is this field required?
+        description: string,                       // Field description for documentation
+    }
+}
+
+/// Main plugin interface - all plugins must implement this
+interface plugin {
+    use types.{config, evidence, error, plugin-info, config-schema};
+
+    /// Return plugin metadata and capabilities
+    /// Called once during plugin initialization
+    describe: func() -> plugin-info;
+
+    /// Return configuration schema for validation
+    /// Called once during pre-flight validation
+    schema: func() -> config-schema;
+
+    /// Execute observation and return evidence
+    /// This is the main entry point for plugin execution
+    /// Returns Ok(evidence) on success, Err(error) on failure
+    observe: func(config: config) -> result<evidence, error>;
+}
+
+/// The plugin world - defines what a plugin exports
+world reglet-plugin {
+    export plugin;
+}
