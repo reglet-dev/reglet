@@ -39,7 +39,10 @@ func (p *Plugin) getInstance() (api.Module, error) {
 	}
 
 	// Configure WASI with filesystem access
-	// TODO: Implement proper capability-based restrictions
+	// TODO Phase 2: Implement proper capability-based restrictions
+	// TODO Phase 2: Fix WASI directory stat issue - os.Stat() on directories fails
+	//               with memory corruption. Works fine for regular files.
+	//               Likely related to WASI preview1 limitations or wazero config.
 	// For now, grant full filesystem access for testing
 	config := wazero.NewModuleConfig().
 		WithFS(os.DirFS("/"))
@@ -167,6 +170,13 @@ func (p *Plugin) Schema() (*ConfigSchema, error) {
 
 // Observe calls the plugin's observe() function with the given config
 func (p *Plugin) Observe(cfg Config) (*ObservationResult, error) {
+	// Phase 1b workaround: Close and recreate instance for each observation
+	// This avoids memory corruption from Go GC moving allocated slices
+	if p.instance != nil {
+		p.instance.Close(p.ctx)
+		p.instance = nil
+	}
+
 	instance, err := p.getInstance()
 	if err != nil {
 		return nil, err
@@ -183,6 +193,10 @@ func (p *Plugin) Observe(cfg Config) (*ObservationResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal config: %w", err)
 	}
+
+	// Debug: Print the JSON being sent to plugin
+	// fmt.Printf("DEBUG: Sending config to plugin: %s\n", string(configData))
+	// fmt.Printf("DEBUG: Config bytes (hex): % x\n", configData)
 
 	// Write config to WASM memory
 	configPtr, err := p.writeToMemory(instance, configData)
@@ -306,6 +320,13 @@ func (p *Plugin) writeToMemory(instance api.Module, data []byte) (uint32, error)
 	if !instance.Memory().Write(ptr, data) {
 		return 0, fmt.Errorf("failed to write to WASM memory at offset %d", ptr)
 	}
+
+	// Debug: Verify the write by reading it back
+	// readBack, ok := instance.Memory().Read(ptr, uint32(len(data)))
+	// if !ok {
+	// 	return 0, fmt.Errorf("failed to read back written data at offset %d", ptr)
+	// }
+	// fmt.Printf("DEBUG writeToMemory: Wrote %d bytes to ptr %d. Readback hex: % x\n", len(data), ptr, readBack)
 
 	return ptr, nil
 }

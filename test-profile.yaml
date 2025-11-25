@@ -1,0 +1,44 @@
+profile:
+  name: test-profile
+  version: 1.0.0
+  description: Phase 1b integration test profile
+
+vars:
+  test_path: /etc
+
+controls:
+  defaults:
+    severity: medium
+    owner: test-team
+    tags: [test]
+
+  items:
+    - id: file-exists-test
+      name: Test File Existence Check
+      description: Verify that /etc/hosts file exists
+      severity: high
+      tags: [filesystem, test]
+      observations:
+        - plugin: file
+          config:
+            path: /etc/hosts
+            mode: exists
+
+    - id: passwd-file-test
+      name: Test Passwd File
+      description: Verify /etc/passwd file exists using variable substitution
+      observations:
+        - plugin: file
+          config:
+            path: "{{ .vars.test_path }}/passwd"
+            mode: exists
+
+    - id: missing-file-test
+      name: Test Missing File
+      description: This should fail - file does not exist
+      severity: low
+      observations:
+        - plugin: file
+          config:
+            path: /this/file/should/not/exist
+            mode: exists
