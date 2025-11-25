@@ -202,16 +202,18 @@ func (p *Plugin) Observe(cfg Config) (*ObservationResult, error) {
 		return nil, fmt.Errorf("failed to write config to WASM memory: %w", err)
 	}
 
+	// CRITICAL: Ensure config memory is always deallocated, even on error
+	defer func() {
+		deallocateFn := instance.ExportedFunction("deallocate")
+		if deallocateFn != nil {
+			deallocateFn.Call(p.ctx, uint64(configPtr), uint64(len(configData)))
+		}
+	}()
+
 	// Call observe(configPtr, configLen)
 	results, err := observeFn.Call(p.ctx, uint64(configPtr), uint64(len(configData)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to call observe(): %w", err)
-	}
-
-	// Deallocate config memory after observe() has read it
-	deallocateFn := instance.ExportedFunction("deallocate")
-	if deallocateFn != nil {
-		deallocateFn.Call(p.ctx, uint64(configPtr), uint64(len(configData)))
 	}
 
 	if len(results) == 0 {
@@ -270,6 +272,17 @@ func (p *Plugin) Close() error {
 // readString reads a null-terminated string from WASM memory starting at ptr
 // and calls deallocate to free the memory after reading
 func (p *Plugin) readString(instance api.Module, ptr uint32) ([]byte, error) {
+	// CRITICAL: Ensure memory is always deallocated, even on error
+	// We defer this immediately since we know the ptr, even if we can't read it
+	defer func() {
+		deallocateFn := instance.ExportedFunction("deallocate")
+		if deallocateFn != nil {
+			// Use maxSize as a safe upper bound for deallocation
+			// The plugin's deallocate will handle the actual size
+			deallocateFn.Call(p.ctx, uint64(ptr), uint64(64*1024))
+		}
+	}()
+
 	// Read up to 64KB (reasonable limit for plugin metadata)
 	maxSize := uint32(64 * 1024)
 
@@ -296,12 +309,6 @@ func (p *Plugin) readString(instance api.Module, ptr uint32) ([]byte, error) {
 	} else {
 		result = make([]byte, end)
 		copy(result, data[:end])
-	}
-
-	// Call deallocate to free the plugin's memory
-	deallocateFn := instance.ExportedFunction("deallocate")
-	if deallocateFn != nil {
-		deallocateFn.Call(p.ctx, uint64(ptr), uint64(len(result)))
 	}
 
 	return result, nil
