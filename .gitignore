@@ -6,7 +6,6 @@ dist/
 *.dll
 *.so
 *.dylib
-reglet
 
 # Test coverage
 *.out
