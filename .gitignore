@@ -1,0 +1,48 @@
+# Binaries
+bin/
+dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+reglet
+
+# Test coverage
+*.out
+coverage.html
+*.test
+
+# Profiling
+*.prof
+*.pprof
+*.trace
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Go workspace file
+go.work
+go.work.sum
+
+# Temporary files
+tmp/
+temp/
+.cache/
+
+# Reglet specific
+reglet.lock
+.reglet/
+.regletignore
+
+# Build artifacts
+*.wasm.tmp
+/internal/plugins/embedded/wasm/*.wasm
+
+# OS specific
+Thumbs.db
