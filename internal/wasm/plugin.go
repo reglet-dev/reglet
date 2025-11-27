@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
@@ -17,13 +18,10 @@ type Plugin struct {
 	runtime wazero.Runtime
 	ctx     context.Context
 
-	// Cached instance for reuse
-	instance api.Module
-
-	// Cached plugin info from describe()
+	// Cached plugin info from describe() (thread-safe, immutable after first read)
 	info *PluginInfo
 
-	// Cached schema from schema()
+	// Cached schema from schema() (thread-safe, immutable after first read)
 	schema *ConfigSchema
 }
 
@@ -32,27 +30,29 @@ func (p *Plugin) Name() string {
 	return p.name
 }
 
-// getInstance gets or creates a module instance
-func (p *Plugin) getInstance() (api.Module, error) {
-	if p.instance != nil {
-		return p.instance, nil
-	}
-
-	// Configure WASI with filesystem access
-	// TODO Phase 2: Implement proper capability-based restrictions
-	// For now, grant full filesystem access for testing
-	config := wazero.NewModuleConfig().
+// createModuleConfig creates a fresh module configuration
+// Includes stdout/stderr for debugging visibility
+func (p *Plugin) createModuleConfig() wazero.ModuleConfig {
+	return wazero.NewModuleConfig().
 		// Mount host root "/" to guest root "/" for filesystem access
+		// TODO Phase 2: Implement proper capability-based restrictions
 		WithFSConfig(wazero.NewFSConfig().WithDirMount("/", "/")).
 		// Enable time-related syscalls (needed for file timestamps)
 		WithSysWalltime().
 		WithSysNanotime().
 		WithSysNanosleep().
 		// Enable random number generation
-		WithRandSource(rand.Reader)
+		WithRandSource(rand.Reader).
+		// FIX: Enable logging visibility for debugging
+		WithStderr(os.Stderr).
+		WithStdout(os.Stderr)
+}
 
-	// Instantiate the module with WASI filesystem access
-	instance, err := p.runtime.InstantiateModule(p.ctx, p.module, config)
+// createInstance creates a fresh module instance
+// Each call gets isolated WASM memory - thread-safe
+func (p *Plugin) createInstance() (api.Module, error) {
+	// Create fresh instance every time - no caching
+	instance, err := p.runtime.InstantiateModule(p.ctx, p.module, p.createModuleConfig())
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate plugin %s: %w", p.name, err)
 	}
@@ -67,21 +67,23 @@ func (p *Plugin) getInstance() (api.Module, error) {
 		}
 	}
 
-	p.instance = instance
 	return instance, nil
 }
 
 // Describe calls the plugin's describe() function and returns metadata
 func (p *Plugin) Describe() (*PluginInfo, error) {
-	// Return cached info if available
+	// Return cached info if available (thread-safe)
 	if p.info != nil {
 		return p.info, nil
 	}
 
-	instance, err := p.getInstance()
+	// Create fresh instance for this call
+	instance, err := p.createInstance()
 	if err != nil {
 		return nil, err
 	}
+	// CRITICAL: Always close instance when done
+	defer instance.Close(p.ctx)
 
 	// Get the describe function
 	describeFn := instance.ExportedFunction("describe")
@@ -122,15 +124,18 @@ func (p *Plugin) Describe() (*PluginInfo, error) {
 
 // Schema calls the plugin's schema() function and returns the config schema
 func (p *Plugin) Schema() (*ConfigSchema, error) {
-	// Return cached schema if available
+	// Return cached schema if available (thread-safe)
 	if p.schema != nil {
 		return p.schema, nil
 	}
 
-	instance, err := p.getInstance()
+	// Create fresh instance for this call
+	instance, err := p.createInstance()
 	if err != nil {
 		return nil, err
 	}
+	// CRITICAL: Always close instance when done
+	defer instance.Close(p.ctx)
 
 	// Get the schema function
 	schemaFn := instance.ExportedFunction("schema")
@@ -174,11 +179,13 @@ func (p *Plugin) Schema() (*ConfigSchema, error) {
 
 // Observe calls the plugin's observe() function with the given config
 func (p *Plugin) Observe(cfg Config) (*ObservationResult, error) {
-	// Get or create instance - memory is now properly pinned via allocations map
-	instance, err := p.getInstance()
+	// Create FRESH instance for this call - ensures thread safety
+	instance, err := p.createInstance()
 	if err != nil {
 		return nil, err
 	}
+	// CRITICAL: Always close instance when done
+	defer instance.Close(p.ctx)
 
 	// Get the observe function
 	observeFn := instance.ExportedFunction("observe")
@@ -191,10 +198,6 @@ func (p *Plugin) Observe(cfg Config) (*ObservationResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal config: %w", err)
 	}
-
-	// Debug: Print the JSON being sent to plugin
-	// fmt.Printf("DEBUG: Sending config to plugin: %s\n", string(configData))
-	// fmt.Printf("DEBUG: Config bytes (hex): % x\n", configData)
 
 	// Write config to WASM memory
 	configPtr, err := p.writeToMemory(instance, configData)
@@ -261,11 +264,11 @@ func (p *Plugin) Observe(cfg Config) (*ObservationResult, error) {
 	}, nil
 }
 
-// Close closes the plugin instance and frees resources
+// Close closes the plugin and frees resources
+// No-op since instances are created and closed per call
 func (p *Plugin) Close() error {
-	if p.instance != nil {
-		return p.instance.Close(p.ctx)
-	}
+	// No cached instance to close anymore
+	// Each method call creates and closes its own instance
 	return nil
 }
 
