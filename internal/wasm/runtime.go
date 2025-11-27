@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jrose/reglet/internal/wasm/hostfuncs"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 )
@@ -15,8 +16,14 @@ type Runtime struct {
 	plugins map[string]*Plugin // Loaded plugins by name
 }
 
-// NewRuntime creates a new WASM runtime
+// NewRuntime creates a new WASM runtime with no granted capabilities
+// For production use, use NewRuntimeWithCapabilities instead
 func NewRuntime(ctx context.Context) (*Runtime, error) {
+	return NewRuntimeWithCapabilities(ctx, nil)
+}
+
+// NewRuntimeWithCapabilities creates a new WASM runtime with specific capabilities
+func NewRuntimeWithCapabilities(ctx context.Context, caps []hostfuncs.Capability) (*Runtime, error) {
 	// Create wazero runtime with default configuration
 	// This is a pure Go WASM runtime - no CGO required
 	r := wazero.NewRuntime(ctx)
@@ -26,6 +33,13 @@ func NewRuntime(ctx context.Context) (*Runtime, error) {
 	if _, err := wasi_snapshot_preview1.Instantiate(ctx, r); err != nil {
 		_ = r.Close(ctx)
 		return nil, fmt.Errorf("failed to instantiate WASI: %w", err)
+	}
+
+	// Register custom host functions with capability enforcement
+	// Capabilities define what operations plugins are allowed to perform
+	if err := hostfuncs.RegisterHostFunctions(ctx, r, caps); err != nil {
+		_ = r.Close(ctx)
+		return nil, fmt.Errorf("failed to register host functions: %w", err)
 	}
 
 	return &Runtime{
