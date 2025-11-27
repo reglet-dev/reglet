@@ -3,20 +3,47 @@ package engine
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/jrose/reglet/internal/config"
 	"github.com/jrose/reglet/internal/wasm"
+	"golang.org/x/sync/errgroup"
 )
+
+// ExecutionConfig controls execution behavior.
+type ExecutionConfig struct {
+	// MaxConcurrentControls limits parallel control execution (0 = no limit)
+	MaxConcurrentControls int
+	// MaxConcurrentObservations limits parallel observation execution within a control (0 = no limit)
+	MaxConcurrentObservations int
+	// Parallel enables parallel execution (default: true for performance)
+	Parallel bool
+}
+
+// DefaultExecutionConfig returns sensible defaults for parallel execution.
+func DefaultExecutionConfig() ExecutionConfig {
+	return ExecutionConfig{
+		MaxConcurrentControls:     10, // Reasonable default
+		MaxConcurrentObservations: 5,  // Conservative to avoid overwhelming systems
+		Parallel:                  true,
+	}
+}
 
 // Engine coordinates profile execution.
 type Engine struct {
 	runtime  *wasm.Runtime
 	executor *ObservationExecutor
+	config   ExecutionConfig
 }
 
-// NewEngine creates a new execution engine.
+// NewEngine creates a new execution engine with default configuration.
 func NewEngine(ctx context.Context) (*Engine, error) {
+	return NewEngineWithConfig(ctx, DefaultExecutionConfig())
+}
+
+// NewEngineWithConfig creates a new execution engine with custom configuration.
+func NewEngineWithConfig(ctx context.Context, cfg ExecutionConfig) (*Engine, error) {
 	// Create WASM runtime
 	runtime, err := wasm.NewRuntime(ctx)
 	if err != nil {
@@ -29,6 +56,7 @@ func NewEngine(ctx context.Context) (*Engine, error) {
 	return &Engine{
 		runtime:  runtime,
 		executor: executor,
+		config:   cfg,
 	}, nil
 }
 
@@ -37,16 +65,46 @@ func (e *Engine) Execute(ctx context.Context, profile *config.Profile) (*Executi
 	// Create execution result
 	result := NewExecutionResult(profile.Metadata.Name, profile.Metadata.Version)
 
-	// Execute each control sequentially (Phase 1b - no parallelism)
-	for _, ctrl := range profile.Controls.Items {
-		controlResult := e.executeControl(ctx, ctrl)
-		result.AddControlResult(controlResult)
+	// Execute controls
+	if e.config.Parallel && len(profile.Controls.Items) > 1 {
+		// Parallel execution of controls
+		if err := e.executeControlsParallel(ctx, profile.Controls.Items, result); err != nil {
+			return nil, err
+		}
+	} else {
+		// Sequential execution of controls
+		for _, ctrl := range profile.Controls.Items {
+			controlResult := e.executeControl(ctx, ctrl)
+			result.AddControlResult(controlResult)
+		}
 	}
 
 	// Finalize result (calculate summary, set end time)
 	result.Finalize()
 
 	return result, nil
+}
+
+// executeControlsParallel executes controls in parallel with concurrency limits.
+func (e *Engine) executeControlsParallel(ctx context.Context, controls []config.Control, result *ExecutionResult) error {
+	g, ctx := errgroup.WithContext(ctx)
+
+	// Apply concurrency limit if specified
+	if e.config.MaxConcurrentControls > 0 {
+		g.SetLimit(e.config.MaxConcurrentControls)
+	}
+
+	// Execute each control in parallel
+	for _, ctrl := range controls {
+		g.Go(func() error {
+			controlResult := e.executeControl(ctx, ctrl)
+			result.AddControlResult(controlResult)
+			return nil // Don't fail fast on individual control errors
+		})
+	}
+
+	// Wait for all controls to complete
+	return g.Wait()
 }
 
 // executeControl executes a single control and returns its result.
@@ -62,10 +120,16 @@ func (e *Engine) executeControl(ctx context.Context, ctrl config.Control) Contro
 		Observations: make([]ObservationResult, 0, len(ctrl.Observations)),
 	}
 
-	// Execute each observation
-	for _, obs := range ctrl.Observations {
-		obsResult := e.executor.Execute(ctx, obs)
-		result.Observations = append(result.Observations, obsResult)
+	// Execute observations
+	if e.config.Parallel && len(ctrl.Observations) > 1 {
+		// Parallel execution of observations
+		result.Observations = e.executeObservationsParallel(ctx, ctrl.Observations)
+	} else {
+		// Sequential execution of observations
+		for _, obs := range ctrl.Observations {
+			obsResult := e.executor.Execute(ctx, obs)
+			result.Observations = append(result.Observations, obsResult)
+		}
 	}
 
 	// Aggregate observation results to determine control status
@@ -78,6 +142,36 @@ func (e *Engine) executeControl(ctx context.Context, ctrl config.Control) Contro
 	result.Duration = time.Since(startTime)
 
 	return result
+}
+
+// executeObservationsParallel executes observations in parallel with concurrency limits.
+func (e *Engine) executeObservationsParallel(ctx context.Context, observations []config.Observation) []ObservationResult {
+	g, ctx := errgroup.WithContext(ctx)
+
+	// Apply concurrency limit if specified
+	if e.config.MaxConcurrentObservations > 0 {
+		g.SetLimit(e.config.MaxConcurrentObservations)
+	}
+
+	// Create results slice with mutex for thread-safe append
+	results := make([]ObservationResult, len(observations))
+	var mu sync.Mutex
+
+	// Execute each observation in parallel
+	for i, obs := range observations {
+		g.Go(func() error {
+			obsResult := e.executor.Execute(ctx, obs)
+			mu.Lock()
+			results[i] = obsResult
+			mu.Unlock()
+			return nil // Don't fail fast on individual observation errors
+		})
+	}
+
+	// Wait for all observations to complete
+	_ = g.Wait() // Ignore error as we don't fail fast
+
+	return results
 }
 
 // aggregateControlStatus determines overall control status from observations.
