@@ -5,6 +5,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"os"
 	"unsafe"
@@ -168,11 +169,12 @@ func observe(configPtr uint32, configLen uint32) uint32 {
 		content, err := os.ReadFile(path)
 		if err == nil {
 			result = map[string]interface{}{
-				"status":  true,
-				"path":    path,
-				"mode":    mode,
-				"content": string(content),
-				"size":    len(content),
+				"status":      true,
+				"path":        path,
+				"mode":        mode,
+				"content_b64": base64.StdEncoding.EncodeToString(content),
+				"encoding":    "base64",
+				"size":        len(content),
 			}
 		} else {
 			result = map[string]interface{}{
