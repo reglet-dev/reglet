@@ -2,6 +2,7 @@ package wasm
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -288,15 +289,96 @@ func TestFilePlugin_Observe_ReadContent(t *testing.T) {
 	require.True(t, ok)
 	assert.True(t, status)
 
-	content, ok := result.Evidence.Data["content"].(string)
+	// Verify base64 content
+	contentB64, ok := result.Evidence.Data["content_b64"].(string)
+	require.True(t, ok, "content_b64 field should be present")
+
+	// Verify encoding field
+	encoding, ok := result.Evidence.Data["encoding"].(string)
 	require.True(t, ok)
-	assert.Equal(t, testContent, content)
+	assert.Equal(t, "base64", encoding)
+
+	// Decode and verify content
+	decoded, err := base64.StdEncoding.DecodeString(contentB64)
+	require.NoError(t, err)
+	assert.Equal(t, testContent, string(decoded))
 
 	// Verify size
 	size, ok := result.Evidence.Data["size"].(float64) // JSON numbers are float64
 	require.True(t, ok)
 	assert.Equal(t, float64(len(testContent)), size)
 }
+
+// TestFilePlugin_Observe_BinaryContent tests reading binary file content
+func TestFilePlugin_Observe_BinaryContent(t *testing.T) {
+	// Skip if WASM file doesn't exist
+	wasmPath := filepath.Join("..", "..", "plugins", "file", "file.wasm")
+	if _, err := os.Stat(wasmPath); os.IsNotExist(err) {
+		t.Skip("file.wasm not built - run 'make -C plugins/file build' first")
+	}
+
+	// Create a temporary test file with binary content (including null bytes)
+	binaryData := []byte{0x00, 0xFF, 0xFE, 0xAB, 0xCD, 0x00, 0x01, 0x02, 0x7F, 0x80, 0x81}
+	tmpFile, err := os.CreateTemp("", "reglet-binary-test-*.bin")
+	require.NoError(t, err)
+	defer os.Remove(tmpFile.Name())
+
+	_, err = tmpFile.Write(binaryData)
+	require.NoError(t, err)
+	tmpFile.Close()
+
+	// Read the WASM file
+	wasmBytes, err := os.ReadFile(wasmPath)
+	require.NoError(t, err)
+
+	// Create runtime and load plugin
+	ctx := context.Background()
+	runtime, err := newRuntimeWithFilesystemCaps(ctx)
+	require.NoError(t, err)
+	defer runtime.Close()
+
+	plugin, err := runtime.LoadPlugin("file", wasmBytes)
+	require.NoError(t, err)
+
+	// Test binary content reading
+	config := Config{
+		Values: map[string]string{
+			"path": tmpFile.Name(),
+			"mode": "content",
+		},
+	}
+
+	result, err := plugin.Observe(config)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Nil(t, result.Error)
+	require.NotNil(t, result.Evidence)
+
+	// Verify status
+	status, ok := result.Evidence.Data["status"].(bool)
+	require.True(t, ok)
+	assert.True(t, status)
+
+	// Verify base64 content field exists
+	contentB64, ok := result.Evidence.Data["content_b64"].(string)
+	require.True(t, ok, "content_b64 field should be present")
+
+	// Verify encoding field
+	encoding, ok := result.Evidence.Data["encoding"].(string)
+	require.True(t, ok)
+	assert.Equal(t, "base64", encoding)
+
+	// Decode and verify binary content
+	decoded, err := base64.StdEncoding.DecodeString(contentB64)
+	require.NoError(t, err, "base64 decoding should succeed")
+	assert.Equal(t, binaryData, decoded, "decoded content should match original binary data")
+
+	// Verify size
+	size, ok := result.Evidence.Data["size"].(float64)
+	require.True(t, ok)
+	assert.Equal(t, float64(len(binaryData)), size)
+}
+
 // DNS Plugin Tests
 
 // TestDNSPlugin_Describe tests DNS plugin metadata
