@@ -44,6 +44,7 @@ func (c *CapabilityChecker) Check(kind, pattern string) error {
 // Supports:
 //   - outbound:53 (exact port match)
 //   - outbound:80,443 (port list)
+//   - outbound:8000-9000 (port range)
 //   - outbound:* (wildcard - any port)
 func matchNetworkPattern(requested, granted string) bool {
 	// Both should have format "outbound:<ports>" or "inbound:<ports>"
@@ -67,15 +68,67 @@ func matchNetworkPattern(requested, granted string) bool {
 		return true
 	}
 
-	// Check if requested port is in the granted port list
+	// Check if requested port is in the granted port list or range
 	grantedPorts := strings.Split(grantPort, ",")
 	for _, p := range grantedPorts {
-		if strings.TrimSpace(p) == reqPort {
+		p = strings.TrimSpace(p)
+
+		// Check for port range (e.g., "8000-9000")
+		if strings.Contains(p, "-") {
+			if matchPortRange(reqPort, p) {
+				return true
+			}
+			continue
+		}
+
+		// Exact match
+		if p == reqPort {
 			return true
 		}
 	}
 
 	return false
+}
+
+// matchPortRange checks if a port is within a granted range
+// Range format: "8000-9000"
+func matchPortRange(port, portRange string) bool {
+	rangeParts := strings.SplitN(portRange, "-", 2)
+	if len(rangeParts) != 2 {
+		return false
+	}
+
+	// Parse requested port
+	reqPortNum := 0
+	if _, err := fmt.Sscanf(port, "%d", &reqPortNum); err != nil {
+		return false
+	}
+
+	// Parse range start
+	startPort := 0
+	if _, err := fmt.Sscanf(strings.TrimSpace(rangeParts[0]), "%d", &startPort); err != nil {
+		return false
+	}
+
+	// Parse range end
+	endPort := 0
+	if _, err := fmt.Sscanf(strings.TrimSpace(rangeParts[1]), "%d", &endPort); err != nil {
+		return false
+	}
+
+	// Validate port numbers
+	if reqPortNum < 1 || reqPortNum > 65535 {
+		return false
+	}
+	if startPort < 1 || startPort > 65535 || endPort < 1 || endPort > 65535 {
+		return false
+	}
+	if startPort > endPort {
+		return false
+	}
+
+	// Check if port is in range
+	return reqPortNum >= startPort && reqPortNum <= endPort
 }
 
 // matchFilesystemPattern checks if a filesystem request matches a granted pattern

@@ -87,6 +87,69 @@ func TestCapabilityChecker_Check_Network(t *testing.T) {
 			pattern:   "outbound:80",
 			shouldErr: true,
 		},
+		{
+			name: "port in range (start)",
+			grants: []Capability{
+				{Kind: "network", Pattern: "outbound:8000-9000"},
+			},
+			kind:      "network",
+			pattern:   "outbound:8000",
+			shouldErr: false,
+		},
+		{
+			name: "port in range (middle)",
+			grants: []Capability{
+				{Kind: "network", Pattern: "outbound:8000-9000"},
+			},
+			kind:      "network",
+			pattern:   "outbound:8500",
+			shouldErr: false,
+		},
+		{
+			name: "port in range (end)",
+			grants: []Capability{
+				{Kind: "network", Pattern: "outbound:8000-9000"},
+			},
+			kind:      "network",
+			pattern:   "outbound:9000",
+			shouldErr: false,
+		},
+		{
+			name: "port below range",
+			grants: []Capability{
+				{Kind: "network", Pattern: "outbound:8000-9000"},
+			},
+			kind:      "network",
+			pattern:   "outbound:7999",
+			shouldErr: true,
+		},
+		{
+			name: "port above range",
+			grants: []Capability{
+				{Kind: "network", Pattern: "outbound:8000-9000"},
+			},
+			kind:      "network",
+			pattern:   "outbound:9001",
+			shouldErr: true,
+		},
+		{
+			name: "mixed list with range",
+			grants: []Capability{
+				{Kind: "network", Pattern: "outbound:53,80,443,8000-9000"},
+			},
+			kind:      "network",
+			pattern:   "outbound:8500",
+			shouldErr: false,
+		},
+		{
+			name: "mixed list with range (exact match)",
+			grants: []Capability{
+				{Kind: "network", Pattern: "outbound:53,80,443,8000-9000"},
+			},
+			kind:      "network",
+			pattern:   "outbound:80",
+			shouldErr: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -423,6 +486,16 @@ func TestMatchNetworkPattern(t *testing.T) {
 		{"wrong direction", "inbound:80", "outbound:80", false},
 		{"malformed request", "outbound", "outbound:80", false},
 		{"malformed grant", "outbound:80", "outbound", false},
+		{"port range (start)", "outbound:8000", "outbound:8000-9000", true},
+		{"port range (middle)", "outbound:8500", "outbound:8000-9000", true},
+		{"port range (end)", "outbound:9000", "outbound:8000-9000", true},
+		{"port below range", "outbound:7999", "outbound:8000-9000", false},
+		{"port above range", "outbound:9001", "outbound:8000-9000", false},
+		{"port range with spaces", "outbound:8500", "outbound:8000 - 9000", true},
+		{"mixed list and range", "outbound:8500", "outbound:53,80,443,8000-9000", true},
+		{"mixed list and range (exact)", "outbound:53", "outbound:53,80,443,8000-9000", true},
+		{"invalid range (reversed)", "outbound:8500", "outbound:9000-8000", false},
+		{"invalid range (malformed)", "outbound:8500", "outbound:8000-", false},
 	}
 
 	for _, tt := range tests {

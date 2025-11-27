@@ -419,6 +419,26 @@ return successResponse(map[string]interface{}{
 7. **Test both success and failure paths**
 8. **Keep plugins focused** - one responsibility per plugin
 
+## Network Operations
+
+**IMPORTANT**: WASI Preview 1 does not support network sockets. Network operations (DNS, HTTP, TCP, SMTP) require host functions.
+
+See `docs/wasi-network-limitation.md` for details.
+
+### Current Status
+
+- Network plugins can be implemented and will compile successfully
+- Schema and describe functions work correctly
+- **Actual network operations fail** with "Connection reset by peer" errors
+- Host functions for network access planned for Phase 2C
+
+### Workaround
+
+For now, network plugins:
+- ✅ Implement full logic using Go's `net` and `net/http` packages
+- ✅ Test schema, describe, and config validation
+- ⏸️  Skip actual network operation tests with `t.Skip("WASI Preview 1 does not support network sockets")`
+
 ## Platform Considerations
 
 ### Linux-Specific Plugins
