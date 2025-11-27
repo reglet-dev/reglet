@@ -3,6 +3,7 @@
 package engine
 
 import (
+	"sync"
 	"time"
 
 	"github.com/jrose/reglet/internal/wasm"
@@ -29,6 +30,7 @@ type ExecutionResult struct {
 	Duration       time.Duration   `json:"duration_ms" yaml:"duration_ms"`
 	Controls       []ControlResult `json:"controls" yaml:"controls"`
 	Summary        ResultSummary   `json:"summary" yaml:"summary"`
+	mu             sync.Mutex      // Protects Controls for concurrent AddControlResult calls
 }
 
 // ControlResult represents the result of executing a single control.
@@ -77,7 +79,10 @@ func NewExecutionResult(profileName, profileVersion string) *ExecutionResult {
 }
 
 // AddControlResult adds a control result to the execution result.
+// Thread-safe for concurrent calls during parallel execution.
 func (r *ExecutionResult) AddControlResult(cr ControlResult) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.Controls = append(r.Controls, cr)
 }
 
