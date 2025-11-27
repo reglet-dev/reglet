@@ -91,7 +91,7 @@ func (p *Plugin) Describe() (*PluginInfo, error) {
 		return nil, fmt.Errorf("plugin %s does not export describe() function", p.name)
 	}
 
-	// Call describe() - returns a pointer to JSON data in WASM memory
+	// Call describe() - returns packed uint64
 	results, err := describeFn.Call(p.ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to call describe(): %w", err)
@@ -101,13 +101,17 @@ func (p *Plugin) Describe() (*PluginInfo, error) {
 		return nil, fmt.Errorf("describe() returned no results")
 	}
 
-	ptr := uint32(results[0])
-	if ptr == 0 {
-		return nil, fmt.Errorf("describe() returned null pointer")
+	// FIX: Unpack ptr and length from uint64
+	packed := results[0]
+	ptr := uint32(packed >> 32)             // High 32 bits
+	size := uint32(packed & 0xFFFFFFFF)     // Low 32 bits
+
+	if ptr == 0 || size == 0 {
+		return nil, fmt.Errorf("describe() returned null pointer or zero length")
 	}
 
-	// Read JSON data from WASM memory
-	data, err := p.readString(instance, ptr)
+	// Read EXACT size from memory
+	data, err := p.readString(instance, ptr, size)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read describe() result: %w", err)
 	}
@@ -143,7 +147,7 @@ func (p *Plugin) Schema() (*ConfigSchema, error) {
 		return nil, fmt.Errorf("plugin %s does not export schema() function", p.name)
 	}
 
-	// Call schema() - returns a pointer to JSON data in WASM memory
+	// Call schema() - returns packed uint64
 	results, err := schemaFn.Call(p.ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to call schema(): %w", err)
@@ -153,13 +157,17 @@ func (p *Plugin) Schema() (*ConfigSchema, error) {
 		return nil, fmt.Errorf("schema() returned no results")
 	}
 
-	ptr := uint32(results[0])
-	if ptr == 0 {
-		return nil, fmt.Errorf("schema() returned null pointer")
+	// FIX: Unpack ptr and length from uint64
+	packed := results[0]
+	ptr := uint32(packed >> 32)
+	size := uint32(packed & 0xFFFFFFFF)
+
+	if ptr == 0 || size == 0 {
+		return nil, fmt.Errorf("schema() returned null pointer or zero length")
 	}
 
-	// Read JSON data from WASM memory
-	data, err := p.readString(instance, ptr)
+	// Read exact size
+	data, err := p.readString(instance, ptr, size)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read schema() result: %w", err)
 	}
@@ -223,13 +231,17 @@ func (p *Plugin) Observe(cfg Config) (*ObservationResult, error) {
 		return nil, fmt.Errorf("observe() returned no results")
 	}
 
-	resultPtr := uint32(results[0])
-	if resultPtr == 0 {
-		return nil, fmt.Errorf("observe() returned null pointer")
+	// FIX: Unpack ptr and length from uint64
+	packed := results[0]
+	resultPtr := uint32(packed >> 32)
+	resultSize := uint32(packed & 0xFFFFFFFF)
+
+	if resultPtr == 0 || resultSize == 0 {
+		return nil, fmt.Errorf("observe() returned null pointer or zero length")
 	}
 
-	// Read result from WASM memory (readString will deallocate resultPtr)
-	resultData, err := p.readString(instance, resultPtr)
+	// Read EXACT size
+	resultData, err := p.readString(instance, resultPtr, resultSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read observe() result: %w", err)
 	}
@@ -272,47 +284,27 @@ func (p *Plugin) Close() error {
 	return nil
 }
 
-// readString reads a null-terminated string from WASM memory starting at ptr
+// readString reads exactly 'size' bytes from WASM memory at ptr
 // and calls deallocate to free the memory after reading
-func (p *Plugin) readString(instance api.Module, ptr uint32) ([]byte, error) {
+func (p *Plugin) readString(instance api.Module, ptr uint32, size uint32) ([]byte, error) {
 	// CRITICAL: Ensure memory is always deallocated, even on error
-	// We defer this immediately since we know the ptr, even if we can't read it
 	defer func() {
 		deallocateFn := instance.ExportedFunction("deallocate")
 		if deallocateFn != nil {
-			// Use maxSize as a safe upper bound for deallocation
-			// The plugin's deallocate will handle the actual size
-			deallocateFn.Call(p.ctx, uint64(ptr), uint64(64*1024))
+			// NOW we know the exact size!
+			deallocateFn.Call(p.ctx, uint64(ptr), uint64(size))
 		}
 	}()
 
-	// Read up to 64KB (reasonable limit for plugin metadata)
-	maxSize := uint32(64 * 1024)
-
-	data, ok := instance.Memory().Read(ptr, maxSize)
+	// Read EXACT size (no more guessing!)
+	data, ok := instance.Memory().Read(ptr, size)
 	if !ok {
 		return nil, fmt.Errorf("failed to read memory at offset %d", ptr)
 	}
 
-	// Find the end of the JSON data (look for null terminator or parse until valid JSON)
-	// For now, find the null terminator
-	end := 0
-	for i, b := range data {
-		if b == 0 {
-			end = i
-			break
-		}
-	}
-
-	var result []byte
-	if end == 0 {
-		// No null terminator found in first maxSize bytes, try to use all data
-		result = make([]byte, len(data))
-		copy(result, data)
-	} else {
-		result = make([]byte, end)
-		copy(result, data[:end])
-	}
+	// Copy to our own buffer
+	result := make([]byte, size)
+	copy(result, data)
 
 	return result, nil
 }

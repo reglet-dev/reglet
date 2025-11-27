@@ -51,7 +51,7 @@ func deallocate(ptr uint32, size uint32) {
 // Returns a pointer to the JSON-encoded PluginInfo.
 //
 //go:wasmexport describe
-func describe() uint32 {
+func describe() uint64 {
 	info := map[string]interface{}{
 		"name":        "file",
 		"version":     "1.0.0",
@@ -73,14 +73,14 @@ func describe() uint32 {
 	// Allocate memory and copy data
 	ptr := allocate(uint32(len(data)))
 	copyToMemory(ptr, data)
-	return ptr
+	return packPtrLen(ptr, uint32(len(data)))
 }
 
 // schema returns configuration schema as JSON.
 // Returns a pointer to the JSON-encoded ConfigSchema.
 //
 //go:wasmexport schema
-func schema() uint32 {
+func schema() uint64 {
 	configSchema := map[string]interface{}{
 		"type": "object",
 		"properties": map[string]interface{}{
@@ -105,14 +105,14 @@ func schema() uint32 {
 
 	ptr := allocate(uint32(len(data)))
 	copyToMemory(ptr, data)
-	return ptr
+	return packPtrLen(ptr, uint32(len(data)))
 }
 
 // observe executes the file check.
 // Takes a pointer to JSON config, returns pointer to JSON result.
 //
 //go:wasmexport observe
-func observe(configPtr uint32, configLen uint32) uint32 {
+func observe(configPtr uint32, configLen uint32) uint64 {
 	// Read config from WASM memory
 	config := readFromMemory(configPtr, configLen)
 
@@ -197,7 +197,7 @@ func observe(configPtr uint32, configLen uint32) uint32 {
 
 	ptr := allocate(uint32(len(data)))
 	copyToMemory(ptr, data)
-	return ptr
+	return packPtrLen(ptr, uint32(len(data)))
 }
 
 // Helper functions
@@ -216,8 +216,14 @@ func readFromMemory(ptr uint32, length uint32) []byte {
 	return data
 }
 
+// packPtrLen packs pointer and length into a single uint64.
+// Pointer in high 32 bits, length in low 32 bits.
+func packPtrLen(ptr uint32, length uint32) uint64 {
+	return (uint64(ptr) << 32) | uint64(length)
+}
+
 // errorResult creates an error result and returns a pointer to it.
-func errorResult(message string) uint32 {
+func errorResult(message string) uint64 {
 	result := map[string]interface{}{
 		"status": false,
 		"error":  message,
@@ -225,7 +231,7 @@ func errorResult(message string) uint32 {
 	data, _ := json.Marshal(result)
 	ptr := allocate(uint32(len(data)))
 	copyToMemory(ptr, data)
-	return ptr
+	return packPtrLen(ptr, uint32(len(data)))
 }
 
 // main is required for WASM compilation but won't be called

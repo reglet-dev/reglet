@@ -44,6 +44,7 @@ type Control struct {
 	Tags         []string      `yaml:"tags,omitempty"`
 	Timeout      time.Duration `yaml:"timeout,omitempty"`
 	Observations []Observation `yaml:"observations"`
+	DependsOn    []string      `yaml:"depends_on,omitempty"` // Control IDs this control depends on
 }
 
 // Observation represents a single check to execute using a plugin.

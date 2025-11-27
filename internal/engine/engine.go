@@ -85,26 +85,42 @@ func (e *Engine) Execute(ctx context.Context, profile *config.Profile) (*Executi
 	return result, nil
 }
 
-// executeControlsParallel executes controls in parallel with concurrency limits.
+// executeControlsParallel executes controls in parallel, respecting dependencies.
+// Controls are organized into levels by BuildControlDAG, and each level is executed
+// sequentially while controls within a level run in parallel.
 func (e *Engine) executeControlsParallel(ctx context.Context, controls []config.Control, result *ExecutionResult) error {
-	g, ctx := errgroup.WithContext(ctx)
-
-	// Apply concurrency limit if specified
-	if e.config.MaxConcurrentControls > 0 {
-		g.SetLimit(e.config.MaxConcurrentControls)
+	// Build dependency graph and get control levels
+	levels, err := BuildControlDAG(controls)
+	if err != nil {
+		return fmt.Errorf("failed to build control dependency graph: %w", err)
 	}
 
-	// Execute each control in parallel
-	for _, ctrl := range controls {
-		g.Go(func() error {
-			controlResult := e.executeControl(ctx, ctrl)
-			result.AddControlResult(controlResult)
-			return nil // Don't fail fast on individual control errors
-		})
+	// Execute each level sequentially, controls within level in parallel
+	for _, level := range levels {
+		// Create errgroup for this level
+		g, levelCtx := errgroup.WithContext(ctx)
+
+		// Apply concurrency limit if specified
+		if e.config.MaxConcurrentControls > 0 {
+			g.SetLimit(e.config.MaxConcurrentControls)
+		}
+
+		// Execute all controls in this level in parallel
+		for _, ctrl := range level.Controls {
+			g.Go(func() error {
+				controlResult := e.executeControl(levelCtx, ctrl)
+				result.AddControlResult(controlResult)
+				return nil // Don't fail fast on individual control errors
+			})
+		}
+
+		// Wait for all controls in this level to complete before moving to next level
+		if err := g.Wait(); err != nil {
+			return fmt.Errorf("level %d execution failed: %w", level.Level, err)
+		}
 	}
 
-	// Wait for all controls to complete
-	return g.Wait()
+	return nil
 }
 
 // executeControl executes a single control and returns its result.
