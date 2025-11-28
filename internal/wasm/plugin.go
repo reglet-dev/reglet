@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sync"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
@@ -16,12 +17,14 @@ type Plugin struct {
 	name    string
 	module  wazero.CompiledModule
 	runtime wazero.Runtime
-	ctx     context.Context
 
-	// Cached plugin info from describe() (thread-safe, immutable after first read)
+	// Mutex protects concurrent access to cached metadata
+	mu sync.Mutex
+
+	// Cached plugin info from describe() (protected by mu)
 	info *PluginInfo
 
-	// Cached schema from schema() (thread-safe, immutable after first read)
+	// Cached schema from schema() (protected by mu)
 	schema *ConfigSchema
 }
 
@@ -50,9 +53,9 @@ func (p *Plugin) createModuleConfig() wazero.ModuleConfig {
 
 // createInstance creates a fresh module instance
 // Each call gets isolated WASM memory - thread-safe
-func (p *Plugin) createInstance() (api.Module, error) {
+func (p *Plugin) createInstance(ctx context.Context) (api.Module, error) {
 	// Create fresh instance every time - no caching
-	instance, err := p.runtime.InstantiateModule(p.ctx, p.module, p.createModuleConfig())
+	instance, err := p.runtime.InstantiateModule(ctx, p.module, p.createModuleConfig())
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate plugin %s: %w", p.name, err)
 	}
@@ -61,8 +64,8 @@ func (p *Plugin) createInstance() (api.Module, error) {
 	// This must be called before any other exported functions
 	initFn := instance.ExportedFunction("_initialize")
 	if initFn != nil {
-		if _, err := initFn.Call(p.ctx); err != nil {
-			instance.Close(p.ctx)
+		if _, err := initFn.Call(ctx); err != nil {
+			instance.Close(ctx)
 			return nil, fmt.Errorf("failed to initialize plugin %s: %w", p.name, err)
 		}
 	}
@@ -71,19 +74,23 @@ func (p *Plugin) createInstance() (api.Module, error) {
 }
 
 // Describe calls the plugin's describe() function and returns metadata
-func (p *Plugin) Describe() (*PluginInfo, error) {
-	// Return cached info if available (thread-safe)
+func (p *Plugin) Describe(ctx context.Context) (*PluginInfo, error) {
+	// Check cache with lock
+	p.mu.Lock()
 	if p.info != nil {
-		return p.info, nil
+		info := p.info
+		p.mu.Unlock()
+		return info, nil
 	}
+	p.mu.Unlock()
 
 	// Create fresh instance for this call
-	instance, err := p.createInstance()
+	instance, err := p.createInstance(ctx)
 	if err != nil {
 		return nil, err
 	}
 	// CRITICAL: Always close instance when done
-	defer instance.Close(p.ctx)
+	defer instance.Close(ctx)
 
 	// Get the describe function
 	describeFn := instance.ExportedFunction("describe")
@@ -92,7 +99,7 @@ func (p *Plugin) Describe() (*PluginInfo, error) {
 	}
 
 	// Call describe() - returns packed uint64
-	results, err := describeFn.Call(p.ctx)
+	results, err := describeFn.Call(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to call describe(): %w", err)
 	}
@@ -111,7 +118,7 @@ func (p *Plugin) Describe() (*PluginInfo, error) {
 	}
 
 	// Read EXACT size from memory
-	data, err := p.readString(instance, ptr, size)
+	data, err := p.readString(ctx, instance, ptr, size)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read describe() result: %w", err)
 	}
@@ -122,24 +129,32 @@ func (p *Plugin) Describe() (*PluginInfo, error) {
 		return nil, fmt.Errorf("failed to parse plugin info: %w", err)
 	}
 
+	// Store in cache with lock
+	p.mu.Lock()
 	p.info = info
+	p.mu.Unlock()
+
 	return info, nil
 }
 
 // Schema calls the plugin's schema() function and returns the config schema
-func (p *Plugin) Schema() (*ConfigSchema, error) {
-	// Return cached schema if available (thread-safe)
+func (p *Plugin) Schema(ctx context.Context) (*ConfigSchema, error) {
+	// Check cache with lock
+	p.mu.Lock()
 	if p.schema != nil {
-		return p.schema, nil
+		schema := p.schema
+		p.mu.Unlock()
+		return schema, nil
 	}
+	p.mu.Unlock()
 
 	// Create fresh instance for this call
-	instance, err := p.createInstance()
+	instance, err := p.createInstance(ctx)
 	if err != nil {
 		return nil, err
 	}
 	// CRITICAL: Always close instance when done
-	defer instance.Close(p.ctx)
+	defer instance.Close(ctx)
 
 	// Get the schema function
 	schemaFn := instance.ExportedFunction("schema")
@@ -148,7 +163,7 @@ func (p *Plugin) Schema() (*ConfigSchema, error) {
 	}
 
 	// Call schema() - returns packed uint64
-	results, err := schemaFn.Call(p.ctx)
+	results, err := schemaFn.Call(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to call schema(): %w", err)
 	}
@@ -167,7 +182,7 @@ func (p *Plugin) Schema() (*ConfigSchema, error) {
 	}
 
 	// Read exact size
-	data, err := p.readString(instance, ptr, size)
+	data, err := p.readString(ctx, instance, ptr, size)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read schema() result: %w", err)
 	}
@@ -181,19 +196,23 @@ func (p *Plugin) Schema() (*ConfigSchema, error) {
 		RawSchema: data,
 	}
 
+	// Store in cache with lock
+	p.mu.Lock()
 	p.schema = schema
+	p.mu.Unlock()
+
 	return schema, nil
 }
 
 // Observe calls the plugin's observe() function with the given config
-func (p *Plugin) Observe(cfg Config) (*ObservationResult, error) {
+func (p *Plugin) Observe(ctx context.Context, cfg Config) (*ObservationResult, error) {
 	// Create FRESH instance for this call - ensures thread safety
-	instance, err := p.createInstance()
+	instance, err := p.createInstance(ctx)
 	if err != nil {
 		return nil, err
 	}
 	// CRITICAL: Always close instance when done
-	defer instance.Close(p.ctx)
+	defer instance.Close(ctx)
 
 	// Get the observe function
 	observeFn := instance.ExportedFunction("observe")
@@ -208,7 +227,7 @@ func (p *Plugin) Observe(cfg Config) (*ObservationResult, error) {
 	}
 
 	// Write config to WASM memory
-	configPtr, err := p.writeToMemory(instance, configData)
+	configPtr, err := p.writeToMemory(ctx, instance, configData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to write config to WASM memory: %w", err)
 	}
@@ -217,12 +236,12 @@ func (p *Plugin) Observe(cfg Config) (*ObservationResult, error) {
 	defer func() {
 		deallocateFn := instance.ExportedFunction("deallocate")
 		if deallocateFn != nil {
-			deallocateFn.Call(p.ctx, uint64(configPtr), uint64(len(configData)))
+			deallocateFn.Call(ctx, uint64(configPtr), uint64(len(configData)))
 		}
 	}()
 
 	// Call observe(configPtr, configLen)
-	results, err := observeFn.Call(p.ctx, uint64(configPtr), uint64(len(configData)))
+	results, err := observeFn.Call(ctx, uint64(configPtr), uint64(len(configData)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to call observe(): %w", err)
 	}
@@ -241,7 +260,7 @@ func (p *Plugin) Observe(cfg Config) (*ObservationResult, error) {
 	}
 
 	// Read EXACT size
-	resultData, err := p.readString(instance, resultPtr, resultSize)
+	resultData, err := p.readString(ctx, instance, resultPtr, resultSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read observe() result: %w", err)
 	}
@@ -286,13 +305,13 @@ func (p *Plugin) Close() error {
 
 // readString reads exactly 'size' bytes from WASM memory at ptr
 // and calls deallocate to free the memory after reading
-func (p *Plugin) readString(instance api.Module, ptr uint32, size uint32) ([]byte, error) {
+func (p *Plugin) readString(ctx context.Context, instance api.Module, ptr uint32, size uint32) ([]byte, error) {
 	// CRITICAL: Ensure memory is always deallocated, even on error
 	defer func() {
 		deallocateFn := instance.ExportedFunction("deallocate")
 		if deallocateFn != nil {
 			// NOW we know the exact size!
-			deallocateFn.Call(p.ctx, uint64(ptr), uint64(size))
+			deallocateFn.Call(ctx, uint64(ptr), uint64(size))
 		}
 	}()
 
@@ -311,7 +330,7 @@ func (p *Plugin) readString(instance api.Module, ptr uint32, size uint32) ([]byt
 
 // writeToMemory allocates memory in the WASM module and writes data to it
 // Returns the pointer to the allocated memory
-func (p *Plugin) writeToMemory(instance api.Module, data []byte) (uint32, error) {
+func (p *Plugin) writeToMemory(ctx context.Context, instance api.Module, data []byte) (uint32, error) {
 	// Get the allocate function from the plugin
 	allocateFn := instance.ExportedFunction("allocate")
 	if allocateFn == nil {
@@ -319,7 +338,7 @@ func (p *Plugin) writeToMemory(instance api.Module, data []byte) (uint32, error)
 	}
 
 	// Allocate memory for the data
-	results, err := allocateFn.Call(p.ctx, uint64(len(data)))
+	results, err := allocateFn.Call(ctx, uint64(len(data)))
 	if err != nil {
 		return 0, fmt.Errorf("failed to allocate memory: %w", err)
 	}

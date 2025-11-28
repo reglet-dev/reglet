@@ -58,7 +58,7 @@ func runCheck(ctx context.Context, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create engine: %w", err)
 	}
-	defer eng.Close()
+	defer eng.Close(ctx)
 
 	slog.Info("executing profile")
 

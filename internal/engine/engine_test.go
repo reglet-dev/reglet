@@ -21,7 +21,7 @@ func TestNewEngine(t *testing.T) {
 	require.NotNil(t, engine.executor)
 
 	// Cleanup
-	err = engine.Close()
+	err = engine.Close(ctx)
 	assert.NoError(t, err)
 }
 
@@ -157,7 +157,7 @@ func TestExecuteControl_SingleObservation(t *testing.T) {
 	ctx := context.Background()
 	engine, err := NewEngine(ctx)
 	require.NoError(t, err)
-	defer engine.Close()
+	defer engine.Close(ctx)
 
 	ctrl := config.Control{
 		ID:          "test-control",
@@ -177,7 +177,9 @@ func TestExecuteControl_SingleObservation(t *testing.T) {
 		},
 	}
 
-	result := engine.executeControl(ctx, ctrl)
+	// Create empty execution result for dependency checking
+	execResult := NewExecutionResult("test", "1.0.0")
+	result := engine.executeControl(ctx, ctrl, execResult)
 
 	assert.Equal(t, "test-control", result.ID)
 	assert.Equal(t, "Test Control", result.Name)
@@ -193,7 +195,7 @@ func TestExecuteControl_MultipleObservations(t *testing.T) {
 	ctx := context.Background()
 	engine, err := NewEngine(ctx)
 	require.NoError(t, err)
-	defer engine.Close()
+	defer engine.Close(ctx)
 
 	ctrl := config.Control{
 		ID:   "multi-test",
@@ -216,7 +218,9 @@ func TestExecuteControl_MultipleObservations(t *testing.T) {
 		},
 	}
 
-	result := engine.executeControl(ctx, ctrl)
+	// Create empty execution result for dependency checking
+	execResult := NewExecutionResult("test", "1.0.0")
+	result := engine.executeControl(ctx, ctrl, execResult)
 
 	assert.Equal(t, "multi-test", result.ID)
 	assert.Len(t, result.Observations, 2)
@@ -227,7 +231,7 @@ func TestExecute_SingleControl(t *testing.T) {
 	ctx := context.Background()
 	engine, err := NewEngine(ctx)
 	require.NoError(t, err)
-	defer engine.Close()
+	defer engine.Close(ctx)
 
 	profile := &config.Profile{
 		Metadata: config.ProfileMetadata{
@@ -271,7 +275,7 @@ func TestExecute_MultipleControls(t *testing.T) {
 	ctx := context.Background()
 	engine, err := NewEngine(ctx)
 	require.NoError(t, err)
-	defer engine.Close()
+	defer engine.Close(ctx)
 
 	profile := &config.Profile{
 		Metadata: config.ProfileMetadata{
@@ -324,7 +328,7 @@ func TestExecute_SummaryStatistics(t *testing.T) {
 	ctx := context.Background()
 	engine, err := NewEngine(ctx)
 	require.NoError(t, err)
-	defer engine.Close()
+	defer engine.Close(ctx)
 
 	profile := &config.Profile{
 		Metadata: config.ProfileMetadata{
@@ -368,7 +372,7 @@ func TestExecute_TimingInfo(t *testing.T) {
 	ctx := context.Background()
 	engine, err := NewEngine(ctx)
 	require.NoError(t, err)
-	defer engine.Close()
+	defer engine.Close(ctx)
 
 	profile := &config.Profile{
 		Metadata: config.ProfileMetadata{
@@ -410,7 +414,7 @@ func TestExecute_InvalidPlugin(t *testing.T) {
 	ctx := context.Background()
 	engine, err := NewEngine(ctx)
 	require.NoError(t, err)
-	defer engine.Close()
+	defer engine.Close(ctx)
 
 	profile := &config.Profile{
 		Metadata: config.ProfileMetadata{
@@ -443,5 +447,5 @@ func TestExecute_InvalidPlugin(t *testing.T) {
 	assert.Len(t, result.Controls[0].Observations, 1)
 	assert.Equal(t, StatusError, result.Controls[0].Observations[0].Status)
 	assert.NotNil(t, result.Controls[0].Observations[0].Error)
-	assert.Contains(t, result.Controls[0].Observations[0].Error.Message, "unknown plugin")
+	assert.Contains(t, result.Controls[0].Observations[0].Error.Message, "failed to read plugin")
 }

@@ -46,10 +46,10 @@ func TestLoadFilePlugin(t *testing.T) {
 	ctx := context.Background()
 	runtime, err := newRuntimeWithNetworkCaps(ctx)
 	require.NoError(t, err)
-	defer runtime.Close()
+	defer runtime.Close(ctx)
 
 	// Load the plugin
-	plugin, err := runtime.LoadPlugin("file", wasmBytes)
+	plugin, err := runtime.LoadPlugin(ctx, "file", wasmBytes)
 	require.NoError(t, err)
 	require.NotNil(t, plugin)
 
@@ -79,13 +79,13 @@ func TestFilePlugin_Describe(t *testing.T) {
 	ctx := context.Background()
 	runtime, err := newRuntimeWithNetworkCaps(ctx)
 	require.NoError(t, err)
-	defer runtime.Close()
+	defer runtime.Close(ctx)
 
-	plugin, err := runtime.LoadPlugin("file", wasmBytes)
+	plugin, err := runtime.LoadPlugin(ctx, "file", wasmBytes)
 	require.NoError(t, err)
 
 	// Call describe and verify real plugin metadata
-	info, err := plugin.Describe()
+	info, err := plugin.Describe(ctx)
 	require.NoError(t, err)
 	require.NotNil(t, info)
 
@@ -116,13 +116,13 @@ func TestFilePlugin_Schema(t *testing.T) {
 	ctx := context.Background()
 	runtime, err := newRuntimeWithNetworkCaps(ctx)
 	require.NoError(t, err)
-	defer runtime.Close()
+	defer runtime.Close(ctx)
 
-	plugin, err := runtime.LoadPlugin("file", wasmBytes)
+	plugin, err := runtime.LoadPlugin(ctx, "file", wasmBytes)
 	require.NoError(t, err)
 
 	// Call schema and verify we get valid JSON Schema
-	schema, err := plugin.Schema()
+	schema, err := plugin.Schema(ctx)
 	require.NoError(t, err)
 	require.NotNil(t, schema)
 	require.NotEmpty(t, schema.RawSchema)
@@ -166,9 +166,9 @@ func TestFilePlugin_Observe_FileExists(t *testing.T) {
 	ctx := context.Background()
 	runtime, err := newRuntimeWithFilesystemCaps(ctx)
 	require.NoError(t, err)
-	defer runtime.Close()
+	defer runtime.Close(ctx)
 
-	plugin, err := runtime.LoadPlugin("file", wasmBytes)
+	plugin, err := runtime.LoadPlugin(ctx, "file", wasmBytes)
 	require.NoError(t, err)
 
 	// Test file exists check
@@ -179,7 +179,7 @@ func TestFilePlugin_Observe_FileExists(t *testing.T) {
 		},
 	}
 
-	result, err := plugin.Observe(config)
+	result, err := plugin.Observe(ctx, config)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.Nil(t, result.Error)
@@ -209,9 +209,9 @@ func TestFilePlugin_Observe_FileNotFound(t *testing.T) {
 	ctx := context.Background()
 	runtime, err := newRuntimeWithFilesystemCaps(ctx)
 	require.NoError(t, err)
-	defer runtime.Close()
+	defer runtime.Close(ctx)
 
-	plugin, err := runtime.LoadPlugin("file", wasmBytes)
+	plugin, err := runtime.LoadPlugin(ctx, "file", wasmBytes)
 	require.NoError(t, err)
 
 	// Test non-existent file
@@ -222,7 +222,7 @@ func TestFilePlugin_Observe_FileNotFound(t *testing.T) {
 		},
 	}
 
-	result, err := plugin.Observe(config)
+	result, err := plugin.Observe(ctx, config)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.Nil(t, result.Error, "file not found should return evidence with status=false, not an error")
@@ -265,9 +265,9 @@ func TestFilePlugin_Observe_ReadContent(t *testing.T) {
 	ctx := context.Background()
 	runtime, err := newRuntimeWithFilesystemCaps(ctx)
 	require.NoError(t, err)
-	defer runtime.Close()
+	defer runtime.Close(ctx)
 
-	plugin, err := runtime.LoadPlugin("file", wasmBytes)
+	plugin, err := runtime.LoadPlugin(ctx, "file", wasmBytes)
 	require.NoError(t, err)
 
 	// Test content reading
@@ -278,7 +278,7 @@ func TestFilePlugin_Observe_ReadContent(t *testing.T) {
 		},
 	}
 
-	result, err := plugin.Observe(config)
+	result, err := plugin.Observe(ctx, config)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.Nil(t, result.Error)
@@ -335,9 +335,9 @@ func TestFilePlugin_Observe_BinaryContent(t *testing.T) {
 	ctx := context.Background()
 	runtime, err := newRuntimeWithFilesystemCaps(ctx)
 	require.NoError(t, err)
-	defer runtime.Close()
+	defer runtime.Close(ctx)
 
-	plugin, err := runtime.LoadPlugin("file", wasmBytes)
+	plugin, err := runtime.LoadPlugin(ctx, "file", wasmBytes)
 	require.NoError(t, err)
 
 	// Test binary content reading
@@ -348,7 +348,7 @@ func TestFilePlugin_Observe_BinaryContent(t *testing.T) {
 		},
 	}
 
-	result, err := plugin.Observe(config)
+	result, err := plugin.Observe(ctx, config)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.Nil(t, result.Error)
@@ -394,12 +394,12 @@ func TestDNSPlugin_Describe(t *testing.T) {
 	ctx := context.Background()
 	runtime, err := newRuntimeWithNetworkCaps(ctx)
 	require.NoError(t, err)
-	defer runtime.Close()
+	defer runtime.Close(ctx)
 
-	plugin, err := runtime.LoadPlugin("dns", wasmBytes)
+	plugin, err := runtime.LoadPlugin(ctx, "dns", wasmBytes)
 	require.NoError(t, err)
 
-	info, err := plugin.Describe()
+	info, err := plugin.Describe(ctx)
 	require.NoError(t, err)
 	require.NotNil(t, info)
 
@@ -425,12 +425,12 @@ func TestDNSPlugin_Schema(t *testing.T) {
 	ctx := context.Background()
 	runtime, err := newRuntimeWithNetworkCaps(ctx)
 	require.NoError(t, err)
-	defer runtime.Close()
+	defer runtime.Close(ctx)
 
-	plugin, err := runtime.LoadPlugin("dns", wasmBytes)
+	plugin, err := runtime.LoadPlugin(ctx, "dns", wasmBytes)
 	require.NoError(t, err)
 
-	schema, err := plugin.Schema()
+	schema, err := plugin.Schema(ctx)
 	require.NoError(t, err)
 	require.NotNil(t, schema)
 	require.NotEmpty(t, schema.RawSchema)
@@ -466,9 +466,9 @@ func TestDNSPlugin_Observe_A_Record(t *testing.T) {
 	ctx := context.Background()
 	runtime, err := newRuntimeWithNetworkCaps(ctx)
 	require.NoError(t, err)
-	defer runtime.Close()
+	defer runtime.Close(ctx)
 
-	plugin, err := runtime.LoadPlugin("dns", wasmBytes)
+	plugin, err := runtime.LoadPlugin(ctx, "dns", wasmBytes)
 	require.NoError(t, err)
 
 	// Test A record lookup for example.com
@@ -479,7 +479,7 @@ func TestDNSPlugin_Observe_A_Record(t *testing.T) {
 		},
 	}
 
-	result, err := plugin.Observe(config)
+	result, err := plugin.Observe(ctx, config)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.Nil(t, result.Error)
@@ -518,9 +518,9 @@ func TestDNSPlugin_Observe_MX_Record(t *testing.T) {
 	ctx := context.Background()
 	runtime, err := newRuntimeWithNetworkCaps(ctx)
 	require.NoError(t, err)
-	defer runtime.Close()
+	defer runtime.Close(ctx)
 
-	plugin, err := runtime.LoadPlugin("dns", wasmBytes)
+	plugin, err := runtime.LoadPlugin(ctx, "dns", wasmBytes)
 	require.NoError(t, err)
 
 	// Test MX record lookup for gmail.com (known to have MX records)
@@ -531,7 +531,7 @@ func TestDNSPlugin_Observe_MX_Record(t *testing.T) {
 		},
 	}
 
-	result, err := plugin.Observe(config)
+	result, err := plugin.Observe(ctx, config)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
@@ -558,9 +558,9 @@ func TestDNSPlugin_Observe_InvalidHostname(t *testing.T) {
 	ctx := context.Background()
 	runtime, err := newRuntimeWithNetworkCaps(ctx)
 	require.NoError(t, err)
-	defer runtime.Close()
+	defer runtime.Close(ctx)
 
-	plugin, err := runtime.LoadPlugin("dns", wasmBytes)
+	plugin, err := runtime.LoadPlugin(ctx, "dns", wasmBytes)
 	require.NoError(t, err)
 
 	// Test with non-existent hostname
@@ -570,7 +570,7 @@ func TestDNSPlugin_Observe_InvalidHostname(t *testing.T) {
 		},
 	}
 
-	result, err := plugin.Observe(config)
+	result, err := plugin.Observe(ctx, config)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.Nil(t, result.Error, "DNS lookup failure should return evidence with status=false, not an error")
@@ -596,9 +596,9 @@ func TestDNSPlugin_Observe_MissingHostname(t *testing.T) {
 	ctx := context.Background()
 	runtime, err := newRuntimeWithNetworkCaps(ctx)
 	require.NoError(t, err)
-	defer runtime.Close()
+	defer runtime.Close(ctx)
 
-	plugin, err := runtime.LoadPlugin("dns", wasmBytes)
+	plugin, err := runtime.LoadPlugin(ctx, "dns", wasmBytes)
 	require.NoError(t, err)
 
 	// Test with missing hostname
@@ -606,7 +606,7 @@ func TestDNSPlugin_Observe_MissingHostname(t *testing.T) {
 		Values: map[string]string{},
 	}
 
-	result, err := plugin.Observe(config)
+	result, err := plugin.Observe(ctx, config)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.Nil(t, result.Error, "validation errors should return evidence with status=false, not an error")
@@ -639,12 +639,12 @@ func TestHTTPPlugin_Describe(t *testing.T) {
 	ctx := context.Background()
 	runtime, err := newRuntimeWithNetworkCaps(ctx)
 	require.NoError(t, err)
-	defer runtime.Close()
+	defer runtime.Close(ctx)
 
-	plugin, err := runtime.LoadPlugin("http", wasmBytes)
+	plugin, err := runtime.LoadPlugin(ctx, "http", wasmBytes)
 	require.NoError(t, err)
 
-	info, err := plugin.Describe()
+	info, err := plugin.Describe(ctx)
 	require.NoError(t, err)
 	require.NotNil(t, info)
 
@@ -666,12 +666,12 @@ func TestHTTPPlugin_Schema(t *testing.T) {
 	ctx := context.Background()
 	runtime, err := newRuntimeWithNetworkCaps(ctx)
 	require.NoError(t, err)
-	defer runtime.Close()
+	defer runtime.Close(ctx)
 
-	plugin, err := runtime.LoadPlugin("http", wasmBytes)
+	plugin, err := runtime.LoadPlugin(ctx, "http", wasmBytes)
 	require.NoError(t, err)
 
-	schema, err := plugin.Schema()
+	schema, err := plugin.Schema(ctx)
 	require.NoError(t, err)
 	require.NotNil(t, schema)
 
@@ -700,9 +700,9 @@ func TestHTTPPlugin_Observe_GET(t *testing.T) {
 	ctx := context.Background()
 	runtime, err := newRuntimeWithNetworkCaps(ctx)
 	require.NoError(t, err)
-	defer runtime.Close()
+	defer runtime.Close(ctx)
 
-	plugin, err := runtime.LoadPlugin("http", wasmBytes)
+	plugin, err := runtime.LoadPlugin(ctx, "http", wasmBytes)
 	require.NoError(t, err)
 
 	config := Config{
@@ -712,7 +712,7 @@ func TestHTTPPlugin_Observe_GET(t *testing.T) {
 		},
 	}
 
-	result, err := plugin.Observe(config)
+	result, err := plugin.Observe(ctx, config)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.Nil(t, result.Error)
@@ -745,12 +745,12 @@ func TestTCPPlugin_Describe(t *testing.T) {
 	ctx := context.Background()
 	runtime, err := newRuntimeWithNetworkCaps(ctx)
 	require.NoError(t, err)
-	defer runtime.Close()
+	defer runtime.Close(ctx)
 
-	plugin, err := runtime.LoadPlugin("tcp", wasmBytes)
+	plugin, err := runtime.LoadPlugin(ctx, "tcp", wasmBytes)
 	require.NoError(t, err)
 
-	info, err := plugin.Describe()
+	info, err := plugin.Describe(ctx)
 	require.NoError(t, err)
 	require.NotNil(t, info)
 
@@ -772,12 +772,12 @@ func TestTCPPlugin_Schema(t *testing.T) {
 	ctx := context.Background()
 	runtime, err := newRuntimeWithNetworkCaps(ctx)
 	require.NoError(t, err)
-	defer runtime.Close()
+	defer runtime.Close(ctx)
 
-	plugin, err := runtime.LoadPlugin("tcp", wasmBytes)
+	plugin, err := runtime.LoadPlugin(ctx, "tcp", wasmBytes)
 	require.NoError(t, err)
 
-	schema, err := plugin.Schema()
+	schema, err := plugin.Schema(ctx)
 	require.NoError(t, err)
 	require.NotNil(t, schema)
 
@@ -807,9 +807,9 @@ func TestTCPPlugin_Observe_PlainTCP(t *testing.T) {
 	ctx := context.Background()
 	runtime, err := newRuntimeWithNetworkCaps(ctx)
 	require.NoError(t, err)
-	defer runtime.Close()
+	defer runtime.Close(ctx)
 
-	plugin, err := runtime.LoadPlugin("tcp", wasmBytes)
+	plugin, err := runtime.LoadPlugin(ctx, "tcp", wasmBytes)
 	require.NoError(t, err)
 
 	config := Config{
@@ -819,7 +819,7 @@ func TestTCPPlugin_Observe_PlainTCP(t *testing.T) {
 		},
 	}
 
-	result, err := plugin.Observe(config)
+	result, err := plugin.Observe(ctx, config)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.Nil(t, result.Error)
@@ -848,9 +848,9 @@ func TestTCPPlugin_Observe_TLS(t *testing.T) {
 	ctx := context.Background()
 	runtime, err := newRuntimeWithNetworkCaps(ctx)
 	require.NoError(t, err)
-	defer runtime.Close()
+	defer runtime.Close(ctx)
 
-	plugin, err := runtime.LoadPlugin("tcp", wasmBytes)
+	plugin, err := runtime.LoadPlugin(ctx, "tcp", wasmBytes)
 	require.NoError(t, err)
 
 	config := Config{
@@ -861,7 +861,7 @@ func TestTCPPlugin_Observe_TLS(t *testing.T) {
 		},
 	}
 
-	result, err := plugin.Observe(config)
+	result, err := plugin.Observe(ctx, config)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.Nil(t, result.Error)

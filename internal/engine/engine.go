@@ -74,7 +74,7 @@ func (e *Engine) Execute(ctx context.Context, profile *config.Profile) (*Executi
 	} else {
 		// Sequential execution of controls
 		for _, ctrl := range profile.Controls.Items {
-			controlResult := e.executeControl(ctx, ctrl)
+			controlResult := e.executeControl(ctx, ctrl, result)
 			result.AddControlResult(controlResult)
 		}
 	}
@@ -108,7 +108,7 @@ func (e *Engine) executeControlsParallel(ctx context.Context, controls []config.
 		// Execute all controls in this level in parallel
 		for _, ctrl := range level.Controls {
 			g.Go(func() error {
-				controlResult := e.executeControl(levelCtx, ctrl)
+				controlResult := e.executeControl(levelCtx, ctrl, result)
 				result.AddControlResult(controlResult)
 				return nil // Don't fail fast on individual control errors
 			})
@@ -124,7 +124,7 @@ func (e *Engine) executeControlsParallel(ctx context.Context, controls []config.
 }
 
 // executeControl executes a single control and returns its result.
-func (e *Engine) executeControl(ctx context.Context, ctrl config.Control) ControlResult {
+func (e *Engine) executeControl(ctx context.Context, ctrl config.Control, execResult *ExecutionResult) ControlResult {
 	startTime := time.Now()
 
 	result := ControlResult{
@@ -134,6 +134,38 @@ func (e *Engine) executeControl(ctx context.Context, ctrl config.Control) Contro
 		Severity:     ctrl.Severity,
 		Tags:         ctrl.Tags,
 		Observations: make([]ObservationResult, 0, len(ctrl.Observations)),
+	}
+
+	// Check dependencies before execution
+	if len(ctrl.DependsOn) > 0 {
+		// Look up dependency statuses from previous results
+		execResult.mu.Lock()
+		for _, depID := range ctrl.DependsOn {
+			// Find the dependency control result
+			var depStatus Status
+			found := false
+			for _, depResult := range execResult.Controls {
+				if depResult.ID == depID {
+					depStatus = depResult.Status
+					found = true
+					break
+				}
+			}
+
+			// If dependency not found or failed/error, skip this control
+			if !found || depStatus == StatusFail || depStatus == StatusError || depStatus == StatusSkipped {
+				execResult.mu.Unlock()
+				result.Status = StatusSkipped
+				if !found {
+					result.Message = fmt.Sprintf("Skipped: dependency '%s' not found", depID)
+				} else {
+					result.Message = fmt.Sprintf("Skipped: dependency '%s' has status '%s'", depID, depStatus)
+				}
+				result.Duration = time.Since(startTime)
+				return result
+			}
+		}
+		execResult.mu.Unlock()
 	}
 
 	// Execute observations
@@ -273,12 +305,15 @@ func generateControlMessage(status Status, observations []ObservationResult) str
 		}
 		return fmt.Sprintf("%d checks encountered errors", errorCount)
 
+	case StatusSkipped:
+		return "Skipped due to failed dependency"
+
 	default:
 		return "Unknown status"
 	}
 }
 
 // Close closes the engine and releases resources.
-func (e *Engine) Close() error {
-	return e.runtime.Close()
+func (e *Engine) Close(ctx context.Context) error {
+	return e.runtime.Close(ctx)
 }

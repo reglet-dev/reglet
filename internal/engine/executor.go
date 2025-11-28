@@ -34,7 +34,7 @@ func (e *ObservationExecutor) Execute(ctx context.Context, obs config.Observatio
 	}
 
 	// Load the plugin
-	plugin, err := e.loadPlugin(obs.Plugin)
+	plugin, err := e.loadPlugin(ctx, obs.Plugin)
 	if err != nil {
 		result.Status = StatusError
 		result.Error = &wasm.PluginError{
@@ -56,7 +56,7 @@ func (e *ObservationExecutor) Execute(ctx context.Context, obs config.Observatio
 	}
 
 	// Execute the observation
-	wasmResult, err := plugin.Observe(wasmConfig)
+	wasmResult, err := plugin.Observe(ctx, wasmConfig)
 	if err != nil {
 		result.Status = StatusError
 		result.Error = &wasm.PluginError{
@@ -95,43 +95,39 @@ func (e *ObservationExecutor) Execute(ctx context.Context, obs config.Observatio
 
 // loadPlugin loads a plugin by name.
 // Phase 1b loads from file system. Phase 2 will use embedded plugins.
-func (e *ObservationExecutor) loadPlugin(pluginName string) (*wasm.Plugin, error) {
+func (e *ObservationExecutor) loadPlugin(ctx context.Context, pluginName string) (*wasm.Plugin, error) {
 	// Check if already loaded in runtime cache
 	if plugin, ok := e.runtime.GetPlugin(pluginName); ok {
 		return plugin, nil
 	}
 
-	// Load plugin from file system
-	switch pluginName {
-	case "file":
-		// Find the project root by looking for go.mod
-		workingDir, err := os.Getwd()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get working directory: %w", err)
-		}
-
-		// Try to find plugins/file/file.wasm relative to current directory
-		// This works for both running from project root and from subdirectories
-		pluginPath := filepath.Join(workingDir, "plugins", "file", "file.wasm")
-
-		// If not found, try going up directories to find project root
-		for i := 0; i < 5; i++ {
-			if _, err := os.Stat(pluginPath); err == nil {
-				break
-			}
-			workingDir = filepath.Dir(workingDir)
-			pluginPath = filepath.Join(workingDir, "plugins", "file", "file.wasm")
-		}
-
-		wasmBytes, err := os.ReadFile(pluginPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read file plugin: %w", err)
-		}
-
-		return e.runtime.LoadPlugin("file", wasmBytes)
-	default:
-		return nil, fmt.Errorf("unknown plugin: %s (only 'file' plugin is supported in Phase 1b)", pluginName)
+	// Find the project root by looking for go.mod
+	workingDir, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get working directory: %w", err)
 	}
+
+	// Dynamically construct plugin path: plugins/{pluginName}/{pluginName}.wasm
+	// This works for both running from project root and from subdirectories
+	pluginPath := filepath.Join(workingDir, "plugins", pluginName, pluginName+".wasm")
+
+	// If not found, try going up directories to find project root
+	for i := 0; i < 5; i++ {
+		if _, err := os.Stat(pluginPath); err == nil {
+			break
+		}
+		workingDir = filepath.Dir(workingDir)
+		pluginPath = filepath.Join(workingDir, "plugins", pluginName, pluginName+".wasm")
+	}
+
+	// Read the WASM file
+	wasmBytes, err := os.ReadFile(pluginPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read plugin %s: %w (expected at %s)", pluginName, err, pluginPath)
+	}
+
+	// Load the plugin into the runtime
+	return e.runtime.LoadPlugin(ctx, pluginName, wasmBytes)
 }
 
 // determineStatus determines the observation status from evidence.
