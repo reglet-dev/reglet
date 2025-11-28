@@ -22,7 +22,7 @@ func TestNewRuntime(t *testing.T) {
 	assert.Empty(t, runtime.plugins)
 
 	// Clean up
-	err = runtime.Close()
+	err = runtime.Close(ctx)
 	assert.NoError(t, err)
 }
 
@@ -32,7 +32,7 @@ func TestRuntime_GetPlugin_NotLoaded(t *testing.T) {
 	ctx := context.Background()
 	runtime, err := NewRuntime(ctx)
 	require.NoError(t, err)
-	defer runtime.Close()
+	defer runtime.Close(ctx)
 
 	// Try to get a plugin that hasn't been loaded
 	plugin, ok := runtime.GetPlugin("nonexistent")
@@ -47,11 +47,11 @@ func TestLoadPlugin_InvalidWASM(t *testing.T) {
 	ctx := context.Background()
 	runtime, err := NewRuntime(ctx)
 	require.NoError(t, err)
-	defer runtime.Close()
+	defer runtime.Close(ctx)
 
 	// Try to load invalid WASM
 	invalidWasm := []byte("not a valid wasm module")
-	plugin, err := runtime.LoadPlugin("invalid", invalidWasm)
+	plugin, err := runtime.LoadPlugin(ctx, "invalid", invalidWasm)
 
 	assert.Error(t, err)
 	assert.Nil(t, plugin)

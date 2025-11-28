@@ -19,6 +19,8 @@ const (
 	StatusFail Status = "fail"
 	// StatusError indicates the check encountered an error
 	StatusError Status = "error"
+	// StatusSkipped indicates the check was skipped due to failed dependencies
+	StatusSkipped Status = "skipped"
 )
 
 // ExecutionResult represents the complete result of executing a profile.
@@ -62,6 +64,7 @@ type ResultSummary struct {
 	PassedControls      int `json:"passed_controls" yaml:"passed_controls"`
 	FailedControls      int `json:"failed_controls" yaml:"failed_controls"`
 	ErrorControls       int `json:"error_controls" yaml:"error_controls"`
+	SkippedControls     int `json:"skipped_controls" yaml:"skipped_controls"`
 	TotalObservations   int `json:"total_observations" yaml:"total_observations"`
 	PassedObservations  int `json:"passed_observations" yaml:"passed_observations"`
 	FailedObservations  int `json:"failed_observations" yaml:"failed_observations"`
@@ -108,6 +111,8 @@ func (r *ExecutionResult) calculateSummary() {
 			r.Summary.FailedControls++
 		case StatusError:
 			r.Summary.ErrorControls++
+		case StatusSkipped:
+			r.Summary.SkippedControls++
 		}
 
 		// Count observation statuses

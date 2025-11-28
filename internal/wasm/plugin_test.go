@@ -17,13 +17,13 @@ func TestPlugin_Observe_Concurrent(t *testing.T) {
 	ctx := context.Background()
 	runtime, err := NewRuntime(ctx)
 	require.NoError(t, err)
-	defer runtime.Close()
+	defer runtime.Close(ctx)
 
 	// Load file plugin
 	wasmBytes, err := os.ReadFile("../../plugins/file/file.wasm")
 	require.NoError(t, err)
 
-	plugin, err := runtime.LoadPlugin("file", wasmBytes)
+	plugin, err := runtime.LoadPlugin(ctx, "file", wasmBytes)
 	require.NoError(t, err)
 
 	// Create multiple temp files with unique content
@@ -61,7 +61,7 @@ func TestPlugin_Observe_Concurrent(t *testing.T) {
 				},
 			}
 
-			result, err := plugin.Observe(config)
+			result, err := plugin.Observe(ctx, config)
 			require.NoError(t, err)
 			results[idx] = result
 		}(i)
@@ -98,13 +98,13 @@ func TestPlugin_ConcurrentDifferentMethods(t *testing.T) {
 	ctx := context.Background()
 	runtime, err := NewRuntime(ctx)
 	require.NoError(t, err)
-	defer runtime.Close()
+	defer runtime.Close(ctx)
 
 	// Load file plugin
 	wasmBytes, err := os.ReadFile("../../plugins/file/file.wasm")
 	require.NoError(t, err)
 
-	plugin, err := runtime.LoadPlugin("file", wasmBytes)
+	plugin, err := runtime.LoadPlugin(ctx, "file", wasmBytes)
 	require.NoError(t, err)
 
 	// Create a test file
@@ -121,7 +121,7 @@ func TestPlugin_ConcurrentDifferentMethods(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		_, err := plugin.Describe()
+		_, err := plugin.Describe(ctx)
 		errors[0] = err
 	}()
 
@@ -129,7 +129,7 @@ func TestPlugin_ConcurrentDifferentMethods(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		_, err := plugin.Schema()
+		_, err := plugin.Schema(ctx)
 		errors[1] = err
 	}()
 
@@ -143,7 +143,7 @@ func TestPlugin_ConcurrentDifferentMethods(t *testing.T) {
 				"mode": "exists",
 			},
 		}
-		_, err := plugin.Observe(config)
+		_, err := plugin.Observe(ctx, config)
 		errors[2] = err
 	}()
 

@@ -12,7 +12,6 @@ import (
 // Runtime manages the WASM runtime environment
 type Runtime struct {
 	runtime wazero.Runtime
-	ctx     context.Context
 	plugins map[string]*Plugin // Loaded plugins by name
 }
 
@@ -44,30 +43,28 @@ func NewRuntimeWithCapabilities(ctx context.Context, caps []hostfuncs.Capability
 
 	return &Runtime{
 		runtime: r,
-		ctx:     ctx,
 		plugins: make(map[string]*Plugin),
 	}, nil
 }
 
 // LoadPlugin loads a WASM plugin from bytes
-func (r *Runtime) LoadPlugin(name string, wasmBytes []byte) (*Plugin, error) {
+func (r *Runtime) LoadPlugin(ctx context.Context, name string, wasmBytes []byte) (*Plugin, error) {
 	// Check if plugin is already loaded
 	if p, ok := r.plugins[name]; ok {
 		return p, nil
 	}
 
 	// Compile the WASM module
-	compiledModule, err := r.runtime.CompileModule(r.ctx, wasmBytes)
+	compiledModule, err := r.runtime.CompileModule(ctx, wasmBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to compile plugin %s: %w", name, err)
 	}
 
 	// Create plugin wrapper
 	plugin := &Plugin{
-		name:   name,
-		module: compiledModule,
+		name:    name,
+		module:  compiledModule,
 		runtime: r.runtime,
-		ctx:    r.ctx,
 	}
 
 	// Cache the plugin
@@ -83,6 +80,6 @@ func (r *Runtime) GetPlugin(name string) (*Plugin, bool) {
 }
 
 // Close closes the runtime and cleans up resources
-func (r *Runtime) Close() error {
-	return r.runtime.Close(r.ctx)
+func (r *Runtime) Close(ctx context.Context) error {
+	return r.runtime.Close(ctx)
 }
