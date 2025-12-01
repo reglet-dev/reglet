@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"log/slog"
 	"os"
@@ -10,27 +9,35 @@ import (
 	"github.com/jrose/reglet/internal/config"
 	"github.com/jrose/reglet/internal/engine"
 	"github.com/jrose/reglet/internal/output"
+	"github.com/spf13/cobra"
 )
 
-// runCheck implements the check command
-func runCheck(ctx context.Context, args []string) error {
-	// Create flag set for check command
-	fs := flag.NewFlagSet("check", flag.ContinueOnError)
-	formatFlag := fs.String("format", "table", "Output format: table, json, yaml")
-	outputFlag := fs.String("output", "", "Output file path (default: stdout)")
+var (
+	format  string
+	outFile string
+)
 
-	// Parse flags
-	if err := fs.Parse(args); err != nil {
-		return err
-	}
+// checkCmd represents the check command
+var checkCmd = &cobra.Command{
+	Use:   "check <profile.yaml>",
+	Short: "Execute compliance checks from a profile",
+	Long: `Load a profile configuration and execute the defined validation controls.
+The profile must be a valid YAML file defining the checks to run.`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runCheckAction(cmd.Context(), args[0])
+	},
+}
 
-	// Get profile path from positional argument
-	if fs.NArg() == 0 {
-		return fmt.Errorf("no profile specified\n\nUsage: reglet check <profile.yaml> [flags]")
-	}
+func init() {
+	rootCmd.AddCommand(checkCmd)
 
-	profilePath := fs.Arg(0)
+	checkCmd.Flags().StringVar(&format, "format", "table", "Output format: table, json, yaml")
+	checkCmd.Flags().StringVarP(&outFile, "output", "o", "", "Output file path (default: stdout)")
+}
 
+// runCheckAction implements the core logic for the check command
+func runCheckAction(ctx context.Context, profilePath string) error {
 	slog.Info("loading profile", "path", profilePath)
 
 	// Load profile
@@ -77,22 +84,28 @@ func runCheck(ctx context.Context, args []string) error {
 
 	// Determine output writer
 	writer := os.Stdout
-	if *outputFlag != "" {
-		file, err := os.Create(*outputFlag)
+	if outFile != "" {
+		file, err := os.Create(outFile)
 		if err != nil {
 			return fmt.Errorf("failed to create output file: %w", err)
 		}
 		defer file.Close()
 		writer = file
-		slog.Info("writing output", "file", *outputFlag, "format", *formatFlag)
+		slog.Info("writing output", "file", outFile, "format", format)
 	}
 
 	// Format and output results
-	if err := formatOutput(writer, result, *formatFlag); err != nil {
+	if err := formatOutput(writer, result, format); err != nil {
 		return fmt.Errorf("failed to format output: %w", err)
 	}
 
 	// Return non-zero exit code if there were failures or errors
+	// We return an error here to let Cobra/main handle the exit code,
+	// or we can use os.Exit(1) if we want to force it immediately.
+	// Cobra doesn't automatically exit 1 on RunE error unless we configure it,
+	// but usually it prints the error.
+	// However, for business logic failure (checks failed), we might not want to print "Error: ..."
+	// but just exit with status 1.
 	if result.Summary.FailedControls > 0 || result.Summary.ErrorControls > 0 {
 		os.Exit(1)
 	}
