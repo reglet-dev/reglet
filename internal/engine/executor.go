@@ -13,14 +13,44 @@ import (
 
 // ObservationExecutor executes observations using WASM plugins.
 type ObservationExecutor struct {
-	runtime *wasm.Runtime
+	runtime   *wasm.Runtime
+	pluginDir string // Base directory where plugins are located (e.g., /path/to/project/plugins)
 }
 
 // NewObservationExecutor creates a new observation executor.
 func NewObservationExecutor(runtime *wasm.Runtime) *ObservationExecutor {
+	projectRoot := findProjectRoot()
+	pluginDirPath := filepath.Join(projectRoot, "plugins")
+
 	return &ObservationExecutor{
-		runtime: runtime,
+		runtime:   runtime,
+		pluginDir: pluginDirPath,
 	}
+}
+
+// findProjectRoot attempts to find the project root by looking for the go.mod file.
+// It searches up to 5 parent directories from the current working directory.
+func findProjectRoot() string {
+	workingDir, err := os.Getwd()
+	if err != nil {
+		// Fallback to current directory if we can't get WD
+		return "."
+	}
+
+	currentDir := workingDir
+	for i := 0; i < 5; i++ { // Limit search to prevent infinite loops
+		if _, err := os.Stat(filepath.Join(currentDir, "go.mod")); err == nil {
+			return currentDir
+		}
+		parentDir := filepath.Dir(currentDir)
+		if parentDir == currentDir { // Reached file system root
+			break
+		}
+		currentDir = parentDir
+	}
+
+	// If go.mod not found, assume current working directory is the base
+	return workingDir
 }
 
 // Execute runs a single observation and returns the result.
@@ -101,24 +131,8 @@ func (e *ObservationExecutor) loadPlugin(ctx context.Context, pluginName string)
 		return plugin, nil
 	}
 
-	// Find the project root by looking for go.mod
-	workingDir, err := os.Getwd()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get working directory: %w", err)
-	}
-
-	// Dynamically construct plugin path: plugins/{pluginName}/{pluginName}.wasm
-	// This works for both running from project root and from subdirectories
-	pluginPath := filepath.Join(workingDir, "plugins", pluginName, pluginName+".wasm")
-
-	// If not found, try going up directories to find project root
-	for i := 0; i < 5; i++ {
-		if _, err := os.Stat(pluginPath); err == nil {
-			break
-		}
-		workingDir = filepath.Dir(workingDir)
-		pluginPath = filepath.Join(workingDir, "plugins", pluginName, pluginName+".wasm")
-	}
+	// Construct plugin path using the pre-calculated pluginDir
+	pluginPath := filepath.Join(e.pluginDir, pluginName, pluginName+".wasm")
 
 	// Read the WASM file
 	wasmBytes, err := os.ReadFile(pluginPath)
