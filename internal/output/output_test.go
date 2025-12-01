@@ -129,6 +129,7 @@ func createTestResult() *engine.ExecutionResult {
 }
 
 func TestTableFormatter_Format(t *testing.T) {
+	t.Parallel()
 	result := createTestResult()
 	var buf bytes.Buffer
 
@@ -167,6 +168,7 @@ func TestTableFormatter_Format(t *testing.T) {
 }
 
 func TestTableFormatter_EmptyResult(t *testing.T) {
+	t.Parallel()
 	result := engine.NewExecutionResult("empty-profile", "1.0.0")
 	result.Finalize()
 
@@ -181,6 +183,7 @@ func TestTableFormatter_EmptyResult(t *testing.T) {
 }
 
 func TestJSONFormatter_Format_Indented(t *testing.T) {
+	t.Parallel()
 	result := createTestResult()
 	var buf bytes.Buffer
 
@@ -208,6 +211,7 @@ func TestJSONFormatter_Format_Indented(t *testing.T) {
 }
 
 func TestJSONFormatter_Format_Compact(t *testing.T) {
+	t.Parallel()
 	result := createTestResult()
 	var buf bytes.Buffer
 
@@ -234,6 +238,7 @@ func TestJSONFormatter_Format_Compact(t *testing.T) {
 }
 
 func TestYAMLFormatter_Format(t *testing.T) {
+	t.Parallel()
 	result := createTestResult()
 	var buf bytes.Buffer
 
@@ -263,6 +268,7 @@ func TestYAMLFormatter_Format(t *testing.T) {
 }
 
 func TestAllFormatters_WithSameData(t *testing.T) {
+	t.Parallel()
 	result := createTestResult()
 
 	// Test that all formatters can handle the same data
@@ -308,6 +314,7 @@ func TestAllFormatters_WithSameData(t *testing.T) {
 }
 
 func TestTableFormatter_StatusSymbols(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	formatter := NewTableFormatter(&buf)
 
@@ -330,6 +337,7 @@ func TestTableFormatter_StatusSymbols(t *testing.T) {
 }
 
 func TestJSONFormatter_PreservesTypes(t *testing.T) {
+	t.Parallel()
 	result := createTestResult()
 	var buf bytes.Buffer
 
@@ -354,6 +362,7 @@ func TestJSONFormatter_PreservesTypes(t *testing.T) {
 }
 
 func TestYAMLFormatter_PreservesTypes(t *testing.T) {
+	t.Parallel()
 	result := createTestResult()
 	var buf bytes.Buffer
 
