@@ -12,6 +12,7 @@ import (
 )
 
 func TestNewEngine(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	engine, err := NewEngine(ctx)
@@ -26,6 +27,7 @@ func TestNewEngine(t *testing.T) {
 }
 
 func TestAggregateControlStatus_AllPass(t *testing.T) {
+	t.Parallel()
 	observations := []ObservationResult{
 		{Status: StatusPass},
 		{Status: StatusPass},
@@ -37,6 +39,7 @@ func TestAggregateControlStatus_AllPass(t *testing.T) {
 }
 
 func TestAggregateControlStatus_OneFail(t *testing.T) {
+	t.Parallel()
 	observations := []ObservationResult{
 		{Status: StatusPass},
 		{Status: StatusFail},
@@ -48,6 +51,7 @@ func TestAggregateControlStatus_OneFail(t *testing.T) {
 }
 
 func TestAggregateControlStatus_OneError(t *testing.T) {
+	t.Parallel()
 	observations := []ObservationResult{
 		{Status: StatusPass},
 		{Status: StatusError, Error: &wasm.PluginError{Code: "test", Message: "test error"}},
@@ -59,6 +63,7 @@ func TestAggregateControlStatus_OneError(t *testing.T) {
 }
 
 func TestAggregateControlStatus_ErrorTakesPrecedence(t *testing.T) {
+	t.Parallel()
 	observations := []ObservationResult{
 		{Status: StatusPass},
 		{Status: StatusFail},
@@ -71,6 +76,7 @@ func TestAggregateControlStatus_ErrorTakesPrecedence(t *testing.T) {
 }
 
 func TestAggregateControlStatus_NoObservations(t *testing.T) {
+	t.Parallel()
 	observations := []ObservationResult{}
 
 	status := aggregateControlStatus(observations)
@@ -78,6 +84,7 @@ func TestAggregateControlStatus_NoObservations(t *testing.T) {
 }
 
 func TestGenerateControlMessage_SinglePass(t *testing.T) {
+	t.Parallel()
 	observations := []ObservationResult{
 		{Status: StatusPass},
 	}
@@ -87,6 +94,7 @@ func TestGenerateControlMessage_SinglePass(t *testing.T) {
 }
 
 func TestGenerateControlMessage_MultiplePass(t *testing.T) {
+	t.Parallel()
 	observations := []ObservationResult{
 		{Status: StatusPass},
 		{Status: StatusPass},
@@ -98,6 +106,7 @@ func TestGenerateControlMessage_MultiplePass(t *testing.T) {
 }
 
 func TestGenerateControlMessage_SingleFail(t *testing.T) {
+	t.Parallel()
 	observations := []ObservationResult{
 		{Status: StatusPass},
 		{Status: StatusFail},
@@ -108,6 +117,7 @@ func TestGenerateControlMessage_SingleFail(t *testing.T) {
 }
 
 func TestGenerateControlMessage_MultipleFail(t *testing.T) {
+	t.Parallel()
 	observations := []ObservationResult{
 		{Status: StatusFail},
 		{Status: StatusFail},
@@ -119,6 +129,7 @@ func TestGenerateControlMessage_MultipleFail(t *testing.T) {
 }
 
 func TestGenerateControlMessage_SingleError(t *testing.T) {
+	t.Parallel()
 	observations := []ObservationResult{
 		{
 			Status: StatusError,
@@ -131,6 +142,7 @@ func TestGenerateControlMessage_SingleError(t *testing.T) {
 }
 
 func TestGenerateControlMessage_SingleErrorNoMessage(t *testing.T) {
+	t.Parallel()
 	observations := []ObservationResult{
 		{
 			Status: StatusError,
@@ -143,6 +155,7 @@ func TestGenerateControlMessage_SingleErrorNoMessage(t *testing.T) {
 }
 
 func TestGenerateControlMessage_MultipleErrors(t *testing.T) {
+	t.Parallel()
 	observations := []ObservationResult{
 		{Status: StatusError, Error: &wasm.PluginError{Code: "test", Message: "error 1"}},
 		{Status: StatusError, Error: &wasm.PluginError{Code: "test", Message: "error 2"}},
@@ -154,6 +167,7 @@ func TestGenerateControlMessage_MultipleErrors(t *testing.T) {
 }
 
 func TestExecuteControl_SingleObservation(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	engine, err := NewEngine(ctx)
 	require.NoError(t, err)
@@ -192,6 +206,7 @@ func TestExecuteControl_SingleObservation(t *testing.T) {
 }
 
 func TestExecuteControl_MultipleObservations(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	engine, err := NewEngine(ctx)
 	require.NoError(t, err)
@@ -228,6 +243,7 @@ func TestExecuteControl_MultipleObservations(t *testing.T) {
 }
 
 func TestExecute_SingleControl(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	engine, err := NewEngine(ctx)
 	require.NoError(t, err)
@@ -272,6 +288,7 @@ func TestExecute_SingleControl(t *testing.T) {
 }
 
 func TestExecute_MultipleControls(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	engine, err := NewEngine(ctx)
 	require.NoError(t, err)
@@ -325,6 +342,7 @@ func TestExecute_MultipleControls(t *testing.T) {
 }
 
 func TestExecute_SummaryStatistics(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	engine, err := NewEngine(ctx)
 	require.NoError(t, err)
@@ -369,6 +387,7 @@ func TestExecute_SummaryStatistics(t *testing.T) {
 }
 
 func TestExecute_TimingInfo(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	engine, err := NewEngine(ctx)
 	require.NoError(t, err)
@@ -411,6 +430,7 @@ func TestExecute_TimingInfo(t *testing.T) {
 }
 
 func TestExecute_InvalidPlugin(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	engine, err := NewEngine(ctx)
 	require.NoError(t, err)
