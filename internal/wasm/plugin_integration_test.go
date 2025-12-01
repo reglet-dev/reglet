@@ -6,12 +6,42 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/jrose/reglet/internal/wasm/hostfuncs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// Global cache for WASM bytes to avoid repeated disk I/O
+var (
+	wasmCache = make(map[string][]byte)
+	cacheMu   sync.Mutex
+)
+
+// getWasmBytes returns the bytes of the requested plugin WASM file.
+// It caches the result for future calls.
+func getWasmBytes(t *testing.T, pluginName string) []byte {
+	cacheMu.Lock()
+	defer cacheMu.Unlock()
+
+	if bytes, ok := wasmCache[pluginName]; ok {
+		return bytes
+	}
+
+	wasmPath := filepath.Join("..", "..", "plugins", pluginName, pluginName+".wasm")
+	if _, err := os.Stat(wasmPath); os.IsNotExist(err) {
+		t.Skipf("%s.wasm not built - run 'make -C plugins/%s build' first", pluginName, pluginName)
+	}
+
+	bytes, err := os.ReadFile(wasmPath)
+	require.NoError(t, err)
+	require.NotEmpty(t, bytes)
+
+	wasmCache[pluginName] = bytes
+	return bytes
+}
 
 // Test helper functions for creating runtimes with proper capabilities
 
@@ -31,16 +61,8 @@ func newRuntimeWithFilesystemCaps(ctx context.Context) (*Runtime, error) {
 
 // TestLoadFilePlugin tests loading the actual file plugin WASM module
 func TestLoadFilePlugin(t *testing.T) {
-	// Skip if WASM file doesn't exist
-	wasmPath := filepath.Join("..", "..", "plugins", "file", "file.wasm")
-	if _, err := os.Stat(wasmPath); os.IsNotExist(err) {
-		t.Skip("file.wasm not built - run 'make -C plugins/file build' first")
-	}
-
-	// Read the WASM file
-	wasmBytes, err := os.ReadFile(wasmPath)
-	require.NoError(t, err)
-	require.NotEmpty(t, wasmBytes)
+	t.Parallel()
+	wasmBytes := getWasmBytes(t, "file")
 
 	// Create runtime
 	ctx := context.Background()
@@ -65,15 +87,8 @@ func TestLoadFilePlugin(t *testing.T) {
 // TestFilePlugin_Describe tests calling the describe function
 // Uses Go 1.24+ //go:wasmexport for function exports
 func TestFilePlugin_Describe(t *testing.T) {
-	// Skip if WASM file doesn't exist
-	wasmPath := filepath.Join("..", "..", "plugins", "file", "file.wasm")
-	if _, err := os.Stat(wasmPath); os.IsNotExist(err) {
-		t.Skip("file.wasm not built - run 'make -C plugins/file build' first")
-	}
-
-	// Read the WASM file
-	wasmBytes, err := os.ReadFile(wasmPath)
-	require.NoError(t, err)
+	t.Parallel()
+	wasmBytes := getWasmBytes(t, "file")
 
 	// Create runtime and load plugin
 	ctx := context.Background()
@@ -102,15 +117,8 @@ func TestFilePlugin_Describe(t *testing.T) {
 
 // TestFilePlugin_Schema tests calling the schema function
 func TestFilePlugin_Schema(t *testing.T) {
-	// Skip if WASM file doesn't exist
-	wasmPath := filepath.Join("..", "..", "plugins", "file", "file.wasm")
-	if _, err := os.Stat(wasmPath); os.IsNotExist(err) {
-		t.Skip("file.wasm not built - run 'make -C plugins/file build' first")
-	}
-
-	// Read the WASM file
-	wasmBytes, err := os.ReadFile(wasmPath)
-	require.NoError(t, err)
+	t.Parallel()
+	wasmBytes := getWasmBytes(t, "file")
 
 	// Create runtime and load plugin
 	ctx := context.Background()
@@ -145,22 +153,18 @@ func TestFilePlugin_Schema(t *testing.T) {
 
 // TestFilePlugin_Observe_FileExists tests checking if a file exists
 func TestFilePlugin_Observe_FileExists(t *testing.T) {
-	// Skip if WASM file doesn't exist
-	wasmPath := filepath.Join("..", "..", "plugins", "file", "file.wasm")
-	if _, err := os.Stat(wasmPath); os.IsNotExist(err) {
-		t.Skip("file.wasm not built - run 'make -C plugins/file build' first")
-	}
+	t.Parallel()
+	wasmBytes := getWasmBytes(t, "file")
 
 	// Create a temporary test file
+	// Note: t.TempDir is better for parallelism, but os.CreateTemp is fine if handled correctly
 	tmpFile, err := os.CreateTemp("", "reglet-test-*.txt")
 	require.NoError(t, err)
+	// We cannot defer remove here if we use t.Parallel() and share filesystem resources in a way that conflicts
+	// But here each test creates its own file, so it's fine.
 	defer os.Remove(tmpFile.Name())
 	tmpFile.WriteString("test content")
 	tmpFile.Close()
-
-	// Read the WASM file
-	wasmBytes, err := os.ReadFile(wasmPath)
-	require.NoError(t, err)
 
 	// Create runtime and load plugin
 	ctx := context.Background()
@@ -195,15 +199,8 @@ func TestFilePlugin_Observe_FileExists(t *testing.T) {
 
 // TestFilePlugin_Observe_FileNotFound tests checking a non-existent file
 func TestFilePlugin_Observe_FileNotFound(t *testing.T) {
-	// Skip if WASM file doesn't exist
-	wasmPath := filepath.Join("..", "..", "plugins", "file", "file.wasm")
-	if _, err := os.Stat(wasmPath); os.IsNotExist(err) {
-		t.Skip("file.wasm not built - run 'make -C plugins/file build' first")
-	}
-
-	// Read the WASM file
-	wasmBytes, err := os.ReadFile(wasmPath)
-	require.NoError(t, err)
+	t.Parallel()
+	wasmBytes := getWasmBytes(t, "file")
 
 	// Create runtime and load plugin
 	ctx := context.Background()
@@ -242,11 +239,8 @@ func TestFilePlugin_Observe_FileNotFound(t *testing.T) {
 
 // TestFilePlugin_Observe_ReadContent tests reading file content
 func TestFilePlugin_Observe_ReadContent(t *testing.T) {
-	// Skip if WASM file doesn't exist
-	wasmPath := filepath.Join("..", "..", "plugins", "file", "file.wasm")
-	if _, err := os.Stat(wasmPath); os.IsNotExist(err) {
-		t.Skip("file.wasm not built - run 'make -C plugins/file build' first")
-	}
+	t.Parallel()
+	wasmBytes := getWasmBytes(t, "file")
 
 	// Create a temporary test file with known content
 	tmpFile, err := os.CreateTemp("", "reglet-test-*.txt")
@@ -256,10 +250,6 @@ func TestFilePlugin_Observe_ReadContent(t *testing.T) {
 	testContent := "Hello from Reglet!"
 	tmpFile.WriteString(testContent)
 	tmpFile.Close()
-
-	// Read the WASM file
-	wasmBytes, err := os.ReadFile(wasmPath)
-	require.NoError(t, err)
 
 	// Create runtime and load plugin
 	ctx := context.Background()
@@ -311,11 +301,8 @@ func TestFilePlugin_Observe_ReadContent(t *testing.T) {
 
 // TestFilePlugin_Observe_BinaryContent tests reading binary file content
 func TestFilePlugin_Observe_BinaryContent(t *testing.T) {
-	// Skip if WASM file doesn't exist
-	wasmPath := filepath.Join("..", "..", "plugins", "file", "file.wasm")
-	if _, err := os.Stat(wasmPath); os.IsNotExist(err) {
-		t.Skip("file.wasm not built - run 'make -C plugins/file build' first")
-	}
+	t.Parallel()
+	wasmBytes := getWasmBytes(t, "file")
 
 	// Create a temporary test file with binary content (including null bytes)
 	binaryData := []byte{0x00, 0xFF, 0xFE, 0xAB, 0xCD, 0x00, 0x01, 0x02, 0x7F, 0x80, 0x81}
@@ -326,10 +313,6 @@ func TestFilePlugin_Observe_BinaryContent(t *testing.T) {
 	_, err = tmpFile.Write(binaryData)
 	require.NoError(t, err)
 	tmpFile.Close()
-
-	// Read the WASM file
-	wasmBytes, err := os.ReadFile(wasmPath)
-	require.NoError(t, err)
 
 	// Create runtime and load plugin
 	ctx := context.Background()
@@ -383,13 +366,8 @@ func TestFilePlugin_Observe_BinaryContent(t *testing.T) {
 
 // TestDNSPlugin_Describe tests DNS plugin metadata
 func TestDNSPlugin_Describe(t *testing.T) {
-	wasmPath := filepath.Join("..", "..", "plugins", "dns", "dns.wasm")
-	if _, err := os.Stat(wasmPath); os.IsNotExist(err) {
-		t.Skip("dns.wasm not built - run 'make -C plugins/dns build' first")
-	}
-
-	wasmBytes, err := os.ReadFile(wasmPath)
-	require.NoError(t, err)
+	t.Parallel()
+	wasmBytes := getWasmBytes(t, "dns")
 
 	ctx := context.Background()
 	runtime, err := newRuntimeWithNetworkCaps(ctx)
@@ -414,13 +392,8 @@ func TestDNSPlugin_Describe(t *testing.T) {
 
 // TestDNSPlugin_Schema tests DNS plugin configuration schema
 func TestDNSPlugin_Schema(t *testing.T) {
-	wasmPath := filepath.Join("..", "..", "plugins", "dns", "dns.wasm")
-	if _, err := os.Stat(wasmPath); os.IsNotExist(err) {
-		t.Skip("dns.wasm not built - run 'make -C plugins/dns build' first")
-	}
-
-	wasmBytes, err := os.ReadFile(wasmPath)
-	require.NoError(t, err)
+	t.Parallel()
+	wasmBytes := getWasmBytes(t, "dns")
 
 	ctx := context.Background()
 	runtime, err := newRuntimeWithNetworkCaps(ctx)
@@ -455,13 +428,8 @@ func TestDNSPlugin_Schema(t *testing.T) {
 
 // TestDNSPlugin_Observe_A_Record tests A record lookup
 func TestDNSPlugin_Observe_A_Record(t *testing.T) {
-	wasmPath := filepath.Join("..", "..", "plugins", "dns", "dns.wasm")
-	if _, err := os.Stat(wasmPath); os.IsNotExist(err) {
-		t.Skip("dns.wasm not built - run 'make -C plugins/dns build' first")
-	}
-
-	wasmBytes, err := os.ReadFile(wasmPath)
-	require.NoError(t, err)
+	t.Parallel()
+	wasmBytes := getWasmBytes(t, "dns")
 
 	ctx := context.Background()
 	runtime, err := newRuntimeWithNetworkCaps(ctx)
@@ -507,13 +475,8 @@ func TestDNSPlugin_Observe_A_Record(t *testing.T) {
 
 // TestDNSPlugin_Observe_MX_Record tests MX record lookup
 func TestDNSPlugin_Observe_MX_Record(t *testing.T) {
-	wasmPath := filepath.Join("..", "..", "plugins", "dns", "dns.wasm")
-	if _, err := os.Stat(wasmPath); os.IsNotExist(err) {
-		t.Skip("dns.wasm not built - run 'make -C plugins/dns build' first")
-	}
-
-	wasmBytes, err := os.ReadFile(wasmPath)
-	require.NoError(t, err)
+	t.Parallel()
+	wasmBytes := getWasmBytes(t, "dns")
 
 	ctx := context.Background()
 	runtime, err := newRuntimeWithNetworkCaps(ctx)
@@ -547,13 +510,8 @@ func TestDNSPlugin_Observe_MX_Record(t *testing.T) {
 
 // TestDNSPlugin_Observe_InvalidHostname tests error handling
 func TestDNSPlugin_Observe_InvalidHostname(t *testing.T) {
-	wasmPath := filepath.Join("..", "..", "plugins", "dns", "dns.wasm")
-	if _, err := os.Stat(wasmPath); os.IsNotExist(err) {
-		t.Skip("dns.wasm not built - run 'make -C plugins/dns build' first")
-	}
-
-	wasmBytes, err := os.ReadFile(wasmPath)
-	require.NoError(t, err)
+	t.Parallel()
+	wasmBytes := getWasmBytes(t, "dns")
 
 	ctx := context.Background()
 	runtime, err := newRuntimeWithNetworkCaps(ctx)
@@ -585,13 +543,8 @@ func TestDNSPlugin_Observe_InvalidHostname(t *testing.T) {
 
 // TestDNSPlugin_Observe_MissingHostname tests config validation
 func TestDNSPlugin_Observe_MissingHostname(t *testing.T) {
-	wasmPath := filepath.Join("..", "..", "plugins", "dns", "dns.wasm")
-	if _, err := os.Stat(wasmPath); os.IsNotExist(err) {
-		t.Skip("dns.wasm not built - run 'make -C plugins/dns build' first")
-	}
-
-	wasmBytes, err := os.ReadFile(wasmPath)
-	require.NoError(t, err)
+	t.Parallel()
+	wasmBytes := getWasmBytes(t, "dns")
 
 	ctx := context.Background()
 	runtime, err := newRuntimeWithNetworkCaps(ctx)
@@ -628,13 +581,8 @@ func TestDNSPlugin_Observe_MissingHostname(t *testing.T) {
 
 // TestHTTPPlugin_Describe tests HTTP plugin describe function
 func TestHTTPPlugin_Describe(t *testing.T) {
-	wasmPath := filepath.Join("..", "..", "plugins", "http", "http.wasm")
-	if _, err := os.Stat(wasmPath); os.IsNotExist(err) {
-		t.Skip("http.wasm not built - run 'make -C plugins/http build' first")
-	}
-
-	wasmBytes, err := os.ReadFile(wasmPath)
-	require.NoError(t, err)
+	t.Parallel()
+	wasmBytes := getWasmBytes(t, "http")
 
 	ctx := context.Background()
 	runtime, err := newRuntimeWithNetworkCaps(ctx)
@@ -655,13 +603,8 @@ func TestHTTPPlugin_Describe(t *testing.T) {
 
 // TestHTTPPlugin_Schema tests HTTP plugin schema function
 func TestHTTPPlugin_Schema(t *testing.T) {
-	wasmPath := filepath.Join("..", "..", "plugins", "http", "http.wasm")
-	if _, err := os.Stat(wasmPath); os.IsNotExist(err) {
-		t.Skip("http.wasm not built - run 'make -C plugins/http build' first")
-	}
-
-	wasmBytes, err := os.ReadFile(wasmPath)
-	require.NoError(t, err)
+	t.Parallel()
+	wasmBytes := getWasmBytes(t, "http")
 
 	ctx := context.Background()
 	runtime, err := newRuntimeWithNetworkCaps(ctx)
@@ -689,13 +632,8 @@ func TestHTTPPlugin_Schema(t *testing.T) {
 
 // TestHTTPPlugin_Observe_GET tests HTTP GET request
 func TestHTTPPlugin_Observe_GET(t *testing.T) {
-	wasmPath := filepath.Join("..", "..", "plugins", "http", "http.wasm")
-	if _, err := os.Stat(wasmPath); os.IsNotExist(err) {
-		t.Skip("http.wasm not built - run 'make -C plugins/http build' first")
-	}
-
-	wasmBytes, err := os.ReadFile(wasmPath)
-	require.NoError(t, err)
+	t.Parallel()
+	wasmBytes := getWasmBytes(t, "http")
 
 	ctx := context.Background()
 	runtime, err := newRuntimeWithNetworkCaps(ctx)
@@ -734,13 +672,8 @@ func TestHTTPPlugin_Observe_GET(t *testing.T) {
 
 // TestTCPPlugin_Describe tests TCP plugin describe function
 func TestTCPPlugin_Describe(t *testing.T) {
-	wasmPath := filepath.Join("..", "..", "plugins", "tcp", "tcp.wasm")
-	if _, err := os.Stat(wasmPath); os.IsNotExist(err) {
-		t.Skip("tcp.wasm not built - run 'make -C plugins/tcp build' first")
-	}
-
-	wasmBytes, err := os.ReadFile(wasmPath)
-	require.NoError(t, err)
+	t.Parallel()
+	wasmBytes := getWasmBytes(t, "tcp")
 
 	ctx := context.Background()
 	runtime, err := newRuntimeWithNetworkCaps(ctx)
@@ -761,13 +694,8 @@ func TestTCPPlugin_Describe(t *testing.T) {
 
 // TestTCPPlugin_Schema tests TCP plugin schema function
 func TestTCPPlugin_Schema(t *testing.T) {
-	wasmPath := filepath.Join("..", "..", "plugins", "tcp", "tcp.wasm")
-	if _, err := os.Stat(wasmPath); os.IsNotExist(err) {
-		t.Skip("tcp.wasm not built - run 'make -C plugins/tcp build' first")
-	}
-
-	wasmBytes, err := os.ReadFile(wasmPath)
-	require.NoError(t, err)
+	t.Parallel()
+	wasmBytes := getWasmBytes(t, "tcp")
 
 	ctx := context.Background()
 	runtime, err := newRuntimeWithNetworkCaps(ctx)
@@ -796,13 +724,8 @@ func TestTCPPlugin_Schema(t *testing.T) {
 
 // TestTCPPlugin_Observe_PlainTCP tests plain TCP connection
 func TestTCPPlugin_Observe_PlainTCP(t *testing.T) {
-	wasmPath := filepath.Join("..", "..", "plugins", "tcp", "tcp.wasm")
-	if _, err := os.Stat(wasmPath); os.IsNotExist(err) {
-		t.Skip("tcp.wasm not built - run 'make -C plugins/tcp build' first")
-	}
-
-	wasmBytes, err := os.ReadFile(wasmPath)
-	require.NoError(t, err)
+	t.Parallel()
+	wasmBytes := getWasmBytes(t, "tcp")
 
 	ctx := context.Background()
 	runtime, err := newRuntimeWithNetworkCaps(ctx)
@@ -837,13 +760,8 @@ func TestTCPPlugin_Observe_PlainTCP(t *testing.T) {
 
 // TestTCPPlugin_Observe_TLS tests TLS connection
 func TestTCPPlugin_Observe_TLS(t *testing.T) {
-	wasmPath := filepath.Join("..", "..", "plugins", "tcp", "tcp.wasm")
-	if _, err := os.Stat(wasmPath); os.IsNotExist(err) {
-		t.Skip("tcp.wasm not built - run 'make -C plugins/tcp build' first")
-	}
-
-	wasmBytes, err := os.ReadFile(wasmPath)
-	require.NoError(t, err)
+	t.Parallel()
+	wasmBytes := getWasmBytes(t, "tcp")
 
 	ctx := context.Background()
 	runtime, err := newRuntimeWithNetworkCaps(ctx)
