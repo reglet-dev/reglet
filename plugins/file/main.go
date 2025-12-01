@@ -2,6 +2,8 @@
 // This is compiled to WASM and loaded by the Reglet runtime.
 //
 // Uses Go 1.24+ //go:wasmexport directive for function exports.
+//go:build wasip1
+
 package main
 
 import (

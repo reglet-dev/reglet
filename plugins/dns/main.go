@@ -2,6 +2,8 @@
 // This is compiled to WASM and loaded by the Reglet runtime.
 //
 // Uses Go 1.24+ //go:wasmexport directive for function exports.
+//go:build wasip1
+
 package main
 
 import (
@@ -60,8 +62,8 @@ func readFromMemory(ptr uint32, length uint32) []byte {
 	return data
 }
 
-// Helper: marshalToPtr marshals data to JSON and returns a pointer to it.
-func marshalToPtr(data interface{}) uint32 {
+// Helper: marshalToPtr marshals data to JSON and returns a packed pointer+length.
+func marshalToPtr(data interface{}) uint64 {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		return 0
@@ -69,11 +71,16 @@ func marshalToPtr(data interface{}) uint32 {
 
 	ptr := allocate(uint32(len(jsonData)))
 	copyToMemory(ptr, jsonData)
-	return ptr
+	return packPtrLen(ptr, uint32(len(jsonData)))
+}
+
+// packPtrLen packs pointer and length into a single uint64.
+func packPtrLen(ptr uint32, length uint32) uint64 {
+	return (uint64(ptr) << 32) | uint64(length)
 }
 
 // Helper: successResponse creates a successful observation result.
-func successResponse(data map[string]interface{}) uint32 {
+func successResponse(data map[string]interface{}) uint64 {
 	result := map[string]interface{}{"status": true}
 	for key, value := range data {
 		result[key] = value
@@ -82,7 +89,7 @@ func successResponse(data map[string]interface{}) uint32 {
 }
 
 // Helper: errorResponse creates an error observation result.
-func errorResponse(message string) uint32 {
+func errorResponse(message string) uint64 {
 	result := map[string]interface{}{
 		"status": false,
 		"error":  message,
@@ -93,7 +100,7 @@ func errorResponse(message string) uint32 {
 // describe returns plugin metadata as JSON in WASM memory.
 //
 //go:wasmexport describe
-func describe() uint32 {
+func describe() uint64 {
 	info := map[string]interface{}{
 		"name":        "dns",
 		"version":     "1.0.0",
@@ -112,7 +119,7 @@ func describe() uint32 {
 // schema returns configuration schema as JSON.
 //
 //go:wasmexport schema
-func schema() uint32 {
+func schema() uint64 {
 	configSchema := map[string]interface{}{
 		"type": "object",
 		"properties": map[string]interface{}{
@@ -140,7 +147,7 @@ func schema() uint32 {
 // observe executes the observation with the given configuration.
 //
 //go:wasmexport observe
-func observe(configPtr uint32, configLen uint32) uint32 {
+func observe(configPtr uint32, configLen uint32) uint64 {
 	// Read config from WASM memory
 	configData := readFromMemory(configPtr, configLen)
 
