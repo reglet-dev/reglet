@@ -139,22 +139,11 @@ func (e *Engine) executeControl(ctx context.Context, ctrl config.Control, execRe
 	// Check dependencies before execution
 	if len(ctrl.DependsOn) > 0 {
 		// Look up dependency statuses from previous results
-		execResult.mu.Lock()
 		for _, depID := range ctrl.DependsOn {
-			// Find the dependency control result
-			var depStatus Status
-			found := false
-			for _, depResult := range execResult.Controls {
-				if depResult.ID == depID {
-					depStatus = depResult.Status
-					found = true
-					break
-				}
-			}
+			depStatus, found := execResult.GetControlStatus(depID)
 
 			// If dependency not found or failed/error, skip this control
 			if !found || depStatus == StatusFail || depStatus == StatusError || depStatus == StatusSkipped {
-				execResult.mu.Unlock()
 				result.Status = StatusSkipped
 				if !found {
 					result.Message = fmt.Sprintf("Skipped: dependency '%s' not found", depID)
@@ -165,7 +154,6 @@ func (e *Engine) executeControl(ctx context.Context, ctrl config.Control, execRe
 				return result
 			}
 		}
-		execResult.mu.Unlock()
 	}
 
 	// Execute observations

@@ -89,6 +89,21 @@ func (r *ExecutionResult) AddControlResult(cr ControlResult) {
 	r.Controls = append(r.Controls, cr)
 }
 
+// GetControlStatus returns the status of a control by ID.
+// Returns the status and a boolean indicating if the control was found.
+// Thread-safe.
+func (r *ExecutionResult) GetControlStatus(id string) (Status, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	for _, ctrl := range r.Controls {
+		if ctrl.ID == id {
+			return ctrl.Status, true
+		}
+	}
+	return "", false
+}
+
 // Finalize completes the execution result and calculates the summary.
 func (r *ExecutionResult) Finalize() {
 	r.EndTime = time.Now()
