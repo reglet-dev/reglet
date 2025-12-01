@@ -9,6 +9,11 @@ import (
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 )
 
+// globalCache is a shared compilation cache for wazero runtimes.
+// This significantly speeds up compilation when creating multiple runtimes
+// (e.g. during testing or parallel execution).
+var globalCache = wazero.NewCompilationCache()
+
 // Runtime manages the WASM runtime environment
 type Runtime struct {
 	runtime wazero.Runtime
@@ -23,9 +28,10 @@ func NewRuntime(ctx context.Context) (*Runtime, error) {
 
 // NewRuntimeWithCapabilities creates a new WASM runtime with specific capabilities
 func NewRuntimeWithCapabilities(ctx context.Context, caps []hostfuncs.Capability) (*Runtime, error) {
-	// Create wazero runtime with default configuration
+	// Create wazero runtime with compilation cache
 	// This is a pure Go WASM runtime - no CGO required
-	r := wazero.NewRuntime(ctx)
+	config := wazero.NewRuntimeConfig().WithCompilationCache(globalCache)
+	r := wazero.NewRuntimeWithConfig(ctx, config)
 
 	// Instantiate WASI to support standard system calls
 	// Plugins may need basic WASI functions (clock, random, etc.)
