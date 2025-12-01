@@ -24,6 +24,7 @@ environments, and generate standardized audit artifacts.`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		setupLogging()
 	},
+	SilenceUsage: true,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 
 	"gopkg.in/yaml.v3"
 )
@@ -11,7 +12,18 @@ import (
 // LoadProfile loads and parses a profile from a YAML file.
 // It applies control defaults and validates the profile structure.
 func LoadProfile(path string) (*Profile, error) {
-	file, err := os.Open(path)
+	// Security: Use os.OpenRoot to prevent path traversal attacks
+	// resolving symlinks or escaping the intended directory.
+	dir := filepath.Dir(path)
+	base := filepath.Base(path)
+
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open profile directory: %w", err)
+	}
+	defer root.Close()
+
+	file, err := root.Open(base)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open profile: %w", err)
 	}
