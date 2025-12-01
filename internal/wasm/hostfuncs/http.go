@@ -91,12 +91,9 @@ func HTTPRequest(ctx context.Context, mod api.Module, stack []uint64, checker *C
 	_ = headersPtr
 	_ = headersLen
 
-	// Perform HTTP request with timeout
-	requestCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
+	// Perform HTTP request
 	start := time.Now()
-	resp, err := performHTTPRequest(requestCtx, method, url, body)
+	resp, err := performHTTPRequest(ctx, method, url, body)
 	responseTime := time.Since(start).Milliseconds()
 
 	if err != nil {
@@ -110,9 +107,8 @@ func HTTPRequest(ctx context.Context, mod api.Module, stack []uint64, checker *C
 
 // performHTTPRequest executes the actual HTTP request
 func performHTTPRequest(ctx context.Context, method, url string, body io.Reader) (*httpResponse, error) {
-	// Create HTTP client with timeout
+	// Create HTTP client
 	client := &http.Client{
-		Timeout: 30 * time.Second,
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
 				MinVersion: tls.VersionTLS12,
