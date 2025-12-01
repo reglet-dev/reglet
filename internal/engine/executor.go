@@ -19,8 +19,16 @@ type ObservationExecutor struct {
 
 // NewObservationExecutor creates a new observation executor.
 func NewObservationExecutor(runtime *wasm.Runtime) *ObservationExecutor {
-	projectRoot := findProjectRoot()
-	pluginDirPath := filepath.Join(projectRoot, "plugins")
+	var pluginDirPath string
+
+	// 1. Check Env Var (Best for production binaries)
+	if envPath := os.Getenv("REGLET_PLUGIN_DIR"); envPath != "" {
+		pluginDirPath = envPath
+	} else {
+		// 2. Fallback to dev mode logic
+		projectRoot := findProjectRoot()
+		pluginDirPath = filepath.Join(projectRoot, "plugins")
+	}
 
 	return &ObservationExecutor{
 		runtime:   runtime,

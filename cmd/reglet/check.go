@@ -107,7 +107,10 @@ func runCheckAction(ctx context.Context, profilePath string) error {
 	// However, for business logic failure (checks failed), we might not want to print "Error: ..."
 	// but just exit with status 1.
 	if result.Summary.FailedControls > 0 || result.Summary.ErrorControls > 0 {
-		os.Exit(1)
+		return fmt.Errorf("check failed: %d passed, %d failed, %d errors",
+			result.Summary.PassedControls,
+			result.Summary.FailedControls,
+			result.Summary.ErrorControls)
 	}
 
 	return nil
