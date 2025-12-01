@@ -233,23 +233,15 @@ func performHTTPRequest(url, method, body string) (map[string]interface{}, error
 		bodyPtr, bodyLen,
 	)
 
-	// Read result from WASM memory
-	maxSize := uint32(64 * 1024)
-	resultDataFull := readFromMemory(resultPtr, maxSize)
-
-	// Trim null bytes
-	var resultData []byte
-	for i, b := range resultDataFull {
-		if b == 0 {
-			resultData = resultDataFull[:i]
-			break
-		}
-	}
-	if resultData == nil {
-		resultData = resultDataFull
+	// FIX: Retrieve the original slice from our allocations map
+	// The host called OUR allocate function, so we have this pointer registered.
+	resultData, ok := allocations[resultPtr]
+	if !ok {
+		return nil, fmt.Errorf("host returned unknown memory pointer: %d", resultPtr)
 	}
 
-	defer deallocate(resultPtr, maxSize)
+	// Always free the memory when we are done
+	defer deallocate(resultPtr, uint32(len(resultData)))
 
 	// Parse JSON result
 	var result map[string]interface{}
