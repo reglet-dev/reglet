@@ -3,9 +3,9 @@ package engine
 import (
 	"testing"
 
-	"github.com/jrose/reglet/internal/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/whiskeyjimbo/reglet/internal/config"
 )
 
 func TestBuildControlDAG_NoDependencies(t *testing.T) {

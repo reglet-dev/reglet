@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/jrose/reglet/internal/config"
-	"github.com/jrose/reglet/internal/wasm"
+	"github.com/whiskeyjimbo/reglet/internal/config"
+	"github.com/whiskeyjimbo/reglet/internal/wasm"
 )
 
 // ObservationExecutor executes observations using WASM plugins.

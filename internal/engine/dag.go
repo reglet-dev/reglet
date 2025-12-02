@@ -3,7 +3,7 @@ package engine
 import (
 	"fmt"
 
-	"github.com/jrose/reglet/internal/config"
+	"github.com/whiskeyjimbo/reglet/internal/config"
 )
 
 // ControlLevel represents a batch of controls that can run in parallel.

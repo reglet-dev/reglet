@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/jrose/reglet/internal/engine"
+	"github.com/whiskeyjimbo/reglet/internal/engine"
 )
 
 // JSONFormatter formats execution results as JSON.

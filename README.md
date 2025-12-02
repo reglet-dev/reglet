@@ -24,7 +24,7 @@ Designed to bridge the gap between DevOps workflows and rigid compliance framewo
 Clone the repository and build the binary:
 
 ```bash
-git clone https://github.com/jrose/reglet.git
+git clone https://github.com/whiskeyjimbo/reglet.git
 cd reglet
 make build
 ```

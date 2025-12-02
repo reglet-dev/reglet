@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jrose/reglet/internal/config"
-	"github.com/jrose/reglet/internal/wasm"
+	"github.com/whiskeyjimbo/reglet/internal/config"
+	"github.com/whiskeyjimbo/reglet/internal/wasm"
 	"golang.org/x/sync/errgroup"
 )
 

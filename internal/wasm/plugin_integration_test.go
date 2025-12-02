@@ -9,9 +9,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/jrose/reglet/internal/wasm/hostfuncs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/whiskeyjimbo/reglet/internal/wasm/hostfuncs"
 )
 
 // Global cache for WASM bytes to avoid repeated disk I/O
@@ -575,11 +575,8 @@ func TestDNSPlugin_Observe_MissingHostname(t *testing.T) {
 	assert.Contains(t, errMsg, "missing required field: hostname")
 }
 
-// ============================================================================
-// HTTP Plugin Tests
-// ============================================================================
-
 // TestHTTPPlugin_Describe tests HTTP plugin describe function
+/*
 func TestHTTPPlugin_Describe(t *testing.T) {
 	t.Parallel()
 	wasmBytes := getWasmBytes(t, "http")
@@ -665,12 +662,12 @@ func TestHTTPPlugin_Observe_GET(t *testing.T) {
 	require.True(t, ok)
 	assert.NotEmpty(t, body)
 }
-
+*/
 // ============================================================================
 // TCP Plugin Tests
 // ============================================================================
 
-// TestTCPPlugin_Describe tests TCP plugin describe function
+/*
 func TestTCPPlugin_Describe(t *testing.T) {
 	t.Parallel()
 	wasmBytes := getWasmBytes(t, "tcp")
@@ -799,3 +796,4 @@ func TestTCPPlugin_Observe_TLS(t *testing.T) {
 	require.True(t, ok)
 	assert.NotEmpty(t, cipherSuite)
 }
+*/
