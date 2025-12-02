@@ -1,4 +1,4 @@
-module github.com/jrose/reglet
+module github.com/whiskeyjimbo/reglet
 
 go 1.25
 

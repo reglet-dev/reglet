@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jrose/reglet/internal/engine"
+	"github.com/whiskeyjimbo/reglet/internal/engine"
 )
 
 // TableFormatter formats execution results as a human-readable table.

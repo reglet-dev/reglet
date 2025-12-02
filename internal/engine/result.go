@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jrose/reglet/internal/wasm"
+	"github.com/whiskeyjimbo/reglet/internal/wasm"
 )
 
 // Status represents the status of a control or observation.
@@ -37,15 +37,15 @@ type ExecutionResult struct {
 
 // ControlResult represents the result of executing a single control.
 type ControlResult struct {
-	ID           string               `json:"id" yaml:"id"`
-	Name         string               `json:"name" yaml:"name"`
-	Description  string               `json:"description,omitempty" yaml:"description,omitempty"`
-	Severity     string               `json:"severity,omitempty" yaml:"severity,omitempty"`
-	Tags         []string             `json:"tags,omitempty" yaml:"tags,omitempty"`
-	Status       Status               `json:"status" yaml:"status"`
-	Observations []ObservationResult  `json:"observations" yaml:"observations"`
-	Message      string               `json:"message,omitempty" yaml:"message,omitempty"`
-	Duration     time.Duration        `json:"duration_ms" yaml:"duration_ms"`
+	ID           string              `json:"id" yaml:"id"`
+	Name         string              `json:"name" yaml:"name"`
+	Description  string              `json:"description,omitempty" yaml:"description,omitempty"`
+	Severity     string              `json:"severity,omitempty" yaml:"severity,omitempty"`
+	Tags         []string            `json:"tags,omitempty" yaml:"tags,omitempty"`
+	Status       Status              `json:"status" yaml:"status"`
+	Observations []ObservationResult `json:"observations" yaml:"observations"`
+	Message      string              `json:"message,omitempty" yaml:"message,omitempty"`
+	Duration     time.Duration       `json:"duration_ms" yaml:"duration_ms"`
 }
 
 // ObservationResult represents the result of executing a single observation.
@@ -60,15 +60,15 @@ type ObservationResult struct {
 
 // ResultSummary provides aggregate statistics about the execution.
 type ResultSummary struct {
-	TotalControls       int `json:"total_controls" yaml:"total_controls"`
-	PassedControls      int `json:"passed_controls" yaml:"passed_controls"`
-	FailedControls      int `json:"failed_controls" yaml:"failed_controls"`
-	ErrorControls       int `json:"error_controls" yaml:"error_controls"`
-	SkippedControls     int `json:"skipped_controls" yaml:"skipped_controls"`
-	TotalObservations   int `json:"total_observations" yaml:"total_observations"`
-	PassedObservations  int `json:"passed_observations" yaml:"passed_observations"`
-	FailedObservations  int `json:"failed_observations" yaml:"failed_observations"`
-	ErrorObservations   int `json:"error_observations" yaml:"error_observations"`
+	TotalControls      int `json:"total_controls" yaml:"total_controls"`
+	PassedControls     int `json:"passed_controls" yaml:"passed_controls"`
+	FailedControls     int `json:"failed_controls" yaml:"failed_controls"`
+	ErrorControls      int `json:"error_controls" yaml:"error_controls"`
+	SkippedControls    int `json:"skipped_controls" yaml:"skipped_controls"`
+	TotalObservations  int `json:"total_observations" yaml:"total_observations"`
+	PassedObservations int `json:"passed_observations" yaml:"passed_observations"`
+	FailedObservations int `json:"failed_observations" yaml:"failed_observations"`
+	ErrorObservations  int `json:"error_observations" yaml:"error_observations"`
 }
 
 // NewExecutionResult creates a new execution result.

@@ -6,10 +6,10 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/jrose/reglet/internal/config"
-	"github.com/jrose/reglet/internal/engine"
-	"github.com/jrose/reglet/internal/output"
 	"github.com/spf13/cobra"
+	"github.com/whiskeyjimbo/reglet/internal/config"
+	"github.com/whiskeyjimbo/reglet/internal/engine"
+	"github.com/whiskeyjimbo/reglet/internal/output"
 )
 
 var (

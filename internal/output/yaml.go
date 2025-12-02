@@ -3,7 +3,7 @@ package output
 import (
 	"io"
 
-	"github.com/jrose/reglet/internal/engine"
+	"github.com/whiskeyjimbo/reglet/internal/engine"
 	"gopkg.in/yaml.v3"
 )
 

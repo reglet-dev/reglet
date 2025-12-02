@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jrose/reglet/internal/config"
-	"github.com/jrose/reglet/internal/wasm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/whiskeyjimbo/reglet/internal/config"
+	"github.com/whiskeyjimbo/reglet/internal/wasm"
 )
 
 func TestNewEngine(t *testing.T) {

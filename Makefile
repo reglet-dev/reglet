@@ -5,9 +5,9 @@ BINARY_NAME=reglet
 VERSION?=dev
 COMMIT=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE=$(shell date -u '+%Y-%m-%d_%H:%M:%S')
-LDFLAGS=-ldflags "-X github.com/jrose/reglet/internal/version.Version=$(VERSION) \
-                   -X github.com/jrose/reglet/internal/version.Commit=$(COMMIT) \
-                   -X github.com/jrose/reglet/internal/version.BuildDate=$(BUILD_DATE)"
+LDFLAGS=-ldflags "-X github.com/whiskeyjimbo/reglet/internal/version.Version=$(VERSION) \
+                   -X github.com/whiskeyjimbo/reglet/internal/version.Commit=$(COMMIT) \
+                   -X github.com/whiskeyjimbo/reglet/internal/version.BuildDate=$(BUILD_DATE)"
 
 # Go commands
 GOCMD=go

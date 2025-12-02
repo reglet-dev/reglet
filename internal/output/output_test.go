@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jrose/reglet/internal/engine"
-	"github.com/jrose/reglet/internal/wasm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/whiskeyjimbo/reglet/internal/engine"
+	"github.com/whiskeyjimbo/reglet/internal/wasm"
 	"gopkg.in/yaml.v3"
 )
 
