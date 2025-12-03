@@ -4,7 +4,7 @@ PLUGIN_NAME=file.wasm
 
 build: ## Build plugin to WASM
 	@echo "Building file plugin to WASM..."
-	GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -o $(PLUGIN_NAME) main.go
+	GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -o $(PLUGIN_NAME) .
 	@echo "Built: $(PLUGIN_NAME)"
 	@ls -lh $(PLUGIN_NAME)
 
