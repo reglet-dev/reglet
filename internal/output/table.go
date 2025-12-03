@@ -108,7 +108,12 @@ func (f *TableFormatter) formatObservation(obs engine.ObservationResult, index i
 		if len(obs.Evidence.Data) > 0 {
 			// Show evidence data fields
 			for key, value := range obs.Evidence.Data {
-				fmt.Fprintf(f.writer, "       - %s: %v\n", key, value)
+				if key == "error" {
+					// Format error nicely instead of raw map
+					fmt.Fprintf(f.writer, "       - %s: %s\n", key, f.formatError(value))
+				} else {
+					fmt.Fprintf(f.writer, "       - %s: %v\n", key, value)
+				}
 			}
 		}
 	}
@@ -135,6 +140,51 @@ func (f *TableFormatter) formatSummary(summary engine.ResultSummary) {
 	fmt.Fprintf(f.writer, "  ⚠ Errors:   %d\n", summary.ErrorObservations)
 
 	fmt.Fprintln(f.writer, strings.Repeat("─", 80))
+}
+
+// formatError formats an error value from evidence data in a readable way.
+func (f *TableFormatter) formatError(value interface{}) string {
+	// Handle different error formats
+	switch v := value.(type) {
+	case string:
+		// Simple string error
+		return v
+	case map[string]interface{}:
+		// Structured error (ErrorDetail)
+		return f.formatErrorDetail(v, "")
+	default:
+		// Fallback to default formatting
+		return fmt.Sprintf("%v", value)
+	}
+}
+
+// formatErrorDetail formats a structured error with type, code, message, and wrapped errors.
+func (f *TableFormatter) formatErrorDetail(errMap map[string]interface{}, indent string) string {
+	var parts []string
+
+	// Extract error type
+	if errType, ok := errMap["type"].(string); ok && errType != "" && errType != "internal" {
+		parts = append(parts, fmt.Sprintf("[%s]", errType))
+	}
+
+	// Extract error code
+	if code, ok := errMap["code"].(string); ok && code != "" {
+		parts = append(parts, fmt.Sprintf("(%s)", code))
+	}
+
+	// Extract message
+	if message, ok := errMap["message"].(string); ok {
+		parts = append(parts, message)
+	}
+
+	result := indent + strings.Join(parts, " ")
+
+	// Handle wrapped errors
+	if wrapped, ok := errMap["wrapped"].(map[string]interface{}); ok {
+		result += "\n" + f.formatErrorDetail(wrapped, indent+"  caused by: ")
+	}
+
+	return result
 }
 
 // getStatusSymbol returns a symbol for the given status.
