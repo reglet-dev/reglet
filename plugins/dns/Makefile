@@ -1,10 +1,14 @@
-.PHONY: build clean test help
+.PHONY: all build clean test help
 
 PLUGIN_NAME=dns.wasm
 
+all: build ## Default target: build
+
 build: ## Build plugin to WASM
+	@echo "Tidying go.mod for dns plugin..."
+	go mod tidy
 	@echo "Building dns plugin to WASM..."
-	GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -o $(PLUGIN_NAME) main.go
+	GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -o $(PLUGIN_NAME) .
 	@echo "Built: $(PLUGIN_NAME)"
 	@ls -lh $(PLUGIN_NAME)
 
