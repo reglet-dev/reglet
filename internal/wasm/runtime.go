@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/jrose/reglet/internal/wasm/hostfuncs"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
+	"github.com/whiskeyjimbo/reglet/internal/wasm/hostfuncs"
 )
 
 // globalCache is a shared compilation cache for wazero runtimes.

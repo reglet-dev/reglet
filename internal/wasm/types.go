@@ -23,7 +23,7 @@ type Capability struct {
 // Config represents plugin configuration
 // Maps to the WIT config record
 type Config struct {
-	Values map[string]string
+	Values map[string]interface{}
 }
 
 // Evidence represents observation results

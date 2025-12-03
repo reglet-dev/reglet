@@ -36,10 +36,19 @@ func (p *Plugin) Name() string {
 // createModuleConfig creates a fresh module configuration
 // Includes stdout/stderr for debugging visibility
 func (p *Plugin) createModuleConfig() wazero.ModuleConfig {
+	// Get current working directory to mount for file access
+	// This allows plugins to access files relative to where reglet was run
+	cwd, err := os.Getwd()
+	if err != nil {
+		// Fallback to root if we can't get cwd (shouldn't happen)
+		cwd = "/"
+	}
+
 	return wazero.NewModuleConfig().
-		// Mount host root "/" to guest root "/" for filesystem access
-		// TODO Phase 2: Implement proper capability-based restrictions
-		WithFSConfig(wazero.NewFSConfig().WithDirMount("/", "/")).
+		// Mount current working directory to guest "/" for relative file access
+		// This allows plugins to use relative paths like "go.mod" or "./config.yaml"
+		// TODO Phase 2: Implement proper capability-based path restrictions
+		WithFSConfig(wazero.NewFSConfig().WithDirMount(cwd, "/")).
 		// Enable time-related syscalls (needed for file timestamps)
 		WithSysWalltime().
 		WithSysNanotime().
@@ -58,6 +67,11 @@ func (p *Plugin) createInstance(ctx context.Context) (api.Module, error) {
 	instance, err := p.runtime.InstantiateModule(ctx, p.module, p.createModuleConfig())
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate plugin %s: %w", p.name, err)
+	}
+
+	// Debug: List all exported functions
+	for _, def := range instance.ExportedFunctionDefinitions() {
+		fmt.Fprintf(os.Stderr, "DEBUG: Exported function: %s from %s\n", def.Name(), p.name)
 	}
 
 	// Call _initialize for WASI modules built with -buildmode=c-shared
@@ -285,6 +299,32 @@ func (p *Plugin) Observe(ctx context.Context, cfg Config) (*ObservationResult, e
 				Message: errMsg,
 			},
 		}, nil
+	}
+
+	// Normalize SDK evidence format:
+	// SDK returns { "status": bool, "data": { ... }, "error": { ... } }
+	// Host expects flattened structure in Evidence.Data
+	if dataMap, ok := rawResult["data"].(map[string]interface{}); ok {
+		if status, ok := rawResult["status"].(bool); ok {
+			// It looks like SDK format. Flatten it.
+			// Use the inner data map as base
+			finalData := dataMap
+			// Inject status
+			finalData["status"] = status
+			// Inject error (convert to string if possible for compatibility)
+			if errVal, ok := rawResult["error"]; ok && errVal != nil {
+				if errMap, ok := errVal.(map[string]interface{}); ok {
+					if msg, ok := errMap["message"].(string); ok {
+						finalData["error"] = msg
+					} else {
+						finalData["error"] = fmt.Sprintf("%v", errMap)
+					}
+				} else {
+					finalData["error"] = errVal
+				}
+			}
+			return &ObservationResult{Evidence: &Evidence{Data: finalData}}, nil
+		}
 	}
 
 	// Parse as evidence (includes results with status=false and error messages)
