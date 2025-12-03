@@ -2,67 +2,104 @@ package hostfuncs
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net"
 	"time"
 
 	"github.com/tetratelabs/wazero/api"
 )
 
-// DNSLookup performs DNS resolution on behalf of the plugin
-// Parameters: hostnamePtr (i32), hostnameLen (i32), recordTypePtr (i32), recordTypeLen (i32)
-// Returns: resultPtr (i32) - pointer to JSON result in WASM memory
+// DNSLookup performs DNS resolution on behalf of the plugin.
+// It receives a packed uint64 (ptr+len) pointing to a JSON-encoded DNSRequestWire.
+// It returns a packed uint64 (ptr+len) pointing to a JSON-encoded DNSResponseWire.
 func DNSLookup(ctx context.Context, mod api.Module, stack []uint64, checker *CapabilityChecker) {
-	hostnamePtr := uint32(stack[0])
-	hostnameLen := uint32(stack[1])
-	recordTypePtr := uint32(stack[2])
-	recordTypeLen := uint32(stack[3])
+	// Stack contains a single uint64 which is packed ptr+len of the request.
+	requestPacked := stack[0]
+	ptr, length := unpackPtrLen(requestPacked)
+
+	requestBytes, ok := mod.Memory().Read(ptr, length)
+	if !ok {
+		// This is a critical error, Host could not read Guest memory.
+		errMsg := "hostfuncs: failed to read DNS request from Guest memory"
+		slog.ErrorContext(ctx, errMsg)
+		stack[0] = hostWriteResponse(ctx, mod, DNSResponseWire{
+			Error: &ErrorDetail{Message: errMsg, Type: "internal"},
+		})
+		return
+	}
+
+	var request DNSRequestWire
+	if err := json.Unmarshal(requestBytes, &request); err != nil {
+		errMsg := fmt.Sprintf("hostfuncs: failed to unmarshal DNS request: %v", err)
+		slog.ErrorContext(ctx, errMsg)
+		stack[0] = hostWriteResponse(ctx, mod, DNSResponseWire{
+			Error: &ErrorDetail{Message: errMsg, Type: "internal"},
+		})
+		return
+	}
+
+	// Create a new context from the wire format, with parent ctx for cancellation.
+	lookupCtx, cancel := createContextFromWire(ctx, request.Context)
+	defer cancel() // Ensure context resources are released.
 
 	// 1. Check capability
 	if err := checker.Check("network", "outbound:53"); err != nil {
-		stack[0] = uint64(writeError(ctx, mod, "permission denied: "+err.Error()))
+		errMsg := fmt.Sprintf("permission denied: %v", err)
+		slog.WarnContext(ctx, errMsg, "hostname", request.Hostname)
+		stack[0] = hostWriteResponse(ctx, mod, DNSResponseWire{
+			Error: &ErrorDetail{Message: errMsg, Type: "capability"},
+		})
 		return
 	}
 
-	// 2. Read hostname from WASM memory
-	hostnameBytes, ok := mod.Memory().Read(hostnamePtr, hostnameLen)
-	if !ok {
-		stack[0] = uint64(writeError(ctx, mod, "failed to read hostname from memory"))
-		return
-	}
-	hostname := string(hostnameBytes)
-
-	// 3. Read record type from WASM memory
-	recordTypeBytes, ok := mod.Memory().Read(recordTypePtr, recordTypeLen)
-	if !ok {
-		stack[0] = uint64(writeError(ctx, mod, "failed to read record type from memory"))
-		return
-	}
-	recordType := string(recordTypeBytes)
-
-	// 4. Validate input
-	if hostname == "" {
-		stack[0] = uint64(writeError(ctx, mod, "hostname cannot be empty"))
+	// 2. Validate input
+	if request.Hostname == "" {
+		errMsg := "hostname cannot be empty"
+		slog.WarnContext(ctx, errMsg)
+		stack[0] = hostWriteResponse(ctx, mod, DNSResponseWire{
+			Error: &ErrorDetail{Message: errMsg, Type: "config"},
+		})
 		return
 	}
 
-	// 5. Perform DNS lookup with timeout
-	lookupCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	records, err := performDNSLookup(lookupCtx, hostname, recordType)
+	// 3. Perform DNS lookup
+	records, err := performDNSLookup(lookupCtx, request.Hostname, request.Type, request.Nameserver)
 	if err != nil {
-		stack[0] = uint64(writeError(ctx, mod, fmt.Sprintf("DNS lookup failed: %v", err)))
+		errMsg := fmt.Sprintf("DNS lookup failed: %v", err)
+		slog.ErrorContext(ctx, errMsg, "hostname", request.Hostname, "record_type", request.Type)
+		stack[0] = hostWriteResponse(ctx, mod, DNSResponseWire{
+			Error: toErrorDetail(err),
+		})
 		return
 	}
 
-	// 6. Write success response to WASM memory and return pointer
-	stack[0] = uint64(writeSuccess(ctx, mod, records))
+	// 4. Write success response
+	stack[0] = hostWriteResponse(ctx, mod, DNSResponseWire{
+		Records: records,
+	})
 }
 
 // performDNSLookup executes the actual DNS lookup based on record type
-func performDNSLookup(ctx context.Context, hostname string, recordType string) ([]string, error) {
-	resolver := net.DefaultResolver
+func performDNSLookup(ctx context.Context, hostname string, recordType string, nameserver string) ([]string, error) {
+	var resolver *net.Resolver
+
+	if nameserver != "" {
+		// Use custom resolver
+		resolver = &net.Resolver{
+			PreferGo: true,
+			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+				d := net.Dialer{
+					Timeout: 5 * time.Second, // Default timeout for connection
+				}
+				return d.DialContext(ctx, "udp", nameserver)
+			},
+		}
+	} else {
+		// Use default resolver
+		resolver = net.DefaultResolver
+	}
 
 	switch recordType {
 	case "A":
