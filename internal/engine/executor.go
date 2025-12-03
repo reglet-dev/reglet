@@ -17,7 +17,7 @@ type ObservationExecutor struct {
 	pluginDir string // Base directory where plugins are located (e.g., /path/to/project/plugins)
 }
 
-// NewObservationExecutor creates a new observation executor.
+// NewObservationExecutor creates a new observation executor with auto-detected plugin directory.
 func NewObservationExecutor(runtime *wasm.Runtime) *ObservationExecutor {
 	var pluginDirPath string
 
@@ -33,6 +33,14 @@ func NewObservationExecutor(runtime *wasm.Runtime) *ObservationExecutor {
 	return &ObservationExecutor{
 		runtime:   runtime,
 		pluginDir: pluginDirPath,
+	}
+}
+
+// NewExecutor creates a new observation executor with explicit plugin directory.
+func NewExecutor(runtime *wasm.Runtime, pluginDir string) *ObservationExecutor {
+	return &ObservationExecutor{
+		runtime:   runtime,
+		pluginDir: pluginDir,
 	}
 }
 
@@ -84,13 +92,9 @@ func (e *ObservationExecutor) Execute(ctx context.Context, obs config.Observatio
 	}
 
 	// Convert observation config to WASM config
+	// Pass config values directly without type conversion to preserve types (int, bool, etc.)
 	wasmConfig := wasm.Config{
-		Values: make(map[string]string),
-	}
-
-	// Convert config map to string values
-	for key, value := range obs.Config {
-		wasmConfig.Values[key] = fmt.Sprintf("%v", value)
+		Values: obs.Config,
 	}
 
 	// Execute the observation

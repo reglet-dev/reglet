@@ -8,6 +8,7 @@ import (
 
 	"github.com/whiskeyjimbo/reglet/internal/config"
 	"github.com/whiskeyjimbo/reglet/internal/wasm"
+	"github.com/whiskeyjimbo/reglet/internal/wasm/hostfuncs"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -37,14 +38,60 @@ type Engine struct {
 	config   ExecutionConfig
 }
 
+// CapabilityManager defines the interface for capability management
+type CapabilityManager interface {
+	CollectRequiredCapabilities(ctx context.Context, profile *config.Profile, runtime *wasm.Runtime, pluginDir string) ([]hostfuncs.Capability, error)
+	GrantCapabilities(required []hostfuncs.Capability) ([]hostfuncs.Capability, error)
+}
+
 // NewEngine creates a new execution engine with default configuration.
 func NewEngine(ctx context.Context) (*Engine, error) {
 	return NewEngineWithConfig(ctx, DefaultExecutionConfig())
 }
 
+// NewEngineWithCapabilities creates an engine with interactive capability prompts
+func NewEngineWithCapabilities(ctx context.Context, capMgr CapabilityManager, pluginDir string, profile *config.Profile) (*Engine, error) {
+	// Create temporary runtime with no capabilities to load plugins and get requirements
+	tempRuntime, err := wasm.NewRuntime(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temporary runtime: %w", err)
+	}
+
+	// Collect required capabilities from all plugins
+	required, err := capMgr.CollectRequiredCapabilities(ctx, profile, tempRuntime, pluginDir)
+	if err != nil {
+		tempRuntime.Close(ctx)
+		return nil, fmt.Errorf("failed to collect capabilities: %w", err)
+	}
+
+	// Close temporary runtime
+	tempRuntime.Close(ctx)
+
+	// Get granted capabilities (will prompt user if needed)
+	granted, err := capMgr.GrantCapabilities(required)
+	if err != nil {
+		return nil, fmt.Errorf("failed to grant capabilities: %w", err)
+	}
+
+	// Create WASM runtime with granted capabilities
+	runtime, err := wasm.NewRuntimeWithCapabilities(ctx, granted)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create WASM runtime: %w", err)
+	}
+
+	// Create observation executor
+	executor := NewObservationExecutor(runtime)
+
+	return &Engine{
+		runtime:  runtime,
+		executor: executor,
+		config:   DefaultExecutionConfig(),
+	}, nil
+}
+
 // NewEngineWithConfig creates a new execution engine with custom configuration.
 func NewEngineWithConfig(ctx context.Context, cfg ExecutionConfig) (*Engine, error) {
-	// Create WASM runtime
+	// Create WASM runtime with no capabilities (legacy path)
 	runtime, err := wasm.NewRuntime(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create WASM runtime: %w", err)
