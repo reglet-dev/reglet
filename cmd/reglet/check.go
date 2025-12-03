@@ -5,16 +5,19 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"github.com/whiskeyjimbo/reglet/internal/capabilities"
 	"github.com/whiskeyjimbo/reglet/internal/config"
 	"github.com/whiskeyjimbo/reglet/internal/engine"
 	"github.com/whiskeyjimbo/reglet/internal/output"
 )
 
 var (
-	format  string
-	outFile string
+	format       string
+	outFile      string
+	trustPlugins bool
 )
 
 // checkCmd represents the check command
@@ -34,6 +37,7 @@ func init() {
 
 	checkCmd.Flags().StringVar(&format, "format", "table", "Output format: table, json, yaml")
 	checkCmd.Flags().StringVarP(&outFile, "output", "o", "", "Output file path (default: stdout)")
+	checkCmd.Flags().BoolVar(&trustPlugins, "trust-plugins", false, "Auto-grant all plugin capabilities (use with caution)")
 }
 
 // runCheckAction implements the core logic for the check command
@@ -60,8 +64,17 @@ func runCheckAction(ctx context.Context, profilePath string) error {
 
 	slog.Info("profile validated", "controls", len(profile.Controls.Items))
 
-	// Create execution engine
-	eng, err := engine.NewEngine(ctx)
+	// Determine plugin directory (relative to current working directory or executable)
+	pluginDir, err := determinePluginDir()
+	if err != nil {
+		return fmt.Errorf("failed to determine plugin directory: %w", err)
+	}
+
+	// Create capability manager
+	capMgr := capabilities.NewManager(trustPlugins)
+
+	// Create execution engine with capability manager
+	eng, err := engine.NewEngineWithCapabilities(ctx, capMgr, pluginDir, profile)
 	if err != nil {
 		return fmt.Errorf("failed to create engine: %w", err)
 	}
@@ -114,6 +127,34 @@ func runCheckAction(ctx context.Context, profilePath string) error {
 	}
 
 	return nil
+}
+
+// determinePluginDir finds the plugin directory
+func determinePluginDir() (string, error) {
+	// Try current working directory first
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+
+	pluginDir := filepath.Join(cwd, "plugins")
+	if _, err := os.Stat(pluginDir); err == nil {
+		return pluginDir, nil
+	}
+
+	// Fallback to executable directory
+	exePath, err := os.Executable()
+	if err != nil {
+		return "", err
+	}
+
+	exeDir := filepath.Dir(exePath)
+	pluginDir = filepath.Join(exeDir, "..", "plugins")
+	if _, err := os.Stat(pluginDir); err == nil {
+		return pluginDir, nil
+	}
+
+	return "", fmt.Errorf("plugin directory not found in %s or %s", cwd, exeDir)
 }
 
 // formatOutput formats the result using the specified formatter
