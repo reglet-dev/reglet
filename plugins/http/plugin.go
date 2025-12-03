@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net/http"
@@ -44,6 +46,7 @@ type HTTPConfig struct {
 	Body                 string `json:"body,omitempty" description:"Request body"`
 	ExpectedStatus       int    `json:"expected_status,omitempty" description:"Expected HTTP status code (optional)"`
 	ExpectedBodyContains string `json:"expected_body_contains,omitempty" description:"String that should be present in response body (optional)"`
+	BodyPreviewLength    int    `json:"body_preview_length,omitempty" default:"200" description:"Number of characters to include from response body (0 = hash only, -1 = full body)"`
 }
 
 // Schema returns the JSON schema for the plugin's configuration.
@@ -56,6 +59,11 @@ func (p *httpPlugin) Check(ctx context.Context, config regletsdk.Config) (reglet
 	// Set default method
 	if _, ok := config["method"]; !ok {
 		config["method"] = "GET"
+	}
+
+	// Set default body_preview_length
+	if _, ok := config["body_preview_length"]; !ok {
+		config["body_preview_length"] = 200
 	}
 
 	var cfg HTTPConfig
@@ -93,16 +101,33 @@ func (p *httpPlugin) Check(ctx context.Context, config regletsdk.Config) (reglet
 	if err != nil {
 		return regletsdk.NetworkError(fmt.Sprintf("failed to read response body: %v", err), err), nil
 	}
-	respBody := string(respBodyBytes)
+
+	// Calculate body hash for verification
+	hash := sha256.Sum256(respBodyBytes)
+	bodyHash := hex.EncodeToString(hash[:])
 
 	// Collect Result Data
 	result := map[string]interface{}{
 		"status_code": resp.StatusCode,
 		"body_size":   len(respBodyBytes),
-		// "headers": resp.Header, // Can be verbose
-		"body": respBody, // Include body for evidence? Careful with size.
-		// Maybe truncate body?
+		"body_sha256": bodyHash,
 	}
+
+	// Include body content based on configuration
+	if cfg.BodyPreviewLength == -1 {
+		// Include full body
+		result["body"] = string(respBodyBytes)
+	} else if cfg.BodyPreviewLength > 0 {
+		// Include preview
+		respBody := string(respBodyBytes)
+		if len(respBody) > cfg.BodyPreviewLength {
+			result["body_preview"] = respBody[:cfg.BodyPreviewLength] + "..."
+			result["body_truncated"] = true
+		} else {
+			result["body"] = respBody
+		}
+	}
+	// If BodyPreviewLength == 0, only include hash and size (no body content)
 
 	// Validate Expectations
 	if cfg.ExpectedStatus != 0 {
@@ -117,6 +142,7 @@ func (p *httpPlugin) Check(ctx context.Context, config regletsdk.Config) (reglet
 	}
 
 	if cfg.ExpectedBodyContains != "" {
+		respBody := string(respBodyBytes)
 		if !strings.Contains(respBody, cfg.ExpectedBodyContains) {
 			result["expectation_failed"] = true
 			result["expectation_error"] = fmt.Sprintf("expected body to contain '%s'", cfg.ExpectedBodyContains)
