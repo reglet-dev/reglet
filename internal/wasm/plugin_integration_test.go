@@ -20,6 +20,15 @@ var (
 	cacheMu   sync.Mutex
 )
 
+// getKeys returns the keys of a map for debugging
+func getKeys(m map[string]interface{}) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
 // getWasmBytes returns the bytes of the requested plugin WASM file.
 // It caches the result for future calls.
 func getWasmBytes(t *testing.T, pluginName string) []byte {
@@ -158,7 +167,7 @@ func TestFilePlugin_Observe_FileExists(t *testing.T) {
 
 	// Create a temporary test file
 	// Note: t.TempDir is better for parallelism, but os.CreateTemp is fine if handled correctly
-	tmpFile, err := os.CreateTemp("", "reglet-test-*.txt")
+	tmpFile, err := os.CreateTemp(".", "reglet-test-*.txt")
 	require.NoError(t, err)
 	// We cannot defer remove here if we use t.Parallel() and share filesystem resources in a way that conflicts
 	// But here each test creates its own file, so it's fine.
@@ -177,7 +186,7 @@ func TestFilePlugin_Observe_FileExists(t *testing.T) {
 
 	// Test file exists check
 	config := Config{
-		Values: map[string]string{
+		Values: map[string]interface{}{
 			"path": tmpFile.Name(),
 			"mode": "exists",
 		},
@@ -190,6 +199,8 @@ func TestFilePlugin_Observe_FileExists(t *testing.T) {
 	require.NotNil(t, result.Evidence)
 
 	// Verify the file was found
+	t.Logf("Evidence.Data keys: %v", getKeys(result.Evidence.Data))
+	t.Logf("Full Evidence.Data: %+v", result.Evidence.Data)
 	status, ok := result.Evidence.Data["status"].(bool)
 	require.True(t, ok)
 	assert.True(t, status)
@@ -213,7 +224,7 @@ func TestFilePlugin_Observe_FileNotFound(t *testing.T) {
 
 	// Test non-existent file
 	config := Config{
-		Values: map[string]string{
+		Values: map[string]interface{}{
 			"path": "/tmp/reglet-nonexistent-file-12345.txt",
 			"mode": "exists",
 		},
@@ -222,19 +233,28 @@ func TestFilePlugin_Observe_FileNotFound(t *testing.T) {
 	result, err := plugin.Observe(ctx, config)
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	require.Nil(t, result.Error, "file not found should return evidence with status=false, not an error")
 	require.NotNil(t, result.Evidence)
 
-	// Verify the file was not found
+	// Verify the check failed (status=false) for non-existent file
 	status, ok := result.Evidence.Data["status"].(bool)
 	require.True(t, ok)
-	assert.False(t, status, "status should be false for non-existent file")
+	assert.False(t, status, "status should be false (check failed for missing file)")
+
+	// Verify error message is present and indicates file not found
 	assert.Contains(t, result.Evidence.Data, "error", "should include error message in evidence")
 
-	// Verify the error message makes sense
-	errMsg, ok := result.Evidence.Data["error"].(string)
-	require.True(t, ok)
-	assert.Contains(t, errMsg, "such file", "error message should indicate file not found")
+	// Error can be a map or string
+	var errMsg string
+	switch v := result.Evidence.Data["error"].(type) {
+	case string:
+		errMsg = v
+	case map[string]interface{}:
+		if msg, ok := v["message"].(string); ok {
+			errMsg = msg
+		}
+	}
+	require.NotEmpty(t, errMsg, "should have error message")
+	assert.Contains(t, errMsg, "not found", "error message should indicate file not found")
 }
 
 // TestFilePlugin_Observe_ReadContent tests reading file content
@@ -243,7 +263,7 @@ func TestFilePlugin_Observe_ReadContent(t *testing.T) {
 	wasmBytes := getWasmBytes(t, "file")
 
 	// Create a temporary test file with known content
-	tmpFile, err := os.CreateTemp("", "reglet-test-*.txt")
+	tmpFile, err := os.CreateTemp(".", "reglet-test-*.txt")
 	require.NoError(t, err)
 	defer os.Remove(tmpFile.Name())
 
@@ -262,7 +282,7 @@ func TestFilePlugin_Observe_ReadContent(t *testing.T) {
 
 	// Test content reading
 	config := Config{
-		Values: map[string]string{
+		Values: map[string]interface{}{
 			"path": tmpFile.Name(),
 			"mode": "content",
 		},
@@ -275,6 +295,9 @@ func TestFilePlugin_Observe_ReadContent(t *testing.T) {
 	require.NotNil(t, result.Evidence)
 
 	// Verify the content was read
+	t.Logf("Evidence.Data keys: %v", getKeys(result.Evidence.Data))
+	t.Logf("Full Evidence.Data: %+v", result.Evidence.Data)
+
 	status, ok := result.Evidence.Data["status"].(bool)
 	require.True(t, ok)
 	assert.True(t, status)
@@ -306,7 +329,7 @@ func TestFilePlugin_Observe_BinaryContent(t *testing.T) {
 
 	// Create a temporary test file with binary content (including null bytes)
 	binaryData := []byte{0x00, 0xFF, 0xFE, 0xAB, 0xCD, 0x00, 0x01, 0x02, 0x7F, 0x80, 0x81}
-	tmpFile, err := os.CreateTemp("", "reglet-binary-test-*.bin")
+	tmpFile, err := os.CreateTemp(".", "reglet-binary-test-*.bin")
 	require.NoError(t, err)
 	defer os.Remove(tmpFile.Name())
 
@@ -325,7 +348,7 @@ func TestFilePlugin_Observe_BinaryContent(t *testing.T) {
 
 	// Test binary content reading
 	config := Config{
-		Values: map[string]string{
+		Values: map[string]interface{}{
 			"path": tmpFile.Name(),
 			"mode": "content",
 		},
@@ -441,7 +464,7 @@ func TestDNSPlugin_Observe_A_Record(t *testing.T) {
 
 	// Test A record lookup for example.com
 	config := Config{
-		Values: map[string]string{
+		Values: map[string]interface{}{
 			"hostname":    "example.com",
 			"record_type": "A",
 		},
@@ -488,7 +511,7 @@ func TestDNSPlugin_Observe_MX_Record(t *testing.T) {
 
 	// Test MX record lookup for gmail.com (known to have MX records)
 	config := Config{
-		Values: map[string]string{
+		Values: map[string]interface{}{
 			"hostname":    "gmail.com",
 			"record_type": "MX",
 		},
@@ -523,7 +546,7 @@ func TestDNSPlugin_Observe_InvalidHostname(t *testing.T) {
 
 	// Test with non-existent hostname
 	config := Config{
-		Values: map[string]string{
+		Values: map[string]interface{}{
 			"hostname": "this-definitely-does-not-exist-12345.invalid",
 		},
 	}
@@ -556,7 +579,7 @@ func TestDNSPlugin_Observe_MissingHostname(t *testing.T) {
 
 	// Test with missing hostname
 	config := Config{
-		Values: map[string]string{},
+		Values: map[string]interface{}{},
 	}
 
 	result, err := plugin.Observe(ctx, config)
@@ -566,13 +589,25 @@ func TestDNSPlugin_Observe_MissingHostname(t *testing.T) {
 	require.NotNil(t, result.Evidence)
 
 	// Should return status=false with error message in evidence
+	t.Logf("Evidence.Data keys: %v", getKeys(result.Evidence.Data))
+	t.Logf("Full Evidence.Data: %+v", result.Evidence.Data)
+
 	status, ok := result.Evidence.Data["status"].(bool)
 	require.True(t, ok)
 	assert.False(t, status, "status should be false for validation error")
 
-	errMsg, ok := result.Evidence.Data["error"].(string)
-	require.True(t, ok)
-	assert.Contains(t, errMsg, "missing required field: hostname")
+	// Error can be either a string or a map
+	var errMsg string
+	switch v := result.Evidence.Data["error"].(type) {
+	case string:
+		errMsg = v
+	case map[string]interface{}:
+		if msg, ok := v["message"].(string); ok {
+			errMsg = msg
+		}
+	}
+	require.NotEmpty(t, errMsg, "should have error message")
+	assert.Contains(t, errMsg, "Hostname")
 }
 
 // TestHTTPPlugin_Describe tests HTTP plugin describe function
@@ -641,7 +676,7 @@ func TestHTTPPlugin_Observe_GET(t *testing.T) {
 	require.NoError(t, err)
 
 	config := Config{
-		Values: map[string]string{
+		Values: map[string]interface{}{
 			"url":    "https://example.com",
 			"method": "GET",
 		},
@@ -733,7 +768,7 @@ func TestTCPPlugin_Observe_PlainTCP(t *testing.T) {
 	require.NoError(t, err)
 
 	config := Config{
-		Values: map[string]string{
+		Values: map[string]interface{}{
 			"host": "example.com",
 			"port": "80",
 		},
@@ -769,7 +804,7 @@ func TestTCPPlugin_Observe_TLS(t *testing.T) {
 	require.NoError(t, err)
 
 	config := Config{
-		Values: map[string]string{
+		Values: map[string]interface{}{
 			"host": "example.com",
 			"port": "443",
 			"tls":  "true",

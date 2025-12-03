@@ -32,7 +32,7 @@ func TestPlugin_Observe_Concurrent(t *testing.T) {
 	expectedPaths := make([]string, numFiles)
 
 	for i := 0; i < numFiles; i++ {
-		f, err := os.CreateTemp("", "concurrent-test-*.txt")
+		f, err := os.CreateTemp(".", "concurrent-test-*.txt")
 		require.NoError(t, err)
 		defer os.Remove(f.Name())
 
@@ -55,7 +55,7 @@ func TestPlugin_Observe_Concurrent(t *testing.T) {
 			defer wg.Done()
 
 			config := Config{
-				Values: map[string]string{
+				Values: map[string]interface{}{
 					"path": expectedPaths[idx],
 					"mode": "exists",
 				},
@@ -108,7 +108,7 @@ func TestPlugin_ConcurrentDifferentMethods(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a test file
-	tmpFile, err := os.CreateTemp("", "method-test-*.txt")
+	tmpFile, err := os.CreateTemp(".", "method-test-*.txt")
 	require.NoError(t, err)
 	defer os.Remove(tmpFile.Name())
 	tmpFile.WriteString("Test content")
@@ -138,7 +138,7 @@ func TestPlugin_ConcurrentDifferentMethods(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		config := Config{
-			Values: map[string]string{
+			Values: map[string]interface{}{
 				"path": tmpFile.Name(),
 				"mode": "exists",
 			},
