@@ -258,10 +258,15 @@ func (e *Engine) executeObservationsParallel(ctx context.Context, observations [
 }
 
 // aggregateControlStatus determines overall control status from observations.
-// Logic for Phase 1b:
-//   - If any observation is StatusError → Control is StatusError
+// CRITICAL: Proven failures take precedence over errors for compliance reporting.
+// Logic:
+//   - If any observation is StatusFail → Control is StatusFail (proven non-compliance)
+//   - If any observation is StatusError (but no failures) → Control is StatusError (inconclusive)
 //   - If all observations are StatusPass → Control is StatusPass
-//   - If any observation is StatusFail → Control is StatusFail
+//
+// Rationale: If 9 observations FAIL and 1 errors, the control FAILED (not errored).
+// A proven compliance violation is more important than a technical error.
+// Auditors need to see definitive failures, not have them masked by errors.
 func aggregateControlStatus(observations []ObservationResult) Status {
 	if len(observations) == 0 {
 		return StatusError
@@ -282,14 +287,15 @@ func aggregateControlStatus(observations []ObservationResult) Status {
 		}
 	}
 
-	// Errors take precedence
-	if hasError {
-		return StatusError
-	}
-
-	// If any failures, control fails
+	// CRITICAL: Failures take precedence over errors
+	// If we proved non-compliance, that's what matters
 	if hasFail {
 		return StatusFail
+	}
+
+	// Errors only matter if we don't have proven failures
+	if hasError {
+		return StatusError
 	}
 
 	// All observations passed

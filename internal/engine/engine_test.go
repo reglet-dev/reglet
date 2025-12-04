@@ -62,7 +62,7 @@ func TestAggregateControlStatus_OneError(t *testing.T) {
 	assert.Equal(t, StatusError, status)
 }
 
-func TestAggregateControlStatus_ErrorTakesPrecedence(t *testing.T) {
+func TestAggregateControlStatus_FailTakesPrecedenceOverError(t *testing.T) {
 	t.Parallel()
 	observations := []ObservationResult{
 		{Status: StatusPass},
@@ -70,9 +70,24 @@ func TestAggregateControlStatus_ErrorTakesPrecedence(t *testing.T) {
 		{Status: StatusError, Error: &wasm.PluginError{Code: "test", Message: "test error"}},
 	}
 
-	// Error should take precedence over Fail
+	// CRITICAL: Fail should take precedence over Error for compliance reporting
+	// If we proved non-compliance (fail), that's more important than a technical error
+	// Scenario: 9 observations FAIL, 1 errors -> control should be FAIL (not ERROR)
 	status := aggregateControlStatus(observations)
-	assert.Equal(t, StatusError, status)
+	assert.Equal(t, StatusFail, status, "Proven failures must take precedence over errors")
+}
+
+func TestAggregateControlStatus_ErrorWithoutFail(t *testing.T) {
+	t.Parallel()
+	observations := []ObservationResult{
+		{Status: StatusPass},
+		{Status: StatusPass},
+		{Status: StatusError, Error: &wasm.PluginError{Code: "test", Message: "test error"}},
+	}
+
+	// Errors should still be reported when there are no failures
+	status := aggregateControlStatus(observations)
+	assert.Equal(t, StatusError, status, "Errors should be reported when there are no proven failures")
 }
 
 func TestAggregateControlStatus_NoObservations(t *testing.T) {
