@@ -45,7 +45,12 @@ func DNSLookup(ctx context.Context, mod api.Module, stack []uint64, checker *Cap
 	defer cancel() // Ensure context resources are released.
 
 	// 1. Check capability
-	if err := checker.Check("network", "outbound:53"); err != nil {
+	pluginName := mod.Name()
+	if name, ok := PluginNameFromContext(ctx); ok {
+		pluginName = name
+	}
+
+	if err := checker.Check(pluginName, "network", "outbound:53"); err != nil {
 		errMsg := fmt.Sprintf("permission denied: %v", err)
 		slog.WarnContext(ctx, errMsg, "hostname", request.Hostname)
 		stack[0] = hostWriteResponse(ctx, mod, DNSResponseWire{

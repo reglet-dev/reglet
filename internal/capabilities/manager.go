@@ -49,7 +49,7 @@ func isInteractive() bool {
 }
 
 // CollectRequiredCapabilities loads all plugins in parallel and collects their required capabilities
-func (m *Manager) CollectRequiredCapabilities(ctx context.Context, profile *config.Profile, runtime *wasm.Runtime, pluginDir string) ([]hostfuncs.Capability, error) {
+func (m *Manager) CollectRequiredCapabilities(ctx context.Context, profile *config.Profile, runtime *wasm.Runtime, pluginDir string) (map[string][]hostfuncs.Capability, error) {
 	// Get unique plugin names from profile
 	pluginNames := make(map[string]bool)
 	for _, ctrl := range profile.Controls.Items {
@@ -66,7 +66,7 @@ func (m *Manager) CollectRequiredCapabilities(ctx context.Context, profile *conf
 
 	// Thread-safe map for collecting capabilities
 	var mu sync.Mutex
-	required := make(map[string]hostfuncs.Capability)
+	required := make(map[string][]hostfuncs.Capability)
 
 	// Load plugins in parallel
 	g, ctx := errgroup.WithContext(ctx)
@@ -93,13 +93,14 @@ func (m *Manager) CollectRequiredCapabilities(ctx context.Context, profile *conf
 
 			// Collect capabilities (thread-safe)
 			mu.Lock()
+			var caps []hostfuncs.Capability
 			for _, cap := range info.Capabilities {
-				key := fmt.Sprintf("%s:%s", cap.Kind, cap.Pattern)
-				required[key] = hostfuncs.Capability{
+				caps = append(caps, hostfuncs.Capability{
 					Kind:    cap.Kind,
 					Pattern: cap.Pattern,
-				}
+				})
 			}
+			required[name] = caps
 			mu.Unlock()
 
 			return nil
@@ -111,21 +112,29 @@ func (m *Manager) CollectRequiredCapabilities(ctx context.Context, profile *conf
 		return nil, err
 	}
 
-	// Convert map to slice
-	result := make([]hostfuncs.Capability, 0, len(required))
-	for _, cap := range required {
-		result = append(result, cap)
-	}
-
-	return result, nil
+	return required, nil
 }
 
 // GrantCapabilities determines which capabilities to grant based on user input
-func (m *Manager) GrantCapabilities(required []hostfuncs.Capability) ([]hostfuncs.Capability, error) {
+func (m *Manager) GrantCapabilities(required map[string][]hostfuncs.Capability) (map[string][]hostfuncs.Capability, error) {
+	// Flatten all required capabilities to a unique set for user prompting
+	flatRequired := make([]hostfuncs.Capability, 0)
+	seen := make(map[string]bool)
+
+	for _, caps := range required {
+		for _, cap := range caps {
+			key := fmt.Sprintf("%s:%s", cap.Kind, cap.Pattern)
+			if !seen[key] {
+				flatRequired = append(flatRequired, cap)
+				seen[key] = true
+			}
+		}
+	}
+
 	// If --trust-plugins flag is set, grant everything
 	if m.trustAll {
 		fmt.Fprintln(os.Stderr, "⚠️  Auto-granting all requested capabilities (--trust-plugins enabled)")
-		m.grants = required
+		m.grants = flatRequired
 		return required, nil
 	}
 
@@ -137,51 +146,75 @@ func (m *Manager) GrantCapabilities(required []hostfuncs.Capability) ([]hostfunc
 	}
 
 	// Determine which capabilities are not already granted
-	missing := m.findMissingCapabilities(required, existingGrants)
+	missing := m.findMissingCapabilities(flatRequired, existingGrants)
 
+	var grantedGlobal []hostfuncs.Capability
 	if len(missing) == 0 {
 		// All capabilities already granted
-		m.grants = existingGrants
-		return existingGrants, nil
-	}
-
-	// Prompt for missing capabilities
-	if !m.interactive {
-		// Non-interactive mode - fail with clear instructions
-		return nil, m.formatNonInteractiveError(missing)
-	}
-
-	// Interactive prompts
-	newGrants := existingGrants
-	shouldSave := false
-
-	for _, cap := range missing {
-		granted, always, err := m.promptForCapability(cap)
-		if err != nil {
-			return nil, err
+		grantedGlobal = existingGrants
+	} else {
+		// Prompt for missing capabilities
+		if !m.interactive {
+			// Non-interactive mode - fail with clear instructions
+			return nil, m.formatNonInteractiveError(missing)
 		}
 
-		if granted {
-			newGrants = append(newGrants, cap)
-			if always {
-				shouldSave = true
+		// Interactive prompts
+		newGrants := existingGrants
+		shouldSave := false
+
+		for _, cap := range missing {
+			granted, always, err := m.promptForCapability(cap)
+			if err != nil {
+				return nil, err
 			}
-		} else {
-			return nil, fmt.Errorf("capability denied by user: %s:%s", cap.Kind, cap.Pattern)
+
+			if granted {
+				newGrants = append(newGrants, cap)
+				if always {
+					shouldSave = true
+				}
+			} else {
+				return nil, fmt.Errorf("capability denied by user: %s:%s", cap.Kind, cap.Pattern)
+			}
+		}
+
+		// Save to config if user chose "always" for any capability
+		if shouldSave {
+			if err := m.saveConfig(newGrants); err != nil {
+				fmt.Fprintf(os.Stderr, "⚠️  Warning: failed to save config: %v\n", err)
+			} else {
+				fmt.Fprintf(os.Stderr, "✓ Permissions saved to %s\n", m.configPath)
+			}
+		}
+		grantedGlobal = newGrants
+	}
+
+	m.grants = grantedGlobal
+
+	// Filter the requested capabilities against the globally granted ones
+	// ensuring each plugin only gets what it requested AND what was granted
+	grantedPerPlugin := make(map[string][]hostfuncs.Capability)
+	grantedGlobalMap := make(map[string]bool)
+	for _, cap := range grantedGlobal {
+		key := fmt.Sprintf("%s:%s", cap.Kind, cap.Pattern)
+		grantedGlobalMap[key] = true
+	}
+
+	for name, caps := range required {
+		var allowed []hostfuncs.Capability
+		for _, cap := range caps {
+			key := fmt.Sprintf("%s:%s", cap.Kind, cap.Pattern)
+			if grantedGlobalMap[key] {
+				allowed = append(allowed, cap)
+			}
+		}
+		if len(allowed) > 0 {
+			grantedPerPlugin[name] = allowed
 		}
 	}
 
-	// Save to config if user chose "always" for any capability
-	if shouldSave {
-		if err := m.saveConfig(newGrants); err != nil {
-			fmt.Fprintf(os.Stderr, "⚠️  Warning: failed to save config: %v\n", err)
-		} else {
-			fmt.Fprintf(os.Stderr, "✓ Permissions saved to %s\n", m.configPath)
-		}
-	}
-
-	m.grants = newGrants
-	return newGrants, nil
+	return grantedPerPlugin, nil
 }
 
 // findMissingCapabilities returns capabilities in required that are not in granted
