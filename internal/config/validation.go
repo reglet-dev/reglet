@@ -11,7 +11,7 @@ import (
 )
 
 // Control ID must be alphanumeric with dashes and underscores
-var controlIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+var controlIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_.-]+$`)
 
 // PluginSchemaProvider is an interface for loading plugins and retrieving their schemas.
 // This allows validation code to be decoupled from the WASM runtime implementation.
