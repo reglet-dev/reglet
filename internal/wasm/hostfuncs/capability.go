@@ -8,9 +8,15 @@ import (
 
 // Check verifies if the requested capability is granted
 // Implements full pattern matching for network, fs, env, and exec capabilities
-func (c *CapabilityChecker) Check(kind, pattern string) error {
+func (c *CapabilityChecker) Check(pluginName, kind, pattern string) error {
+	// Get capabilities granted to this specific plugin
+	grants, ok := c.grantedCapabilities[pluginName]
+	if !ok {
+		return fmt.Errorf("capability denied: %s:%s (no capabilities granted to plugin %s)", kind, pattern, pluginName)
+	}
+
 	// Check if any granted capability matches the request
-	for _, grant := range c.grantedCapabilities {
+	for _, grant := range grants {
 		if grant.Kind != kind {
 			continue
 		}
@@ -37,7 +43,7 @@ func (c *CapabilityChecker) Check(kind, pattern string) error {
 	}
 
 	// No matching grant found
-	return fmt.Errorf("capability denied: %s:%s (no matching grant)", kind, pattern)
+	return fmt.Errorf("capability denied: %s:%s (no matching grant for plugin %s)", kind, pattern, pluginName)
 }
 
 // matchNetworkPattern checks if a network request matches a granted pattern

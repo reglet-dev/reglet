@@ -52,30 +52,21 @@ func getWasmBytes(t *testing.T, pluginName string) []byte {
 	return bytes
 }
 
-// Test helper functions for creating runtimes with proper capabilities
-
-func newRuntimeWithNetworkCaps(ctx context.Context) (*Runtime, error) {
-	caps := []hostfuncs.Capability{
-		{Kind: "network", Pattern: "outbound:*"},
-	}
-	return NewRuntimeWithCapabilities(ctx, caps)
-}
-
-func newRuntimeWithFilesystemCaps(ctx context.Context) (*Runtime, error) {
-	caps := []hostfuncs.Capability{
-		{Kind: "fs", Pattern: "read:**"},
-	}
-	return NewRuntimeWithCapabilities(ctx, caps)
-}
-
 // TestLoadFilePlugin tests loading the actual file plugin WASM module
 func TestLoadFilePlugin(t *testing.T) {
 	t.Parallel()
 	wasmBytes := getWasmBytes(t, "file")
 
+	// File plugin needs filesystem capabilities
+	caps := map[string][]hostfuncs.Capability{
+		"file": {
+			{Kind: "fs", Pattern: "read:**"},
+		},
+	}
+
 	// Create runtime
 	ctx := context.Background()
-	runtime, err := newRuntimeWithNetworkCaps(ctx)
+	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -99,9 +90,16 @@ func TestFilePlugin_Describe(t *testing.T) {
 	t.Parallel()
 	wasmBytes := getWasmBytes(t, "file")
 
+	// File plugin needs filesystem capabilities
+	caps := map[string][]hostfuncs.Capability{
+		"file": {
+			{Kind: "fs", Pattern: "read:**"},
+		},
+	}
+
 	// Create runtime and load plugin
 	ctx := context.Background()
-	runtime, err := newRuntimeWithNetworkCaps(ctx)
+	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -129,9 +127,16 @@ func TestFilePlugin_Schema(t *testing.T) {
 	t.Parallel()
 	wasmBytes := getWasmBytes(t, "file")
 
+	// File plugin needs filesystem capabilities
+	caps := map[string][]hostfuncs.Capability{
+		"file": {
+			{Kind: "fs", Pattern: "read:**"},
+		},
+	}
+
 	// Create runtime and load plugin
 	ctx := context.Background()
-	runtime, err := newRuntimeWithNetworkCaps(ctx)
+	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -175,9 +180,16 @@ func TestFilePlugin_Observe_FileExists(t *testing.T) {
 	tmpFile.WriteString("test content")
 	tmpFile.Close()
 
+	// File plugin needs filesystem capabilities
+	caps := map[string][]hostfuncs.Capability{
+		"file": {
+			{Kind: "fs", Pattern: "read:**"},
+		},
+	}
+
 	// Create runtime and load plugin
 	ctx := context.Background()
-	runtime, err := newRuntimeWithFilesystemCaps(ctx)
+	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -213,9 +225,16 @@ func TestFilePlugin_Observe_FileNotFound(t *testing.T) {
 	t.Parallel()
 	wasmBytes := getWasmBytes(t, "file")
 
+	// File plugin needs filesystem capabilities
+	caps := map[string][]hostfuncs.Capability{
+		"file": {
+			{Kind: "fs", Pattern: "read:**"},
+		},
+	}
+
 	// Create runtime and load plugin
 	ctx := context.Background()
-	runtime, err := newRuntimeWithFilesystemCaps(ctx)
+	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -271,9 +290,16 @@ func TestFilePlugin_Observe_ReadContent(t *testing.T) {
 	tmpFile.WriteString(testContent)
 	tmpFile.Close()
 
+	// File plugin needs filesystem capabilities
+	caps := map[string][]hostfuncs.Capability{
+		"file": {
+			{Kind: "fs", Pattern: "read:**"},
+		},
+	}
+
 	// Create runtime and load plugin
 	ctx := context.Background()
-	runtime, err := newRuntimeWithFilesystemCaps(ctx)
+	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -337,9 +363,16 @@ func TestFilePlugin_Observe_BinaryContent(t *testing.T) {
 	require.NoError(t, err)
 	tmpFile.Close()
 
+	// File plugin needs filesystem capabilities
+	caps := map[string][]hostfuncs.Capability{
+		"file": {
+			{Kind: "fs", Pattern: "read:**"},
+		},
+	}
+
 	// Create runtime and load plugin
 	ctx := context.Background()
-	runtime, err := newRuntimeWithFilesystemCaps(ctx)
+	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -392,8 +425,15 @@ func TestDNSPlugin_Describe(t *testing.T) {
 	t.Parallel()
 	wasmBytes := getWasmBytes(t, "dns")
 
+	// DNS plugin needs network capabilities for port 53
+	caps := map[string][]hostfuncs.Capability{
+		"dns": {
+			{Kind: "network", Pattern: "outbound:53"},
+		},
+	}
+
 	ctx := context.Background()
-	runtime, err := newRuntimeWithNetworkCaps(ctx)
+	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -418,8 +458,15 @@ func TestDNSPlugin_Schema(t *testing.T) {
 	t.Parallel()
 	wasmBytes := getWasmBytes(t, "dns")
 
+	// DNS plugin needs network capabilities for port 53
+	caps := map[string][]hostfuncs.Capability{
+		"dns": {
+			{Kind: "network", Pattern: "outbound:53"},
+		},
+	}
+
 	ctx := context.Background()
-	runtime, err := newRuntimeWithNetworkCaps(ctx)
+	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -454,8 +501,15 @@ func TestDNSPlugin_Observe_A_Record(t *testing.T) {
 	t.Parallel()
 	wasmBytes := getWasmBytes(t, "dns")
 
+	// DNS plugin needs network capabilities for port 53
+	caps := map[string][]hostfuncs.Capability{
+		"dns": {
+			{Kind: "network", Pattern: "outbound:53"},
+		},
+	}
+
 	ctx := context.Background()
-	runtime, err := newRuntimeWithNetworkCaps(ctx)
+	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -501,8 +555,15 @@ func TestDNSPlugin_Observe_MX_Record(t *testing.T) {
 	t.Parallel()
 	wasmBytes := getWasmBytes(t, "dns")
 
+	// DNS plugin needs network capabilities for port 53
+	caps := map[string][]hostfuncs.Capability{
+		"dns": {
+			{Kind: "network", Pattern: "outbound:53"},
+		},
+	}
+
 	ctx := context.Background()
-	runtime, err := newRuntimeWithNetworkCaps(ctx)
+	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -536,8 +597,15 @@ func TestDNSPlugin_Observe_InvalidHostname(t *testing.T) {
 	t.Parallel()
 	wasmBytes := getWasmBytes(t, "dns")
 
+	// DNS plugin needs network capabilities for port 53
+	caps := map[string][]hostfuncs.Capability{
+		"dns": {
+			{Kind: "network", Pattern: "outbound:53"},
+		},
+	}
+
 	ctx := context.Background()
-	runtime, err := newRuntimeWithNetworkCaps(ctx)
+	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -569,8 +637,15 @@ func TestDNSPlugin_Observe_MissingHostname(t *testing.T) {
 	t.Parallel()
 	wasmBytes := getWasmBytes(t, "dns")
 
+	// DNS plugin needs network capabilities for port 53
+	caps := map[string][]hostfuncs.Capability{
+		"dns": {
+			{Kind: "network", Pattern: "outbound:53"},
+		},
+	}
+
 	ctx := context.Background()
-	runtime, err := newRuntimeWithNetworkCaps(ctx)
+	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -607,17 +682,23 @@ func TestDNSPlugin_Observe_MissingHostname(t *testing.T) {
 		}
 	}
 	require.NotEmpty(t, errMsg, "should have error message")
-	assert.Contains(t, errMsg, "Hostname")
+	assert.Contains(t, errMsg, "Hostname", "error message should indicate missing Hostname")
 }
 
 // TestHTTPPlugin_Describe tests HTTP plugin describe function
-/*
 func TestHTTPPlugin_Describe(t *testing.T) {
 	t.Parallel()
 	wasmBytes := getWasmBytes(t, "http")
 
+	// HTTP plugin needs network capabilities for ports 80,443
+	caps := map[string][]hostfuncs.Capability{
+		"http": {
+			{Kind: "network", Pattern: "outbound:80,443"},
+		},
+	}
+
 	ctx := context.Background()
-	runtime, err := newRuntimeWithNetworkCaps(ctx)
+	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -638,8 +719,15 @@ func TestHTTPPlugin_Schema(t *testing.T) {
 	t.Parallel()
 	wasmBytes := getWasmBytes(t, "http")
 
+	// HTTP plugin needs network capabilities for ports 80,443
+	caps := map[string][]hostfuncs.Capability{
+		"http": {
+			{Kind: "network", Pattern: "outbound:80,443"},
+		},
+	}
+
 	ctx := context.Background()
-	runtime, err := newRuntimeWithNetworkCaps(ctx)
+	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -664,11 +752,18 @@ func TestHTTPPlugin_Schema(t *testing.T) {
 
 // TestHTTPPlugin_Observe_GET tests HTTP GET request
 func TestHTTPPlugin_Observe_GET(t *testing.T) {
-	t.Parallel()
+	t.Parallel() // Restore t.Parallel()
 	wasmBytes := getWasmBytes(t, "http")
 
+	// HTTP plugin needs network capabilities for ports 80,443
+	caps := map[string][]hostfuncs.Capability{
+		"http": {
+			{Kind: "network", Pattern: "outbound:80,443"},
+		},
+	}
+
 	ctx := context.Background()
-	runtime, err := newRuntimeWithNetworkCaps(ctx)
+	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -677,8 +772,9 @@ func TestHTTPPlugin_Observe_GET(t *testing.T) {
 
 	config := Config{
 		Values: map[string]interface{}{
-			"url":    "https://example.com",
-			"method": "GET",
+			"url":                 "https://example.com",
+			"method":              "GET",
+			"body_preview_length": -1, // Get full body for testing
 		},
 	}
 
@@ -694,21 +790,27 @@ func TestHTTPPlugin_Observe_GET(t *testing.T) {
 	assert.Equal(t, float64(200), statusCode)
 
 	body, ok := result.Evidence.Data["body"].(string)
-	require.True(t, ok)
+	require.True(t, ok, "Expected 'body' field in response data. Got: %+v", result.Evidence.Data)
 	assert.NotEmpty(t, body)
 }
-*/
+
 // ============================================================================
 // TCP Plugin Tests
 // ============================================================================
 
-/*
 func TestTCPPlugin_Describe(t *testing.T) {
 	t.Parallel()
 	wasmBytes := getWasmBytes(t, "tcp")
 
+	// TCP plugin needs network capabilities for outbound connections
+	caps := map[string][]hostfuncs.Capability{
+		"tcp": {
+			{Kind: "network", Pattern: "outbound:*"},
+		},
+	}
+
 	ctx := context.Background()
-	runtime, err := newRuntimeWithNetworkCaps(ctx)
+	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -729,8 +831,15 @@ func TestTCPPlugin_Schema(t *testing.T) {
 	t.Parallel()
 	wasmBytes := getWasmBytes(t, "tcp")
 
+	// TCP plugin needs network capabilities for outbound connections
+	caps := map[string][]hostfuncs.Capability{
+		"tcp": {
+			{Kind: "network", Pattern: "outbound:*"},
+		},
+	}
+
 	ctx := context.Background()
-	runtime, err := newRuntimeWithNetworkCaps(ctx)
+	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -754,13 +863,19 @@ func TestTCPPlugin_Schema(t *testing.T) {
 	assert.Contains(t, properties, "tls")
 }
 
-// TestTCPPlugin_Observe_PlainTCP tests plain TCP connection
 func TestTCPPlugin_Observe_PlainTCP(t *testing.T) {
 	t.Parallel()
 	wasmBytes := getWasmBytes(t, "tcp")
 
+	// TCP plugin needs network capabilities for outbound connections
+	caps := map[string][]hostfuncs.Capability{
+		"tcp": {
+			{Kind: "network", Pattern: "outbound:*"},
+		},
+	}
+
 	ctx := context.Background()
-	runtime, err := newRuntimeWithNetworkCaps(ctx)
+	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -790,13 +905,19 @@ func TestTCPPlugin_Observe_PlainTCP(t *testing.T) {
 	assert.Equal(t, "example.com:80", address)
 }
 
-// TestTCPPlugin_Observe_TLS tests TLS connection
 func TestTCPPlugin_Observe_TLS(t *testing.T) {
 	t.Parallel()
 	wasmBytes := getWasmBytes(t, "tcp")
 
+	// TCP plugin needs network capabilities for outbound connections
+	caps := map[string][]hostfuncs.Capability{
+		"tcp": {
+			{Kind: "network", Pattern: "outbound:*"},
+		},
+	}
+
 	ctx := context.Background()
-	runtime, err := newRuntimeWithNetworkCaps(ctx)
+	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -807,7 +928,7 @@ func TestTCPPlugin_Observe_TLS(t *testing.T) {
 		Values: map[string]interface{}{
 			"host": "example.com",
 			"port": "443",
-			"tls":  "true",
+			"tls":  true,
 		},
 	}
 
@@ -831,4 +952,3 @@ func TestTCPPlugin_Observe_TLS(t *testing.T) {
 	require.True(t, ok)
 	assert.NotEmpty(t, cipherSuite)
 }
-*/

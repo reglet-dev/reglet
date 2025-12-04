@@ -40,8 +40,8 @@ type Engine struct {
 
 // CapabilityManager defines the interface for capability management
 type CapabilityManager interface {
-	CollectRequiredCapabilities(ctx context.Context, profile *config.Profile, runtime *wasm.Runtime, pluginDir string) ([]hostfuncs.Capability, error)
-	GrantCapabilities(required []hostfuncs.Capability) ([]hostfuncs.Capability, error)
+	CollectRequiredCapabilities(ctx context.Context, profile *config.Profile, runtime *wasm.Runtime, pluginDir string) (map[string][]hostfuncs.Capability, error)
+	GrantCapabilities(required map[string][]hostfuncs.Capability) (map[string][]hostfuncs.Capability, error)
 }
 
 // NewEngine creates a new execution engine with default configuration.
@@ -346,6 +346,12 @@ func generateControlMessage(status Status, observations []ObservationResult) str
 	default:
 		return "Unknown status"
 	}
+}
+
+// Runtime returns the WASM runtime for accessing plugin schemas.
+// This is used for pre-flight schema validation.
+func (e *Engine) Runtime() *wasm.Runtime {
+	return e.runtime
 }
 
 // Close closes the engine and releases resources.

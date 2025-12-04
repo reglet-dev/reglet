@@ -68,7 +68,12 @@ func HTTPRequest(ctx context.Context, mod api.Module, stack []uint64, checker *C
 	}
 	capabilityPattern := fmt.Sprintf("outbound:%s", port)
 
-	if err := checker.Check("network", capabilityPattern); err != nil {
+	pluginName := mod.Name()
+	if name, ok := PluginNameFromContext(ctx); ok {
+		pluginName = name
+	}
+
+	if err := checker.Check(pluginName, "network", capabilityPattern); err != nil {
 		errMsg := fmt.Sprintf("permission denied for %s %s: %v", request.Method, request.URL, err)
 		slog.WarnContext(ctx, errMsg, "url", request.URL, "method", request.Method)
 		stack[0] = hostWriteResponse(ctx, mod, HTTPResponseWire{

@@ -8,7 +8,7 @@ import (
 )
 
 // RegisterHostFunctions registers all host functions with the wazero runtime
-func RegisterHostFunctions(ctx context.Context, runtime wazero.Runtime, caps []Capability) error {
+func RegisterHostFunctions(ctx context.Context, runtime wazero.Runtime, caps map[string][]Capability) error {
 	checker := NewCapabilityChecker(caps)
 
 	// Create host module "reglet_host"

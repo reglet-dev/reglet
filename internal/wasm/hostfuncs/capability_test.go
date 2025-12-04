@@ -156,8 +156,8 @@ func TestCapabilityChecker_Check_Network(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			checker := NewCapabilityChecker(tt.grants)
-			err := checker.Check(tt.kind, tt.pattern)
+			checker := NewCapabilityChecker(map[string][]Capability{"test-plugin": tt.grants})
+			err := checker.Check("test-plugin", tt.kind, tt.pattern)
 
 			if tt.shouldErr {
 				assert.Error(t, err)
@@ -248,8 +248,8 @@ func TestCapabilityChecker_Check_Filesystem(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			checker := NewCapabilityChecker(tt.grants)
-			err := checker.Check(tt.kind, tt.pattern)
+			checker := NewCapabilityChecker(map[string][]Capability{"test-plugin": tt.grants})
+			err := checker.Check("test-plugin", tt.kind, tt.pattern)
 
 			if tt.shouldErr {
 				assert.Error(t, err)
@@ -322,8 +322,8 @@ func TestCapabilityChecker_Check_Environment(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			checker := NewCapabilityChecker(tt.grants)
-			err := checker.Check(tt.kind, tt.pattern)
+			checker := NewCapabilityChecker(map[string][]Capability{"test-plugin": tt.grants})
+			err := checker.Check("test-plugin", tt.kind, tt.pattern)
 
 			if tt.shouldErr {
 				assert.Error(t, err)
@@ -396,8 +396,8 @@ func TestCapabilityChecker_Check_Exec(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			checker := NewCapabilityChecker(tt.grants)
-			err := checker.Check(tt.kind, tt.pattern)
+			checker := NewCapabilityChecker(map[string][]Capability{"test-plugin": tt.grants})
+			err := checker.Check("test-plugin", tt.kind, tt.pattern)
 
 			if tt.shouldErr {
 				assert.Error(t, err)
@@ -419,38 +419,38 @@ func TestCapabilityChecker_Check_MultipleGrants(t *testing.T) {
 		{Kind: "env", Pattern: "AWS_*"},
 	}
 
-	checker := NewCapabilityChecker(grants)
+	checker := NewCapabilityChecker(map[string][]Capability{"test-plugin": grants})
 
 	// Should allow DNS
-	err := checker.Check("network", "outbound:53")
+	err := checker.Check("test-plugin", "network", "outbound:53")
 	require.NoError(t, err)
 
 	// Should allow HTTP
-	err = checker.Check("network", "outbound:80")
+	err = checker.Check("test-plugin", "network", "outbound:80")
 	require.NoError(t, err)
 
 	// Should allow HTTPS
-	err = checker.Check("network", "outbound:443")
+	err = checker.Check("test-plugin", "network", "outbound:443")
 	require.NoError(t, err)
 
 	// Should deny SSH
-	err = checker.Check("network", "outbound:22")
+	err = checker.Check("test-plugin", "network", "outbound:22")
 	require.Error(t, err)
 
 	// Should allow reading /etc files
-	err = checker.Check("fs", "read:/etc/hosts")
+	err = checker.Check("test-plugin", "fs", "read:/etc/hosts")
 	require.NoError(t, err)
 
 	// Should deny reading /home files
-	err = checker.Check("fs", "read:/home/user/file")
+	err = checker.Check("test-plugin", "fs", "read:/home/user/file")
 	require.Error(t, err)
 
 	// Should allow AWS env vars
-	err = checker.Check("env", "AWS_ACCESS_KEY_ID")
+	err = checker.Check("test-plugin", "env", "AWS_ACCESS_KEY_ID")
 	require.NoError(t, err)
 
 	// Should deny other env vars
-	err = checker.Check("env", "DB_PASSWORD")
+	err = checker.Check("test-plugin", "env", "DB_PASSWORD")
 	require.Error(t, err)
 }
 
@@ -461,12 +461,50 @@ func TestCapabilityChecker_Check_UnknownKind(t *testing.T) {
 		{Kind: "network", Pattern: "outbound:80"},
 	}
 
-	checker := NewCapabilityChecker(grants)
+	checker := NewCapabilityChecker(map[string][]Capability{"test-plugin": grants})
 
 	// Unknown capability kind should be denied
-	err := checker.Check("unknown", "some:pattern")
+	err := checker.Check("test-plugin", "unknown", "some:pattern")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "capability denied")
+}
+
+func TestCapabilityChecker_CrossPluginIsolation(t *testing.T) {
+	t.Parallel()
+
+	caps := map[string][]Capability{
+		"pluginA": {
+			{Kind: "network", Pattern: "outbound:80"},
+		},
+		"pluginB": {
+			{Kind: "fs", Pattern: "read:/etc/hosts"},
+		},
+	}
+
+	checker := NewCapabilityChecker(caps)
+
+	// Plugin A should have network access
+	err := checker.Check("pluginA", "network", "outbound:80")
+	require.NoError(t, err)
+
+	// Plugin B should have file access
+	err = checker.Check("pluginB", "fs", "read:/etc/hosts")
+	require.NoError(t, err)
+
+	// Plugin A should NOT have file access (from Plugin B)
+	err = checker.Check("pluginA", "fs", "read:/etc/hosts")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no matching grant for plugin pluginA")
+
+	// Plugin B should NOT have network access (from Plugin A)
+	err = checker.Check("pluginB", "network", "outbound:80")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no matching grant for plugin pluginB")
+
+	// Unknown plugin should have no access
+	err = checker.Check("unknownPlugin", "network", "outbound:80")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no capabilities granted to plugin unknownPlugin")
 }
 
 func TestMatchNetworkPattern(t *testing.T) {

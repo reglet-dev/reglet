@@ -10,6 +10,7 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/whiskeyjimbo/reglet/internal/wasm/hostfuncs"
 )
 
 // Plugin represents a loaded WASM plugin
@@ -89,6 +90,9 @@ func (p *Plugin) createInstance(ctx context.Context) (api.Module, error) {
 
 // Describe calls the plugin's describe() function and returns metadata
 func (p *Plugin) Describe(ctx context.Context) (*PluginInfo, error) {
+	// Wrap context with plugin name so host functions can access it
+	ctx = hostfuncs.WithPluginName(ctx, p.name)
+
 	// Check cache with lock
 	p.mu.Lock()
 	if p.info != nil {
@@ -153,6 +157,9 @@ func (p *Plugin) Describe(ctx context.Context) (*PluginInfo, error) {
 
 // Schema calls the plugin's schema() function and returns the config schema
 func (p *Plugin) Schema(ctx context.Context) (*ConfigSchema, error) {
+	// Wrap context with plugin name so host functions can access it
+	ctx = hostfuncs.WithPluginName(ctx, p.name)
+
 	// Check cache with lock
 	p.mu.Lock()
 	if p.schema != nil {
@@ -220,6 +227,9 @@ func (p *Plugin) Schema(ctx context.Context) (*ConfigSchema, error) {
 
 // Observe calls the plugin's observe() function with the given config
 func (p *Plugin) Observe(ctx context.Context, cfg Config) (*ObservationResult, error) {
+	// Wrap context with plugin name so host functions can access it
+	ctx = hostfuncs.WithPluginName(ctx, p.name)
+
 	// Create FRESH instance for this call - ensures thread safety
 	instance, err := p.createInstance(ctx)
 	if err != nil {
