@@ -27,7 +27,7 @@ func NewRuntime(ctx context.Context) (*Runtime, error) {
 }
 
 // NewRuntimeWithCapabilities creates a new WASM runtime with specific capabilities
-func NewRuntimeWithCapabilities(ctx context.Context, caps []hostfuncs.Capability) (*Runtime, error) {
+func NewRuntimeWithCapabilities(ctx context.Context, caps map[string][]hostfuncs.Capability) (*Runtime, error) {
 	// Create wazero runtime with compilation cache
 	// This is a pure Go WASM runtime - no CGO required
 	config := wazero.NewRuntimeConfig().WithCompilationCache(globalCache)
@@ -83,6 +83,32 @@ func (r *Runtime) LoadPlugin(ctx context.Context, name string, wasmBytes []byte)
 func (r *Runtime) GetPlugin(name string) (*Plugin, bool) {
 	p, ok := r.plugins[name]
 	return p, ok
+}
+
+// GetPluginSchema implements config.PluginSchemaProvider.
+// It loads the plugin (if not already loaded) and retrieves its JSON Schema.
+func (r *Runtime) GetPluginSchema(ctx context.Context, pluginName string) ([]byte, error) {
+	// Check if plugin is already loaded
+	plugin, ok := r.plugins[pluginName]
+	if !ok {
+		// Plugin not loaded - need to load it first
+		// This requires finding the plugin WASM file
+		// For now, return an error indicating the plugin needs to be loaded
+		return nil, fmt.Errorf("plugin %s not loaded; call LoadPlugin first", pluginName)
+	}
+
+	// Get the schema from the plugin
+	schema, err := plugin.Schema(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get schema for plugin %s: %w", pluginName, err)
+	}
+
+	if schema == nil || len(schema.RawSchema) == 0 {
+		// Plugin doesn't provide a schema
+		return nil, nil
+	}
+
+	return schema.RawSchema, nil
 }
 
 // Close closes the runtime and cleans up resources
