@@ -57,7 +57,7 @@ func runCheckAction(ctx context.Context, profilePath string) error {
 		return fmt.Errorf("failed to substitute variables: %w", err)
 	}
 
-	// Validate profile
+	// Validate profile structure
 	if err := config.Validate(profile); err != nil {
 		return fmt.Errorf("profile validation failed: %w", err)
 	}
@@ -79,6 +79,14 @@ func runCheckAction(ctx context.Context, profilePath string) error {
 		return fmt.Errorf("failed to create engine: %w", err)
 	}
 	defer eng.Close(ctx)
+
+	// Pre-flight schema validation
+	// This validates observation configs against plugin schemas BEFORE execution
+	slog.Info("validating observation configs against plugin schemas")
+	if err := config.ValidateWithSchemas(ctx, profile, eng.Runtime()); err != nil {
+		return fmt.Errorf("schema validation failed: %w", err)
+	}
+	slog.Info("schema validation complete")
 
 	slog.Info("executing profile")
 
