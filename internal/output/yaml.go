@@ -3,8 +3,8 @@ package output
 import (
 	"io"
 
+	"github.com/goccy/go-yaml"
 	"github.com/whiskeyjimbo/reglet/internal/engine"
-	"gopkg.in/yaml.v3"
 )
 
 // YAMLFormatter formats execution results as YAML.
@@ -19,8 +19,7 @@ func NewYAMLFormatter(w io.Writer) *YAMLFormatter {
 
 // Format writes the execution result as YAML.
 func (f *YAMLFormatter) Format(result *engine.ExecutionResult) error {
-	encoder := yaml.NewEncoder(f.writer)
-	encoder.SetIndent(2)
+	encoder := yaml.NewEncoder(f.writer, yaml.Indent(2))
 
 	if err := encoder.Encode(result); err != nil {
 		return err

@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"gopkg.in/yaml.v3"
+	"github.com/goccy/go-yaml"
 )
 
 // LoadProfile loads and parses a profile from a YAML file.
@@ -37,8 +37,8 @@ func LoadProfile(path string) (*Profile, error) {
 func LoadProfileFromReader(r io.Reader) (*Profile, error) {
 	var profile Profile
 
-	decoder := yaml.NewDecoder(r)
-	decoder.KnownFields(true) // Strict parsing - reject unknown fields
+	// Strict parsing - reject unknown fields
+	decoder := yaml.NewDecoder(r, yaml.DisallowUnknownField())
 
 	if err := decoder.Decode(&profile); err != nil {
 		return nil, fmt.Errorf("failed to parse YAML: %w", err)

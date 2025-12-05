@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/whiskeyjimbo/reglet/internal/engine"
 	"github.com/whiskeyjimbo/reglet/internal/wasm"
-	"gopkg.in/yaml.v3"
 )
 
 // createTestResult creates a sample execution result for testing.

@@ -9,11 +9,11 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/goccy/go-yaml"
 	"github.com/whiskeyjimbo/reglet/internal/config"
 	"github.com/whiskeyjimbo/reglet/internal/wasm"
 	"github.com/whiskeyjimbo/reglet/internal/wasm/hostfuncs"
 	"golang.org/x/sync/errgroup"
-	"gopkg.in/yaml.v3"
 )
 
 // Manager handles capability grants and user prompts
