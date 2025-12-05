@@ -40,14 +40,13 @@ func RegisterHostFunctions(ctx context.Context, runtime wazero.Runtime, caps map
 			TCPConnect(ctx, mod, stack, checker)
 		}), []api.ValueType{api.ValueTypeI64}, []api.ValueType{api.ValueTypeI64}).
 		Export("tcp_connect")
-	
+
 	// Register logging function
 	builder.NewFunctionBuilder().
 		WithGoModuleFunction(api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
 			LogMessage(ctx, mod, stack)
 		}), []api.ValueType{api.ValueTypeI64}, []api.ValueType{}). // No return value
 		Export("log_message")
-
 
 	// Instantiate the host module
 	_, err := builder.Instantiate(ctx)

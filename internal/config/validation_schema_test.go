@@ -223,7 +223,7 @@ func Test_ValidateWithSchemas_StructuralValidationFirst(t *testing.T) {
 	// Profile with structural errors (should fail before schema validation)
 	profile := &Profile{
 		Metadata: ProfileMetadata{
-			Name: "", // Missing required name
+			Name:    "", // Missing required name
 			Version: "1.0.0",
 		},
 		Controls: ControlsSection{

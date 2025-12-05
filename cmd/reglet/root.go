@@ -75,7 +75,7 @@ func setupLogging() {
 	if verbose {
 		level = slog.LevelDebug
 	}
-	
+
 	// Using TextHandler for CLI friendliness
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 		Level: level,

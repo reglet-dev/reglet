@@ -111,10 +111,10 @@ controls:
 
 	// Second control should override severity but merge tags
 	ctrl2 := profile.Controls.Items[1]
-	assert.Equal(t, "critical", ctrl2.Severity) // Overridden
+	assert.Equal(t, "critical", ctrl2.Severity)   // Overridden
 	assert.Equal(t, "security-team", ctrl2.Owner) // From default
 	assert.Contains(t, ctrl2.Tags, "default-tag") // From default
-	assert.Contains(t, ctrl2.Tags, "custom-tag") // From control
+	assert.Contains(t, ctrl2.Tags, "custom-tag")  // From control
 }
 
 func TestSubstituteVariables_Simple(t *testing.T) {

@@ -128,8 +128,8 @@ func (p *Plugin) Describe(ctx context.Context) (*PluginInfo, error) {
 
 	// FIX: Unpack ptr and length from uint64
 	packed := results[0]
-	ptr := uint32(packed >> 32)             // High 32 bits
-	size := uint32(packed & 0xFFFFFFFF)     // Low 32 bits
+	ptr := uint32(packed >> 32)         // High 32 bits
+	size := uint32(packed & 0xFFFFFFFF) // Low 32 bits
 
 	if ptr == 0 || size == 0 {
 		return nil, fmt.Errorf("describe() returned null pointer or zero length")

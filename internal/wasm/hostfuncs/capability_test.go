@@ -72,8 +72,8 @@ func TestCapabilityChecker_Check_Network(t *testing.T) {
 			shouldErr: true,
 		},
 		{
-			name: "no grants",
-			grants: []Capability{},
+			name:      "no grants",
+			grants:    []Capability{},
 			kind:      "network",
 			pattern:   "outbound:80",
 			shouldErr: true,

@@ -110,7 +110,7 @@ func substituteInMap(m map[string]interface{}, vars map[string]interface{}) erro
 				}
 			}
 
-		// Other types (int, bool, etc.) don't need substitution
+			// Other types (int, bool, etc.) don't need substitution
 		}
 	}
 
