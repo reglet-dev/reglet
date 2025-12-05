@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync"
 
 	jsonschema "github.com/santhosh-tekuri/jsonschema/v5"
 )
@@ -19,6 +20,69 @@ type PluginSchemaProvider interface {
 	// GetPluginSchema returns the JSON Schema for a plugin's configuration.
 	// Returns nil if the plugin is not found.
 	GetPluginSchema(ctx context.Context, pluginName string) ([]byte, error)
+}
+
+// SchemaCompiler caches compiled JSON schemas to avoid repeated compilation overhead.
+// For profiles with many observations using the same plugin, this significantly improves
+// validation performance by compiling each unique schema only once.
+type SchemaCompiler struct {
+	provider PluginSchemaProvider
+	cache    map[string]*jsonschema.Schema
+	mu       sync.RWMutex
+}
+
+// NewSchemaCompiler creates a new schema compiler that wraps a PluginSchemaProvider.
+func NewSchemaCompiler(provider PluginSchemaProvider) *SchemaCompiler {
+	return &SchemaCompiler{
+		provider: provider,
+		cache:    make(map[string]*jsonschema.Schema),
+	}
+}
+
+// GetCompiledSchema returns a compiled JSON schema for the given plugin.
+// Schemas are cached after first compilation for performance.
+func (sc *SchemaCompiler) GetCompiledSchema(ctx context.Context, pluginName string) (*jsonschema.Schema, error) {
+	// Fast path: check cache with read lock
+	sc.mu.RLock()
+	if schema, ok := sc.cache[pluginName]; ok {
+		sc.mu.RUnlock()
+		return schema, nil
+	}
+	sc.mu.RUnlock()
+
+	// Slow path: get schema bytes from provider
+	schemaBytes, err := sc.provider.GetPluginSchema(ctx, pluginName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get schema for plugin %s: %w", pluginName, err)
+	}
+
+	if len(schemaBytes) == 0 {
+		// No schema available - cache nil to avoid repeated lookups
+		sc.mu.Lock()
+		sc.cache[pluginName] = nil
+		sc.mu.Unlock()
+		return nil, nil
+	}
+
+	// Compile the schema
+	compiler := jsonschema.NewCompiler()
+	compiler.Draft = jsonschema.Draft2020
+
+	if err := compiler.AddResource("schema.json", bytes.NewReader(schemaBytes)); err != nil {
+		return nil, fmt.Errorf("failed to add schema resource for plugin %s: %w", pluginName, err)
+	}
+
+	schema, err := compiler.Compile("schema.json")
+	if err != nil {
+		return nil, fmt.Errorf("failed to compile schema for plugin %s: %w", pluginName, err)
+	}
+
+	// Cache the compiled schema
+	sc.mu.Lock()
+	sc.cache[pluginName] = schema
+	sc.mu.Unlock()
+
+	return schema, nil
 }
 
 // Validate performs comprehensive validation of a profile.
@@ -53,11 +117,14 @@ func ValidateWithSchemas(ctx context.Context, profile *Profile, provider PluginS
 		return err
 	}
 
+	// Create schema compiler to cache compiled schemas across observations
+	compiler := NewSchemaCompiler(provider)
+
 	// Then validate each observation's config against its plugin's schema
 	var errors []string
 	for _, ctrl := range profile.Controls.Items {
 		for j, obs := range ctrl.Observations {
-			if err := validateObservationSchema(ctx, obs, provider); err != nil {
+			if err := validateObservationSchemaCompiled(ctx, obs, compiler); err != nil {
 				errors = append(errors, fmt.Sprintf("control %s, observation %d (%s): %s", ctrl.ID, j, obs.Plugin, err.Error()))
 			}
 		}
@@ -180,32 +247,18 @@ func validateObservation(obs Observation) error {
 	return nil
 }
 
-// validateObservationSchema validates an observation's config against its plugin's JSON Schema.
-func validateObservationSchema(ctx context.Context, obs Observation, provider PluginSchemaProvider) error {
-	// Get the plugin's schema
-	schemaBytes, err := provider.GetPluginSchema(ctx, obs.Plugin)
+// validateObservationSchemaCompiled validates an observation's config using a schema compiler.
+// This uses cached compiled schemas to avoid repeated compilation overhead.
+func validateObservationSchemaCompiled(ctx context.Context, obs Observation, compiler *SchemaCompiler) error {
+	// Get compiled schema from cache or compile if needed
+	schema, err := compiler.GetCompiledSchema(ctx, obs.Plugin)
 	if err != nil {
-		return fmt.Errorf("failed to get schema for plugin %s: %w", obs.Plugin, err)
+		return err
 	}
 
-	if len(schemaBytes) == 0 {
+	if schema == nil {
 		// No schema available - skip validation
-		// This can happen if the plugin doesn't provide a schema
 		return nil
-	}
-
-	// Compile the schema
-	compiler := jsonschema.NewCompiler()
-	compiler.Draft = jsonschema.Draft2020
-
-	// Add the schema document from bytes
-	if err := compiler.AddResource("schema.json", bytes.NewReader(schemaBytes)); err != nil {
-		return fmt.Errorf("failed to add schema resource for plugin %s: %w", obs.Plugin, err)
-	}
-
-	schema, err := compiler.Compile("schema.json")
-	if err != nil {
-		return fmt.Errorf("failed to compile schema for plugin %s: %w", obs.Plugin, err)
 	}
 
 	// Validate the observation config against the schema
