@@ -8,80 +8,20 @@ import (
 	"time"
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/whiskeyjimbo/reglet/wireformat"
 )
 
-// ContextWireFormat is the JSON wire format for context.Context propagation.
-type ContextWireFormat struct {
-	Deadline   *time.Time `json:"deadline,omitempty"`
-	TimeoutMs  int64      `json:"timeout_ms,omitempty"`
-	RequestID  string     `json:"request_id,omitempty"` // For log correlation
-	Cancelled  bool       `json:"cancelled,omitempty"`  // True if context is already cancelled
-}
-
-// DNSRequestWire is the JSON wire format for a DNS lookup request from Guest to Host.
-type DNSRequestWire struct {
-	Context    ContextWireFormat `json:"context"`
-	Hostname   string            `json:"hostname"`
-	Type       string            `json:"type"` // "A", "AAAA", "CNAME", "MX", "TXT", "NS"
-	Nameserver string            `json:"nameserver,omitempty"` // Optional: "host:port"
-}
-
-// DNSResponseWire is the JSON wire format for a DNS lookup response from Host to Guest.
-type DNSResponseWire struct {
-	Records []string     `json:"records,omitempty"`
-	Error   *ErrorDetail `json:"error,omitempty"` // Structured error
-}
-
-// HTTPRequestWire is the JSON wire format for an HTTP request from Guest to Host.
-type HTTPRequestWire struct {
-	Context ContextWireFormat `json:"context"`
-	Method  string            `json:"method"`
-	URL     string            `json:"url"`
-	Headers map[string][]string `json:"headers,omitempty"`
-	Body    string            `json:"body,omitempty"` // Base64 encoded for binary, or plain string
-	// TimeoutMs is implied by Context.TimeoutMs
-}
-
-// HTTPResponseWire is the JSON wire format for an HTTP response from Host to Guest.
-type HTTPResponseWire struct {
-	StatusCode int               `json:"status_code"`
-	Headers    map[string][]string `json:"headers,omitempty"`
-	Body       string            `json:"body,omitempty"` // Base64 encoded for binary, or plain string
-	Error      *ErrorDetail      `json:"error,omitempty"` // Structured error
-}
-
-// TCPRequestWire is the JSON wire format for a TCP connection request from Guest to Host.
-type TCPRequestWire struct {
-	Context   ContextWireFormat `json:"context"`
-	Host      string            `json:"host"`
-	Port      string            `json:"port"`
-	TimeoutMs int               `json:"timeout_ms,omitempty"` // Optional timeout in milliseconds
-	TLS       bool              `json:"tls"`                  // Whether to use TLS
-}
-
-// TCPResponseWire is the JSON wire format for a TCP connection response from Host to Guest.
-type TCPResponseWire struct {
-	Connected      bool              `json:"connected"`
-	Address        string            `json:"address,omitempty"`
-	RemoteAddr     string            `json:"remote_addr,omitempty"`
-	LocalAddr      string            `json:"local_addr,omitempty"`
-	ResponseTimeMs int64             `json:"response_time_ms,omitempty"`
-	TLS            bool              `json:"tls,omitempty"`
-	TLSVersion     string            `json:"tls_version,omitempty"`
-	TLSCipherSuite string            `json:"tls_cipher_suite,omitempty"`
-	TLSServerName  string            `json:"tls_server_name,omitempty"`
-	TLSCertSubject string            `json:"tls_cert_subject,omitempty"`
-	TLSCertIssuer  string            `json:"tls_cert_issuer,omitempty"`
-	Error          *ErrorDetail      `json:"error,omitempty"` // Structured error
-}
-
-// ErrorDetail provides structured error information, consistent with SDK's ErrorDetail.
-type ErrorDetail struct {
-	Message string       `json:"message"`
-	Type    string       `json:"type"`
-	Code    string       `json:"code"`
-	Wrapped *ErrorDetail `json:"wrapped,omitempty"`
-}
+// Re-export wire format types from shared wireformat package
+type (
+	ContextWireFormat = wireformat.ContextWireFormat
+	DNSRequestWire    = wireformat.DNSRequestWire
+	DNSResponseWire   = wireformat.DNSResponseWire
+	HTTPRequestWire   = wireformat.HTTPRequestWire
+	HTTPResponseWire  = wireformat.HTTPResponseWire
+	TCPRequestWire    = wireformat.TCPRequestWire
+	TCPResponseWire   = wireformat.TCPResponseWire
+	ErrorDetail       = wireformat.ErrorDetail
+)
 
 // createContextFromWire creates a new context from the wire format.
 func createContextFromWire(parentCtx context.Context, wireCtx ContextWireFormat) (context.Context, context.CancelFunc) {

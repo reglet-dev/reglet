@@ -129,9 +129,12 @@ func HTTPRequest(ctx context.Context, mod api.Module, stack []uint64, checker *C
 	}
 	defer resp.Body.Close()
 
-	// 5. Read response body (with a limit)
+	// 5. Read response body (with a limit) and detect truncation
 	const maxBodySize = 10 * 1024 * 1024 // 10MB limit as per SDK design
-	respBodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxBodySize))
+
+	// Try to read maxBodySize + 1 byte to detect if body exceeds limit
+	limitedReader := io.LimitReader(resp.Body, maxBodySize+1)
+	respBodyBytes, err := io.ReadAll(limitedReader)
 	if err != nil {
 		errMsg := fmt.Sprintf("failed to read response body: %v", err)
 		slog.ErrorContext(ctx, errMsg, "url", request.URL)
@@ -140,6 +143,19 @@ func HTTPRequest(ctx context.Context, mod api.Module, stack []uint64, checker *C
 		})
 		return
 	}
+
+	// Detect if body was truncated
+	bodyTruncated := false
+	if len(respBodyBytes) > maxBodySize {
+		// Body exceeded limit - truncate and set flag
+		respBodyBytes = respBodyBytes[:maxBodySize]
+		bodyTruncated = true
+		slog.WarnContext(ctx, "HTTP response body truncated",
+			"url", request.URL,
+			"max_size_mb", maxBodySize/(1024*1024),
+			"truncated", true)
+	}
+
 	var encodedRespBody string
 	if len(respBodyBytes) > 0 {
 		encodedRespBody = base64.StdEncoding.EncodeToString(respBodyBytes)
@@ -152,8 +168,9 @@ func HTTPRequest(ctx context.Context, mod api.Module, stack []uint64, checker *C
 	}
 
 	stack[0] = hostWriteResponse(ctx, mod, HTTPResponseWire{
-		StatusCode: resp.StatusCode,
-		Headers:    responseHeaders,
-		Body:       encodedRespBody,
+		StatusCode:    resp.StatusCode,
+		Headers:       responseHeaders,
+		Body:          encodedRespBody,
+		BodyTruncated: bodyTruncated,
 	})
 }
