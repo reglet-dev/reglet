@@ -124,7 +124,9 @@ func performTCPConnect(ctx context.Context, host, port string, useTLS bool) (*TC
 		if err != nil {
 			return nil, fmt.Errorf("connection failed: %w", err)
 		}
-		defer conn.Close()
+		defer func() {
+			_ = conn.Close() // Best-effort cleanup
+		}()
 
 		response.Connected = true
 		response.RemoteAddr = conn.RemoteAddr().String()
@@ -143,7 +145,9 @@ func performTCPConnect(ctx context.Context, host, port string, useTLS bool) (*TC
 	if err != nil {
 		return nil, fmt.Errorf("TLS connection failed: %w", err)
 	}
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close() // Best-effort cleanup
+	}()
 
 	// Get TLS connection state
 	state := conn.ConnectionState()
