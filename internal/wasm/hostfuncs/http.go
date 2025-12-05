@@ -82,6 +82,16 @@ func HTTPRequest(ctx context.Context, mod api.Module, stack []uint64, checker *C
 		return
 	}
 
+	// SSRF protection: validate destination is not a private/reserved IP
+	if err := ValidateDestination(ctx, parsedURL.Hostname(), pluginName, checker); err != nil {
+		errMsg := fmt.Sprintf("SSRF protection: %v", err)
+		slog.WarnContext(ctx, errMsg, "url", request.URL, "host", parsedURL.Hostname())
+		stack[0] = hostWriteResponse(ctx, mod, HTTPResponseWire{
+			Error: &ErrorDetail{Message: errMsg, Type: "ssrf_protection"},
+		})
+		return
+	}
+
 	// 2. Prepare HTTP request body
 	var reqBody io.Reader
 	if request.Body != "" {

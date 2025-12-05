@@ -15,6 +15,9 @@ import (
 // Control ID must be alphanumeric with dashes and underscores
 var controlIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_.-]+$`)
 
+// Plugin name must be alphanumeric with underscores and hyphens (no path separators)
+var pluginNamePattern = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+
 // PluginSchemaProvider is an interface for loading plugins and retrieving their schemas.
 // This allows validation code to be decoupled from the WASM runtime implementation.
 type PluginSchemaProvider interface {
@@ -227,6 +230,34 @@ func validateControl(ctrl Control) error {
 	return nil
 }
 
+// validatePluginName validates that a plugin name is safe to use in filesystem paths.
+// This prevents path traversal attacks when loading plugins.
+func validatePluginName(name string) error {
+	if name == "" {
+		return fmt.Errorf("plugin name cannot be empty")
+	}
+
+	if len(name) > 64 {
+		return fmt.Errorf("plugin name too long (max 64 characters)")
+	}
+
+	// Check for path traversal attempts first (more specific error messages)
+	if strings.Contains(name, "/") || strings.Contains(name, "\\") {
+		return fmt.Errorf("plugin name cannot contain path separators")
+	}
+
+	if strings.Contains(name, "..") {
+		return fmt.Errorf("plugin name cannot contain parent directory references")
+	}
+
+	// Finally check against allowed character set
+	if !pluginNamePattern.MatchString(name) {
+		return fmt.Errorf("plugin name must contain only alphanumeric characters, underscores, and hyphens")
+	}
+
+	return nil
+}
+
 // validateObservation validates a single observation.
 func validateObservation(obs Observation) error {
 	var errors []string
@@ -234,6 +265,11 @@ func validateObservation(obs Observation) error {
 	// Plugin is required
 	if obs.Plugin == "" {
 		errors = append(errors, "plugin name is required")
+	} else {
+		// Validate plugin name format for security
+		if err := validatePluginName(obs.Plugin); err != nil {
+			errors = append(errors, fmt.Sprintf("invalid plugin name: %v", err))
+		}
 	}
 
 	// Config is required (even if empty map)

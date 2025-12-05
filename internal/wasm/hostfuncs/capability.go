@@ -2,6 +2,7 @@ package hostfuncs
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -143,6 +144,8 @@ func matchPortRange(port, portRange string) bool {
 //   - read:/etc/** (any file under /etc)
 //   - read:/var/log/*.log (log files only)
 //   - write:/tmp/* (temp directory)
+//
+// Security: Normalizes paths and resolves symlinks to prevent path traversal attacks
 func matchFilesystemPattern(requested, granted string) bool {
 	// Both should have format "read:<path>" or "write:<path>"
 	reqParts := strings.SplitN(requested, ":", 2)
@@ -157,16 +160,47 @@ func matchFilesystemPattern(requested, granted string) bool {
 		return false
 	}
 
-	reqPath := reqParts[1]
+	// Normalize requested path to prevent path traversal
+	reqPath := filepath.Clean(reqParts[1])
 	grantPattern := grantParts[1]
+
+	// Convert to absolute paths for consistent comparison
+	if !filepath.IsAbs(reqPath) {
+		cwd, err := os.Getwd()
+		if err != nil {
+			// Can't get cwd - deny by default
+			return false
+		}
+		reqPath = filepath.Join(cwd, reqPath)
+		reqPath = filepath.Clean(reqPath)
+	}
+
+	// Resolve symlinks to prevent bypass via symlinks
+	realPath, err := filepath.EvalSymlinks(reqPath)
+	if err == nil {
+		// Only use resolved path if it exists (EvalSymlinks succeeds)
+		reqPath = realPath
+	}
+
+	// Normalize grant pattern similarly
+	if !filepath.IsAbs(grantPattern) && !strings.Contains(grantPattern, "**") {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return false
+		}
+		grantPattern = filepath.Join(cwd, grantPattern)
+		grantPattern = filepath.Clean(grantPattern)
+	}
 
 	// Handle ** for recursive directory matching
 	if strings.Contains(grantPattern, "**") {
 		// Convert ** to a prefix match
 		// e.g., "/etc/**" matches anything starting with "/etc/"
 		prefix := strings.TrimSuffix(grantPattern, "**")
-		prefix = strings.TrimSuffix(prefix, "/") + "/"
-		return strings.HasPrefix(reqPath, prefix) || reqPath == strings.TrimSuffix(prefix, "/")
+		prefix = filepath.Clean(prefix) + string(filepath.Separator)
+
+		// Ensure normalized path is still within granted prefix
+		return strings.HasPrefix(reqPath, prefix) || reqPath == strings.TrimSuffix(prefix, string(filepath.Separator))
 	}
 
 	// Use filepath.Match for glob patterns

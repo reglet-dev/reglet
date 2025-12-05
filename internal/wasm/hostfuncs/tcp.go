@@ -76,6 +76,16 @@ func TCPConnect(ctx context.Context, mod api.Module, stack []uint64, checker *Ca
 		return
 	}
 
+	// SSRF protection: validate destination is not a private/reserved IP
+	if err := ValidateDestination(ctx, request.Host, pluginName, checker); err != nil {
+		errMsg := fmt.Sprintf("SSRF protection: %v", err)
+		slog.WarnContext(ctx, errMsg, "host", request.Host, "port", request.Port)
+		stack[0] = hostWriteResponse(ctx, mod, TCPResponseWire{
+			Error: &ErrorDetail{Message: errMsg, Type: "ssrf_protection"},
+		})
+		return
+	}
+
 	if request.Port == "" {
 		errMsg := "port cannot be empty"
 		slog.WarnContext(ctx, errMsg)

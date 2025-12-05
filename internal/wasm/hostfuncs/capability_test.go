@@ -573,6 +573,77 @@ func TestMatchFilesystemPattern(t *testing.T) {
 	}
 }
 
+// Test_matchFilesystemPattern_PathTraversalSecurity tests path traversal attack prevention
+func Test_matchFilesystemPattern_PathTraversalSecurity(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		requested string
+		granted   string
+		expected  bool
+		reason    string
+	}{
+		{
+			name:      "parent directory traversal blocked",
+			requested: "read:/tmp/../etc/passwd",
+			granted:   "read:/tmp/**",
+			expected:  false,
+			reason:    "normalized path /etc/passwd is outside /tmp/ grant",
+		},
+		{
+			name:      "double parent directory traversal blocked",
+			requested: "read:/tmp/subdir/../../etc/passwd",
+			granted:   "read:/tmp/**",
+			expected:  false,
+			reason:    "normalized path /etc/passwd is outside /tmp/ grant",
+		},
+		{
+			name:      "current directory normalization allowed",
+			requested: "read:/etc/./hosts",
+			granted:   "read:/etc/**",
+			expected:  true,
+			reason:    "normalized path /etc/hosts is within /etc/ grant",
+		},
+		{
+			name:      "redundant slashes normalized",
+			requested: "read:/etc//ssh///sshd_config",
+			granted:   "read:/etc/**",
+			expected:  true,
+			reason:    "normalized path /etc/ssh/sshd_config is within /etc/ grant",
+		},
+		{
+			name:      "complex traversal attempt blocked",
+			requested: "read:/tmp/foo/bar/../../../etc/passwd",
+			granted:   "read:/tmp/**",
+			expected:  false,
+			reason:    "normalized path /etc/passwd is outside /tmp/ grant",
+		},
+		{
+			name:      "valid path with dots in filename allowed",
+			requested: "read:/var/log/app.test.log",
+			granted:   "read:/var/log/**",
+			expected:  true,
+			reason:    "dots in filename are valid, path is within grant",
+		},
+		{
+			name:      "hidden directory traversal blocked",
+			requested: "read:/var/log/../../../etc/passwd",
+			granted:   "read:/var/log/**",
+			expected:  false,
+			reason:    "normalized path /etc/passwd is outside /var/log/ grant",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := matchFilesystemPattern(tt.requested, tt.granted)
+			assert.Equal(t, tt.expected, result, "Test failed: %s", tt.reason)
+		})
+	}
+}
+
 func TestMatchEnvironmentPattern(t *testing.T) {
 	t.Parallel()
 

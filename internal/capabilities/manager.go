@@ -74,6 +74,7 @@ func (m *Manager) CollectRequiredCapabilities(ctx context.Context, profile *conf
 	for _, name := range names {
 		name := name // Capture loop variable
 		g.Go(func() error {
+			// Plugin name is validated in config.validatePluginName() to prevent path traversal
 			pluginPath := filepath.Join(pluginDir, name, name+".wasm")
 			wasmBytes, err := os.ReadFile(pluginPath)
 			if err != nil {
@@ -273,6 +274,9 @@ func (m *Manager) describeCapability(cap hostfuncs.Capability) string {
 	case "network":
 		if cap.Pattern == "outbound:*" {
 			return "Network access to any port"
+		}
+		if cap.Pattern == "outbound:private" {
+			return "Network access to private/reserved IPs (localhost, 192.168.x.x, 10.x.x.x, 169.254.169.254, etc.)"
 		}
 		if strings.HasPrefix(cap.Pattern, "outbound:") {
 			ports := strings.TrimPrefix(cap.Pattern, "outbound:")
