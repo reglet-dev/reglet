@@ -7,6 +7,9 @@ import (
 	"github.com/tetratelabs/wazero/api"
 )
 
+//nolint:gosec // G115: uint64->uint32 conversions are safe for WASM32 address space
+//nolint:unused // Helper functions for potential future use
+
 // writeJSON marshals data to JSON and writes it to WASM memory
 // Returns pointer to the allocated memory in WASM
 func writeJSON(ctx context.Context, mod api.Module, data interface{}) uint32 {

@@ -147,6 +147,7 @@ func (e *ObservationExecutor) loadPlugin(ctx context.Context, pluginName string)
 	pluginPath := filepath.Join(e.pluginDir, pluginName, pluginName+".wasm")
 
 	// Read the WASM file
+	//nolint:gosec // G304: Plugin path is constructed from profile-defined plugin names
 	wasmBytes, err := os.ReadFile(pluginPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read plugin %s: %w (expected at %s)", pluginName, err, pluginPath)

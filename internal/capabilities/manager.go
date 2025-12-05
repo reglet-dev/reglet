@@ -1,3 +1,4 @@
+// Package capabilities provides capability-based security management for WASM plugins.
 package capabilities
 
 import (
@@ -308,8 +309,8 @@ func (m *Manager) formatNonInteractiveError(missing []hostfuncs.Capability) erro
 	}
 
 	msg.WriteString("\nTo grant these permissions:\n")
-	msg.WriteString(fmt.Sprintf("  1. Run interactively and approve when prompted\n"))
-	msg.WriteString(fmt.Sprintf("  2. Use --trust-plugins flag (grants all permissions)\n"))
+	msg.WriteString("  1. Run interactively and approve when prompted\n")
+	msg.WriteString("  2. Use --trust-plugins flag (grants all permissions)\n")
 	msg.WriteString(fmt.Sprintf("  3. Manually edit: %s\n", m.configPath))
 
 	return fmt.Errorf("%s", msg.String())

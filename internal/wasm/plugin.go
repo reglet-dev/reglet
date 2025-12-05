@@ -13,6 +13,8 @@ import (
 	"github.com/whiskeyjimbo/reglet/internal/wasm/hostfuncs"
 )
 
+//nolint:gosec // G115: uint64->uint32 conversions are safe for WASM32 address space
+
 // Plugin represents a loaded WASM plugin
 type Plugin struct {
 	name    string
@@ -80,7 +82,7 @@ func (p *Plugin) createInstance(ctx context.Context) (api.Module, error) {
 	initFn := instance.ExportedFunction("_initialize")
 	if initFn != nil {
 		if _, err := initFn.Call(ctx); err != nil {
-			instance.Close(ctx)
+			_ = instance.Close(ctx) // Best-effort cleanup
 			return nil, fmt.Errorf("failed to initialize plugin %s: %w", p.name, err)
 		}
 	}
@@ -108,7 +110,9 @@ func (p *Plugin) Describe(ctx context.Context) (*PluginInfo, error) {
 		return nil, err
 	}
 	// CRITICAL: Always close instance when done
-	defer instance.Close(ctx)
+	defer func() {
+		_ = instance.Close(ctx) // Best-effort cleanup
+	}()
 
 	// Get the describe function
 	describeFn := instance.ExportedFunction("describe")
@@ -175,7 +179,9 @@ func (p *Plugin) Schema(ctx context.Context) (*ConfigSchema, error) {
 		return nil, err
 	}
 	// CRITICAL: Always close instance when done
-	defer instance.Close(ctx)
+	defer func() {
+		_ = instance.Close(ctx) // Best-effort cleanup
+	}()
 
 	// Get the schema function
 	schemaFn := instance.ExportedFunction("schema")
@@ -236,7 +242,9 @@ func (p *Plugin) Observe(ctx context.Context, cfg Config) (*ObservationResult, e
 		return nil, err
 	}
 	// CRITICAL: Always close instance when done
-	defer instance.Close(ctx)
+	defer func() {
+		_ = instance.Close(ctx) // Best-effort cleanup
+	}()
 
 	// Get the observe function
 	observeFn := instance.ExportedFunction("observe")
@@ -260,6 +268,7 @@ func (p *Plugin) Observe(ctx context.Context, cfg Config) (*ObservationResult, e
 	defer func() {
 		deallocateFn := instance.ExportedFunction("deallocate")
 		if deallocateFn != nil {
+			//nolint:errcheck // Deallocation is best-effort cleanup
 			deallocateFn.Call(ctx, uint64(configPtr), uint64(len(configData)))
 		}
 	}()
@@ -360,7 +369,7 @@ func (p *Plugin) readString(ctx context.Context, instance api.Module, ptr uint32
 	defer func() {
 		deallocateFn := instance.ExportedFunction("deallocate")
 		if deallocateFn != nil {
-			// NOW we know the exact size!
+			//nolint:errcheck // Deallocation is best-effort cleanup
 			deallocateFn.Call(ctx, uint64(ptr), uint64(size))
 		}
 	}()

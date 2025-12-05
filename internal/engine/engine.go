@@ -59,12 +59,12 @@ func NewEngineWithCapabilities(ctx context.Context, capMgr CapabilityManager, pl
 	// Collect required capabilities from all plugins
 	required, err := capMgr.CollectRequiredCapabilities(ctx, profile, tempRuntime, pluginDir)
 	if err != nil {
-		tempRuntime.Close(ctx)
+		_ = tempRuntime.Close(ctx) // Best-effort cleanup
 		return nil, fmt.Errorf("failed to collect capabilities: %w", err)
 	}
 
 	// Close temporary runtime
-	tempRuntime.Close(ctx)
+	_ = tempRuntime.Close(ctx) // Best-effort cleanup
 
 	// Get granted capabilities (will prompt user if needed)
 	granted, err := capMgr.GrantCapabilities(required)

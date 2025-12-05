@@ -20,6 +20,8 @@ func NewTableFormatter(w io.Writer) *TableFormatter {
 }
 
 // Format writes the execution result as a table.
+//
+//nolint:errcheck // Table formatting errors are non-critical (best-effort terminal output)
 func (f *TableFormatter) Format(result *engine.ExecutionResult) error {
 	// Print header
 	fmt.Fprintf(f.writer, "Profile: %s (v%s)\n", result.ProfileName, result.ProfileVersion)
@@ -50,6 +52,8 @@ func (f *TableFormatter) Format(result *engine.ExecutionResult) error {
 }
 
 // formatControl formats a single control.
+//
+//nolint:errcheck // Best-effort terminal output
 func (f *TableFormatter) formatControl(ctrl engine.ControlResult) {
 	// Status symbol
 	statusSymbol := f.getStatusSymbol(ctrl.Status)
@@ -93,6 +97,8 @@ func (f *TableFormatter) formatControl(ctrl engine.ControlResult) {
 }
 
 // formatObservation formats a single observation.
+//
+//nolint:errcheck // Best-effort terminal output
 func (f *TableFormatter) formatObservation(obs engine.ObservationResult, index int) {
 	statusSymbol := f.getStatusSymbol(obs.Status)
 	fmt.Fprintf(f.writer, "    %d. %s Plugin: %s (%s)\n", index, statusSymbol, obs.Plugin, obs.Status)
@@ -122,6 +128,8 @@ func (f *TableFormatter) formatObservation(obs engine.ObservationResult, index i
 }
 
 // formatSummary formats the summary statistics.
+//
+//nolint:errcheck // Best-effort terminal output
 func (f *TableFormatter) formatSummary(summary engine.ResultSummary) {
 	fmt.Fprintln(f.writer, "Summary:")
 	fmt.Fprintln(f.writer, strings.Repeat("─", 80))

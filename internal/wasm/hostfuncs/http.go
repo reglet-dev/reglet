@@ -127,7 +127,9 @@ func HTTPRequest(ctx context.Context, mod api.Module, stack []uint64, checker *C
 		})
 		return
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close() // Best-effort cleanup
+	}()
 
 	// 5. Read response body (with a limit) and detect truncation
 	const maxBodySize = 10 * 1024 * 1024 // 10MB limit as per SDK design

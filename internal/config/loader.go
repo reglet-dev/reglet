@@ -21,13 +21,17 @@ func LoadProfile(path string) (*Profile, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open profile directory: %w", err)
 	}
-	defer root.Close()
+	defer func() {
+		_ = root.Close() // Best-effort cleanup
+	}()
 
 	file, err := root.Open(base)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open profile: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close() // Best-effort cleanup
+	}()
 
 	return LoadProfileFromReader(file)
 }

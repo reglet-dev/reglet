@@ -10,7 +10,7 @@ import (
 var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print the version number of reglet",
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, _ []string) {
 		fmt.Printf("reglet version %s\n", version)
 	},
 }

@@ -1,3 +1,4 @@
+// Package main provides the reglet CLI for compliance and infrastructure validation.
 package main
 
 import (
@@ -78,7 +79,9 @@ func runCheckAction(ctx context.Context, profilePath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create engine: %w", err)
 	}
-	defer eng.Close(ctx)
+	defer func() {
+		_ = eng.Close(ctx) // Best-effort cleanup
+	}()
 
 	// Pre-flight schema validation
 	// This validates observation configs against plugin schemas BEFORE execution
@@ -106,11 +109,14 @@ func runCheckAction(ctx context.Context, profilePath string) error {
 	// Determine output writer
 	writer := os.Stdout
 	if outFile != "" {
+		//nolint:gosec // G304: User-controlled output file path is intentional
 		file, err := os.Create(outFile)
 		if err != nil {
 			return fmt.Errorf("failed to create output file: %w", err)
 		}
-		defer file.Close()
+		defer func() {
+			_ = file.Close() // Best-effort cleanup
+		}()
 		writer = file
 		slog.Info("writing output", "file", outFile, "format", format)
 	}

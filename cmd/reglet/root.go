@@ -21,7 +21,7 @@ var rootCmd = &cobra.Command{
 WebAssembly extensibility and OSCAL-compliant output. It allows engineering 
 teams to define policy as code, execute validation logic in sandboxed 
 environments, and generate standardized audit artifacts.`,
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+	PersistentPreRun: func(_ *cobra.Command, _ []string) {
 		setupLogging()
 	},
 	SilenceUsage: true,

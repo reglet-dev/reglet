@@ -3,6 +3,7 @@ package config
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -264,7 +265,8 @@ func validateObservationSchemaCompiled(ctx context.Context, obs Observation, com
 	// Validate the observation config against the schema
 	if err := schema.Validate(obs.Config); err != nil {
 		// Format validation errors nicely
-		if validationErr, ok := err.(*jsonschema.ValidationError); ok {
+		var validationErr *jsonschema.ValidationError
+		if errors.As(err, &validationErr) {
 			return formatSchemaValidationError(validationErr)
 		}
 		return fmt.Errorf("config validation failed: %w", err)
