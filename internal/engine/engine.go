@@ -3,7 +3,6 @@ package engine
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/whiskeyjimbo/reglet/internal/config"
@@ -236,17 +235,16 @@ func (e *Engine) executeObservationsParallel(ctx context.Context, observations [
 		g.SetLimit(e.config.MaxConcurrentObservations)
 	}
 
-	// Create results slice with mutex for thread-safe append
+	// Pre-allocate results slice to exact size needed
+	// Each goroutine writes to a unique index - no mutex needed
 	results := make([]ObservationResult, len(observations))
-	var mu sync.Mutex
 
 	// Execute each observation in parallel
 	for i, obs := range observations {
 		g.Go(func() error {
 			obsResult := e.executor.Execute(ctx, obs)
-			mu.Lock()
+			// Safe without mutex: each goroutine writes to unique index in pre-allocated slice
 			results[i] = obsResult
-			mu.Unlock()
 			return nil // Don't fail fast on individual observation errors
 		})
 	}
