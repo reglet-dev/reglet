@@ -5,7 +5,10 @@ go 1.25.4
 require (
 	github.com/go-playground/validator/v10 v10.28.0
 	github.com/invopop/jsonschema v0.13.0
+	github.com/whiskeyjimbo/reglet/wireformat v0.0.0
 )
+
+replace github.com/whiskeyjimbo/reglet/wireformat => ../../wireformat
 
 require (
 	github.com/bahlo/generic-list-go v0.2.0 // indirect

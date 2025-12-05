@@ -2,7 +2,10 @@ module github.com/whiskeyjimbo/reglet/plugins/dns
 
 go 1.25.4
 
-replace github.com/whiskeyjimbo/reglet/sdk => ../../sdk/go
+replace (
+	github.com/whiskeyjimbo/reglet/sdk => ../../sdk/go
+	github.com/whiskeyjimbo/reglet/wireformat => ../../wireformat
+)
 
 require github.com/whiskeyjimbo/reglet/sdk v0.0.0-00010101000000-000000000000
 
@@ -16,6 +19,7 @@ require (
 	github.com/invopop/jsonschema v0.13.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
+	github.com/whiskeyjimbo/reglet/wireformat v0.0.0 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	golang.org/x/crypto v0.42.0 // indirect
 	golang.org/x/sys v0.36.0 // indirect

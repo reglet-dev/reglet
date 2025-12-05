@@ -1,6 +1,6 @@
 package sdk
 
-import "fmt"
+import "github.com/whiskeyjimbo/reglet/wireformat"
 
 // Config represents the configuration passed to a plugin observation.
 type Config map[string]interface{}
@@ -12,15 +12,9 @@ type Evidence struct {
 	Error  *ErrorDetail           `json:"error,omitempty"` // Structured error details
 }
 
-// ErrorDetail provides structured error information.
+// ErrorDetail is re-exported from wireformat for backward compatibility.
 // Error Types: "network", "timeout", "config", "panic", "capability", "validation", "internal"
-type ErrorDetail struct {
-	Message string       `json:"message"`
-	Type    string       `json:"type"`     // "network", "timeout", "config", "panic", "capability", "validation", "internal"
-	Code    string       `json:"code"`     // "ECONNREFUSED", "ETIMEDOUT", etc.
-	Wrapped *ErrorDetail `json:"wrapped,omitempty"`
-	Stack   []byte       `json:"stack,omitempty"` // Stack trace for panic errors
-}
+type ErrorDetail = wireformat.ErrorDetail
 
 // Metadata contains information about the plugin.
 type Metadata struct {
@@ -83,24 +77,6 @@ func NetworkError(message string, err error) Evidence {
 			Wrapped: ToErrorDetail(err),
 		},
 	}
-}
-
-// Error method to make ErrorDetail implement the error interface.
-func (e *ErrorDetail) Error() string {
-	if e == nil {
-		return ""
-	}
-	msg := e.Message
-	if e.Type != "" && e.Type != "internal" {
-		msg = fmt.Sprintf("%s: %s", e.Type, msg)
-	}
-	if e.Code != "" {
-		msg = fmt.Sprintf("%s [%s]", msg, e.Code)
-	}
-	if e.Wrapped != nil {
-		msg = fmt.Sprintf("%s: %v", msg, e.Wrapped.Error())
-	}
-	return msg
 }
 
 const (

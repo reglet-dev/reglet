@@ -11,8 +11,8 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/whiskeyjimbo/reglet/sdk" // For sdk.ErrorDetail
 	"github.com/whiskeyjimbo/reglet/sdk/internal/abi"
+	"github.com/whiskeyjimbo/reglet/wireformat"
 )
 
 // Define the host function signature for HTTP requests.
@@ -78,6 +78,16 @@ func (t *WasmTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		Status:     http.StatusText(response.StatusCode),
 	}
 
+	// Add header if body was truncated
+	// This allows plugins to detect incomplete responses
+	if response.BodyTruncated {
+		if resp.Header == nil {
+			resp.Header = make(http.Header)
+		}
+		resp.Header.Set("X-Reglet-Body-Truncated", "true")
+		slog.Warn("SDK: HTTP response body was truncated by host (exceeded 10MB limit)", "url", req.URL.String())
+	}
+
 	// Decode response body if present
 	if response.Body != "" {
 		decodedBody, err := base64.StdEncoding.DecodeString(response.Body)
@@ -101,19 +111,8 @@ func init() {
 	slog.Info("Reglet SDK: HTTP transport initialized.")
 }
 
-// HTTPRequestWire is the JSON wire format for an HTTP request from Guest to Host.
-type HTTPRequestWire struct {
-	Context ContextWireFormat `json:"context"`
-	Method  string            `json:"method"`
-	URL     string            `json:"url"`
-	Headers map[string][]string `json:"headers,omitempty"`
-	Body    string            `json:"body,omitempty"` // Base64 encoded for binary, or plain string
-}
-
-// HTTPResponseWire is the JSON wire format for an HTTP response from Host to Guest.
-type HTTPResponseWire struct {
-	StatusCode int               `json:"status_code"`
-	Headers    map[string][]string `json:"headers,omitempty"`
-	Body       string            `json:"body,omitempty"` // Base64 encoded for binary, or plain string
-	Error      *sdk.ErrorDetail  `json:"error,omitempty"` // Structured error
-}
+// Re-export HTTP wire format types from shared wireformat package
+type (
+	HTTPRequestWire  = wireformat.HTTPRequestWire
+	HTTPResponseWire = wireformat.HTTPResponseWire
+)
