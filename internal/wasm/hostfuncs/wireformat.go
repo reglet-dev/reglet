@@ -22,6 +22,8 @@ type (
 	HTTPResponseWire  = wireformat.HTTPResponseWire
 	TCPRequestWire    = wireformat.TCPRequestWire
 	TCPResponseWire   = wireformat.TCPResponseWire
+	ExecRequestWire   = wireformat.ExecRequestWire
+	ExecResponseWire  = wireformat.ExecResponseWire
 	ErrorDetail       = wireformat.ErrorDetail
 )
 

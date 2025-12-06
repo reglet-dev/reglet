@@ -41,6 +41,15 @@ func RegisterHostFunctions(ctx context.Context, runtime wazero.Runtime, caps map
 		}), []api.ValueType{api.ValueTypeI64}, []api.ValueType{api.ValueTypeI64}).
 		Export("tcp_connect")
 
+	// Register Exec command function
+	// Parameters: exec_requestPacked (i64) - packed ptr+len of ExecRequestWire JSON
+	// Returns: exec_responsePacked (i64) - packed ptr+len of ExecResponseWire JSON
+	builder.NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
+			ExecCommand(ctx, mod, stack, checker)
+		}), []api.ValueType{api.ValueTypeI64}, []api.ValueType{api.ValueTypeI64}).
+		Export("exec_command")
+
 	// Register logging function
 	builder.NewFunctionBuilder().
 		WithGoModuleFunction(api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {

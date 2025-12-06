@@ -232,7 +232,13 @@ func matchEnvironmentPattern(requested, granted string) bool {
 // Supports:
 //   - /usr/bin/systemctl (exact binary path)
 //   - /bin/* (any binary in directory)
+//   - ** (any command)
 func matchExecPattern(requested, granted string) bool {
+	// Universal wildcard
+	if granted == "**" {
+		return true
+	}
+
 	// Wildcard matching for directory
 	if strings.HasSuffix(granted, "/*") {
 		dir := strings.TrimSuffix(granted, "/*")

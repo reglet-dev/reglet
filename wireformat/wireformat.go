@@ -74,6 +74,23 @@ type TCPResponseWire struct {
 	Error          *ErrorDetail `json:"error,omitempty"` // Structured error
 }
 
+// ExecRequestWire is the JSON wire format for an exec request from Guest to Host.
+type ExecRequestWire struct {
+	Context ContextWireFormat `json:"context"`
+	Command string            `json:"command"`
+	Args    []string          `json:"args"`
+	Dir     string            `json:"dir,omitempty"`
+	Env     []string          `json:"env,omitempty"`
+}
+
+// ExecResponseWire is the JSON wire format for an exec response from Host to Guest.
+type ExecResponseWire struct {
+	Stdout   string       `json:"stdout"`
+	Stderr   string       `json:"stderr"`
+	ExitCode int          `json:"exit_code"`
+	Error    *ErrorDetail `json:"error,omitempty"`
+}
+
 // ErrorDetail provides structured error information, consistent across host and SDK.
 // Error Types: "network", "timeout", "config", "panic", "capability", "validation", "internal"
 type ErrorDetail struct {

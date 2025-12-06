@@ -8,6 +8,7 @@ import "time"
 // Profiles define compliance checks with controls and observations.
 type Profile struct {
 	Metadata ProfileMetadata        `yaml:"profile"`
+	Plugins  []string               `yaml:"plugins,omitempty"`
 	Vars     map[string]interface{} `yaml:"vars,omitempty"`
 	Controls ControlsSection        `yaml:"controls"`
 }
@@ -51,4 +52,5 @@ type Control struct {
 type Observation struct {
 	Plugin string                 `yaml:"plugin"`
 	Config map[string]interface{} `yaml:"config"`
+	Expect []string               `yaml:"expect,omitempty"`
 }
