@@ -58,12 +58,17 @@ func (p *commandPlugin) Check(ctx context.Context, config regletsdk.Config) (reg
 
 	// "run" mode: execute via shell
 	if cfg.Run != "" {
-		// Default to /bin/sh for now (Linux/Unix target)
-		// Ideally, we detect OS or allow config override
+		// ⚠️  SECURITY WARNING: Shell execution can be dangerous!
+		// - Requires explicit "exec:/bin/sh" capability (user must grant shell access)
+		// - Vulnerable to command injection if Run contains untrusted input
+		// - For untrusted input, use "command" mode with explicit args instead
+		//
+		// Safe:   run: "systemctl is-active sshd"
+		// Unsafe: run: "echo " + userInput  (if userInput can contain shell metacharacters)
 		cmd = "/bin/sh"
 		args = []string{"-c", cfg.Run}
 	} else {
-		// "command" mode: direct execution
+		// "command" mode: direct execution (safer - no shell interpretation)
 		cmd = cfg.Command
 		args = cfg.Args
 	}
@@ -84,13 +89,16 @@ func (p *commandPlugin) Check(ctx context.Context, config regletsdk.Config) (reg
 	stdoutTrimmed := strings.TrimSpace(resp.Stdout)
 	stderrTrimmed := strings.TrimSpace(resp.Stderr)
 
+	// Determine status based on exit code
+	statusPass := resp.ExitCode == 0
+
 	result := map[string]interface{}{
 		"stdout":        stdoutTrimmed,
 		"stderr":        stderrTrimmed,
 		"exit_code":     resp.ExitCode,
 		"stdout_raw":    resp.Stdout, // Keep raw for regex matching if needed
 		"stderr_raw":    resp.Stderr,
-		"status":        resp.ExitCode == 0, // Status determines pass/fail
+		"status":        statusPass, // Status determines pass/fail
 	}
 
 	return regletsdk.Success(result), nil

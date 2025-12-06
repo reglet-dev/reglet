@@ -328,8 +328,11 @@ func (p *Plugin) Observe(ctx context.Context, cfg Config) (*ObservationResult, e
 			// It looks like SDK format. Flatten it.
 			// Use the inner data map as base
 			finalData := dataMap
-			// Inject status
-			finalData["status"] = status
+			// Inject outer status ONLY if data doesn't already have a status field
+			// This allows plugins to override the evidence status (e.g., command plugin sets status based on exit code)
+			if _, hasDataStatus := finalData["status"]; !hasDataStatus {
+				finalData["status"] = status
+			}
 			// Inject error (convert to string if possible for compatibility)
 			if errVal, ok := rawResult["error"]; ok && errVal != nil {
 				if errMap, ok := errVal.(map[string]interface{}); ok {

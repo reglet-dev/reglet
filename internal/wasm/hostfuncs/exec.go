@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/tetratelabs/wazero/api"
@@ -49,13 +50,32 @@ func ExecCommand(ctx context.Context, mod api.Module, stack []uint64, checker *C
 	}
 
 	// Capability check: exec:<command>
-	if err := checker.Check(pluginName, "exec", request.Command); err != nil {
-		errMsg := fmt.Sprintf("permission denied: %v", err)
-		slog.WarnContext(ctx, errMsg, "command", request.Command)
-		stack[0] = hostWriteResponse(ctx, mod, ExecResponseWire{
-			Error: &ErrorDetail{Message: errMsg, Type: "capability"},
-		})
-		return
+	// For shell execution, require explicit shell capability to prevent injection
+	if isShellExecution(request.Command) && len(request.Args) > 0 {
+		// Shell execution detected (e.g., /bin/sh -c "command")
+		// Require explicit shell capability for security
+		if err := checker.Check(pluginName, "exec", request.Command); err != nil {
+			errMsg := fmt.Sprintf("shell execution requires 'exec:%s' capability (prevents command injection)", request.Command)
+			slog.WarnContext(ctx, errMsg, "command", request.Command)
+			stack[0] = hostWriteResponse(ctx, mod, ExecResponseWire{
+				Error: &ErrorDetail{
+					Message: errMsg,
+					Type:    "capability",
+				},
+			})
+			return
+		}
+		slog.InfoContext(ctx, "shell execution granted", "command", request.Command, "plugin", pluginName)
+	} else {
+		// Direct command execution - check capability for the specific command
+		if err := checker.Check(pluginName, "exec", request.Command); err != nil {
+			errMsg := fmt.Sprintf("permission denied: %v", err)
+			slog.WarnContext(ctx, errMsg, "command", request.Command)
+			stack[0] = hostWriteResponse(ctx, mod, ExecResponseWire{
+				Error: &ErrorDetail{Message: errMsg, Type: "capability"},
+			})
+			return
+		}
 	}
 
 	// Execute command
@@ -108,4 +128,24 @@ func ExecCommand(ctx context.Context, mod api.Module, stack []uint64, checker *C
 		ExitCode: exitCode,
 		Error:    errorDetail,
 	})
+}
+
+// isShellExecution detects if a command is a shell invocation.
+// Common shells: sh, bash, dash, zsh, ksh, csh, tcsh, fish
+func isShellExecution(command string) bool {
+	// Normalize to basename for matching
+	base := command
+	if idx := strings.LastIndex(command, "/"); idx >= 0 {
+		base = command[idx+1:]
+	}
+
+	// List of common shells
+	shells := []string{"sh", "bash", "dash", "zsh", "ksh", "csh", "tcsh", "fish"}
+	for _, shell := range shells {
+		if base == shell {
+			return true
+		}
+	}
+
+	return false
 }
