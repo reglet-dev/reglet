@@ -43,6 +43,7 @@ type ControlEnv struct {
 	ID       string   `expr:"id"`
 	Name     string   `expr:"name"`
 	Severity string   `expr:"severity"`
+	Owner    string   `expr:"owner"`
 	Tags     []string `expr:"tags"`
 }
 
@@ -374,6 +375,7 @@ func (e *Engine) shouldRun(ctrl config.Control) (bool, string) {
 			ID:       ctrl.ID,
 			Name:     ctrl.Name,
 			Severity: ctrl.Severity,
+			Owner:    ctrl.Owner,
 			Tags:     ctrl.Tags,
 		}
 		output, err := expr.Run(e.config.FilterProgram, env)
