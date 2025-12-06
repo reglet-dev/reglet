@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/expr-lang/expr"
 	"github.com/spf13/cobra"
 	"github.com/whiskeyjimbo/reglet/internal/capabilities"
 	"github.com/whiskeyjimbo/reglet/internal/config"
@@ -16,9 +17,16 @@ import (
 )
 
 var (
-	format       string
-	outFile      string
-	trustPlugins bool
+	format              string
+	outFile             string
+	trustPlugins        bool
+	includeTags         []string
+	includeSeverities   []string
+	includeControlIDs   []string
+	excludeTags         []string
+	excludeControlIDs   []string
+	filterExpr          string
+	includeDependencies bool
 )
 
 // checkCmd represents the check command
@@ -26,7 +34,16 @@ var checkCmd = &cobra.Command{
 	Use:   "check <profile.yaml>",
 	Short: "Execute compliance checks from a profile",
 	Long: `Load a profile configuration and execute the defined validation controls.
-The profile must be a valid YAML file defining the checks to run.`,
+The profile must be a valid YAML file defining the checks to run.
+
+Filtering:
+  Use flags to select specific controls to run.
+  --tags security,production    Run controls with 'security' OR 'production' tags
+  --severity critical,high      Run controls with 'critical' OR 'high' severity
+  --control ssh-check           Run specific controls (exclusive)
+  --exclude-tags slow           Exclude controls with 'slow' tag
+  --filter "severity == 'high'" Advanced filtering expression
+  --include-dependencies        Include dependencies of selected controls`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runCheckAction(cmd.Context(), args[0])
@@ -39,6 +56,15 @@ func init() {
 	checkCmd.Flags().StringVar(&format, "format", "table", "Output format: table, json, yaml")
 	checkCmd.Flags().StringVarP(&outFile, "output", "o", "", "Output file path (default: stdout)")
 	checkCmd.Flags().BoolVar(&trustPlugins, "trust-plugins", false, "Auto-grant all plugin capabilities (use with caution)")
+
+	// Filtering flags
+	checkCmd.Flags().StringSliceVar(&includeTags, "tags", nil, "Run controls with these tags (comma-separated)")
+	checkCmd.Flags().StringSliceVar(&includeSeverities, "severity", nil, "Run controls with these severities (comma-separated)")
+	checkCmd.Flags().StringSliceVar(&includeControlIDs, "control", nil, "Run specific controls by ID (exclusive, comma-separated)")
+	checkCmd.Flags().StringSliceVar(&excludeTags, "exclude-tags", nil, "Exclude controls with these tags (comma-separated)")
+	checkCmd.Flags().StringSliceVar(&excludeControlIDs, "exclude-control", nil, "Exclude specific controls by ID (comma-separated)")
+	checkCmd.Flags().StringVar(&filterExpr, "filter", "", "Advanced filter expression (e.g. \"severity == 'critical'\")")
+	checkCmd.Flags().BoolVar(&includeDependencies, "include-dependencies", false, "Include dependencies of selected controls")
 }
 
 // runCheckAction implements the core logic for the check command
@@ -65,6 +91,20 @@ func runCheckAction(ctx context.Context, profilePath string) error {
 
 	slog.Info("profile validated", "controls", len(profile.Controls.Items))
 
+	// Prepare execution config
+	execConfig := engine.DefaultExecutionConfig()
+	execConfig.IncludeTags = includeTags
+	execConfig.IncludeSeverities = includeSeverities
+	execConfig.IncludeControlIDs = includeControlIDs
+	execConfig.ExcludeTags = excludeTags
+	execConfig.ExcludeControlIDs = excludeControlIDs
+	execConfig.IncludeDependencies = includeDependencies
+
+	// Validate filter config
+	if err := validateFilterConfig(profile, &execConfig); err != nil {
+		return err
+	}
+
 	// Determine plugin directory (relative to current working directory or executable)
 	pluginDir, err := determinePluginDir()
 	if err != nil {
@@ -74,8 +114,8 @@ func runCheckAction(ctx context.Context, profilePath string) error {
 	// Create capability manager
 	capMgr := capabilities.NewManager(trustPlugins)
 
-	// Create execution engine with capability manager
-	eng, err := engine.NewEngineWithCapabilities(ctx, capMgr, pluginDir, profile)
+	// Create execution engine with capability manager and config
+	eng, err := engine.NewEngineWithCapabilities(ctx, capMgr, pluginDir, profile, execConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create engine: %w", err)
 	}
@@ -104,7 +144,8 @@ func runCheckAction(ctx context.Context, profilePath string) error {
 		"total_controls", result.Summary.TotalControls,
 		"passed", result.Summary.PassedControls,
 		"failed", result.Summary.FailedControls,
-		"errors", result.Summary.ErrorControls)
+		"errors", result.Summary.ErrorControls,
+		"skipped", result.Summary.SkippedControls)
 
 	// Determine output writer
 	writer := os.Stdout
@@ -127,17 +168,59 @@ func runCheckAction(ctx context.Context, profilePath string) error {
 	}
 
 	// Return non-zero exit code if there were failures or errors
-	// We return an error here to let Cobra/main handle the exit code,
-	// or we can use os.Exit(1) if we want to force it immediately.
-	// Cobra doesn't automatically exit 1 on RunE error unless we configure it,
-	// but usually it prints the error.
-	// However, for business logic failure (checks failed), we might not want to print "Error: ..."
-	// but just exit with status 1.
 	if result.Summary.FailedControls > 0 || result.Summary.ErrorControls > 0 {
 		return fmt.Errorf("check failed: %d passed, %d failed, %d errors",
 			result.Summary.PassedControls,
 			result.Summary.FailedControls,
 			result.Summary.ErrorControls)
+	}
+
+	return nil
+}
+
+// validateFilterConfig validates the filter configuration against the profile.
+func validateFilterConfig(profile *config.Profile, cfg *engine.ExecutionConfig) error {
+	// 1. Validate --control references exist
+	if len(cfg.IncludeControlIDs) > 0 {
+		controlMap := make(map[string]bool)
+		for _, ctrl := range profile.Controls.Items {
+			controlMap[ctrl.ID] = true
+		}
+
+		for _, id := range cfg.IncludeControlIDs {
+			if !controlMap[id] {
+				return fmt.Errorf("--control references non-existent control: %s", id)
+			}
+		}
+
+		// Warn if other filters are specified
+		if len(cfg.IncludeTags) > 0 || len(cfg.IncludeSeverities) > 0 || filterExpr != "" {
+			fmt.Fprintln(os.Stderr, "⚠️  Warning: --control specified, ignoring other include filters")
+		}
+	}
+
+	// 2. Compile --filter expression ONCE at startup
+	if filterExpr != "" {
+		program, err := expr.Compile(filterExpr,
+			expr.Env(engine.ControlEnv{}),
+			expr.AsBool())
+		if err != nil {
+			return fmt.Errorf("invalid --filter expression: %w\nExample: severity in ['critical', 'high'] && !('slow' in tags)", err)
+		}
+		cfg.FilterProgram = program
+	}
+
+	// 3. Validate --exclude-control references exist
+	if len(cfg.ExcludeControlIDs) > 0 {
+		controlMap := make(map[string]bool)
+		for _, ctrl := range profile.Controls.Items {
+			controlMap[ctrl.ID] = true
+		}
+		for _, id := range cfg.ExcludeControlIDs {
+			if !controlMap[id] {
+				return fmt.Errorf("--exclude-control references non-existent control: %s", id)
+			}
+		}
 	}
 
 	return nil

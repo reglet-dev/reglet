@@ -19,7 +19,7 @@ const (
 	StatusFail Status = "fail"
 	// StatusError indicates the check encountered an error
 	StatusError Status = "error"
-	// StatusSkipped indicates the check was skipped due to failed dependencies
+	// StatusSkipped indicates the check was skipped (dependency failure or filtered)
 	StatusSkipped Status = "skipped"
 )
 
@@ -45,6 +45,7 @@ type ControlResult struct {
 	Status       Status              `json:"status" yaml:"status"`
 	Observations []ObservationResult `json:"observations" yaml:"observations"`
 	Message      string              `json:"message,omitempty" yaml:"message,omitempty"`
+	SkipReason   string              `json:"skip_reason,omitempty" yaml:"skip_reason,omitempty"`
 	Duration     time.Duration       `json:"duration_ms" yaml:"duration_ms"`
 }
 

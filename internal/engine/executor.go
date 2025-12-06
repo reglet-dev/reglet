@@ -80,7 +80,7 @@ func (e *ObservationExecutor) Execute(ctx context.Context, obs config.Observatio
 	}
 
 	// Load the plugin
-	plugin, err := e.loadPlugin(ctx, obs.Plugin)
+	plugin, err := e.LoadPlugin(ctx, obs.Plugin)
 	if err != nil {
 		result.Status = StatusError
 		result.Error = &wasm.PluginError{
@@ -135,9 +135,9 @@ func (e *ObservationExecutor) Execute(ctx context.Context, obs config.Observatio
 	return result
 }
 
-// loadPlugin loads a plugin by name.
+// LoadPlugin loads a plugin by name.
 // Phase 1b loads from file system. Phase 2 will use embedded plugins.
-func (e *ObservationExecutor) loadPlugin(ctx context.Context, pluginName string) (*wasm.Plugin, error) {
+func (e *ObservationExecutor) LoadPlugin(ctx context.Context, pluginName string) (*wasm.Plugin, error) {
 	// Check if already loaded in runtime cache
 	if plugin, ok := e.runtime.GetPlugin(pluginName); ok {
 		return plugin, nil

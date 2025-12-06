@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/expr-lang/expr"
+	"github.com/expr-lang/expr/vm"
 	"github.com/whiskeyjimbo/reglet/internal/config"
 	"github.com/whiskeyjimbo/reglet/internal/wasm"
 	"github.com/whiskeyjimbo/reglet/internal/wasm/hostfuncs"
@@ -19,6 +21,29 @@ type ExecutionConfig struct {
 	MaxConcurrentObservations int
 	// Parallel enables parallel execution (default: true for performance)
 	Parallel bool
+
+	// Include Filters (OR logic within slice, AND between types)
+	IncludeTags       []string
+	IncludeSeverities []string
+	IncludeControlIDs []string // Exclusive - if set, other filters ignored
+
+	// Exclude Filters (take precedence over includes)
+	ExcludeTags       []string
+	ExcludeControlIDs []string
+
+	// Advanced Filter (Compiled Expression)
+	FilterProgram *vm.Program
+
+	// Dependency Strategy
+	IncludeDependencies bool
+}
+
+// ControlEnv exposes control metadata for expression evaluation.
+type ControlEnv struct {
+	ID       string   `expr:"id"`
+	Name     string   `expr:"name"`
+	Severity string   `expr:"severity"`
+	Tags     []string `expr:"tags"`
 }
 
 // DefaultExecutionConfig returns sensible defaults for parallel execution.
@@ -49,7 +74,7 @@ func NewEngine(ctx context.Context) (*Engine, error) {
 }
 
 // NewEngineWithCapabilities creates an engine with interactive capability prompts
-func NewEngineWithCapabilities(ctx context.Context, capMgr CapabilityManager, pluginDir string, profile *config.Profile) (*Engine, error) {
+func NewEngineWithCapabilities(ctx context.Context, capMgr CapabilityManager, pluginDir string, profile *config.Profile, cfg ExecutionConfig) (*Engine, error) {
 	// Create temporary runtime with no capabilities to load plugins and get requirements
 	tempRuntime, err := wasm.NewRuntime(ctx)
 	if err != nil {
@@ -79,12 +104,21 @@ func NewEngineWithCapabilities(ctx context.Context, capMgr CapabilityManager, pl
 	}
 
 	// Create observation executor
-	executor := NewObservationExecutor(runtime)
+	executor := NewExecutor(runtime, pluginDir)
+
+	// Preload plugins for schema validation
+	for _, ctrl := range profile.Controls.Items {
+		for _, obs := range ctrl.Observations {
+			if _, err := executor.LoadPlugin(ctx, obs.Plugin); err != nil {
+				return nil, fmt.Errorf("failed to preload plugin %s: %w", obs.Plugin, err)
+			}
+		}
+	}
 
 	return &Engine{
 		runtime:  runtime,
 		executor: executor,
-		config:   DefaultExecutionConfig(),
+		config:   cfg,
 	}, nil
 }
 
@@ -111,16 +145,22 @@ func (e *Engine) Execute(ctx context.Context, profile *config.Profile) (*Executi
 	// Create execution result
 	result := NewExecutionResult(profile.Metadata.Name, profile.Metadata.Version)
 
+	// Calculate required dependencies if enabled
+	var requiredControls map[string]bool
+	if e.config.IncludeDependencies {
+		requiredControls = e.resolveDependencies(profile)
+	}
+
 	// Execute controls
 	if e.config.Parallel && len(profile.Controls.Items) > 1 {
 		// Parallel execution of controls
-		if err := e.executeControlsParallel(ctx, profile.Controls.Items, result); err != nil {
+		if err := e.executeControlsParallel(ctx, profile.Controls.Items, result, requiredControls); err != nil {
 			return nil, err
 		}
 	} else {
 		// Sequential execution of controls
 		for _, ctrl := range profile.Controls.Items {
-			controlResult := e.executeControl(ctx, ctrl, result)
+			controlResult := e.executeControl(ctx, ctrl, result, requiredControls)
 			result.AddControlResult(controlResult)
 		}
 	}
@@ -131,10 +171,50 @@ func (e *Engine) Execute(ctx context.Context, profile *config.Profile) (*Executi
 	return result, nil
 }
 
+// resolveDependencies calculates the transitive closure of dependencies for matched controls.
+func (e *Engine) resolveDependencies(profile *config.Profile) map[string]bool {
+	required := make(map[string]bool)
+	queue := make([]string, 0)
+	controlMap := make(map[string]config.Control)
+
+	// Index controls for fast lookup
+	for _, ctrl := range profile.Controls.Items {
+		controlMap[ctrl.ID] = ctrl
+	}
+
+	// Identify initial targets (controls that match filters)
+	for _, ctrl := range profile.Controls.Items {
+		if should, _ := e.shouldRun(ctrl); should {
+			// Add dependencies to queue
+			queue = append(queue, ctrl.DependsOn...)
+		}
+	}
+
+	// Process queue to find all transitive dependencies
+	visited := make(map[string]bool)
+	for len(queue) > 0 {
+		id := queue[0]
+		queue = queue[1:]
+
+		if visited[id] {
+			continue
+		}
+		visited[id] = true
+
+		// If dependency exists in profile, mark as required and add its dependencies
+		if ctrl, exists := controlMap[id]; exists {
+			required[id] = true
+			queue = append(queue, ctrl.DependsOn...)
+		}
+	}
+
+	return required
+}
+
 // executeControlsParallel executes controls in parallel, respecting dependencies.
 // Controls are organized into levels by BuildControlDAG, and each level is executed
 // sequentially while controls within a level run in parallel.
-func (e *Engine) executeControlsParallel(ctx context.Context, controls []config.Control, result *ExecutionResult) error {
+func (e *Engine) executeControlsParallel(ctx context.Context, controls []config.Control, result *ExecutionResult, requiredDeps map[string]bool) error {
 	// Build dependency graph and get control levels
 	levels, err := BuildControlDAG(controls)
 	if err != nil {
@@ -154,7 +234,7 @@ func (e *Engine) executeControlsParallel(ctx context.Context, controls []config.
 		// Execute all controls in this level in parallel
 		for _, ctrl := range level.Controls {
 			g.Go(func() error {
-				controlResult := e.executeControl(levelCtx, ctrl, result)
+				controlResult := e.executeControl(levelCtx, ctrl, result, requiredDeps)
 				result.AddControlResult(controlResult)
 				return nil // Don't fail fast on individual control errors
 			})
@@ -170,7 +250,7 @@ func (e *Engine) executeControlsParallel(ctx context.Context, controls []config.
 }
 
 // executeControl executes a single control and returns its result.
-func (e *Engine) executeControl(ctx context.Context, ctrl config.Control, execResult *ExecutionResult) ControlResult {
+func (e *Engine) executeControl(ctx context.Context, ctrl config.Control, execResult *ExecutionResult, requiredDeps map[string]bool) ControlResult {
 	startTime := time.Now()
 
 	result := ControlResult{
@@ -180,6 +260,23 @@ func (e *Engine) executeControl(ctx context.Context, ctrl config.Control, execRe
 		Severity:     ctrl.Severity,
 		Tags:         ctrl.Tags,
 		Observations: make([]ObservationResult, 0, len(ctrl.Observations)),
+	}
+
+	// Check if control should run (filtering)
+	shouldRun, skipReason := e.shouldRun(ctrl)
+	
+	// If filtering says skip, check if it's required as a dependency
+	if !shouldRun && e.config.IncludeDependencies && requiredDeps[ctrl.ID] {
+		shouldRun = true
+		skipReason = "" // Clear skip reason as we are running it
+	}
+
+	if !shouldRun {
+		result.Status = StatusSkipped
+		result.SkipReason = skipReason
+		result.Message = skipReason
+		result.Duration = time.Since(startTime)
+		return result
 	}
 
 	// Check dependencies before execution
@@ -224,6 +321,81 @@ func (e *Engine) executeControl(ctx context.Context, ctrl config.Control, execRe
 	result.Duration = time.Since(startTime)
 
 	return result
+}
+
+// shouldRun determines if a control should run based on the configuration filters.
+func (e *Engine) shouldRun(ctrl config.Control) (bool, string) {
+	// 0. EXCLUSIVE MODE: --control overrides all other filters
+	if len(e.config.IncludeControlIDs) > 0 {
+		if contains(e.config.IncludeControlIDs, ctrl.ID) {
+			return true, ""
+		}
+		return false, "excluded by --control filter"
+	}
+
+	// 1. EXCLUSIONS: Check explicit exclusions first
+	if contains(e.config.ExcludeControlIDs, ctrl.ID) {
+		return false, "excluded by --exclude-control"
+	}
+
+	// 2. EXCLUSIONS: Check tag exclusions
+	if len(e.config.ExcludeTags) > 0 {
+		for _, tag := range ctrl.Tags {
+			if contains(e.config.ExcludeTags, tag) {
+				return false, fmt.Sprintf("excluded by --exclude-tags %s", tag)
+			}
+		}
+	}
+
+	// 3. INCLUDES: Check Severity filter (OR within list)
+	if len(e.config.IncludeSeverities) > 0 {
+		if !contains(e.config.IncludeSeverities, ctrl.Severity) {
+			return false, "excluded by --severity filter"
+		}
+	}
+
+	// 4. INCLUDES: Check Tags filter (OR within list - any match)
+	if len(e.config.IncludeTags) > 0 {
+		match := false
+		for _, tag := range ctrl.Tags {
+			if contains(e.config.IncludeTags, tag) {
+				match = true
+				break
+			}
+		}
+		if !match {
+			return false, "excluded by --tags filter"
+		}
+	}
+
+	// 5. ADVANCED: Check Expression Filter
+	if e.config.FilterProgram != nil {
+		env := ControlEnv{
+			ID:       ctrl.ID,
+			Name:     ctrl.Name,
+			Severity: ctrl.Severity,
+			Tags:     ctrl.Tags,
+		}
+		output, err := expr.Run(e.config.FilterProgram, env)
+		if err != nil {
+			return false, fmt.Sprintf("filter expression error: %v", err)
+		}
+		if !output.(bool) {
+			return false, "excluded by --filter expression"
+		}
+	}
+
+	return true, ""
+}
+
+// contains checks if a string is present in a slice.
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
 }
 
 // executeObservationsParallel executes observations in parallel with concurrency limits.

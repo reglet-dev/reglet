@@ -81,6 +81,11 @@ func (f *TableFormatter) formatControl(ctrl engine.ControlResult) {
 	if ctrl.Message != "" {
 		fmt.Fprintf(f.writer, "  Message: %s\n", ctrl.Message)
 	}
+	
+	// Explicit skip reason if different from message or for clarity
+	if ctrl.SkipReason != "" && ctrl.SkipReason != ctrl.Message {
+		fmt.Fprintf(f.writer, "  Skip Reason: %s\n", ctrl.SkipReason)
+	}
 
 	// Duration
 	fmt.Fprintf(f.writer, "  Duration: %s\n", ctrl.Duration.Round(time.Millisecond))
@@ -139,6 +144,7 @@ func (f *TableFormatter) formatSummary(summary engine.ResultSummary) {
 	fmt.Fprintf(f.writer, "  ✓ Passed:   %d\n", summary.PassedControls)
 	fmt.Fprintf(f.writer, "  ✗ Failed:   %d\n", summary.FailedControls)
 	fmt.Fprintf(f.writer, "  ⚠ Errors:   %d\n", summary.ErrorControls)
+	fmt.Fprintf(f.writer, "  ⊘ Skipped:  %d\n", summary.SkippedControls)
 	fmt.Fprintln(f.writer)
 
 	// Observations summary
@@ -204,6 +210,8 @@ func (f *TableFormatter) getStatusSymbol(status engine.Status) string {
 		return "✗"
 	case engine.StatusError:
 		return "⚠"
+	case engine.StatusSkipped:
+		return "⊘"
 	default:
 		return "?"
 	}
