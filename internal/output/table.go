@@ -3,20 +3,44 @@ package output
 import (
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/whiskeyjimbo/reglet/internal/engine"
 )
 
+const (
+	colorReset  = "\033[0m"
+	colorRed    = "\033[31m"
+	colorGreen  = "\033[32m"
+	colorYellow = "\033[33m"
+	colorBlue   = "\033[34m"
+	colorGray   = "\033[90m"
+	colorCyan   = "\033[36m"
+	colorBold   = "\033[1m"
+)
+
 // TableFormatter formats execution results as a human-readable table.
 type TableFormatter struct {
-	writer io.Writer
+	writer      io.Writer
+	EnableColor bool
 }
 
 // NewTableFormatter creates a new table formatter.
 func NewTableFormatter(w io.Writer) *TableFormatter {
-	return &TableFormatter{writer: w}
+	return &TableFormatter{
+		writer:      w,
+		EnableColor: true, // Default to true, caller can disable
+	}
+}
+
+// colorize returns the string wrapped in ANSI color codes if enabled.
+func (f *TableFormatter) colorize(text, code string) string {
+	if !f.EnableColor {
+		return text
+	}
+	return code + text + colorReset
 }
 
 // Format writes the execution result as a table.
@@ -24,7 +48,8 @@ func NewTableFormatter(w io.Writer) *TableFormatter {
 //nolint:errcheck // Table formatting errors are non-critical (best-effort terminal output)
 func (f *TableFormatter) Format(result *engine.ExecutionResult) error {
 	// Print header
-	fmt.Fprintf(f.writer, "Profile: %s (v%s)\n", result.ProfileName, result.ProfileVersion)
+	fmt.Fprintln(f.writer, f.colorize(strings.Repeat("─", 80), colorGray))
+	fmt.Fprintf(f.writer, "Profile: %s (v%s)\n", f.colorize(result.ProfileName, colorBold), result.ProfileVersion)
 	fmt.Fprintf(f.writer, "Executed: %s\n", result.StartTime.Format(time.RFC3339))
 	fmt.Fprintf(f.writer, "Duration: %s\n", result.Duration.Round(time.Millisecond))
 	fmt.Fprintln(f.writer)
@@ -35,14 +60,14 @@ func (f *TableFormatter) Format(result *engine.ExecutionResult) error {
 		return nil
 	}
 
-	fmt.Fprintln(f.writer, "Controls:")
-	fmt.Fprintln(f.writer, strings.Repeat("─", 80))
+	fmt.Fprintln(f.writer, f.colorize("Controls:", colorBold))
+	fmt.Fprintln(f.writer, f.colorize(strings.Repeat("─", 80), colorGray))
 
 	for _, ctrl := range result.Controls {
 		f.formatControl(ctrl)
 	}
 
-	fmt.Fprintln(f.writer, strings.Repeat("─", 80))
+	fmt.Fprintln(f.writer, f.colorize(strings.Repeat("─", 80), colorGray))
 	fmt.Fprintln(f.writer)
 
 	// Print summary
@@ -55,11 +80,13 @@ func (f *TableFormatter) Format(result *engine.ExecutionResult) error {
 //
 //nolint:errcheck // Best-effort terminal output
 func (f *TableFormatter) formatControl(ctrl engine.ControlResult) {
-	// Status symbol
-	statusSymbol := f.getStatusSymbol(ctrl.Status)
+	// Status symbol and color
+	statusSymbol, statusColor := f.getStatusInfo(ctrl.Status)
+	coloredSymbol := f.colorize(statusSymbol, statusColor)
+	coloredID := f.colorize(ctrl.ID, statusColor)
 
 	// Control header
-	fmt.Fprintf(f.writer, "%s %s: %s\n", statusSymbol, ctrl.ID, ctrl.Name)
+	fmt.Fprintf(f.writer, "%s %s: %s\n", coloredSymbol, coloredID, ctrl.Name)
 
 	// Description
 	if ctrl.Description != "" {
@@ -77,11 +104,12 @@ func (f *TableFormatter) formatControl(ctrl engine.ControlResult) {
 	}
 
 	// Status and message
-	fmt.Fprintf(f.writer, "  Status: %s\n", strings.ToUpper(string(ctrl.Status)))
+	statusText := f.colorize(strings.ToUpper(string(ctrl.Status)), statusColor)
+	fmt.Fprintf(f.writer, "  Status: %s\n", statusText)
 	if ctrl.Message != "" {
 		fmt.Fprintf(f.writer, "  Message: %s\n", ctrl.Message)
 	}
-	
+
 	// Explicit skip reason if different from message or for clarity
 	if ctrl.SkipReason != "" && ctrl.SkipReason != ctrl.Message {
 		fmt.Fprintf(f.writer, "  Skip Reason: %s\n", ctrl.SkipReason)
@@ -105,25 +133,54 @@ func (f *TableFormatter) formatControl(ctrl engine.ControlResult) {
 //
 //nolint:errcheck // Best-effort terminal output
 func (f *TableFormatter) formatObservation(obs engine.ObservationResult, index int) {
-	statusSymbol := f.getStatusSymbol(obs.Status)
-	fmt.Fprintf(f.writer, "    %d. %s Plugin: %s (%s)\n", index, statusSymbol, obs.Plugin, obs.Status)
+	statusSymbol, statusColor := f.getStatusInfo(obs.Status)
+	coloredSymbol := f.colorize(statusSymbol, statusColor)
+
+	// Plugin name in cyan
+	pluginName := f.colorize(obs.Plugin, colorCyan)
+
+	fmt.Fprintf(f.writer, "    %d. %s Plugin: %s (%s)\n", index, coloredSymbol, pluginName, obs.Status)
 
 	// Show error if present
 	if obs.Error != nil {
-		fmt.Fprintf(f.writer, "       Error: [%s] %s\n", obs.Error.Code, obs.Error.Message)
+		errMsg := fmt.Sprintf("[%s] %s", obs.Error.Code, obs.Error.Message)
+		fmt.Fprintf(f.writer, "       %s: %s\n", f.colorize("Error", colorRed), errMsg)
 	}
 
 	// Show evidence summary if present
 	if obs.Evidence != nil {
-		fmt.Fprintf(f.writer, "       Evidence: collected at %s\n", obs.Evidence.Timestamp.Format(time.RFC3339))
-		if len(obs.Evidence.Data) > 0 {
-			// Show evidence data fields
-			for key, value := range obs.Evidence.Data {
-				if key == "error" {
-					// Format error nicely instead of raw map
-					fmt.Fprintf(f.writer, "       - %s: %s\n", key, f.formatError(value))
+		// Collect valid keys to print (excluding internal/redundant ones)
+		var keys []string
+		for k, v := range obs.Evidence.Data {
+			if k == "status" || k == "error" || k == "success" {
+				continue
+			}
+			// Skip empty/nil values to reduce noise
+			if v == nil {
+				continue
+			}
+			if s, ok := v.(string); ok && s == "" {
+				continue
+			}
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+
+		if len(keys) > 0 {
+			fmt.Fprintf(f.writer, "       Evidence:\n")
+			for _, key := range keys {
+				value := obs.Evidence.Data[key]
+				valStr := f.formatValue(value)
+
+				// If value is multi-line, indent it properly
+				if strings.Contains(valStr, "\n") {
+					fmt.Fprintf(f.writer, "         - %s:\n", f.colorize(key, colorBlue))
+					lines := strings.Split(valStr, "\n")
+					for _, line := range lines {
+						fmt.Fprintf(f.writer, "           %s\n", line)
+					}
 				} else {
-					fmt.Fprintf(f.writer, "       - %s: %v\n", key, value)
+					fmt.Fprintf(f.writer, "         - %s: %s\n", f.colorize(key, colorBlue), valStr)
 				}
 			}
 		}
@@ -132,44 +189,42 @@ func (f *TableFormatter) formatObservation(obs engine.ObservationResult, index i
 	fmt.Fprintf(f.writer, "       Duration: %s\n", obs.Duration.Round(time.Millisecond))
 }
 
+// formatValue formats a value for display
+func (f *TableFormatter) formatValue(value interface{}) string {
+	switch v := value.(type) {
+	case string:
+		return v
+	case map[string]interface{}:
+		return f.formatErrorDetail(v, "")
+	case []interface{}:
+		return fmt.Sprintf("%v", v)
+	default:
+		return fmt.Sprintf("%v", value)
+	}
+}
+
 // formatSummary formats the summary statistics.
 //
 //nolint:errcheck // Best-effort terminal output
 func (f *TableFormatter) formatSummary(summary engine.ResultSummary) {
-	fmt.Fprintln(f.writer, "Summary:")
-	fmt.Fprintln(f.writer, strings.Repeat("─", 80))
+	fmt.Fprintln(f.writer, f.colorize("Summary:", colorBold))
+	fmt.Fprintln(f.writer, f.colorize(strings.Repeat("─", 80), colorGray))
 
 	// Controls summary
 	fmt.Fprintf(f.writer, "Controls:     %d total\n", summary.TotalControls)
-	fmt.Fprintf(f.writer, "  ✓ Passed:   %d\n", summary.PassedControls)
-	fmt.Fprintf(f.writer, "  ✗ Failed:   %d\n", summary.FailedControls)
-	fmt.Fprintf(f.writer, "  ⚠ Errors:   %d\n", summary.ErrorControls)
-	fmt.Fprintf(f.writer, "  ⊘ Skipped:  %d\n", summary.SkippedControls)
+	fmt.Fprintf(f.writer, "  %s Passed:   %d\n", f.colorize("✓", colorGreen), summary.PassedControls)
+	fmt.Fprintf(f.writer, "  %s Failed:   %d\n", f.colorize("✗", colorRed), summary.FailedControls)
+	fmt.Fprintf(f.writer, "  %s Errors:   %d\n", f.colorize("⚠", colorYellow), summary.ErrorControls)
+	fmt.Fprintf(f.writer, "  %s Skipped:  %d\n", f.colorize("⊘", colorGray), summary.SkippedControls)
 	fmt.Fprintln(f.writer)
 
 	// Observations summary
 	fmt.Fprintf(f.writer, "Observations: %d total\n", summary.TotalObservations)
-	fmt.Fprintf(f.writer, "  ✓ Passed:   %d\n", summary.PassedObservations)
-	fmt.Fprintf(f.writer, "  ✗ Failed:   %d\n", summary.FailedObservations)
-	fmt.Fprintf(f.writer, "  ⚠ Errors:   %d\n", summary.ErrorObservations)
+	fmt.Fprintf(f.writer, "  %s Passed:   %d\n", f.colorize("✓", colorGreen), summary.PassedObservations)
+	fmt.Fprintf(f.writer, "  %s Failed:   %d\n", f.colorize("✗", colorRed), summary.FailedObservations)
+	fmt.Fprintf(f.writer, "  %s Errors:   %d\n", f.colorize("⚠", colorYellow), summary.ErrorObservations)
 
-	fmt.Fprintln(f.writer, strings.Repeat("─", 80))
-}
-
-// formatError formats an error value from evidence data in a readable way.
-func (f *TableFormatter) formatError(value interface{}) string {
-	// Handle different error formats
-	switch v := value.(type) {
-	case string:
-		// Simple string error
-		return v
-	case map[string]interface{}:
-		// Structured error (ErrorDetail)
-		return f.formatErrorDetail(v, "")
-	default:
-		// Fallback to default formatting
-		return fmt.Sprintf("%v", value)
-	}
+	fmt.Fprintln(f.writer, f.colorize(strings.Repeat("─", 80), colorGray))
 }
 
 // formatErrorDetail formats a structured error with type, code, message, and wrapped errors.
@@ -201,18 +256,24 @@ func (f *TableFormatter) formatErrorDetail(errMap map[string]interface{}, indent
 	return result
 }
 
-// getStatusSymbol returns a symbol for the given status.
-func (f *TableFormatter) getStatusSymbol(status engine.Status) string {
+// getStatusInfo returns a symbol and color for the given status.
+func (f *TableFormatter) getStatusInfo(status engine.Status) (string, string) {
 	switch status {
 	case engine.StatusPass:
-		return "✓"
+		return "✓", colorGreen
 	case engine.StatusFail:
-		return "✗"
+		return "✗", colorRed
 	case engine.StatusError:
-		return "⚠"
+		return "⚠", colorYellow
 	case engine.StatusSkipped:
-		return "⊘"
+		return "⊘", colorGray
 	default:
-		return "?"
+		return "?", colorReset
 	}
+}
+
+// getStatusSymbol returns a symbol for the given status (legacy helper)
+func (f *TableFormatter) getStatusSymbol(status engine.Status) string {
+	s, _ := f.getStatusInfo(status)
+	return s
 }
