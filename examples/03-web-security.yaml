@@ -1,0 +1,104 @@
+# Web Server Security - HTTP/HTTPS Validation
+# Run: reglet check examples/03-web-security.yaml
+#
+# This profile tests HTTP endpoints for security best practices.
+# Requires HTTP plugin (WASM built and ready!)
+#
+# NOTE: These checks connect to real websites. Requires network access.
+
+profile:
+  name: Web Server Security
+  description: HTTP/HTTPS validation and security header checks
+  version: 1.0.0
+
+controls:
+  - id: http-responds
+    name: HTTP endpoint is accessible
+    description: Verify the website responds to HTTP requests
+    severity: low
+    tags: [web, http, connectivity]
+    observations:
+      - plugin: http
+        capabilities:
+          - network:outbound:80
+        config:
+          url: http://example.com
+          method: GET
+        expect: |
+          data.status_code >= 200 && data.status_code < 500
+
+  - id: https-accessible
+    name: HTTPS endpoint is accessible
+    description: Verify the website responds over HTTPS
+    severity: high
+    tags: [web, https, connectivity]
+    observations:
+      - plugin: http
+        capabilities:
+          - network:outbound:443
+        config:
+          url: https://example.com
+          method: GET
+        expect: |
+          data.status_code == 200
+
+  - id: https-success
+    name: HTTPS returns 200 OK
+    description: HTTPS endpoint should return successful status
+    severity: high
+    tags: [web, https, status]
+    observations:
+      - plugin: http
+        capabilities:
+          - network:outbound:443
+        config:
+          url: https://example.com
+        expect: |
+          data.status_code == 200
+
+  - id: body-not-empty
+    name: Response body contains content
+    description: Server returns actual content, not empty response
+    severity: medium
+    tags: [web, http, content]
+    observations:
+      - plugin: http
+        capabilities:
+          - network:outbound:443
+        config:
+          url: https://example.com
+          body_preview_length: 100
+        expect: |
+          data.body_size > 0
+
+  - id: github-api-accessible
+    name: GitHub API is accessible
+    description: Test connectivity to external API
+    severity: low
+    tags: [web, api, connectivity]
+    observations:
+      - plugin: http
+        capabilities:
+          - network:outbound:443
+        config:
+          url: https://api.github.com
+          method: GET
+        expect: |
+          data.status_code == 200
+
+  - id: api-returns-json
+    name: API returns JSON content
+    description: Verify API response contains JSON markers
+    severity: low
+    tags: [web, api, json]
+    observations:
+      - plugin: http
+        capabilities:
+          - network:outbound:443
+        config:
+          url: https://api.github.com
+          body_preview_length: -1
+        expect: |
+          data.status_code == 200 &&
+          data.body.contains("{") &&
+          data.body.contains("}")

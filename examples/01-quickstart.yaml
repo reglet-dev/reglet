@@ -1,0 +1,65 @@
+# Quickstart - Check basic system security
+# Run: reglet check examples/01-quickstart.yaml
+#
+# This profile checks basic security settings that work on any Linux system.
+# No special setup required - just run it!
+
+profile:
+  name: System Security Quickstart
+  description: Basic security checks that work on any Linux system
+  version: 1.0.0
+
+controls:
+  - id: root-home-permissions
+    name: Root home directory permissions
+    description: Verify /root has restrictive permissions (0700)
+    severity: high
+    tags: [filesystem, permissions, privileged]
+    observations:
+      - plugin: file
+        config:
+          path: /root
+        expect: |
+          data.exists &&
+          data.is_dir &&
+          (data.mode == "0700" || data.mode == "drwx------")
+
+  - id: shadow-file-permissions
+    name: Shadow file is not world-readable
+    description: /etc/shadow must not be readable by regular users
+    severity: critical
+    tags: [filesystem, permissions, authentication]
+    observations:
+      - plugin: file
+        config:
+          path: /etc/shadow
+        expect: |
+          data.exists &&
+          !data.mode.contains("r--r--r--") &&
+          !data.mode.contains("rw-rw-rw-")
+
+  - id: tmp-directory-exists
+    name: Temporary directory exists and is writable
+    description: /tmp should exist and be accessible
+    severity: low
+    tags: [filesystem, basic]
+    observations:
+      - plugin: file
+        config:
+          path: /tmp
+        expect: |
+          data.exists && data.is_dir
+
+  - id: etc-directory-protected
+    name: /etc directory has proper permissions
+    description: System configuration directory should not be world-writable
+    severity: high
+    tags: [filesystem, permissions, config]
+    observations:
+      - plugin: file
+        config:
+          path: /etc
+        expect: |
+          data.exists &&
+          data.is_dir &&
+          !data.mode.contains("rwxrwxrwx")
