@@ -21,6 +21,30 @@ func TestFiltering_EndToEnd(t *testing.T) {
 
 	ctx := context.Background()
 
+	// Locate plugins directory
+	cwd, err := os.Getwd()
+	require.NoError(t, err)
+	
+	// Walk up to find project root containing go.mod
+	projectRoot := cwd
+	for {
+		if _, err := os.Stat(filepath.Join(projectRoot, "go.mod")); err == nil {
+			break
+		}
+		parent := filepath.Dir(projectRoot)
+		if parent == projectRoot {
+			t.Fatal("could not find project root")
+		}
+		projectRoot = parent
+	}
+	pluginDir := filepath.Join(projectRoot, "plugins")
+
+	// Create a temporary file that definitely exists and is accessible
+	tempDir := t.TempDir()
+	targetFile := filepath.Join(tempDir, "target.txt")
+	err = os.WriteFile(targetFile, []byte("content"), 0644)
+	require.NoError(t, err)
+
 	// 1. Define a profile with 20 controls
 	// 5 controls: tag "target", severity "high"
 	// 15 controls: tag "other", severity "low"
@@ -42,7 +66,7 @@ func TestFiltering_EndToEnd(t *testing.T) {
 				{
 					Plugin: "file",
 					Config: map[string]interface{}{
-						"path": "/tmp", // Should exist and pass
+						"path": "/", // Root should always exist if FS is mounted correctly
 						"mode": "exists",
 					},
 				},
@@ -66,25 +90,6 @@ func TestFiltering_EndToEnd(t *testing.T) {
 	cfg.IncludeTags = []string{"target"}
 	// Use parallel execution to stress test, but we handle result ordering
 	cfg.Parallel = true
-
-	// Locate plugins directory
-	// We are in internal/engine. Plugins are in ../../plugins
-	cwd, err := os.Getwd()
-	require.NoError(t, err)
-	
-	// Walk up to find project root containing go.mod
-	projectRoot := cwd
-	for {
-		if _, err := os.Stat(filepath.Join(projectRoot, "go.mod")); err == nil {
-			break
-		}
-		parent := filepath.Dir(projectRoot)
-		if parent == projectRoot {
-			t.Fatal("could not find project root")
-		}
-		projectRoot = parent
-	}
-	pluginDir := filepath.Join(projectRoot, "plugins")
 
 	// Create capability manager that trusts all plugins (auto-grant)
 	capMgr := capabilities.NewManager(true)
@@ -124,7 +129,19 @@ func TestFiltering_EndToEnd(t *testing.T) {
 
 		if i < 5 {
 			// Should be executed and pass
-			assert.Equal(t, StatusPass, ctrl.Status, "Control %s should pass", id)
+			if !assert.Equal(t, StatusPass, ctrl.Status, "Control %s should pass", id) {
+				// Dump details if failed
+				t.Logf("Control %s failed. Message: %s", id, ctrl.Message)
+				for _, obs := range ctrl.Observations {
+					t.Logf("  Observation status: %s", obs.Status)
+					if obs.Error != nil {
+						t.Logf("  Error: %v", obs.Error)
+					}
+					if obs.Evidence != nil {
+						t.Logf("  Evidence: %v", obs.Evidence.Data)
+					}
+				}
+			}
 			assert.Empty(t, ctrl.SkipReason)
 			assert.NotEmpty(t, ctrl.Observations)
 		} else {
