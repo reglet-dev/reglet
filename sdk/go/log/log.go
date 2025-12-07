@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/whiskeyjimbo/reglet/sdk/internal/abi"
-	"github.com/whiskeyjimbo/reglet/sdk/net" // To reuse ContextWireFormat
+	"github.com/whiskeyjimbo/reglet/wireformat"
 )
 
 // Define the host function signature for logging messages.
@@ -20,11 +20,11 @@ func host_log_message(messagePacked uint64)
 
 // LogMessageWire is the JSON wire format for a log message from Guest to Host.
 type LogMessageWire struct {
-	Context   net.ContextWireFormat `json:"context"`
-	Level     string                `json:"level"`
-	Message   string                `json:"message"`
-	Timestamp time.Time             `json:"timestamp"`
-	Attrs     []LogAttrWire         `json:"attrs,omitempty"`
+	Context   wireformat.ContextWireFormat `json:"context"`
+	Level     string                       `json:"level"`
+	Message   string                       `json:"message"`
+	Timestamp time.Time                    `json:"timestamp"`
+	Attrs     []LogAttrWire                `json:"attrs,omitempty"`
 }
 
 // LogAttrWire represents a single slog attribute for wire transfer.
@@ -46,38 +46,11 @@ func (h *WasmLogHandler) Enabled(_ context.Context, level slog.Level) bool {
 
 // Handle serializes a slog.Record and sends it to the host via a host function.
 func (h *WasmLogHandler) Handle(ctx context.Context, record slog.Record) error {
-	// Create LogMessageWire from slog.Record
-	// Note: sdk/net package is in the same module, so we can import it.
-	// But Wait, sdk/net depends on sdk/internal/abi.
-	// sdk/log depends on sdk/net.
-	// This is fine.
-
-	// We need to construct ContextWireFormat manually if we can't import sdk/net to avoid cycles
-	// Actually, sdk/net doesn't depend on sdk/log.
-	// So sdk/log CAN import sdk/net.
-
 	logMsg := LogMessageWire{
-		// Context:   net.CreateContextWireFormat(ctx), // This function is not exported in sdk/net yet? It is.
-		// Actually, let's just re-implement context extraction or make it public in a shared place?
-		// Ideally sdk/net/wireformat.go has it.
-		// Let's verify net/wireformat.go content.
 		Level:     record.Level.String(),
 		Message:   record.Message,
 		Timestamp: record.Time,
 	}
-
-	// Handle context manually to avoid circular dependency if sdk/net imports sdk/log (which it doesn't, but good to be safe)
-	// Actually, sdk/net/http.go uses slog.Info in init().
-	// If sdk/net imports sdk/log, we have a cycle.
-	// sdk/net imports "log/slog".
-	// sdk/log imports "sdk/net".
-	// Cycle: sdk/net -> sdk/log (implicitly via init?) No, sdk/net uses stdlib log/slog.
-	// But if we want sdk/net's init() logs to go to host, we need sdk/log.
-	// And sdk/log needs sdk/net's ContextWireFormat.
-	// This IS a cycle if sdk/net/http.go imports sdk/log to set default logger?
-	// Currently sdk/net/http.go does NOT import sdk/log. It just logs.
-	// But sdk/log/log.go's init() sets the default logger.
-	// So if both are imported by main, both inits run.
 
 	// Convert slog.Attr to LogAttrWire
 	record.Attrs(func(attr slog.Attr) bool {

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/whiskeyjimbo/reglet/sdk/internal/abi"
+	_ "github.com/whiskeyjimbo/reglet/sdk/log" // Initialize WASM logging handler
 )
 
 // Define the host function signature for DNS lookups.

@@ -10,6 +10,7 @@ import (
 	"runtime/debug" // For stack traces in panic recovery
 
 	"github.com/whiskeyjimbo/reglet/sdk/internal/abi"
+	_ "github.com/whiskeyjimbo/reglet/sdk/log" // Initialize WASM logging handler
 )
 
 // Plugin is the interface every Reglet plugin must implement.

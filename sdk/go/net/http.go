@@ -12,6 +12,7 @@ import (
 	"net/http"
 
 	"github.com/whiskeyjimbo/reglet/sdk/internal/abi"
+	_ "github.com/whiskeyjimbo/reglet/sdk/log" // Initialize WASM logging handler
 	"github.com/whiskeyjimbo/reglet/wireformat"
 )
 

@@ -73,9 +73,9 @@ func (p *Plugin) createInstance(ctx context.Context) (api.Module, error) {
 	}
 
 	// Debug: List all exported functions
-	for _, def := range instance.ExportedFunctionDefinitions() {
-		fmt.Fprintf(os.Stderr, "DEBUG: Exported function: %s from %s\n", def.Name(), p.name)
-	}
+	// for _, def := range instance.ExportedFunctionDefinitions() {
+	// 	fmt.Fprintf(os.Stderr, "DEBUG: Exported function: %s from %s\n", def.Name(), p.name)
+	// }
 
 	// Call _initialize for WASI modules built with -buildmode=c-shared
 	// This must be called before any other exported functions

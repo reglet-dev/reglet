@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -135,7 +136,7 @@ func (m *Manager) GrantCapabilities(required map[string][]hostfuncs.Capability) 
 
 	// If --trust-plugins flag is set, grant everything
 	if m.trustAll {
-		fmt.Fprintln(os.Stderr, "⚠️  Auto-granting all requested capabilities (--trust-plugins enabled)")
+		slog.Warn("Auto-granting all requested capabilities (--trust-plugins enabled)")
 		m.grants = flatRequired
 		return required, nil
 	}
@@ -294,6 +295,9 @@ func (m *Manager) describeCapability(cap hostfuncs.Capability) string {
 		}
 		return fmt.Sprintf("Filesystem: %s", cap.Pattern)
 	case "exec":
+		if cap.Pattern == "/bin/sh" {
+			return "Shell execution (executes shell commands)"
+		}
 		return fmt.Sprintf("Execute commands: %s", cap.Pattern)
 	case "env":
 		return fmt.Sprintf("Read environment variables: %s", cap.Pattern)
