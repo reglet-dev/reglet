@@ -14,6 +14,7 @@ import (
 	"github.com/whiskeyjimbo/reglet/internal/config"
 	"github.com/whiskeyjimbo/reglet/internal/engine"
 	"github.com/whiskeyjimbo/reglet/internal/output"
+	"github.com/whiskeyjimbo/reglet/internal/redaction"
 )
 
 var (
@@ -91,6 +92,25 @@ func runCheckAction(ctx context.Context, profilePath string) error {
 
 	slog.Info("profile validated", "controls", len(profile.Controls.Items))
 
+	// Load system config for redaction and capabilities
+	// TODO: Centralize system config loading in root.go or config package
+	sysConfig, err := loadSystemConfig()
+	if err != nil {
+		// Log warning but continue with defaults
+		slog.Debug("failed to load system config, using defaults", "error", err)
+		sysConfig = &config.SystemConfig{}
+	}
+
+	// Initialize Redactor
+	redactor, err := redaction.New(redaction.Config{
+		Patterns: sysConfig.Redaction.Patterns,
+		Paths:    sysConfig.Redaction.Paths,
+		HashMode: sysConfig.Redaction.HashMode.Enabled,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to initialize redactor: %w", err)
+	}
+
 	// Prepare execution config
 	execConfig := engine.DefaultExecutionConfig()
 	execConfig.IncludeTags = includeTags
@@ -115,7 +135,7 @@ func runCheckAction(ctx context.Context, profilePath string) error {
 	capMgr := capabilities.NewManager(trustPlugins)
 
 	// Create execution engine with capability manager and config
-	eng, err := engine.NewEngineWithCapabilities(ctx, capMgr, pluginDir, profile, execConfig)
+	eng, err := engine.NewEngineWithCapabilities(ctx, capMgr, pluginDir, profile, execConfig, redactor)
 	if err != nil {
 		return fmt.Errorf("failed to create engine: %w", err)
 	}
@@ -176,6 +196,19 @@ func runCheckAction(ctx context.Context, profilePath string) error {
 	}
 
 	return nil
+}
+
+// loadSystemConfig loads the global configuration.
+// This duplicates logic from capabilities/manager.go slightly, but we need the struct here.
+// Ideally this should be refactored into config package.
+func loadSystemConfig() (*config.SystemConfig, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+	configPath := filepath.Join(homeDir, ".reglet", "config.yaml")
+	
+	return config.LoadSystemConfig(configPath)
 }
 
 // validateFilterConfig validates the filter configuration against the profile.

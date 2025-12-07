@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/whiskeyjimbo/reglet/internal/config"
+	"github.com/whiskeyjimbo/reglet/internal/redaction"
 	"github.com/whiskeyjimbo/reglet/internal/wasm"
 )
 
@@ -15,10 +16,11 @@ import (
 type ObservationExecutor struct {
 	runtime   *wasm.Runtime
 	pluginDir string // Base directory where plugins are located (e.g., /path/to/project/plugins)
+	redactor  *redaction.Redactor
 }
 
 // NewObservationExecutor creates a new observation executor with auto-detected plugin directory.
-func NewObservationExecutor(runtime *wasm.Runtime) *ObservationExecutor {
+func NewObservationExecutor(runtime *wasm.Runtime, redactor *redaction.Redactor) *ObservationExecutor {
 	var pluginDirPath string
 
 	// 1. Check Env Var (Best for production binaries)
@@ -33,14 +35,16 @@ func NewObservationExecutor(runtime *wasm.Runtime) *ObservationExecutor {
 	return &ObservationExecutor{
 		runtime:   runtime,
 		pluginDir: pluginDirPath,
+		redactor:  redactor,
 	}
 }
 
 // NewExecutor creates a new observation executor with explicit plugin directory.
-func NewExecutor(runtime *wasm.Runtime, pluginDir string) *ObservationExecutor {
+func NewExecutor(runtime *wasm.Runtime, pluginDir string, redactor *redaction.Redactor) *ObservationExecutor {
 	return &ObservationExecutor{
 		runtime:   runtime,
 		pluginDir: pluginDir,
+		redactor:  redactor,
 	}
 }
 
@@ -119,8 +123,19 @@ func (e *ObservationExecutor) Execute(ctx context.Context, obs config.Observatio
 
 	// Plugin returned evidence
 	if wasmResult.Evidence != nil {
-		result.Evidence = wasmResult.Evidence
+		// Determine status BEFORE redaction to ensure tests run against raw data
+		// In Phase 2 (Expect engine), we will run expectation logic here.
 		result.Status = determineStatus(wasmResult.Evidence)
+
+		// Redact sensitive data from evidence before returning/storing it
+		if e.redactor != nil && wasmResult.Evidence.Data != nil {
+			redactedData := e.redactor.Redact(wasmResult.Evidence.Data)
+			if asMap, ok := redactedData.(map[string]interface{}); ok {
+				wasmResult.Evidence.Data = asMap
+			}
+		}
+
+		result.Evidence = wasmResult.Evidence
 		result.Duration = time.Since(startTime)
 		return result
 	}

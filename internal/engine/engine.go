@@ -8,6 +8,7 @@ import (
 	"github.com/expr-lang/expr"
 	"github.com/expr-lang/expr/vm"
 	"github.com/whiskeyjimbo/reglet/internal/config"
+	"github.com/whiskeyjimbo/reglet/internal/redaction"
 	"github.com/whiskeyjimbo/reglet/internal/wasm"
 	"github.com/whiskeyjimbo/reglet/internal/wasm/hostfuncs"
 	"golang.org/x/sync/errgroup"
@@ -75,7 +76,7 @@ func NewEngine(ctx context.Context) (*Engine, error) {
 }
 
 // NewEngineWithCapabilities creates an engine with interactive capability prompts
-func NewEngineWithCapabilities(ctx context.Context, capMgr CapabilityManager, pluginDir string, profile *config.Profile, cfg ExecutionConfig) (*Engine, error) {
+func NewEngineWithCapabilities(ctx context.Context, capMgr CapabilityManager, pluginDir string, profile *config.Profile, cfg ExecutionConfig, redactor *redaction.Redactor) (*Engine, error) {
 	// Create temporary runtime with no capabilities to load plugins and get requirements
 	tempRuntime, err := wasm.NewRuntime(ctx)
 	if err != nil {
@@ -105,7 +106,7 @@ func NewEngineWithCapabilities(ctx context.Context, capMgr CapabilityManager, pl
 	}
 
 	// Create observation executor
-	executor := NewExecutor(runtime, pluginDir)
+	executor := NewExecutor(runtime, pluginDir, redactor)
 
 	// Preload plugins for schema validation
 	for _, ctrl := range profile.Controls.Items {
@@ -131,8 +132,8 @@ func NewEngineWithConfig(ctx context.Context, cfg ExecutionConfig) (*Engine, err
 		return nil, fmt.Errorf("failed to create WASM runtime: %w", err)
 	}
 
-	// Create observation executor
-	executor := NewObservationExecutor(runtime)
+	// Create observation executor with no redactor
+	executor := NewObservationExecutor(runtime, nil)
 
 	return &Engine{
 		runtime:  runtime,
