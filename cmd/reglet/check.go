@@ -106,6 +106,7 @@ func runCheckAction(ctx context.Context, profilePath string) error {
 		Patterns: sysConfig.Redaction.Patterns,
 		Paths:    sysConfig.Redaction.Paths,
 		HashMode: sysConfig.Redaction.HashMode.Enabled,
+		Salt:     sysConfig.Redaction.HashMode.Salt,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to initialize redactor: %w", err)

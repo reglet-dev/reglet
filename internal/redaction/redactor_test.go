@@ -11,6 +11,7 @@ func TestRedactor_ScrubString(t *testing.T) {
 		name     string
 		input    string
 		hashMode bool
+		salt     string
 		want     string
 	}{
 		{
@@ -29,16 +30,28 @@ func TestRedactor_ScrubString(t *testing.T) {
 			want:  "Hello World",
 		},
 		{
-			name:     "Hash Mode",
+			name:     "Hash Mode (No Salt)",
 			input:    "AKIAIOSFODNN7EXAMPLE",
 			hashMode: true,
-			want:     "[sha256:1a5d44a2]", // Correct hash prefix
+			want:     "[sha256:1a5d44a2]", // Hash of "AKIAIOSFODNN7EXAMPLE"
+		},
+		{
+			name:     "Hash Mode (With Salt)",
+			input:    "AKIAIOSFODNN7EXAMPLE",
+			hashMode: true,
+			salt:     "my-salt",
+			// Hash of "my-saltAKIAIOSFODNN7EXAMPLE"
+			// echo -n "my-saltAKIAIOSFODNN7EXAMPLE" | sha256sum -> 2cdf1...
+			want: "[sha256:2cdf121b]",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r, err := New(Config{HashMode: tt.hashMode})
+			r, err := New(Config{
+				HashMode: tt.hashMode,
+				Salt:     tt.salt,
+			})
 			assert.NoError(t, err)
 			got := r.ScrubString(tt.input)
 			assert.Equal(t, tt.want, got)

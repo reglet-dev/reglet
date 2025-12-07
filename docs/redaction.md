@@ -11,6 +11,8 @@ redaction:
   # Replace sensitive values with a consistent hash instead of [REDACTED]
   hash_mode:
     enabled: false
+    # Optional: salt for hashing (prevents rainbow table attacks)
+    salt: "my-secret-salt-string"
 
   # List of regex patterns to scrub from any string output
   patterns:
@@ -74,6 +76,16 @@ redaction:
 [sha256:a1b2c3d4]
 ```
 
+**Salting:**
+To prevent rainbow table attacks (where an attacker pre-computes hashes for common passwords), you should configure a **salt**. This ensures that the hash of "password123" is unique to your organization.
+
+```yaml
+redaction:
+  hash_mode:
+    enabled: true
+    salt: "random-string-generated-by-you"
+```
+
 ## Built-in Patterns
 
 Reglet automatically attempts to detect and redact high-confidence secrets even without configuration, including:
@@ -86,3 +98,4 @@ Reglet automatically attempts to detect and redact high-confidence secrets even 
 1.  **Prefer Path Matching**: Whenever possible, rely on path matching (`paths`) rather than regex. It is more performant and less prone to false positives.
 2.  **Use Hash Mode for Audits**: Hash mode is useful when an auditor asks "Is the API key on Server A the same as Server B?". You can show them matching hashes without revealing the key.
 3.  **Test Your Patterns**: Regex can be tricky. Test your patterns against dummy data to ensure they catch what you expect without redacting too much.
+4.  **Use a Salt**: If using Hash Mode, always configure a secret salt in your local config to prevent reversing the hashes.

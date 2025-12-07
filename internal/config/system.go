@@ -1,6 +1,12 @@
 package config
 
-import "github.com/whiskeyjimbo/reglet/internal/wasm/hostfuncs"
+import (
+	"fmt"
+	"os"
+
+	"github.com/goccy/go-yaml"
+	"github.com/whiskeyjimbo/reglet/internal/wasm/hostfuncs"
+)
 
 // SystemConfig represents the global configuration file (~/.reglet/config.yaml).
 type SystemConfig struct {
@@ -25,7 +31,31 @@ type RedactionConfig struct {
 }
 
 type HashModeConfig struct {
-	Enabled bool `yaml:"enabled"`
+	Enabled bool   `yaml:"enabled"`
+	Salt    string `yaml:"salt"` // Optional salt for stable hashing
+}
+
+// LoadSystemConfig loads the system configuration from the specified path.
+// If the file does not exist, it returns an empty config without error.
+func LoadSystemConfig(path string) (*SystemConfig, error) {
+	// Check if file exists
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return &SystemConfig{}, nil
+	}
+
+	// Read config file
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read system config: %w", err)
+	}
+
+	// Parse YAML
+	var config SystemConfig
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("failed to parse system config: %w", err)
+	}
+
+	return &config, nil
 }
 
 // ToHostFuncsCapabilities converts the config capability format to the internal hostfuncs format.

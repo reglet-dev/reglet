@@ -14,6 +14,7 @@ type Redactor struct {
 	patterns []*regexp.Regexp
 	paths    []string
 	hashMode bool
+	salt     string
 	mu       sync.RWMutex
 }
 
@@ -25,6 +26,8 @@ type Config struct {
 	Paths []string
 	// If true, replace with hash instead of [REDACTED]
 	HashMode bool
+	// Salt for hashing (prevents rainbow tables). If empty, hash is deterministic but unsalted.
+	Salt string
 }
 
 // New creates a new Redactor with the given configuration.
@@ -32,6 +35,7 @@ func New(cfg Config) (*Redactor, error) {
 	r := &Redactor{
 		paths:    cfg.Paths,
 		hashMode: cfg.HashMode,
+		salt:     cfg.Salt,
 		patterns: make([]*regexp.Regexp, 0, len(cfg.Patterns)+len(defaultPatterns)),
 	}
 
@@ -145,7 +149,7 @@ func (r *Redactor) isPathMatch(path string) bool {
 // hash returns a truncated SHA256 hash of the secret.
 // Format: [sha256:a1b2c3d4]
 func (r *Redactor) hash(secret string) string {
-	h := sha256.Sum256([]byte(secret))
+	h := sha256.Sum256([]byte(r.salt + secret))
 	// Use first 8 bytes (16 hex chars) for correlation
 	return fmt.Sprintf("[sha256:%s]", hex.EncodeToString(h[:])[:8])
 }
