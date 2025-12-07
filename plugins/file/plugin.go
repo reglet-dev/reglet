@@ -2,9 +2,13 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
+	"io"
 	"os"
+	"time"
 
 	regletsdk "github.com/whiskeyjimbo/reglet/sdk"
 )
@@ -16,8 +20,8 @@ type filePlugin struct{}
 func (p *filePlugin) Describe(ctx context.Context) (regletsdk.Metadata, error) {
 	return regletsdk.Metadata{
 		Name:        "file",
-		Version:     "1.0.0",
-		Description: "File existence and content checks",
+		Version:     "1.1.0",
+		Description: "File existence, content, and hash checks",
 		Capabilities: []regletsdk.Capability{
 			{
 				Kind:    "fs",
@@ -28,8 +32,9 @@ func (p *filePlugin) Describe(ctx context.Context) (regletsdk.Metadata, error) {
 }
 
 type FileConfig struct {
-	Path string `json:"path" validate:"required" description:"Path to file to check"`
-	Mode string `json:"mode" validate:"oneof=exists readable content" default:"exists" description:"Check mode: exists, readable, or content"`
+	Path        string `json:"path" validate:"required" description:"Path to file to check"`
+	ReadContent bool   `json:"read_content,omitempty" description:"Read and return file content"`
+	Hash        bool   `json:"hash,omitempty" description:"Calculate SHA256 hash of file"`
 }
 
 // Schema returns the JSON schema for the plugin's configuration.
@@ -39,57 +44,57 @@ func (p *filePlugin) Schema(ctx context.Context) ([]byte, error) {
 
 // Check executes the file observation.
 func (p *filePlugin) Check(ctx context.Context, config regletsdk.Config) (regletsdk.Evidence, error) {
-	// Set default mode if missing
-	if _, ok := config["mode"]; !ok {
-		config["mode"] = "exists"
-	}
-
 	var cfg FileConfig
 	if err := regletsdk.ValidateConfig(config, &cfg); err != nil {
 		return regletsdk.ConfigError(err), nil
 	}
 
-	var result map[string]interface{}
-
-	switch cfg.Mode {
-	case "exists":
-		_, err := os.Stat(cfg.Path)
-		if err != nil {
-			// File doesn't exist - this is a check failure
-			return regletsdk.Failure("fs", fmt.Sprintf("file not found: %v", err)), nil
-		}
-		// File exists - check passes
-		result = map[string]interface{}{
-			"exists": true,
-		}
-
-	case "readable":
-		file, err := os.Open(cfg.Path)
-		if err == nil {
-			file.Close()
-			result = map[string]interface{}{
-				"readable": true,
-			}
-		} else {
-			return regletsdk.Failure("fs", fmt.Sprintf("file not readable: %v", err)), nil
-		}
-
-	case "content":
-		content, err := os.ReadFile(cfg.Path)
-		if err == nil {
-			result = map[string]interface{}{
-				"content_b64": base64.StdEncoding.EncodeToString(content),
-				"encoding":    "base64",
-				"size":        len(content),
-			}
-		} else {
-			return regletsdk.Failure("fs", fmt.Sprintf("failed to read file: %v", err)), nil
-		}
+	result := map[string]interface{}{
+		"path": cfg.Path,
 	}
 
-	// Add common fields
-	result["path"] = cfg.Path
-	result["mode"] = cfg.Mode
+	// 1. Check Existence & Metadata
+	info, err := os.Stat(cfg.Path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			result["exists"] = false
+			return regletsdk.Success(result), nil
+		}
+		return regletsdk.Failure("fs", fmt.Sprintf("stat failed: %v", err)), nil
+	}
+
+	result["exists"] = true
+	result["is_dir"] = info.IsDir()
+	result["size"] = info.Size()
+	result["mode"] = fmt.Sprintf("%04o", info.Mode().Perm())
+	result["permissions"] = info.Mode().String()
+	result["mod_time"] = info.ModTime().Format(time.RFC3339)
+
+	// 2. Read Content (if requested and not a directory)
+	if cfg.ReadContent && !info.IsDir() {
+		content, err := os.ReadFile(cfg.Path)
+		if err != nil {
+			return regletsdk.Failure("fs", fmt.Sprintf("read failed: %v", err)), nil
+		}
+		result["content_b64"] = base64.StdEncoding.EncodeToString(content)
+		result["encoding"] = "base64"
+		// We could add plain "content" string if utf8, but b64 is safer for generic use
+	}
+
+	// 3. Calculate Hash (if requested and not a directory)
+	if cfg.Hash && !info.IsDir() {
+		f, err := os.Open(cfg.Path)
+		if err != nil {
+			return regletsdk.Failure("fs", fmt.Sprintf("open for hash failed: %v", err)), nil
+		}
+		defer f.Close()
+
+		hasher := sha256.New()
+		if _, err := io.Copy(hasher, f); err != nil {
+			return regletsdk.Failure("fs", fmt.Sprintf("hash calculation failed: %v", err)), nil
+		}
+		result["sha256"] = hex.EncodeToString(hasher.Sum(nil))
+	}
 
 	return regletsdk.Success(result), nil
 }

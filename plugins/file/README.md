@@ -4,32 +4,21 @@ The file plugin checks file existence, permissions, and content.
 
 ## Status
 
-🚧 **Under Development** - This is a proof-of-concept plugin to validate the WASM runtime infrastructure.
+✅ **Operational** - Functional file checking implementation.
 
-## Current Implementation
+## Implementation
 
-This is a **placeholder** implementation that demonstrates the plugin structure. It does NOT yet implement proper WIT bindings.
+Uses standard Go `os` and `io` packages, compiled to WASI. The host (Reglet) mounts the root filesystem `/` to the WASI guest's `/`, allowing absolute path access.
 
-### What Works
-- Basic Go structure with exported functions
-- Can be compiled to WASM
-
-### What's Missing
-- WIT bindings for proper data marshaling
-- Memory management between host and WASM
-- Proper Config/Evidence serialization
-- Host function calls for filesystem access
+### Features
+- Check existence (`mode: exists`)
+- Check readability (`mode: readable`)
+- Read content (`mode: content`)
+- Retrieve metadata (permissions, size, mod time)
 
 ## Building
 
 To compile to WASM:
-
-```bash
-cd plugins/file
-GOOS=wasip1 GOARCH=wasm go build -o file.wasm main.go
-```
-
-Or use the Makefile:
 
 ```bash
 make -C plugins/file build
@@ -37,30 +26,40 @@ make -C plugins/file build
 
 ## Configuration
 
-Once implemented, the plugin will accept this configuration:
-
 ```yaml
 observations:
   - plugin: file
     config:
       path: /etc/ssh/sshd_config    # Required: Path to check
-      mode: content                  # Optional: exists|readable|content
+      mode: exists                   # Optional: exists|readable|content (default: exists)
 ```
 
 ## Evidence
 
-Will return:
+### `mode: exists`
+
+Returns metadata about the file:
 
 ```json
 {
-  "timestamp": "2025-01-15T10:30:00Z",
-  "data": {
-    "exists": true,
-    "readable": true,
-    "size_bytes": 3456,
-    "modified": "2025-01-10T08:00:00Z",
-    "content": "...file contents..."
-  }
+  "exists": true,
+  "is_dir": false,
+  "size": 3456,
+  "mode": "0644",
+  "permissions": "-rw-r--r--",
+  "mod_time": "2025-01-15T10:30:00Z"
+}
+```
+
+### `mode: content`
+
+Returns base64-encoded content:
+
+```json
+{
+  "content_b64": "...",
+  "encoding": "base64",
+  "size": 3456
 }
 ```
 
@@ -78,11 +77,3 @@ plugins:
       - fs:read:/etc/**
       - fs:read:/var/log/**
 ```
-
-## Next Steps
-
-1. Implement WIT bindings using wit-bindgen-go (or manual implementation)
-2. Add proper memory management for string/data passing
-3. Call host functions for filesystem access (respects capabilities)
-4. Test end-to-end with Reglet runtime
-5. Add comprehensive tests
