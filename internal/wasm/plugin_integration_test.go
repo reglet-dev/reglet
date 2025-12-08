@@ -113,8 +113,8 @@ func TestFilePlugin_Describe(t *testing.T) {
 
 	// Verify plugin metadata matches what the plugin exports
 	assert.Equal(t, "file", info.Name)
-	assert.Equal(t, "1.0.0", info.Version)
-	assert.Equal(t, "File existence and content checks", info.Description)
+	assert.Equal(t, "1.1.0", info.Version)
+	assert.Equal(t, "File existence, content, and hash checks", info.Description)
 
 	// Verify capabilities
 	require.Len(t, info.Capabilities, 1)
@@ -162,7 +162,8 @@ func TestFilePlugin_Schema(t *testing.T) {
 	props, ok := jsonSchema["properties"].(map[string]interface{})
 	require.True(t, ok)
 	assert.Contains(t, props, "path")
-	assert.Contains(t, props, "mode")
+	assert.Contains(t, props, "read_content")
+	assert.Contains(t, props, "hash")
 }
 
 // TestFilePlugin_Observe_FileExists tests checking if a file exists
@@ -200,7 +201,6 @@ func TestFilePlugin_Observe_FileExists(t *testing.T) {
 	config := Config{
 		Values: map[string]interface{}{
 			"path": tmpFile.Name(),
-			"mode": "exists",
 		},
 	}
 
@@ -217,7 +217,6 @@ func TestFilePlugin_Observe_FileExists(t *testing.T) {
 	require.True(t, ok)
 	assert.True(t, status)
 	assert.Equal(t, tmpFile.Name(), result.Evidence.Data["path"])
-	assert.Equal(t, "exists", result.Evidence.Data["mode"])
 }
 
 // TestFilePlugin_Observe_FileNotFound tests checking a non-existent file
@@ -245,7 +244,6 @@ func TestFilePlugin_Observe_FileNotFound(t *testing.T) {
 	config := Config{
 		Values: map[string]interface{}{
 			"path": "/tmp/reglet-nonexistent-file-12345.txt",
-			"mode": "exists",
 		},
 	}
 
@@ -254,26 +252,14 @@ func TestFilePlugin_Observe_FileNotFound(t *testing.T) {
 	require.NotNil(t, result)
 	require.NotNil(t, result.Evidence)
 
-	// Verify the check failed (status=false) for non-existent file
+	// Verify the check succeeded (status=true) but file does not exist (exists=false)
 	status, ok := result.Evidence.Data["status"].(bool)
 	require.True(t, ok)
-	assert.False(t, status, "status should be false (check failed for missing file)")
+	assert.True(t, status, "status should be true (observation successful)")
 
-	// Verify error message is present and indicates file not found
-	assert.Contains(t, result.Evidence.Data, "error", "should include error message in evidence")
-
-	// Error can be a map or string
-	var errMsg string
-	switch v := result.Evidence.Data["error"].(type) {
-	case string:
-		errMsg = v
-	case map[string]interface{}:
-		if msg, ok := v["message"].(string); ok {
-			errMsg = msg
-		}
-	}
-	require.NotEmpty(t, errMsg, "should have error message")
-	assert.Contains(t, errMsg, "not found", "error message should indicate file not found")
+	exists, ok := result.Evidence.Data["exists"].(bool)
+	require.True(t, ok)
+	assert.False(t, exists, "exists should be false for missing file")
 }
 
 // TestFilePlugin_Observe_ReadContent tests reading file content
@@ -309,8 +295,8 @@ func TestFilePlugin_Observe_ReadContent(t *testing.T) {
 	// Test content reading
 	config := Config{
 		Values: map[string]interface{}{
-			"path": tmpFile.Name(),
-			"mode": "content",
+			"path":         tmpFile.Name(),
+			"read_content": true,
 		},
 	}
 
@@ -382,8 +368,8 @@ func TestFilePlugin_Observe_BinaryContent(t *testing.T) {
 	// Test binary content reading
 	config := Config{
 		Values: map[string]interface{}{
-			"path": tmpFile.Name(),
-			"mode": "content",
+			"path":         tmpFile.Name(),
+			"read_content": true,
 		},
 	}
 

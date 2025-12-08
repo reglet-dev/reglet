@@ -95,7 +95,7 @@ func TestFiltering_EndToEnd(t *testing.T) {
 	capMgr := capabilities.NewManager(true)
 
 	// Initialize Engine with Capabilities and Config
-	engine, err := NewEngineWithCapabilities(ctx, capMgr, pluginDir, profile, cfg)
+	engine, err := NewEngineWithCapabilities(ctx, capMgr, pluginDir, profile, cfg, nil)
 	require.NoError(t, err)
 	defer engine.Close(ctx)
 
