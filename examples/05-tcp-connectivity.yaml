@@ -1,5 +1,5 @@
 # TCP Port Connectivity and TLS Validation
-# Run: reglet check examples/05-tcp-connectivity.yaml
+# Run: reglet check examples/05-tcp-connectivity.yaml --trust-plugins
 #
 # This profile tests TCP connectivity and TLS configuration.
 # Useful for port scanning, service availability, and TLS validation.
@@ -12,155 +12,145 @@ profile:
   version: 1.0.0
 
 controls:
-  - id: tcp-google-http
-    name: Google HTTP port is open
-    description: Verify HTTP port 80 is accessible
-    severity: low
-    tags: [tcp, http, connectivity]
-    observations:
-      - plugin: tcp
-        capabilities:
-          - network:outbound:*
-        config:
-          host: google.com
-          port: "80"
-          timeout_ms: 5000
-        expect: |
-          data.connected == true
+  items:
+    - id: tcp-google-http
+      name: Google HTTP port is open
+      description: Verify HTTP port 80 is accessible
+      severity: low
+      tags: [tcp, http, connectivity]
+      observations:
+        - plugin: tcp
+          config:
+            host: google.com
+            port: "80"
+            timeout_ms: 5000
+          expect:
+            - data.connected == true
 
-  - id: tcp-google-https
-    name: Google HTTPS port is open
-    description: Verify HTTPS port 443 is accessible
-    severity: high
-    tags: [tcp, https, connectivity]
-    observations:
-      - plugin: tcp
-        capabilities:
-          - network:outbound:*
-        config:
-          host: google.com
-          port: "443"
-          timeout_ms: 5000
-        expect: |
-          data.connected == true
+    - id: tcp-google-https
+      name: Google HTTPS port is open
+      description: Verify HTTPS port 443 is accessible
+      severity: high
+      tags: [tcp, https, connectivity]
+      observations:
+        - plugin: tcp
+          config:
+            host: google.com
+            port: "443"
+            timeout_ms: 5000
+          expect:
+            - data.connected == true
 
-  - id: tcp-google-https-tls
-    name: Google HTTPS uses TLS
-    description: Verify TLS connection to HTTPS port
-    severity: critical
-    tags: [tcp, tls, security]
-    observations:
-      - plugin: tcp
-        capabilities:
-          - network:outbound:*
-        config:
-          host: google.com
-          port: "443"
-          tls: true
-          timeout_ms: 5000
-        expect: |
-          data.connected == true &&
-          data.tls == true
+    - id: tcp-google-https-tls
+      name: Google HTTPS uses TLS
+      description: Verify TLS connection to HTTPS port
+      severity: critical
+      tags: [tcp, tls, security]
+      observations:
+        - plugin: tcp
+          config:
+            host: google.com
+            port: "443"
+            tls: true
+            timeout_ms: 5000
+          expect:
+            - |
+              data.connected == true &&
+              data.tls == true
 
-  - id: tcp-google-tls-version
-    name: Google uses modern TLS version
-    description: Verify TLS 1.2 or higher is used
-    severity: critical
-    tags: [tcp, tls, security, compliance]
-    observations:
-      - plugin: tcp
-        capabilities:
-          - network:outbound:*
-        config:
-          host: google.com
-          port: "443"
-          tls: true
-          timeout_ms: 5000
-        expect: |
-          data.tls_version == "TLS 1.2" ||
-          data.tls_version == "TLS 1.3"
+    - id: tcp-google-tls-version
+      name: Google uses modern TLS version
+      description: Verify TLS 1.2 or higher is used
+      severity: critical
+      tags: [tcp, tls, security, compliance]
+      observations:
+        - plugin: tcp
+          config:
+            host: google.com
+            port: "443"
+            tls: true
+            timeout_ms: 5000
+          expect:
+            - |
+              data.tls_version == "TLS 1.2" ||
+              data.tls_version == "TLS 1.3"
 
-  - id: tcp-github-ssh
-    name: GitHub SSH port is accessible
-    description: Verify SSH port 22 for Git operations
-    severity: medium
-    tags: [tcp, ssh, git]
-    observations:
-      - plugin: tcp
-        capabilities:
-          - network:outbound:*
-        config:
-          host: github.com
-          port: "22"
-          timeout_ms: 5000
-        expect: |
-          data.connected == true
+    - id: tcp-github-ssh
+      name: GitHub SSH port is accessible
+      description: Verify SSH port 22 for Git operations
+      severity: medium
+      tags: [tcp, ssh, git]
+      observations:
+        - plugin: tcp
+          config:
+            host: github.com
+            port: "22"
+            timeout_ms: 5000
+          expect:
+            - data.connected == true
 
-  - id: tcp-fast-connection
-    name: TCP connection is fast
-    description: Connection should establish quickly
-    severity: low
-    tags: [tcp, performance]
-    observations:
-      - plugin: tcp
-        capabilities:
-          - network:outbound:*
-        config:
-          host: google.com
-          port: "443"
-          timeout_ms: 5000
-        expect: |
-          data.connected == true &&
-          data.response_time_ms < 1000
+    - id: tcp-fast-connection
+      name: TCP connection is fast
+      description: Connection should establish quickly
+      severity: low
+      tags: [tcp, performance]
+      observations:
+        - plugin: tcp
+          config:
+            host: google.com
+            port: "443"
+            timeout_ms: 5000
+          expect:
+            - |
+              data.connected == true &&
+              data.response_time_ms < 1000
 
-  - id: tcp-cloudflare-dns
-    name: Cloudflare DNS is accessible
-    description: Verify 1.1.1.1 DNS service availability
-    severity: medium
-    tags: [tcp, dns, infrastructure]
-    observations:
-      - plugin: tcp
-        capabilities:
-          - network:outbound:*
-        config:
-          host: "1.1.1.1"
-          port: "53"
-          timeout_ms: 5000
-        expect: |
-          data.connected == true
+    - id: tcp-cloudflare-dns
+      name: Cloudflare DNS is accessible
+      description: Verify 1.1.1.1 DNS service availability
+      severity: medium
+      tags: [tcp, dns, infrastructure]
+      observations:
+        - plugin: tcp
+          config:
+            host: "1.1.1.1"
+            port: "53"
+            timeout_ms: 5000
+          expect:
+            - data.connected == true
 
-  - id: tcp-tls-certificate-present
-    name: TLS certificate information available
-    description: Verify TLS handshake provides certificate details
-    severity: high
-    tags: [tcp, tls, certificates]
-    observations:
-      - plugin: tcp
-        capabilities:
-          - network:outbound:*
-        config:
-          host: google.com
-          port: "443"
-          tls: true
-        expect: |
-          data.connected == true &&
-          data.tls_cert_subject != "" &&
-          data.tls_cert_issuer != ""
+    - id: tcp-tls-certificate-present
+      name: TLS certificate information available
+      description: Verify TLS handshake provides certificate details
+      severity: high
+      tags: [tcp, tls, certificates]
+      observations:
+        - plugin: tcp
+          config:
+            host: google.com
+            port: "443"
+            tls: true
+            timeout_ms: 5000
+          expect:
+            - |
+              data.connected == true &&
+              data.tls_cert_subject != "" &&
+              data.tls_cert_issuer != ""
 
-  - id: tcp-github-https-tls13
-    name: GitHub supports TLS 1.3
-    description: Modern servers should support TLS 1.3
-    severity: low
-    tags: [tcp, tls, modern]
-    observations:
-      - plugin: tcp
-        capabilities:
-          - network:outbound:*
-        config:
-          host: github.com
-          port: "443"
-          tls: true
-          expected_tls_version: "TLS 1.2"
-        expect: |
-          data.connected == true &&
-          !data.expectation_failed
+    - id: tcp-github-https-tls13
+      name: GitHub supports TLS 1.3
+      description: Modern servers should support TLS 1.3
+      severity: low
+      tags: [tcp, tls, modern]
+      observations:
+        - plugin: tcp
+          config:
+            host: github.com
+            port: "443"
+            tls: true
+            expected_tls_version: "TLS 1.2"
+            timeout_ms: 5000
+          expect:
+            - |
+              data.connected == true &&
+              !data.expectation_failed

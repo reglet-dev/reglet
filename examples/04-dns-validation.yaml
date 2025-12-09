@@ -1,5 +1,5 @@
 # DNS Resolution and Validation
-# Run: reglet check examples/04-dns-validation.yaml
+# Run: reglet check examples/04-dns-validation.yaml --trust-plugins
 #
 # This profile validates DNS records for infrastructure.
 # Useful for verifying DNS configuration, failover, and propagation.
@@ -12,124 +12,110 @@ profile:
   version: 1.0.0
 
 controls:
-  - id: dns-google-a-record
-    name: Google DNS resolves
-    description: Verify DNS system can resolve public hostnames
-    severity: critical
-    tags: [dns, connectivity, infrastructure]
-    observations:
-      - plugin: dns
-        capabilities:
-          - network:outbound:53
-        config:
-          hostname: google.com
-          record_type: A
-        expect: |
-          data.record_count > 0
+  items:
+    - id: dns-google-a-record
+      name: Google DNS resolves
+      description: Verify DNS system can resolve public hostnames
+      severity: critical
+      tags: [dns, connectivity, infrastructure]
+      observations:
+        - plugin: dns
+          config:
+            hostname: google.com
+            record_type: A
+          expect:
+            - data.record_count > 0
 
-  - id: dns-google-ipv4
-    name: Google returns IPv4 addresses
-    description: A records should return valid IPv4 addresses
-    severity: high
-    tags: [dns, ipv4]
-    observations:
-      - plugin: dns
-        capabilities:
-          - network:outbound:53
-        config:
-          hostname: google.com
-          record_type: A
-        expect: |
-          data.record_count > 0 &&
-          data.records[0].contains(".")
+    - id: dns-google-ipv4
+      name: Google returns IPv4 addresses
+      description: A records should return valid IPv4 addresses
+      severity: high
+      tags: [dns, ipv4]
+      observations:
+        - plugin: dns
+          config:
+            hostname: google.com
+            record_type: A
+          expect:
+            - |
+              data.record_count > 0 &&
+              data.records[0].contains(".")
 
-  - id: dns-github-cname
-    name: GitHub Pages CNAME exists
-    description: Verify CNAME records resolve correctly
-    severity: medium
-    tags: [dns, cname]
-    observations:
-      - plugin: dns
-        capabilities:
-          - network:outbound:53
-        config:
-          hostname: www.github.com
-          record_type: CNAME
-        expect: |
-          data.record_count > 0
+    - id: dns-github-cname
+      name: GitHub Pages CNAME exists
+      description: Verify CNAME records resolve correctly
+      severity: medium
+      tags: [dns, cname]
+      observations:
+        - plugin: dns
+          config:
+            hostname: www.github.com
+            record_type: CNAME
+          expect:
+            - data.record_count > 0
 
-  - id: dns-google-mx
-    name: Google MX records exist
-    description: Mail exchanger records for email delivery
-    severity: medium
-    tags: [dns, mx, email]
-    observations:
-      - plugin: dns
-        capabilities:
-          - network:outbound:53
-        config:
-          hostname: google.com
-          record_type: MX
-        expect: |
-          data.record_count > 0
+    - id: dns-google-mx
+      name: Google MX records exist
+      description: Mail exchanger records for email delivery
+      severity: medium
+      tags: [dns, mx, email]
+      observations:
+        - plugin: dns
+          config:
+            hostname: google.com
+            record_type: MX
+          expect:
+            - data.record_count > 0
 
-  - id: dns-github-txt
-    name: GitHub TXT records exist
-    description: TXT records used for verification and SPF
-    severity: low
-    tags: [dns, txt]
-    observations:
-      - plugin: dns
-        capabilities:
-          - network:outbound:53
-        config:
-          hostname: github.com
-          record_type: TXT
-        expect: |
-          data.record_count >= 0
+    - id: dns-github-txt
+      name: GitHub TXT records exist
+      description: TXT records used for verification and SPF
+      severity: low
+      tags: [dns, txt]
+      observations:
+        - plugin: dns
+          config:
+            hostname: github.com
+            record_type: TXT
+          expect:
+            - data.record_count >= 0
 
-  - id: dns-google-ns
-    name: Google NS records exist
-    description: Nameserver records for delegation
-    severity: high
-    tags: [dns, ns, nameservers]
-    observations:
-      - plugin: dns
-        capabilities:
-          - network:outbound:53
-        config:
-          hostname: google.com
-          record_type: NS
-        expect: |
-          data.record_count > 0
+    - id: dns-google-ns
+      name: Google NS records exist
+      description: Nameserver records for delegation
+      severity: high
+      tags: [dns, ns, nameservers]
+      observations:
+        - plugin: dns
+          config:
+            hostname: google.com
+            record_type: NS
+          expect:
+            - data.record_count > 0
 
-  - id: dns-fast-resolution
-    name: DNS resolution is fast
-    description: DNS queries should complete quickly
-    severity: low
-    tags: [dns, performance]
-    observations:
-      - plugin: dns
-        capabilities:
-          - network:outbound:53
-        config:
-          hostname: google.com
-          record_type: A
-        expect: |
-          data.query_time_ms < 1000
+    - id: dns-fast-resolution
+      name: DNS resolution is fast
+      description: DNS queries should complete quickly
+      severity: low
+      tags: [dns, performance]
+      observations:
+        - plugin: dns
+          config:
+            hostname: google.com
+            record_type: A
+          expect:
+            - data.query_time_ms < 1000
 
-  - id: dns-custom-nameserver
-    name: Custom nameserver works (Google DNS)
-    description: Test using specific DNS server
-    severity: low
-    tags: [dns, nameserver]
-    observations:
-      - plugin: dns
-        capabilities:
-          - network:outbound:53
-        config:
-          hostname: example.com
-          record_type: A
-          nameserver: "8.8.8.8:53"
-        expect: |
-          data.record_count > 0
+    - id: dns-custom-nameserver
+      name: Custom nameserver works (Google DNS)
+      description: Test using specific DNS server
+      severity: low
+      tags: [dns, nameserver]
+      observations:
+        - plugin: dns
+          config:
+            hostname: example.com
+            record_type: A
+            nameserver: "8.8.8.8:53"
+          expect:
+            - data.record_count > 0
