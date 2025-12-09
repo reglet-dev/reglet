@@ -1,11 +1,13 @@
 //go:build wasip1
 
+// Package net
 package net
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/whiskeyjimbo/reglet/sdk/internal/abi"
 	_ "github.com/whiskeyjimbo/reglet/sdk/log" // Initialize WASM logging handler
@@ -19,17 +21,18 @@ func host_tcp_connect(requestPacked uint64) uint64
 
 // TCPConnectResult contains the result of a TCP connection test
 type TCPConnectResult struct {
-	Connected      bool
-	Address        string
-	RemoteAddr     string
-	LocalAddr      string
-	ResponseTimeMs int64
-	TLS            bool
-	TLSVersion     string
-	TLSCipherSuite string
-	TLSServerName  string
-	TLSCertSubject string
-	TLSCertIssuer  string
+	Connected       bool
+	Address         string
+	RemoteAddr      string
+	LocalAddr       string
+	ResponseTimeMs  int64
+	TLS             bool
+	TLSVersion      string
+	TLSCipherSuite  string
+	TLSServerName   string
+	TLSCertSubject  string
+	TLSCertIssuer   string
+	TLSCertNotAfter *time.Time
 }
 
 // DialTCP connects to the given host and port via the host runtime.
@@ -74,17 +77,18 @@ func DialTCP(ctx context.Context, host, port string, timeoutMs int, useTLS bool)
 
 	// Convert to result struct
 	result := &TCPConnectResult{
-		Connected:      response.Connected,
-		Address:        response.Address,
-		RemoteAddr:     response.RemoteAddr,
-		LocalAddr:      response.LocalAddr,
-		ResponseTimeMs: response.ResponseTimeMs,
-		TLS:            response.TLS,
-		TLSVersion:     response.TLSVersion,
-		TLSCipherSuite: response.TLSCipherSuite,
-		TLSServerName:  response.TLSServerName,
-		TLSCertSubject: response.TLSCertSubject,
-		TLSCertIssuer:  response.TLSCertIssuer,
+		Connected:       response.Connected,
+		Address:         response.Address,
+		RemoteAddr:      response.RemoteAddr,
+		LocalAddr:       response.LocalAddr,
+		ResponseTimeMs:  response.ResponseTimeMs,
+		TLS:             response.TLS,
+		TLSVersion:      response.TLSVersion,
+		TLSCipherSuite:  response.TLSCipherSuite,
+		TLSServerName:   response.TLSServerName,
+		TLSCertSubject:  response.TLSCertSubject,
+		TLSCertIssuer:   response.TLSCertIssuer,
+		TLSCertNotAfter: response.TLSCertNotAfter,
 	}
 
 	return result, nil

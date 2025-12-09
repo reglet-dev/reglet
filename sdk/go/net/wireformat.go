@@ -16,7 +16,6 @@ type (
 	TCPResponseWire   = wireformat.TCPResponseWire
 )
 
-
 // createContextWireFormat extracts relevant info from a Go context into the wire format.
 func createContextWireFormat(ctx context.Context) ContextWireFormat {
 	wire := ContextWireFormat{}

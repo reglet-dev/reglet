@@ -25,9 +25,11 @@ type CommandRequest struct {
 
 // CommandResponse contains the result of the command execution.
 type CommandResponse struct {
-	Stdout   string
-	Stderr   string
-	ExitCode int
+	Stdout     string
+	Stderr     string
+	ExitCode   int
+	DurationMs int64 // Execution duration in milliseconds
+	IsTimeout  bool  // True if command timed out
 }
 
 // Run executes a command on the host system.
@@ -76,8 +78,10 @@ func Run(ctx context.Context, req CommandRequest) (*CommandResponse, error) {
 	}
 
 	return &CommandResponse{
-		Stdout:   wireRes.Stdout,
-		Stderr:   wireRes.Stderr,
-		ExitCode: wireRes.ExitCode,
+		Stdout:     wireRes.Stdout,
+		Stderr:     wireRes.Stderr,
+		ExitCode:   wireRes.ExitCode,
+		DurationMs: wireRes.DurationMs,
+		IsTimeout:  wireRes.IsTimeout,
 	}, nil
 }

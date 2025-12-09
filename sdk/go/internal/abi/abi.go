@@ -119,12 +119,17 @@ func UnpackPtrLen(packed uint64) (ptr, length uint32) {
 // copyToMemory copies data to WASM linear memory at the given pointer.
 func copyToMemory(ptr uint32, data []byte) {
 	// The length of the slice (len(data)) must not exceed `size` when allocate was called.
+	// WASM linear memory: uint32 offset -> pointer conversion is safe and necessary
+	//nolint:gosec // G103: Valid unsafe.Pointer use for WASM linear memory access
 	dest := unsafe.Slice((*byte)(unsafe.Pointer(uintptr(ptr))), len(data))
 	copy(dest, data)
 }
 
 // readFromMemory reads data from WASM linear memory.
 func readFromMemory(ptr uint32, length uint32) []byte {
+	// The length of the slice (len(data)) must not exceed `size` when allocate was called.
+	// WASM linear memory: uint32 offset -> pointer conversion is safe and necessary
+	//nolint:gosec // G103: Valid unsafe.Pointer use for WASM linear memory access
 	src := unsafe.Slice((*byte)(unsafe.Pointer(uintptr(ptr))), length)
 	data := make([]byte, length) // Create a new slice to return a copy
 	copy(data, src)

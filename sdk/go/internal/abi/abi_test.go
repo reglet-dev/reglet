@@ -5,7 +5,6 @@ package abi
 import (
 	"sync"
 	"testing"
-	"unsafe"
 )
 
 func TestPackPtrLen(t *testing.T) {
@@ -93,8 +92,8 @@ func TestFreeAllTracked(t *testing.T) {
 	FreeAllTracked()
 
 	// Allocate multiple
-	p1 := allocate(100)
-	p2 := allocate(200)
+	// p1 := allocate(100)
+	// p2 := allocate(200)
 
 	memoryManager.Lock()
 	count := len(memoryManager.ptrs)
@@ -123,7 +122,7 @@ func TestPtrFromBytes(t *testing.T) {
 	data := []byte("test data")
 	packed := PtrFromBytes(data)
 
-	ptr, length := UnpackPtrLen(packed)
+	_, length := UnpackPtrLen(packed)
 	if length != uint32(len(data)) {
 		t.Errorf("packed length = %d; want %d", length, len(data))
 	}

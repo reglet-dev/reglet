@@ -1,6 +1,9 @@
 package sdk
 
-import "github.com/whiskeyjimbo/reglet/wireformat"
+import (
+	"errors" // New import
+	"github.com/whiskeyjimbo/reglet/wireformat"
+)
 
 // Config represents the configuration passed to a plugin observation.
 type Config map[string]interface{}
@@ -38,6 +41,13 @@ func ToErrorDetail(err error) *ErrorDetail {
 	if err == nil {
 		return nil
 	}
+	
+	// If the error is already a *wireformat.ErrorDetail, use it directly.
+	var wfError *wireformat.ErrorDetail
+	if errors.As(err, &wfError) {
+		return wfError
+	}
+
 	// For now, a simple conversion. Can be expanded to unwrap errors and categorize.
 	return &ErrorDetail{
 		Message: err.Error(),
@@ -61,9 +71,10 @@ func Failure(errType, message string) Evidence {
 
 // ConfigError creates a config validation error Evidence.
 func ConfigError(err error) Evidence {
+	// ToErrorDetail will handle if err is already a *wireformat.ErrorDetail
 	return Evidence{
 		Status: false,
-		Error:  &ErrorDetail{Message: err.Error(), Type: "config"},
+		Error:  ToErrorDetail(err),
 	}
 }
 
@@ -74,7 +85,7 @@ func NetworkError(message string, err error) Evidence {
 		Error: &ErrorDetail{
 			Message: message,
 			Type:    "network",
-			Wrapped: ToErrorDetail(err),
+			Wrapped: ToErrorDetail(err), // Wrapped error is now also processed by ToErrorDetail
 		},
 	}
 }

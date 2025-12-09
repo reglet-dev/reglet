@@ -12,6 +12,7 @@ import (
 
 	"github.com/whiskeyjimbo/reglet/sdk/internal/abi"
 	_ "github.com/whiskeyjimbo/reglet/sdk/log" // Initialize WASM logging handler
+	"github.com/whiskeyjimbo/reglet/wireformat"
 )
 
 // Define the host function signature for DNS lookups.
@@ -28,41 +29,34 @@ type WasmResolver struct{
 
 // LookupHost resolves IP addresses for a given host using the host function.
 func (r *WasmResolver) LookupHost(ctx context.Context, host string) ([]string, error) {
-	// Try A records
-	addrsA, errA := r.lookup(ctx, host, "A")
-	if errA != nil {
-		return nil, errA
+	resp, err := r.lookup(ctx, host, "A")
+	if err != nil {
+		return nil, err
 	}
+	recordsA := resp.Records
 
-	// Try AAAA records
-	// We don't fail if AAAA fails, unless A also failed (but A returned nil error above).
-	// Actually, standard LookupHost behavior is to return what it finds.
-	// If A lookup succeeded (even with 0 records), we try AAAA.
-	addrsAAAA, errAAAA := r.lookup(ctx, host, "AAAA")
-	if errAAAA != nil {
-		// Use slog to log the error but don't fail the whole lookup if A succeeded?
-		// Standard behavior: if one fails, it might be a network issue.
-		// But typically if A succeeds, we return those.
-		// Let's be safe: return error if AAAA fails?
-		// If the host doesn't have AAAA, lookup should return empty list, not error.
-		// So real error means DNS failure.
-		return nil, errAAAA
+	resp, err = r.lookup(ctx, host, "AAAA")
+	if err != nil {
+		return nil, err
 	}
+	recordsAAAA := resp.Records
 
-	return append(addrsA, addrsAAAA...), nil
+	return append(recordsA, recordsAAAA...), nil
 }
 
 // LookupIPAddr resolves IP addresses for a given host using the host function.
 func (r *WasmResolver) LookupIPAddr(ctx context.Context, host string) ([]stdnet.IPAddr, error) {
-	records, err := r.lookup(ctx, host, "A") // Get A records
+	resp, err := r.lookup(ctx, host, "A") // Get A records
 	if err != nil {
 		return nil, err
 	}
-	recordsIPv6, err := r.lookup(ctx, host, "AAAA") // Get AAAA records
+	records := resp.Records
+
+	resp, err = r.lookup(ctx, host, "AAAA") // Get AAAA records
 	if err != nil {
 		return nil, err
 	}
-	records = append(records, recordsIPv6...)
+	records = append(records, resp.Records...)
 
 	var ipAddrs []stdnet.IPAddr
 	for _, rec := range records {
@@ -74,9 +68,9 @@ func (r *WasmResolver) LookupIPAddr(ctx context.Context, host string) ([]stdnet.
 }
 
 // lookup performs the actual DNS query via the host function.
-func (r *WasmResolver) lookup(ctx context.Context, hostname, recordType string) ([]string, error) {
+func (r *WasmResolver) lookup(ctx context.Context, hostname, recordType string) (*wireformat.DNSResponseWire, error) {
 	wireCtx := createContextWireFormat(ctx)
-	request := DNSRequestWire{
+	request := wireformat.DNSRequestWire{ // Use wireformat's DNSRequestWire
 		Context:    wireCtx,
 		Hostname:   hostname,
 		Type:       recordType,
@@ -95,7 +89,7 @@ func (r *WasmResolver) lookup(ctx context.Context, hostname, recordType string) 
 	responseBytes := abi.BytesFromPtr(responsePacked)
 	abi.DeallocatePacked(responsePacked) // Free memory on Guest side (allocated by Host for result)
 
-	var response DNSResponseWire
+	var response wireformat.DNSResponseWire
 	if err := json.Unmarshal(responseBytes, &response); err != nil {
 		return nil, fmt.Errorf("sdk: failed to unmarshal DNS response: %w", err)
 	}
@@ -104,7 +98,7 @@ func (r *WasmResolver) lookup(ctx context.Context, hostname, recordType string) 
 		return nil, response.Error // Convert structured error to Go error
 	}
 
-	return response.Records, nil
+	return &response, nil
 }
 
 // init configures the default resolver to use our WasmResolver.
@@ -137,29 +131,54 @@ func init() {
 
 // LookupCNAME returns the canonical name for the given host
 func (r *WasmResolver) LookupCNAME(ctx context.Context, host string) (string, error) {
-	records, err := r.lookup(ctx, host, "CNAME")
+	resp, err := r.lookup(ctx, host, "CNAME")
 	if err != nil {
 		return "", err
 	}
-	if len(records) == 0 {
+	if len(resp.Records) == 0 {
 		return "", fmt.Errorf("no CNAME record found")
 	}
-	return records[0], nil
+	return resp.Records[0], nil
 }
 
-// LookupMX returns MX records as strings "Pref Host"
+// LookupMX returns MX records as strings "Pref Host" (for compatibility)
 func (r *WasmResolver) LookupMX(ctx context.Context, host string) ([]string, error) {
-	return r.lookup(ctx, host, "MX")
+	resp, err := r.lookup(ctx, host, "MX")
+	if err != nil {
+		return nil, err
+	}
+	var records []string
+	for _, mx := range resp.MXRecords {
+		records = append(records, fmt.Sprintf("%d %s", mx.Pref, mx.Host))
+	}
+	return records, nil
+}
+
+// LookupMXRecords returns structured MX records
+func (r *WasmResolver) LookupMXRecords(ctx context.Context, host string) ([]wireformat.MXRecordWire, error) {
+	resp, err := r.lookup(ctx, host, "MX")
+	if err != nil {
+		return nil, err
+	}
+	return resp.MXRecords, nil
 }
 
 // LookupTXT returns TXT records
 func (r *WasmResolver) LookupTXT(ctx context.Context, host string) ([]string, error) {
-	return r.lookup(ctx, host, "TXT")
+	resp, err := r.lookup(ctx, host, "TXT")
+	if err != nil {
+		return nil, err
+	}
+	return resp.Records, nil
 }
 
 // LookupNS returns NS records (nameservers)
 func (r *WasmResolver) LookupNS(ctx context.Context, host string) ([]string, error) {
-	return r.lookup(ctx, host, "NS")
+	resp, err := r.lookup(ctx, host, "NS")
+	if err != nil {
+		return nil, err
+	}
+	return resp.Records, nil
 }
 
 // Exported helper for plugins to use instead of net.LookupHost
@@ -172,6 +191,18 @@ func LookupHost(ctx context.Context, host string) ([]string, error) {
 func LookupMX(ctx context.Context, host string) ([]string, error) {
 	r := &WasmResolver{}
 	return r.LookupMX(ctx, host)
+}
+
+// LookupMXRecords returns structured MX records
+func LookupMXRecords(ctx context.Context, host string) ([]wireformat.MXRecordWire, error) {
+	r := &WasmResolver{}
+	return r.LookupMXRecords(ctx, host)
+}
+
+// LookupRaw performs a raw DNS query and returns the DNSResponseWire.
+func LookupRaw(ctx context.Context, hostname, recordType, nameserver string) (*wireformat.DNSResponseWire, error) {
+	r := &WasmResolver{Nameserver: nameserver}
+	return r.lookup(ctx, hostname, recordType)
 }
 
 // LookupCNAME returns the canonical name for the given host
