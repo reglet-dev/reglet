@@ -1,7 +1,9 @@
 package sdk
 
 import (
-	"errors" // New import
+	"errors"
+	"fmt"
+
 	"github.com/whiskeyjimbo/reglet/wireformat"
 )
 
@@ -36,23 +38,119 @@ type Capability struct {
 }
 
 // ToErrorDetail converts a Go error to our structured ErrorDetail.
-// This function can be expanded to unwrap errors and categorize them into specific types/codes.
+// This function recognizes custom error types and categorizes them appropriately.
 func ToErrorDetail(err error) *ErrorDetail {
 	if err == nil {
 		return nil
 	}
-	
+
 	// If the error is already a *wireformat.ErrorDetail, use it directly.
 	var wfError *wireformat.ErrorDetail
 	if errors.As(err, &wfError) {
 		return wfError
 	}
 
-	// For now, a simple conversion. Can be expanded to unwrap errors and categorize.
-	return &ErrorDetail{
-		Message: err.Error(),
-		Type:    "internal", // Default type, can be refined later
-		Code:    "",
+	// Check for custom SDK error types and categorize appropriately
+	var (
+		netErr    *NetworkError
+		dnsErr    *DNSError
+		httpErr   *HTTPError
+		tcpErr    *TCPError
+		timeoutErr *TimeoutError
+		capErr    *CapabilityError
+		confErr   *ConfigError
+		execErr   *ExecError
+		schemaErr *SchemaError
+		memErr    *MemoryError
+		wireErr   *WireFormatError
+	)
+
+	switch {
+	case errors.As(err, &netErr):
+		return &ErrorDetail{
+			Message: netErr.Error(),
+			Type:    "network",
+			Code:    netErr.Operation,
+		}
+	case errors.As(err, &dnsErr):
+		detail := &ErrorDetail{
+			Message: dnsErr.Error(),
+			Type:    "network",
+			Code:    "dns_" + dnsErr.RecordType,
+		}
+		if dnsErr.Timeout() {
+			detail.Type = "timeout"
+		}
+		return detail
+	case errors.As(err, &httpErr):
+		detail := &ErrorDetail{
+			Message: httpErr.Error(),
+			Type:    "network",
+			Code:    fmt.Sprintf("http_%d", httpErr.StatusCode),
+		}
+		if httpErr.Timeout() {
+			detail.Type = "timeout"
+		}
+		return detail
+	case errors.As(err, &tcpErr):
+		detail := &ErrorDetail{
+			Message: tcpErr.Error(),
+			Type:    "network",
+			Code:    "tcp_connect",
+		}
+		if tcpErr.Timeout() {
+			detail.Type = "timeout"
+		}
+		return detail
+	case errors.As(err, &timeoutErr):
+		return &ErrorDetail{
+			Message: timeoutErr.Error(),
+			Type:    "timeout",
+			Code:    timeoutErr.Operation,
+		}
+	case errors.As(err, &capErr):
+		return &ErrorDetail{
+			Message: capErr.Error(),
+			Type:    "capability",
+			Code:    capErr.Required,
+		}
+	case errors.As(err, &confErr):
+		return &ErrorDetail{
+			Message: confErr.Error(),
+			Type:    "config",
+			Code:    confErr.Field,
+		}
+	case errors.As(err, &execErr):
+		return &ErrorDetail{
+			Message: execErr.Error(),
+			Type:    "exec",
+			Code:    fmt.Sprintf("exit_%d", execErr.ExitCode),
+		}
+	case errors.As(err, &schemaErr):
+		return &ErrorDetail{
+			Message: schemaErr.Error(),
+			Type:    "validation",
+			Code:    "schema",
+		}
+	case errors.As(err, &memErr):
+		return &ErrorDetail{
+			Message: memErr.Error(),
+			Type:    "internal",
+			Code:    "memory_limit",
+		}
+	case errors.As(err, &wireErr):
+		return &ErrorDetail{
+			Message: wireErr.Error(),
+			Type:    "internal",
+			Code:    "wire_format",
+		}
+	default:
+		// Generic error - categorize as internal
+		return &ErrorDetail{
+			Message: err.Error(),
+			Type:    "internal",
+			Code:    "",
+		}
 	}
 }
 
@@ -69,8 +167,9 @@ func Failure(errType, message string) Evidence {
 	}
 }
 
-// ConfigError creates a config validation error Evidence.
-func ConfigError(err error) Evidence {
+// ConfigFailure creates a config validation error Evidence.
+// Deprecated: Use ConfigError type and proper error handling instead.
+func ConfigFailure(err error) Evidence {
 	// ToErrorDetail will handle if err is already a *wireformat.ErrorDetail
 	return Evidence{
 		Status: false,
@@ -78,8 +177,9 @@ func ConfigError(err error) Evidence {
 	}
 }
 
-// NetworkError creates a network error Evidence with wrapped error.
-func NetworkError(message string, err error) Evidence {
+// NetworkFailure creates a network error Evidence with wrapped error.
+// Deprecated: Use NetworkError type and proper error handling instead.
+func NetworkFailure(message string, err error) Evidence {
 	return Evidence{
 		Status: false,
 		Error: &ErrorDetail{

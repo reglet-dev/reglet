@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -275,21 +276,21 @@ func TestFailureHelper(t *testing.T) {
 	}
 }
 
-func TestConfigErrorHelper(t *testing.T) {
+func TestConfigFailureHelper(t *testing.T) {
 	err := fmt.Errorf("missing required field 'host'")
-	evidence := ConfigError(err)
+	evidence := ConfigFailure(err)
 
 	assert.False(t, evidence.Status)
 	require.NotNil(t, evidence.Error)
 	assert.Contains(t, evidence.Error.Message, "missing required field")
-	// Note: ConfigError currently uses ToErrorDetail which returns "internal" type
+	// Note: ConfigFailure currently uses ToErrorDetail which returns "internal" type
 	// This will be improved in Phase 4 when we add custom error types
 	assert.Equal(t, "internal", evidence.Error.Type)
 }
 
-func TestNetworkErrorHelper(t *testing.T) {
+func TestNetworkFailureHelper(t *testing.T) {
 	err := fmt.Errorf("connection timeout")
-	evidence := NetworkError("failed to connect to api.example.com:443", err)
+	evidence := NetworkFailure("failed to connect to api.example.com:443", err)
 
 	assert.False(t, evidence.Status)
 	require.NotNil(t, evidence.Error)
@@ -299,4 +300,181 @@ func TestNetworkErrorHelper(t *testing.T) {
 	// Test that wrapped error is populated
 	assert.NotNil(t, evidence.Error.Wrapped)
 	assert.Contains(t, evidence.Error.Wrapped.Message, "connection timeout")
+}
+
+// Test ToErrorDetail with custom error types (Phase 4)
+func TestToErrorDetail_CustomErrorTypes(t *testing.T) {
+	tests := []struct {
+		name         string
+		err          error
+		expectedType string
+		expectedCode string
+	}{
+		{
+			name: "NetworkError",
+			err: &NetworkError{
+				Operation: "http_request",
+				Target:    "api.example.com",
+				Err:       fmt.Errorf("connection refused"),
+			},
+			expectedType: "network",
+			expectedCode: "http_request",
+		},
+		{
+			name: "DNSError",
+			err: &DNSError{
+				Hostname:   "example.com",
+				RecordType: "A",
+				Err:        fmt.Errorf("no such host"),
+			},
+			expectedType: "network",
+			expectedCode: "dns_A",
+		},
+		{
+			name: "HTTPError",
+			err: &HTTPError{
+				Method:     "GET",
+				URL:        "https://api.example.com",
+				StatusCode: 500,
+				Err:        fmt.Errorf("internal server error"),
+			},
+			expectedType: "network",
+			expectedCode: "http_500",
+		},
+		{
+			name: "TCPError",
+			err: &TCPError{
+				Network: "tcp",
+				Address: "example.com:443",
+				Err:     fmt.Errorf("connection refused"),
+			},
+			expectedType: "network",
+			expectedCode: "tcp_connect",
+		},
+		{
+			name: "TimeoutError",
+			err: &TimeoutError{
+				Operation: "dns_lookup",
+				Duration:  5 * time.Second,
+			},
+			expectedType: "timeout",
+			expectedCode: "dns_lookup",
+		},
+		{
+			name: "CapabilityError",
+			err: &CapabilityError{
+				Required: "network:outbound",
+				Pattern:  "api.example.com:443",
+			},
+			expectedType: "capability",
+			expectedCode: "network:outbound",
+		},
+		{
+			name: "ConfigError",
+			err: &ConfigError{
+				Field: "hostname",
+				Err:   fmt.Errorf("invalid format"),
+			},
+			expectedType: "config",
+			expectedCode: "hostname",
+		},
+		{
+			name: "ExecError",
+			err: &ExecError{
+				Command:  "grep",
+				ExitCode: 1,
+				Stderr:   "pattern not found",
+			},
+			expectedType: "exec",
+			expectedCode: "exit_1",
+		},
+		{
+			name: "SchemaError",
+			err: &SchemaError{
+				Type: "MyStruct",
+				Err:  fmt.Errorf("unsupported type"),
+			},
+			expectedType: "validation",
+			expectedCode: "schema",
+		},
+		{
+			name: "MemoryError",
+			err: &MemoryError{
+				Requested: 10 * 1024 * 1024,
+				Current:   95 * 1024 * 1024,
+				Limit:     100 * 1024 * 1024,
+			},
+			expectedType: "internal",
+			expectedCode: "memory_limit",
+		},
+		{
+			name: "WireFormatError",
+			err: &WireFormatError{
+				Operation: "unmarshal",
+				Type:      "DNSResponseWire",
+				Err:       fmt.Errorf("invalid json"),
+			},
+			expectedType: "internal",
+			expectedCode: "wire_format",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			detail := ToErrorDetail(tt.err)
+
+			require.NotNil(t, detail)
+			assert.Equal(t, tt.expectedType, detail.Type, "Error type mismatch")
+			assert.Equal(t, tt.expectedCode, detail.Code, "Error code mismatch")
+			assert.NotEmpty(t, detail.Message)
+		})
+	}
+}
+
+func TestToErrorDetail_TimeoutPropagation(t *testing.T) {
+	// Test that timeout is properly detected through wrapped errors
+	timeoutErr := &TimeoutError{Operation: "http", Duration: 10 * time.Second}
+
+	tests := []struct {
+		name         string
+		err          error
+		expectedType string
+	}{
+		{
+			name: "DNSError with timeout",
+			err: &DNSError{
+				Hostname:   "example.com",
+				RecordType: "A",
+				Err:        timeoutErr,
+			},
+			expectedType: "timeout",
+		},
+		{
+			name: "HTTPError with timeout",
+			err: &HTTPError{
+				Method: "GET",
+				URL:    "https://example.com",
+				Err:    timeoutErr,
+			},
+			expectedType: "timeout",
+		},
+		{
+			name: "TCPError with timeout",
+			err: &TCPError{
+				Network: "tcp",
+				Address: "example.com:443",
+				Err:     timeoutErr,
+			},
+			expectedType: "timeout",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			detail := ToErrorDetail(tt.err)
+
+			require.NotNil(t, detail)
+			assert.Equal(t, tt.expectedType, detail.Type, "Should detect timeout")
+		})
+	}
 }
