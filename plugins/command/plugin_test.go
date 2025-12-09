@@ -94,9 +94,9 @@ func TestCommandConfig_Validation(t *testing.T) {
 				"run":     "echo hello",
 				"command": "/bin/echo",
 			},
-			// Note: Current implementation allows this (run takes precedence)
-			// Consider if this should be an error
-			wantError: false,
+			// Should be an error - mutual exclusivity
+			wantError: true,
+			errMsg:    "cannot specify both",
 		},
 	}
 

@@ -49,12 +49,17 @@ func (p *commandPlugin) Check(ctx context.Context, config regletsdk.Config) (reg
 		return regletsdk.ConfigError(err), nil
 	}
 
+	// Validate mutual exclusivity
 	if cfg.Run == "" && cfg.Command == "" {
 		return regletsdk.ConfigError(fmt.Errorf("either 'run' or 'command' must be specified")), nil
+	}
+	if cfg.Run != "" && cfg.Command != "" {
+		return regletsdk.ConfigError(fmt.Errorf("cannot specify both 'run' and 'command' - choose one")), nil
 	}
 
 	var cmd string
 	var args []string
+	var execMode string
 
 	// "run" mode: execute via shell
 	if cfg.Run != "" {
@@ -67,10 +72,12 @@ func (p *commandPlugin) Check(ctx context.Context, config regletsdk.Config) (reg
 		// Unsafe: run: "echo " + userInput  (if userInput can contain shell metacharacters)
 		cmd = "/bin/sh"
 		args = []string{"-c", cfg.Run}
+		execMode = "shell"
 	} else {
 		// "command" mode: direct execution (safer - no shell interpretation)
 		cmd = cfg.Command
 		args = cfg.Args
+		execMode = "direct"
 	}
 
 	resp, err := exec.Run(ctx, exec.CommandRequest{
@@ -93,12 +100,32 @@ func (p *commandPlugin) Check(ctx context.Context, config regletsdk.Config) (reg
 	statusPass := resp.ExitCode == 0
 
 	result := map[string]interface{}{
-		"stdout":        stdoutTrimmed,
-		"stderr":        stderrTrimmed,
-		"exit_code":     resp.ExitCode,
-		"stdout_raw":    resp.Stdout, // Keep raw for regex matching if needed
-		"stderr_raw":    resp.Stderr,
-		"status":        statusPass, // Status determines pass/fail
+		// Output streams
+		"stdout":     stdoutTrimmed,
+		"stderr":     stderrTrimmed,
+		"stdout_raw": resp.Stdout, // Keep raw for regex matching if needed
+		"stderr_raw": resp.Stderr,
+
+		// Execution results
+		"exit_code":   resp.ExitCode,
+		"status":      statusPass, // Status determines pass/fail
+		"duration_ms": resp.DurationMs,
+		"is_timeout":  resp.IsTimeout,
+
+		// Command metadata (for debugging and auditing)
+		"exec_mode":      execMode, // "shell" or "direct"
+		"command":        cmd,       // Actual command executed
+		"args":           args,      // Actual arguments used
+		"working_dir":    cfg.Dir,
+		"timeout_config": cfg.Timeout,
+	}
+
+	// Add original command for clarity
+	if execMode == "shell" {
+		result["shell_command"] = cfg.Run
+	} else {
+		result["command_path"] = cfg.Command
+		result["command_args"] = cfg.Args
 	}
 
 	return regletsdk.Success(result), nil
