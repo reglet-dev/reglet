@@ -4,17 +4,21 @@ package net
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 
 	"github.com/whiskeyjimbo/reglet/sdk/internal/abi"
 	_ "github.com/whiskeyjimbo/reglet/sdk/log" // Initialize WASM logging handler
 	"github.com/whiskeyjimbo/reglet/wireformat"
 )
+
+// MaxHTTPBodySize is the maximum size of HTTP response body that can be returned.
+// Response bodies exceeding this limit will result in an error.
+const MaxHTTPBodySize = 10 * 1024 * 1024 // 10 MB
 
 // Define the host function signature for HTTP requests.
 // This matches the signature defined in internal/wasm/hostfuncs/registry.go.
@@ -68,6 +72,12 @@ func (t *WasmTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		return nil, response.Error // Convert structured error to Go error
 	}
 
+	// Check if response body was truncated due to size limit
+	// Return explicit error instead of silently truncating
+	if response.BodyTruncated {
+		return nil, fmt.Errorf("sdk: HTTP response body exceeds maximum size (%d bytes). URL: %s", MaxHTTPBodySize, req.URL.String())
+	}
+
 	// Prepare native http.Response
 	resp := &http.Response{
 		StatusCode: response.StatusCode,
@@ -77,16 +87,6 @@ func (t *WasmTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		ProtoMajor: 1,
 		ProtoMinor: 1,
 		Status:     http.StatusText(response.StatusCode),
-	}
-
-	// Add header if body was truncated
-	// This allows plugins to detect incomplete responses
-	if response.BodyTruncated {
-		if resp.Header == nil {
-			resp.Header = make(http.Header)
-		}
-		resp.Header.Set("X-Reglet-Body-Truncated", "true")
-		slog.Warn("SDK: HTTP response body was truncated by host (exceeded 10MB limit)", "url", req.URL.String())
 	}
 
 	// Decode response body if present
@@ -104,12 +104,67 @@ func (t *WasmTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return resp, nil
 }
 
-// init configures the default HTTP transport to use our WasmTransport.
-// This ensures that http.Get(), http.Post(), and other functions that use
-// the default transport will use our WASM-aware implementation.
-func init() {
-	http.DefaultTransport = &WasmTransport{}
-	slog.Info("Reglet SDK: HTTP transport initialized.")
+// REMOVED: init() function that set http.DefaultTransport = &WasmTransport{}
+//
+// BREAKING CHANGE: Plugins must now explicitly use WasmTransport or SDK helper functions.
+//
+// Option 1 - Use SDK helper functions (recommended):
+//     import sdknet "github.com/whiskeyjimbo/reglet/sdk/net"
+//     resp, err := sdknet.Get(ctx, "https://example.com")
+//
+// Option 2 - Create custom http.Client:
+//     client := &http.Client{Transport: &net.WasmTransport{}}
+//     resp, err := client.Get("https://example.com")
+//
+// This change makes HTTP transport configuration explicit instead of implicit,
+// avoiding global state mutation and making test isolation easier.
+
+// defaultClient is a reusable HTTP client with WasmTransport.
+// Using a single client instance is more efficient than creating a new one for each request.
+var defaultClient = &http.Client{
+	Transport: &WasmTransport{},
+}
+
+// Get is a convenience function for making HTTP GET requests using WasmTransport.
+// It's equivalent to http.Get() but uses the WASM host function.
+//
+// Example:
+//     resp, err := net.Get(ctx, "https://api.example.com/status")
+//     if err != nil {
+//         return err
+//     }
+//     defer resp.Body.Close()
+func Get(ctx context.Context, url string) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	return defaultClient.Do(req)
+}
+
+// Post is a convenience function for making HTTP POST requests using WasmTransport.
+//
+// Example:
+//     body := bytes.NewReader([]byte(`{"key":"value"}`))
+//     resp, err := net.Post(ctx, "https://api.example.com/data", "application/json", body)
+func Post(ctx context.Context, url, contentType string, body io.Reader) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", contentType)
+	return defaultClient.Do(req)
+}
+
+// Do executes an HTTP request using WasmTransport.
+// This is useful when you need full control over the request.
+//
+// Example:
+//     req, _ := http.NewRequestWithContext(ctx, "PUT", url, body)
+//     req.Header.Set("Authorization", "Bearer "+token)
+//     resp, err := net.Do(req)
+func Do(req *http.Request) (*http.Response, error) {
+	return defaultClient.Do(req)
 }
 
 // Re-export HTTP wire format types from shared wireformat package
