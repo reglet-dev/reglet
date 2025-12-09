@@ -6,16 +6,15 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"sync"
 )
 
 // Redactor handles sanitization of sensitive data.
+// All fields are read-only after construction, making it safe for concurrent use.
 type Redactor struct {
 	patterns []*regexp.Regexp
 	paths    []string
 	hashMode bool
 	salt     string
-	mu       sync.RWMutex
 }
 
 // Config holds the configuration for the Redactor.
@@ -122,7 +121,7 @@ func (r *Redactor) walk(data interface{}, currentPath string) interface{} {
 			// or we don't track array indices in path.
 		}
 		return v
-	
+
 	// Handle other primitives that might be sensitive? usually secrets are strings.
 	default:
 		return v
@@ -130,15 +129,20 @@ func (r *Redactor) walk(data interface{}, currentPath string) interface{} {
 }
 
 // isPathMatch checks if the current path matches any of the configured redact paths.
-// Supports simple glob matching (*).
+//
+// Matching rules:
+// - Exact match: path="config.password" matches "config.password"
+// - Suffix match: path="password" matches "*.password" (any.nested.password)
+//
+// Future: Support glob patterns like "config.*.password" (not yet implemented)
 func (r *Redactor) isPathMatch(path string) bool {
 	for _, p := range r.paths {
-		// Simple equality check first
+		// Exact match
 		if p == path {
 			return true
 		}
-		// Handle "config.*.password" type globs later if needed
-		// For now, precise suffix match is common convention
+		// Suffix match - "password" matches "user.password", "db.config.password", etc.
+		// This allows simple patterns without full glob support
 		if strings.HasSuffix(path, "."+p) {
 			return true
 		}
@@ -147,11 +151,17 @@ func (r *Redactor) isPathMatch(path string) bool {
 }
 
 // hash returns a truncated SHA256 hash of the secret.
-// Format: [sha256:a1b2c3d4]
+// Format: [sha256:a1b2c3d4e5f6g7h8]
+//
+// Security notes:
+// - Hashes are for CORRELATION ONLY (prove same value across runs)
+// - Truncation to 8 bytes (16 hex chars) prevents rainbow table attacks
+// - Low-entropy secrets (short passwords, sequential IDs) may still be vulnerable
+// - For maximum security, use HashMode:false which replaces with [REDACTED]
 func (r *Redactor) hash(secret string) string {
 	h := sha256.Sum256([]byte(r.salt + secret))
-	// Use first 8 bytes (16 hex chars) for correlation
-	return fmt.Sprintf("[sha256:%s]", hex.EncodeToString(h[:])[:8])
+	// Use first 8 bytes (16 hex chars) for correlation - provides 2^64 unique values
+	return fmt.Sprintf("[sha256:%s]", hex.EncodeToString(h[:])[:16])
 }
 
 // defaultPatterns contains regexes for common secrets.

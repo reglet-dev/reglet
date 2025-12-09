@@ -33,7 +33,7 @@ func TestRedactor_ScrubString(t *testing.T) {
 			name:     "Hash Mode (No Salt)",
 			input:    "AKIAIOSFODNN7EXAMPLE",
 			hashMode: true,
-			want:     "[sha256:1a5d44a2]", // Hash of "AKIAIOSFODNN7EXAMPLE"
+			want:     "[sha256:1a5d44a2dca19669]", // Hash of "AKIAIOSFODNN7EXAMPLE" (first 8 bytes)
 		},
 		{
 			name:     "Hash Mode (With Salt)",
@@ -42,7 +42,7 @@ func TestRedactor_ScrubString(t *testing.T) {
 			salt:     "my-salt",
 			// Hash of "my-saltAKIAIOSFODNN7EXAMPLE"
 			// echo -n "my-saltAKIAIOSFODNN7EXAMPLE" | sha256sum -> 2cdf1...
-			want: "[sha256:2cdf121b]",
+			want: "[sha256:2cdf121b595786fb]", // First 8 bytes (16 hex chars)
 		},
 	}
 
@@ -66,9 +66,9 @@ func TestRedactor_Redact_Map(t *testing.T) {
 	assert.NoError(t, err)
 
 	input := map[string]interface{}{
-		"username":   "admin",
-		"password":   "supersecret",
-		"aws_key":    "AKIAIOSFODNN7EXAMPLE",
+		"username": "admin",
+		"password": "supersecret",
+		"aws_key":  "AKIAIOSFODNN7EXAMPLE",
 		"nested": map[string]interface{}{
 			"secret_key": "hidden",
 			"public":     "visible",
@@ -76,9 +76,9 @@ func TestRedactor_Redact_Map(t *testing.T) {
 	}
 
 	expected := map[string]interface{}{
-		"username":   "admin",
-		"password":   "[REDACTED]", // Path match
-		"aws_key":    "[REDACTED]", // Pattern match
+		"username": "admin",
+		"password": "[REDACTED]", // Path match
+		"aws_key":  "[REDACTED]", // Pattern match
 		"nested": map[string]interface{}{
 			"secret_key": "[REDACTED]", // Path match
 			"public":     "visible",
