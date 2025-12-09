@@ -197,6 +197,32 @@ func (f *TableFormatter) formatValue(value interface{}) string {
 	case map[string]interface{}:
 		return f.formatErrorDetail(v, "")
 	case []interface{}:
+		// Check if it's a list of maps (like mx_records)
+		if len(v) > 0 {
+			if _, ok := v[0].(map[string]interface{}); ok {
+				var lines []string
+				for _, item := range v {
+					if m, ok := item.(map[string]interface{}); ok {
+						// Format map as key=value pairs
+						var parts []string
+						// Sort keys for deterministic output
+						var keys []string
+						for k := range m {
+							keys = append(keys, k)
+						}
+						sort.Strings(keys)
+						for _, k := range keys {
+							parts = append(parts, fmt.Sprintf("%s=%v", k, m[k]))
+						}
+						lines = append(lines, fmt.Sprintf("{%s}", strings.Join(parts, ", ")))
+					} else {
+						lines = append(lines, fmt.Sprintf("%v", item))
+					}
+				}
+				// Indent the list items
+				return "\n           " + strings.Join(lines, "\n           ")
+			}
+		}
 		return fmt.Sprintf("%v", v)
 	default:
 		return fmt.Sprintf("%v", value)

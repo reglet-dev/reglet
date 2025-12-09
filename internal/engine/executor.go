@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/expr-lang/expr"
 	"github.com/whiskeyjimbo/reglet/internal/config"
 	"github.com/whiskeyjimbo/reglet/internal/redaction"
 	"github.com/whiskeyjimbo/reglet/internal/wasm"
@@ -124,8 +125,8 @@ func (e *ObservationExecutor) Execute(ctx context.Context, obs config.Observatio
 	// Plugin returned evidence
 	if wasmResult.Evidence != nil {
 		// Determine status BEFORE redaction to ensure tests run against raw data
-		// In Phase 2 (Expect engine), we will run expectation logic here.
-		result.Status = determineStatus(wasmResult.Evidence)
+		// Evaluate expect expressions if provided, otherwise fall back to status field
+		result.Status = determineStatusWithExpect(wasmResult.Evidence, obs.Expect)
 
 		// Redact sensitive data from evidence before returning/storing it
 		if e.redactor != nil && wasmResult.Evidence.Data != nil {
@@ -172,10 +173,59 @@ func (e *ObservationExecutor) LoadPlugin(ctx context.Context, pluginName string)
 	return e.runtime.LoadPlugin(ctx, pluginName, wasmBytes)
 }
 
-// determineStatus determines the observation status from evidence.
-// Phase 1b uses simple logic: check if evidence.Data["status"] is true/false.
-// Phase 2 will use expect expression evaluation.
-func determineStatus(evidence *wasm.Evidence) Status {
+// determineStatusWithExpect determines the observation status by evaluating expect expressions.
+// If no expect expressions provided, falls back to checking evidence.Data["status"].
+func determineStatusWithExpect(evidence *wasm.Evidence, expectations []string) Status {
+	if evidence.Data == nil {
+		return StatusError
+	}
+
+	// If no expectations provided, fall back to checking status field
+	if len(expectations) == 0 {
+		return determineStatusFromField(evidence)
+	}
+
+	// Create environment for expression evaluation
+	// The evidence data is available under "data" namespace
+	env := map[string]interface{}{
+		"data": evidence.Data,
+	}
+
+	// Evaluate all expect expressions
+	// ALL expressions must evaluate to true for the observation to pass
+	for _, expectExpr := range expectations {
+		program, err := expr.Compile(expectExpr, expr.Env(env), expr.AsBool())
+		if err != nil {
+			// Expression compilation error - treat as error
+			return StatusError
+		}
+
+		result, err := expr.Run(program, env)
+		if err != nil {
+			// Expression evaluation error - treat as error
+			return StatusError
+		}
+
+		// Check if result is boolean true
+		resultBool, ok := result.(bool)
+		if !ok {
+			// Expression didn't return boolean - treat as error
+			return StatusError
+		}
+
+		// If any expression is false, observation fails
+		if !resultBool {
+			return StatusFail
+		}
+	}
+
+	// All expressions evaluated to true
+	return StatusPass
+}
+
+// determineStatusFromField checks the evidence.Data["status"] field.
+// Used as fallback when no expect expressions are provided.
+func determineStatusFromField(evidence *wasm.Evidence) Status {
 	if evidence.Data == nil {
 		return StatusError
 	}

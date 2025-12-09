@@ -11,6 +11,12 @@ import (
 	"github.com/tetratelabs/wazero/api"
 )
 
+// DnsLookupResult is an intermediate struct to hold the DNS lookup results before converting to wire format.
+type DnsLookupResult struct {
+	Records   []string
+	MXRecords []MXRecordWire
+}
+
 // DNSLookup performs DNS resolution on behalf of the plugin.
 // It receives a packed uint64 (ptr+len) pointing to a JSON-encoded DNSRequestWire.
 // It returns a packed uint64 (ptr+len) pointing to a JSON-encoded DNSResponseWire.
@@ -70,7 +76,7 @@ func DNSLookup(ctx context.Context, mod api.Module, stack []uint64, checker *Cap
 	}
 
 	// 3. Perform DNS lookup
-	records, err := performDNSLookup(lookupCtx, request.Hostname, request.Type, request.Nameserver)
+	dnsResult, err := performDNSLookup(lookupCtx, request.Hostname, request.Type, request.Nameserver)
 	if err != nil {
 		errMsg := fmt.Sprintf("DNS lookup failed: %v", err)
 		slog.ErrorContext(ctx, errMsg, "hostname", request.Hostname, "record_type", request.Type)
@@ -82,12 +88,13 @@ func DNSLookup(ctx context.Context, mod api.Module, stack []uint64, checker *Cap
 
 	// 4. Write success response
 	stack[0] = hostWriteResponse(ctx, mod, DNSResponseWire{
-		Records: records,
+		Records:   dnsResult.Records,
+		MXRecords: dnsResult.MXRecords,
 	})
 }
 
 // performDNSLookup executes the actual DNS lookup based on record type
-func performDNSLookup(ctx context.Context, hostname string, recordType string, nameserver string) ([]string, error) {
+func performDNSLookup(ctx context.Context, hostname string, recordType string, nameserver string) (*DnsLookupResult, error) {
 	var resolver *net.Resolver
 
 	if nameserver != "" {
@@ -106,6 +113,8 @@ func performDNSLookup(ctx context.Context, hostname string, recordType string, n
 		resolver = net.DefaultResolver
 	}
 
+	result := &DnsLookupResult{}
+
 	switch recordType {
 	case "A":
 		ips, err := resolver.LookupHost(ctx, hostname)
@@ -120,7 +129,8 @@ func performDNSLookup(ctx context.Context, hostname string, recordType string, n
 				ipv4s = append(ipv4s, ip)
 			}
 		}
-		return ipv4s, nil
+		result.Records = ipv4s
+		return result, nil
 
 	case "AAAA":
 		ips, err := resolver.LookupHost(ctx, hostname)
@@ -135,32 +145,36 @@ func performDNSLookup(ctx context.Context, hostname string, recordType string, n
 				ipv6s = append(ipv6s, ip)
 			}
 		}
-		return ipv6s, nil
+		result.Records = ipv6s
+		return result, nil
 
 	case "CNAME":
 		cname, err := resolver.LookupCNAME(ctx, hostname)
 		if err != nil {
 			return nil, err
 		}
-		return []string{cname}, nil
+		result.Records = []string{cname}
+		return result, nil
 
 	case "MX":
 		mxRecords, err := resolver.LookupMX(ctx, hostname)
 		if err != nil {
 			return nil, err
 		}
-		var records []string
+		var wiredMXRecords []MXRecordWire
 		for _, mx := range mxRecords {
-			records = append(records, fmt.Sprintf("%d %s", mx.Pref, mx.Host))
+			wiredMXRecords = append(wiredMXRecords, MXRecordWire{Host: mx.Host, Pref: mx.Pref})
 		}
-		return records, nil
+		result.MXRecords = wiredMXRecords
+		return result, nil
 
 	case "TXT":
 		txtRecords, err := resolver.LookupTXT(ctx, hostname)
 		if err != nil {
 			return nil, err
 		}
-		return txtRecords, nil
+		result.Records = txtRecords
+		return result, nil
 
 	case "NS":
 		nsRecords, err := resolver.LookupNS(ctx, hostname)
@@ -171,7 +185,8 @@ func performDNSLookup(ctx context.Context, hostname string, recordType string, n
 		for _, ns := range nsRecords {
 			records = append(records, ns.Host)
 		}
-		return records, nil
+		result.Records = records
+		return result, nil
 
 	default:
 		return nil, fmt.Errorf("unsupported record type: %s", recordType)

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os/exec"
@@ -79,6 +80,9 @@ func ExecCommand(ctx context.Context, mod api.Module, stack []uint64, checker *C
 	}
 
 	// Execute command
+	// SECURITY: exec.CommandContext does NOT use shell 
+	// Arguments are passed directly to the binary, preventing shell injection
+	// Only shell execution can interpret arguments as shell commands
 	cmd := exec.CommandContext(execCtx, request.Command, request.Args...)
 	if request.Dir != "" {
 		cmd.Dir = request.Dir
@@ -96,10 +100,12 @@ func ExecCommand(ctx context.Context, mod api.Module, stack []uint64, checker *C
 	duration := time.Since(start)
 
 	exitCode := 0
+	isTimeout := false
 	var errorDetail *ErrorDetail
 
 	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
+		exitErr := &exec.ExitError{}
+		if errors.As(err, &exitErr) {
 			exitCode = exitErr.ExitCode()
 		} else {
 			// Other error (not found, timeout, etc.)
@@ -108,6 +114,7 @@ func ExecCommand(ctx context.Context, mod api.Module, stack []uint64, checker *C
 			if execCtx.Err() == context.DeadlineExceeded {
 				errorDetail.Type = "timeout"
 				errorDetail.Code = "ETIMEDOUT"
+				isTimeout = true
 			} else {
 				errorDetail.Type = "execution"
 			}
@@ -123,10 +130,12 @@ func ExecCommand(ctx context.Context, mod api.Module, stack []uint64, checker *C
 
 	// Write response
 	stack[0] = hostWriteResponse(ctx, mod, ExecResponseWire{
-		Stdout:   stdout.String(),
-		Stderr:   stderr.String(),
-		ExitCode: exitCode,
-		Error:    errorDetail,
+		Stdout:     stdout.String(),
+		Stderr:     stderr.String(),
+		ExitCode:   exitCode,
+		DurationMs: duration.Milliseconds(),
+		IsTimeout:  isTimeout,
+		Error:      errorDetail,
 	})
 }
 

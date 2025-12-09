@@ -76,8 +76,10 @@ func TCPConnect(ctx context.Context, mod api.Module, stack []uint64, checker *Ca
 		return
 	}
 
-	// SSRF protection: validate destination is not a private/reserved IP
-	if err := ValidateDestination(ctx, request.Host, pluginName, checker); err != nil {
+	// SSRF protection: Resolve hostname ONCE, validate IP, then use validated IP
+	// This prevents DNS rebinding attacks where DNS changes between validation and connection
+	validatedIP, err := resolveAndValidate(ctx, request.Host, pluginName, checker)
+	if err != nil {
 		errMsg := fmt.Sprintf("SSRF protection: %v", err)
 		slog.WarnContext(ctx, errMsg, "host", request.Host, "port", request.Port)
 		stack[0] = hostWriteResponse(ctx, mod, TCPResponseWire{
@@ -95,9 +97,9 @@ func TCPConnect(ctx context.Context, mod api.Module, stack []uint64, checker *Ca
 		return
 	}
 
-	// 3. Perform TCP connection test
+	// 3. Perform TCP connection test using validated IP
 	start := time.Now()
-	response, err := performTCPConnect(tcpCtx, request.Host, request.Port, request.TLS)
+	response, err := performTCPConnect(tcpCtx, validatedIP, request.Port, request.TLS, request.Host)
 	responseTime := time.Since(start).Milliseconds()
 
 	if err != nil {
@@ -117,12 +119,18 @@ func TCPConnect(ctx context.Context, mod api.Module, stack []uint64, checker *Ca
 }
 
 // performTCPConnect executes the actual TCP connection test
-func performTCPConnect(ctx context.Context, host, port string, useTLS bool) (*TCPResponseWire, error) {
-	address := net.JoinHostPort(host, port)
+// validatedIP is the pre-resolved and validated IP address to connect to
+// originalHost is the original hostname (used for TLS SNI and logging)
+func performTCPConnect(ctx context.Context, validatedIP, port string, useTLS bool, originalHost string) (*TCPResponseWire, error) {
+	// Connect to the validated IP address, not the hostname
+	// This prevents DNS rebinding attacks
+	address := net.JoinHostPort(validatedIP, port)
 
 	response := &TCPResponseWire{
 		Connected: false,
-		Address:   address,
+		// Use original hostname in address field for user-friendliness
+		// (actual connection uses validated IP for security)
+		Address: net.JoinHostPort(originalHost, port),
 	}
 
 	// Create dialer with context
@@ -147,7 +155,8 @@ func performTCPConnect(ctx context.Context, host, port string, useTLS bool) (*TC
 
 	// TLS connection
 	tlsConfig := &tls.Config{
-		ServerName: host,
+		// Use original hostname for SNI (Server Name Indication), not the IP
+		ServerName: originalHost,
 		MinVersion: tls.VersionTLS12,
 	}
 
@@ -175,6 +184,7 @@ func performTCPConnect(ctx context.Context, host, port string, useTLS bool) (*TC
 		cert := state.PeerCertificates[0]
 		response.TLSCertSubject = cert.Subject.String()
 		response.TLSCertIssuer = cert.Issuer.String()
+		response.TLSCertNotAfter = &cert.NotAfter
 	}
 
 	return response, nil

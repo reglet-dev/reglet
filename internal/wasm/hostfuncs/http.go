@@ -126,8 +126,22 @@ func HTTPRequest(ctx context.Context, mod api.Module, stack []uint64, checker *C
 		}
 	}
 
-	// 4. Perform HTTP request
-	client := http.DefaultClient // Use default client for now (could be configurable later)
+	// 4. Perform HTTP request with SSRF-safe client
+	// SECURITY: Block redirects to prevent SSRF bypass via redirect chains
+	// Redirects could bypass ValidateDestination by redirecting to private IPs
+	client := &http.Client{
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			// Validate redirect target against SSRF protection
+			if err := ValidateDestination(ctx, req.URL.Hostname(), pluginName, checker); err != nil {
+				return fmt.Errorf("redirect blocked by SSRF protection: %w", err)
+			}
+			// Allow up to 10 redirects (http.DefaultClient default)
+			if len(via) >= 10 {
+				return fmt.Errorf("stopped after 10 redirects")
+			}
+			return nil
+		},
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		errMsg := fmt.Sprintf("HTTP request failed: %v", err)

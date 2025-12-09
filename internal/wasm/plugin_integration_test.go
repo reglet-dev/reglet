@@ -217,6 +217,75 @@ func TestFilePlugin_Observe_FileExists(t *testing.T) {
 	require.True(t, ok)
 	assert.True(t, status)
 	assert.Equal(t, tmpFile.Name(), result.Evidence.Data["path"])
+
+	// Verify ownership
+	uid, ok := result.Evidence.Data["uid"].(float64)
+	require.True(t, ok, "uid should be present")
+	assert.GreaterOrEqual(t, uid, float64(0))
+
+	gid, ok := result.Evidence.Data["gid"].(float64)
+	require.True(t, ok, "gid should be present")
+	assert.GreaterOrEqual(t, gid, float64(0))
+}
+
+// TestFilePlugin_Observe_Symlink tests checking a symlink
+func TestFilePlugin_Observe_Symlink(t *testing.T) {
+	t.Parallel()
+	wasmBytes := getWasmBytes(t, "file")
+
+	// Create a temporary test file and symlink in current directory
+	// to ensure WASM runtime access (similar to other tests)
+	targetFile, err := os.CreateTemp(".", "reglet-target-*.txt")
+	require.NoError(t, err)
+	targetName := targetFile.Name()
+	targetFile.Close()
+	defer os.Remove(targetName)
+
+	err = os.WriteFile(targetName, []byte("content"), 0644)
+	require.NoError(t, err)
+
+	linkName := targetName + ".link"
+	err = os.Symlink(targetName, linkName)
+	require.NoError(t, err)
+	defer os.Remove(linkName)
+
+	// File plugin needs filesystem capabilities
+	caps := map[string][]hostfuncs.Capability{
+		"file": {
+			{Kind: "fs", Pattern: "read:**"},
+		},
+	}
+
+	// Create runtime and load plugin
+	ctx := context.Background()
+	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
+	require.NoError(t, err)
+	defer runtime.Close(ctx)
+
+	plugin, err := runtime.LoadPlugin(ctx, "file", wasmBytes)
+	require.NoError(t, err)
+
+	// Test symlink check
+	config := Config{
+		Values: map[string]interface{}{
+			"path": linkName,
+		},
+	}
+
+	result, err := plugin.Observe(ctx, config)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Nil(t, result.Error)
+
+	// Verify symlink details
+	t.Logf("Evidence.Data: %+v", result.Evidence.Data)
+	isSymlink, ok := result.Evidence.Data["is_symlink"].(bool)
+	require.True(t, ok, "is_symlink should be present")
+	assert.True(t, isSymlink, "should be identified as symlink")
+
+	target, ok := result.Evidence.Data["symlink_target"].(string)
+	require.True(t, ok, "symlink_target should be present")
+	assert.Equal(t, targetName, target)
 }
 
 // TestFilePlugin_Observe_FileNotFound tests checking a non-existent file
@@ -513,8 +582,8 @@ func TestDNSPlugin_Observe_A_Record(t *testing.T) {
 	result, err := plugin.Observe(ctx, config)
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	require.Nil(t, result.Error)
 	require.NotNil(t, result.Evidence)
+	require.Nil(t, result.Error) // The Go error should be nil, status in evidence.
 
 	// Verify success
 	status, ok := result.Evidence.Data["status"].(bool)
@@ -534,6 +603,14 @@ func TestDNSPlugin_Observe_A_Record(t *testing.T) {
 	// Verify query time present
 	_, ok = result.Evidence.Data["query_time_ms"].(float64)
 	assert.True(t, ok, "should include query time")
+
+	// Ensure MX records are empty
+	_, ok = result.Evidence.Data["mx_records"]
+	assert.False(t, ok, "mx_records should not be present for A record lookup")
+
+	// Ensure error flags are not set
+	assert.False(t, result.Evidence.Data["is_not_found"].(bool), "is_not_found should be false")
+	assert.False(t, result.Evidence.Data["is_timeout"].(bool), "is_timeout should be false")
 }
 
 // TestDNSPlugin_Observe_MX_Record tests MX record lookup
@@ -567,15 +644,39 @@ func TestDNSPlugin_Observe_MX_Record(t *testing.T) {
 	result, err := plugin.Observe(ctx, config)
 	require.NoError(t, err)
 	require.NotNil(t, result)
+	require.NotNil(t, result.Evidence)
+	require.Nil(t, result.Error) // The Go error should be nil, status in evidence.
 
 	// MX lookup should succeed
 	status, ok := result.Evidence.Data["status"].(bool)
 	require.True(t, ok)
 	assert.True(t, status)
 
-	records, ok := result.Evidence.Data["records"].([]interface{})
+	// Verify structured MX records returned
+	mxRecords, ok := result.Evidence.Data["mx_records"].([]interface{})
+	require.True(t, ok, "mx_records should be present")
+	assert.NotEmpty(t, mxRecords, "gmail.com should have MX records")
+
+	// Check structure of first record
+	firstMX, ok := mxRecords[0].(map[string]interface{})
 	require.True(t, ok)
-	assert.NotEmpty(t, records, "gmail.com should have MX records")
+	assert.Contains(t, firstMX, "host")
+	assert.Contains(t, firstMX, "pref")
+	assert.IsType(t, "", firstMX["host"])
+	assert.IsType(t, float64(0), firstMX["pref"]) // JSON numbers are float64
+
+	// Verify record count
+	recordCount, ok := result.Evidence.Data["record_count"].(float64)
+	require.True(t, ok)
+	assert.Equal(t, float64(len(mxRecords)), recordCount)
+
+	// Ensure generic records are empty
+	_, ok = result.Evidence.Data["records"]
+	assert.False(t, ok, "records should not be present for MX record lookup (structured MX is used)")
+
+	// Ensure error flags are not set
+	assert.False(t, result.Evidence.Data["is_not_found"].(bool), "is_not_found should be false")
+	assert.False(t, result.Evidence.Data["is_timeout"].(bool), "is_timeout should be false")
 }
 
 // TestDNSPlugin_Observe_InvalidHostname tests error handling
@@ -601,21 +702,40 @@ func TestDNSPlugin_Observe_InvalidHostname(t *testing.T) {
 	// Test with non-existent hostname
 	config := Config{
 		Values: map[string]interface{}{
-			"hostname": "this-definitely-does-not-exist-12345.invalid",
+			"hostname":    "this-definitely-does-not-exist-12345.invalid",
+			"record_type": "A",
 		},
 	}
 
 	result, err := plugin.Observe(ctx, config)
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	require.Nil(t, result.Error, "DNS lookup failure should return evidence with status=false, not an error")
 	require.NotNil(t, result.Evidence)
+	require.Nil(t, result.Error, "Observe should return a nil Go error, expected nil for successful observation")
 
 	// Verify DNS lookup failed
 	status, ok := result.Evidence.Data["status"].(bool)
 	require.True(t, ok)
 	assert.False(t, status, "status should be false for failed DNS lookup")
-	assert.Contains(t, result.Evidence.Data, "error", "should include error message in evidence")
+
+	// Verify error flags from Evidence.Data (populated by plugin)
+	isNotFound, ok := result.Evidence.Data["is_not_found"].(bool)
+	require.True(t, ok, "is_not_found should be present in Evidence.Data")
+	assert.True(t, isNotFound, "is_not_found in Evidence.Data should be true for non-existent host")
+	isTimeout, ok := result.Evidence.Data["is_timeout"].(bool)
+	require.True(t, ok, "is_timeout should be present in Evidence.Data")
+	assert.False(t, isTimeout, "is_timeout in Evidence.Data should be false")
+
+	// Verify error message from Evidence.Data
+	errMsgData, ok := result.Evidence.Data["error_message"].(string)
+	require.True(t, ok, "error_message should be present in Evidence.Data")
+	assert.Contains(t, errMsgData, "no such host", "error message in Evidence.Data should indicate no such host")
+
+	// Records should be empty
+	_, recordsPresent := result.Evidence.Data["records"]
+	assert.False(t, recordsPresent, "records key should not be present for failed lookup")
+	_, mxRecordsPresent := result.Evidence.Data["mx_records"]
+	assert.False(t, mxRecordsPresent, "mx_records key should not be present")
 }
 
 // TestDNSPlugin_Observe_MissingHostname tests config validation
@@ -646,29 +766,21 @@ func TestDNSPlugin_Observe_MissingHostname(t *testing.T) {
 	result, err := plugin.Observe(ctx, config)
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	require.Nil(t, result.Error, "validation errors should return evidence with status=false, not an error")
 	require.NotNil(t, result.Evidence)
+	require.Nil(t, result.Error, "Observe should return nil error for config validation error")
 
-	// Should return status=false with error message in evidence
-	t.Logf("Evidence.Data keys: %v", getKeys(result.Evidence.Data))
-	t.Logf("Full Evidence.Data: %+v", result.Evidence.Data)
-
+	// Should return status=false for validation error
 	status, ok := result.Evidence.Data["status"].(bool)
 	require.True(t, ok)
 	assert.False(t, status, "status should be false for validation error")
 
-	// Error can be either a string or a map
-	var errMsg string
-	switch v := result.Evidence.Data["error"].(type) {
-	case string:
-		errMsg = v
-	case map[string]interface{}:
-		if msg, ok := v["message"].(string); ok {
-			errMsg = msg
-		}
-	}
-	require.NotEmpty(t, errMsg, "should have error message")
-	assert.Contains(t, errMsg, "Hostname", "error message should indicate missing Hostname")
+	// Verify that Evidence.Data["error"] contains the structured error (map)
+	errData, ok := result.Evidence.Data["error"].(map[string]interface{})
+	require.True(t, ok, "Error details should be in Evidence.Data['error'] map")
+
+	errMsg, ok := errData["message"].(string)
+	require.True(t, ok, "Error message should be in error map")
+	assert.Contains(t, errMsg, "config validation failed: Key: 'DNSConfig.Hostname'", "error message should indicate missing Hostname")
 }
 
 // TestHTTPPlugin_Describe tests HTTP plugin describe function
@@ -778,6 +890,19 @@ func TestHTTPPlugin_Observe_GET(t *testing.T) {
 	body, ok := result.Evidence.Data["body"].(string)
 	require.True(t, ok, "Expected 'body' field in response data. Got: %+v", result.Evidence.Data)
 	assert.NotEmpty(t, body)
+
+	// Verify new fields (response_time_ms, protocol, headers)
+	_, ok = result.Evidence.Data["response_time_ms"].(float64)
+	assert.True(t, ok, "response_time_ms should be present")
+
+	protocol, ok := result.Evidence.Data["protocol"].(string)
+	assert.True(t, ok, "protocol should be present")
+	assert.NotEmpty(t, protocol)
+
+	// Headers is map[string][]string, but unmarshaled as map[string]interface{}
+	headers, ok := result.Evidence.Data["headers"].(map[string]interface{})
+	assert.True(t, ok, "headers should be present")
+	assert.NotEmpty(t, headers)
 }
 
 // ============================================================================
@@ -937,4 +1062,13 @@ func TestTCPPlugin_Observe_TLS(t *testing.T) {
 	cipherSuite, ok := result.Evidence.Data["tls_cipher_suite"].(string)
 	require.True(t, ok)
 	assert.NotEmpty(t, cipherSuite)
+
+	// Verify certificate details
+	certNotAfter, ok := result.Evidence.Data["tls_cert_not_after"].(string)
+	require.True(t, ok, "tls_cert_not_after should be present")
+	assert.NotEmpty(t, certNotAfter)
+
+	daysRemaining, ok := result.Evidence.Data["tls_cert_days_remaining"].(float64)
+	require.True(t, ok, "tls_cert_days_remaining should be present")
+	assert.True(t, daysRemaining > 0, "days remaining should be positive for a valid cert")
 }

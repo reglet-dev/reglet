@@ -3,8 +3,10 @@ package hostfuncs
 import (
 	"context"
 	"encoding/json"
+	"errors" // New import
 	"fmt"
 	"log/slog"
+	"net" // New import
 	"time"
 
 	"github.com/tetratelabs/wazero/api"
@@ -25,6 +27,7 @@ type (
 	ExecRequestWire   = wireformat.ExecRequestWire
 	ExecResponseWire  = wireformat.ExecResponseWire
 	ErrorDetail       = wireformat.ErrorDetail
+	MXRecordWire      = wireformat.MXRecordWire // New re-export
 )
 
 // createContextFromWire creates a new context from the wire format.
@@ -54,12 +57,29 @@ func toErrorDetail(err error) *ErrorDetail {
 	if err == nil {
 		return nil
 	}
-	// TODO: Expand this to unwrap and categorize errors more granularly
-	return &ErrorDetail{
+
+	detail := &ErrorDetail{
 		Message: err.Error(),
 		Type:    "internal", // Default type
 		Code:    "",
 	}
+
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) {
+		detail.Type = "network" // DNS errors are network errors
+		if dnsErr.IsTimeout {
+			detail.Type = "timeout"
+			detail.IsTimeout = true
+		}
+		if dnsErr.IsNotFound {
+			detail.IsNotFound = true
+			// Could add specific code like "NXDOMAIN" if needed
+		}
+		// Consider other net.DNSError flags if relevant
+	}
+
+	// TODO: Expand this to unwrap and categorize errors more granularly for other types of errors
+	return detail
 }
 
 // hostWriteResponse writes the JSON response to WASM memory and returns packed ptr+len.

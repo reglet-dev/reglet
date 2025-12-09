@@ -39,19 +39,12 @@ func (p *Plugin) Name() string {
 // createModuleConfig creates a fresh module configuration
 // Includes stdout/stderr for debugging visibility
 func (p *Plugin) createModuleConfig() wazero.ModuleConfig {
-	// Get current working directory to mount for file access
-	// This allows plugins to access files relative to where reglet was run
-	cwd, err := os.Getwd()
-	if err != nil {
-		// Fallback to root if we can't get cwd (shouldn't happen)
-		cwd = "/"
-	}
-
 	return wazero.NewModuleConfig().
-		// Mount current working directory to guest "/" for relative file access
-		// This allows plugins to use relative paths like "go.mod" or "./config.yaml"
-		// TODO Phase 2: Implement proper capability-based path restrictions
-		WithFSConfig(wazero.NewFSConfig().WithDirMount(cwd, "/")).
+		// Mount root filesystem to allow access to system files like /etc/ssh/sshd_config
+		// Note: This provides full filesystem access to plugins. Capability enforcement
+		// for WASI operations is planned for Phase 2 (see TODO in design.md)
+		// Current capability system only enforces custom host functions (DNS, HTTP, etc.)
+		WithFSConfig(wazero.NewFSConfig().WithDirMount("/", "/")).
 		// Enable time-related syscalls (needed for file timestamps)
 		WithSysWalltime().
 		WithSysNanotime().
@@ -338,8 +331,16 @@ func (p *Plugin) Observe(ctx context.Context, cfg Config) (*ObservationResult, e
 				if errMap, ok := errVal.(map[string]interface{}); ok {
 					if msg, ok := errMap["message"].(string); ok {
 						finalData["error"] = msg
+						finalData["error_message"] = msg
 					} else {
 						finalData["error"] = fmt.Sprintf("%v", errMap)
+					}
+					// Extract structured error flags
+					if isTimeout, ok := errMap["is_timeout"].(bool); ok && isTimeout {
+						finalData["is_timeout"] = true
+					}
+					if isNotFound, ok := errMap["is_not_found"].(bool); ok && isNotFound {
+						finalData["is_not_found"] = true
 					}
 				} else {
 					finalData["error"] = errVal
