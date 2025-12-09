@@ -90,7 +90,9 @@ func (p *httpPlugin) Check(ctx context.Context, config regletsdk.Config) (reglet
 	}
 
 	// Execute Request
+	start := time.Now()
 	resp, err := client.Do(req)
+	duration := time.Since(start).Milliseconds()
 	if err != nil {
 		return regletsdk.NetworkError(fmt.Sprintf("HTTP request failed: %v", err), err), nil
 	}
@@ -108,9 +110,12 @@ func (p *httpPlugin) Check(ctx context.Context, config regletsdk.Config) (reglet
 
 	// Collect Result Data
 	result := map[string]interface{}{
-		"status_code": resp.StatusCode,
-		"body_size":   len(respBodyBytes),
-		"body_sha256": bodyHash,
+		"status_code":      resp.StatusCode,
+		"response_time_ms": duration,
+		"protocol":         resp.Proto,
+		"headers":          resp.Header,
+		"body_size":        len(respBodyBytes),
+		"body_sha256":      bodyHash,
 	}
 
 	// Include body content based on configuration
