@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"syscall"
 	"time"
 
 	regletsdk "github.com/whiskeyjimbo/reglet/sdk"
@@ -69,6 +70,38 @@ func (p *filePlugin) Check(ctx context.Context, config regletsdk.Config) (reglet
 	result["mode"] = fmt.Sprintf("%04o", info.Mode().Perm())
 	result["permissions"] = info.Mode().String()
 	result["mod_time"] = info.ModTime().Format(time.RFC3339)
+
+	// Check if file is readable (not a directory)
+	if !info.IsDir() {
+		f, err := os.Open(cfg.Path)
+		if err == nil {
+			result["readable"] = true
+			f.Close()
+		} else {
+			result["readable"] = false
+		}
+	} else {
+		// Directories are considered "readable" if we could stat them
+		result["readable"] = true
+	}
+
+	// Attempt to get ownership
+	if stat, ok := info.Sys().(*syscall.Stat_t); ok {
+		result["uid"] = stat.Uid
+		result["gid"] = stat.Gid
+	}
+
+	// Check for symlink
+	linfo, err := os.Lstat(cfg.Path)
+	if err == nil && linfo.Mode()&os.ModeSymlink != 0 {
+		result["is_symlink"] = true
+		target, err := os.Readlink(cfg.Path)
+		if err == nil {
+			result["symlink_target"] = target
+		}
+	} else {
+		result["is_symlink"] = false
+	}
 
 	// 2. Read Content (if requested and not a directory)
 	if cfg.ReadContent && !info.IsDir() {

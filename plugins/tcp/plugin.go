@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"time"
 
 	regletsdk "github.com/whiskeyjimbo/reglet/sdk"
 	regletnet "github.com/whiskeyjimbo/reglet/sdk/net"
@@ -80,6 +81,12 @@ func (p *tcpPlugin) Check(ctx context.Context, config regletsdk.Config) (reglets
 		if result.TLSCertSubject != "" {
 			data["tls_cert_subject"] = result.TLSCertSubject
 			data["tls_cert_issuer"] = result.TLSCertIssuer
+		}
+		if result.TLSCertNotAfter != nil {
+			data["tls_cert_not_after"] = result.TLSCertNotAfter.Format(time.RFC3339)
+			// Calculate days remaining
+			days := int(time.Until(*result.TLSCertNotAfter).Hours() / 24)
+			data["tls_cert_days_remaining"] = days
 		}
 	}
 

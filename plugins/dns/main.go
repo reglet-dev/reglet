@@ -43,7 +43,7 @@ func (w *wasmResolver) LookupNS(ctx context.Context, host string, nameserver str
 func init() {
 	slog.Info("DNS plugin init() started")
 	// Inject the real WASM-compatible resolver
-	regletsdk.Register(&dnsPlugin{resolver: &wasmResolver{}})
+	regletsdk.Register(&dnsPlugin{})
 	slog.Info("DNS plugin init() registered")
 }
 

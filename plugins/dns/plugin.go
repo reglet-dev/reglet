@@ -2,27 +2,16 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"net"
+	"errors"
 	"time"
 
 	regletsdk "github.com/whiskeyjimbo/reglet/sdk"
+	regletnet "github.com/whiskeyjimbo/reglet/sdk/net"
+	"github.com/whiskeyjimbo/reglet/wireformat"
 )
 
-// dnsResolver interface abstracts the network calls for testability.
-// This allows us to mock the SDK's networking functions in tests.
-type dnsResolver interface {
-	LookupHost(ctx context.Context, host string, nameserver string) ([]string, error)
-	LookupCNAME(ctx context.Context, host string, nameserver string) (string, error)
-	LookupMX(ctx context.Context, host string, nameserver string) ([]string, error)
-	LookupTXT(ctx context.Context, host string, nameserver string) ([]string, error)
-	LookupNS(ctx context.Context, host string, nameserver string) ([]string, error)
-}
-
 // dnsPlugin implements the sdk.Plugin interface.
-type dnsPlugin struct {
-	resolver dnsResolver
-}
+type dnsPlugin struct {}
 
 // Describe returns plugin metadata.
 func (p *dnsPlugin) Describe(ctx context.Context) (regletsdk.Metadata, error) {
@@ -36,7 +25,8 @@ func (p *dnsPlugin) Describe(ctx context.Context) (regletsdk.Metadata, error) {
 				Pattern: "outbound:53", // Required for DNS lookups
 			},
 		},
-	}, nil
+	},
+	nil
 }
 
 type DNSConfig struct {
@@ -64,73 +54,74 @@ func (p *dnsPlugin) Check(ctx context.Context, config regletsdk.Config) (reglets
 		return regletsdk.ConfigError(err), nil
 	}
 
-	// Perform DNS lookup using the injected resolver
 	start := time.Now()
-	records, err := p.performDNSLookup(ctx, cfg.Hostname, cfg.RecordType, cfg.Nameserver)
+	dnsResponseWire, sdkErr := regletnet.LookupRaw(ctx, cfg.Hostname, cfg.RecordType, cfg.Nameserver) // sdkErr is *wireformat.ErrorDetail or other Go error type
 	queryTime := time.Since(start).Milliseconds()
 
-	if err != nil {
-		return regletsdk.NetworkError(fmt.Sprintf("DNS lookup failed: %v", err), err), nil
-	}
-
-	// Return success evidence
-	return regletsdk.Success(map[string]interface{}{
+	// Prepare data for evidence.
+	data := map[string]interface{}{
 		"hostname":      cfg.Hostname,
 		"record_type":   cfg.RecordType,
-		"records":       records,
-		"record_count":  len(records),
 		"query_time_ms": queryTime,
-	}), nil
-}
-
-// performDNSLookup executes the actual DNS lookup using the injected resolver.
-func (p *dnsPlugin) performDNSLookup(ctx context.Context, hostname, recordType, nameserver string) ([]string, error) {
-	switch recordType {
-	case "A":
-		ips, err := p.resolver.LookupHost(ctx, hostname, nameserver)
-		if err != nil {
-			return nil, err
-		}
-		var ipv4s []string
-		for _, ip := range ips {
-			parsed := net.ParseIP(ip)
-			if parsed != nil && parsed.To4() != nil {
-				ipv4s = append(ipv4s, ip)
-			}
-		}
-		return ipv4s, nil
-
-	case "AAAA":
-		ips, err := p.resolver.LookupHost(ctx, hostname, nameserver)
-		if err != nil {
-			return nil, err
-		}
-		var ipv6s []string
-		for _, ip := range ips {
-			parsed := net.ParseIP(ip)
-			if parsed != nil && parsed.To4() == nil {
-				ipv6s = append(ipv6s, ip)
-			}
-		}
-		return ipv6s, nil
-
-	case "CNAME":
-		cname, err := p.resolver.LookupCNAME(ctx, hostname, nameserver)
-		if err != nil {
-			return nil, err
-		}
-		return []string{cname}, nil
-
-	case "MX":
-		return p.resolver.LookupMX(ctx, hostname, nameserver)
-
-	case "TXT":
-		return p.resolver.LookupTXT(ctx, hostname, nameserver)
-
-	case "NS":
-		return p.resolver.LookupNS(ctx, hostname, nameserver)
-
-	default:
-		return nil, fmt.Errorf("unsupported record type: %s", recordType)
 	}
+
+	var evidence regletsdk.Evidence
+	var finalErrorDetail *wireformat.ErrorDetail
+
+	if sdkErr != nil {
+		// If SDK returned a Go error, it signifies a problem with the Host call or its processing.
+		// sdkErr is *wireformat.ErrorDetail (due to SDK's LookupRaw function mapping it).
+		if errors.As(sdkErr, &finalErrorDetail) {
+			if finalErrorDetail.Type == "config" {
+				evidence = regletsdk.ConfigError(finalErrorDetail)
+			} else {
+				evidence = regletsdk.NetworkError(finalErrorDetail.Message, finalErrorDetail)
+			}
+		} else {
+			// Generic Go error from SDK, not specific wireformat error.
+			finalErrorDetail = &wireformat.ErrorDetail{
+				Message: sdkErr.Error(),
+				Type: "internal",
+			}
+			evidence = regletsdk.Failure("dns_sdk_error", finalErrorDetail.Message)
+		}
+	} else if dnsResponseWire.Error != nil {
+		// Host returned a structured error in the wire response (e.g. DNS NXDOMAIN, timeout)
+		finalErrorDetail = dnsResponseWire.Error
+		if finalErrorDetail.Type == "config" {
+			evidence = regletsdk.ConfigError(finalErrorDetail)
+		} else {
+			evidence = regletsdk.NetworkError(finalErrorDetail.Message, finalErrorDetail)
+		}
+	} else {
+		// Success path: host returned no error, populate records
+		recordCount := 0
+		if dnsResponseWire.Records != nil {
+			data["records"] = dnsResponseWire.Records
+			recordCount = len(dnsResponseWire.Records)
+		}
+		if dnsResponseWire.MXRecords != nil {
+			var mxRecords []map[string]interface{}
+			for _, mx := range dnsResponseWire.MXRecords {
+				mxRecords = append(mxRecords, map[string]interface{}{"host": mx.Host, "pref": mx.Pref})
+			}
+			data["mx_records"] = mxRecords
+			recordCount = len(mxRecords)
+		}
+		data["record_count"] = recordCount
+		evidence = regletsdk.Success(data) // Final success
+	}
+
+	// Always populate error flags and message into Evidence.Data for consistent OPA policy access.
+	if finalErrorDetail != nil {
+		data["error_message"] = finalErrorDetail.Message
+		data["is_timeout"] = finalErrorDetail.IsTimeout
+		data["is_not_found"] = finalErrorDetail.IsNotFound
+	} else {
+		data["is_timeout"] = false
+		data["is_not_found"] = false
+	}
+    evidence.Data = data
+
+	return evidence, nil
 }
