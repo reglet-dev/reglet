@@ -15,7 +15,7 @@ func TestRedaction_EndToEnd(t *testing.T) {
 	// 1. Setup Paths
 	rootDir := findProjectRoot(t)
 	binPath := filepath.Join(rootDir, "bin", "reglet")
-	
+
 	// Ensure binary is built
 	cmd := exec.Command("make", "build")
 	cmd.Dir = rootDir
@@ -68,10 +68,10 @@ controls:
 	// We need to set HOME to point to our temp dir so it picks up the config
 	checkCmd := exec.Command(binPath, "check", profilePath, "--format", "json", "--trust-plugins")
 	checkCmd.Env = append(os.Environ(), "HOME="+tempHome)
-	
+
 	outputBytes, err := checkCmd.CombinedOutput()
 	require.NoError(t, err, "Reglet check failed: %s", outputBytes)
-	
+
 	// Parse JSON output (skip log lines)
 	outputStr := string(outputBytes)
 	jsonStart := 0
@@ -93,7 +93,7 @@ controls:
 	obs := controls[0].(map[string]interface{})["observations"].([]interface{})
 	evidence := obs[0].(map[string]interface{})["evidence"].(map[string]interface{})
 	data := evidence["Data"].(map[string]interface{})
-	
+
 	stdout := data["stdout"].(string)
 	assert.Contains(t, stdout, "My secret is [REDACTED]")
 	assert.NotContains(t, stdout, "SECRET-ABC12345")

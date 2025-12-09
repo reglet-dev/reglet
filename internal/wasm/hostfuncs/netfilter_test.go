@@ -13,9 +13,9 @@ func TestIsPrivateOrReservedIP(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name       string
-		ip         string
-		isPrivate  bool
+		name      string
+		ip        string
+		isPrivate bool
 	}{
 		// Loopback addresses
 		{"IPv4 loopback", "127.0.0.1", true},

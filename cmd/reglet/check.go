@@ -208,7 +208,7 @@ func loadSystemConfig() (*config.SystemConfig, error) {
 		return nil, err
 	}
 	configPath := filepath.Join(homeDir, ".reglet", "config.yaml")
-	
+
 	return config.LoadSystemConfig(configPath)
 }
 

@@ -266,7 +266,7 @@ func (e *Engine) executeControl(ctx context.Context, ctrl config.Control, execRe
 
 	// Check if control should run (filtering)
 	shouldRun, skipReason := e.shouldRun(ctrl)
-	
+
 	// If filtering says skip, check if it's required as a dependency
 	if !shouldRun && e.config.IncludeDependencies && requiredDeps[ctrl.ID] {
 		shouldRun = true

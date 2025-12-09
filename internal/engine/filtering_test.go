@@ -24,7 +24,7 @@ func TestFiltering_EndToEnd(t *testing.T) {
 	// Locate plugins directory
 	cwd, err := os.Getwd()
 	require.NoError(t, err)
-	
+
 	// Walk up to find project root containing go.mod
 	projectRoot := cwd
 	for {
