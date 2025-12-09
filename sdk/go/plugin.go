@@ -29,6 +29,13 @@ var userPlugin Plugin
 
 // Register initializes the WASM exports and handles the plugin lifecycle.
 // Plugin authors call this in their `main()` function.
+//
+// Version Checking:
+// The SDK automatically reports its version (Version) and minimum required host
+// version (MinHostVersion) in the Describe() metadata. The host is responsible
+// for validating compatibility before loading the plugin. If the host version
+// is below MinHostVersion, the host should reject the plugin with a clear error
+// message.
 func Register(p Plugin) {
 	if userPlugin != nil {
 		slog.Warn("sdk: plugin already registered, ignoring second call", "userPlugin_addr", fmt.Sprintf("%p", &userPlugin))

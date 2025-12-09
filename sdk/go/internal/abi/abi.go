@@ -8,16 +8,25 @@ import (
 	"unsafe"
 )
 
+// MaxTotalAllocations is the maximum total memory that can be allocated by the SDK.
+// This prevents unbounded memory growth in WASM linear memory.
+const MaxTotalAllocations = 100 * 1024 * 1024 // 100 MB
+
 // MemoryManager tracks all allocations made by the SDK in WASM linear memory.
 // It keeps a reference to allocated slices to prevent the Go GC from collecting them,
 // effectively "pinning" the memory until explicitly freed or during panic recovery.
 var memoryManager = struct {
 	sync.Mutex
-	ptrs map[uint32][]byte // ptr -> slice reference
-}{ptrs: make(map[uint32][]byte)}
+	ptrs           map[uint32][]byte // ptr -> slice reference
+	totalAllocated int               // Total bytes currently allocated
+}{
+	ptrs:           make(map[uint32][]byte),
+	totalAllocated: 0,
+}
 
 // allocate reserves memory in the WASM linear memory and returns a pointer.
 // The host can read from this pointer. It tracks the allocation to prevent GC.
+// Panics if allocation would exceed MaxTotalAllocations limit.
 //
 //go:wasmexport allocate
 func allocate(size uint32) uint32 {
@@ -25,34 +34,53 @@ func allocate(size uint32) uint32 {
 		return 0
 	}
 
+	memoryManager.Lock()
+	defer memoryManager.Unlock()
+
+	// Check if allocation would exceed memory limit
+	if memoryManager.totalAllocated+int(size) > MaxTotalAllocations {
+		panic(fmt.Sprintf("abi: memory allocation limit exceeded (requested: %d bytes, current: %d bytes, limit: %d bytes)",
+			size, memoryManager.totalAllocated, MaxTotalAllocations))
+	}
+
 	buf := make([]byte, size)
 	ptr := uint32(uintptr(unsafe.Pointer(&buf[0])))
 
-	memoryManager.Lock()
 	memoryManager.ptrs[ptr] = buf // PIN THE MEMORY: Store the slice to prevent GC
-	memoryManager.Unlock()
+	memoryManager.totalAllocated += int(size)
 
 	return ptr
 }
 
 // deallocate frees memory by removing the reference from the memory manager,
-// allowing the Go GC to collect it.
+// allowing the Go GC to collect it. Decrements totalAllocated by the given size.
 //
 //go:wasmexport deallocate
 func deallocate(ptr uint32, size uint32) {
 	memoryManager.Lock()
-	delete(memoryManager.ptrs, ptr)
-	memoryManager.Unlock()
+	defer memoryManager.Unlock()
+
+	if _, exists := memoryManager.ptrs[ptr]; exists {
+		delete(memoryManager.ptrs, ptr)
+		memoryManager.totalAllocated -= int(size)
+
+		// Prevent negative totalAllocated due to double-free or other bugs
+		if memoryManager.totalAllocated < 0 {
+			memoryManager.totalAllocated = 0
+		}
+	}
 }
 
 // FreeAllTracked frees all memory currently tracked by the SDK.
 // This is typically called during panic recovery or module shutdown to prevent leaks.
 func FreeAllTracked() {
 	memoryManager.Lock()
+	defer memoryManager.Unlock()
+
 	for ptr := range memoryManager.ptrs {
 		delete(memoryManager.ptrs, ptr)
 	}
-	memoryManager.Unlock()
+	memoryManager.totalAllocated = 0 // Reset total allocation counter
 }
 
 // PtrFromBytes allocates WASM memory, copies the given data into it,
