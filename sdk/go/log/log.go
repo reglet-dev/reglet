@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"time"
 
+	sdkcontext "github.com/whiskeyjimbo/reglet/sdk/internal/context"
 	"github.com/whiskeyjimbo/reglet/sdk/internal/abi"
 	"github.com/whiskeyjimbo/reglet/wireformat"
 )
@@ -47,6 +48,7 @@ func (h *WasmLogHandler) Enabled(_ context.Context, level slog.Level) bool {
 // Handle serializes a slog.Record and sends it to the host via a host function.
 func (h *WasmLogHandler) Handle(ctx context.Context, record slog.Record) error {
 	logMsg := LogMessageWire{
+		Context:   sdkcontext.ContextToWire(ctx),
 		Level:     record.Level.String(),
 		Message:   record.Message,
 		Timestamp: record.Time,

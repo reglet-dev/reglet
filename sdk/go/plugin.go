@@ -10,6 +10,7 @@ import (
 	"runtime/debug" // For stack traces in panic recovery
 
 	"github.com/whiskeyjimbo/reglet/sdk/internal/abi"
+	sdkcontext "github.com/whiskeyjimbo/reglet/sdk/internal/context"
 	_ "github.com/whiskeyjimbo/reglet/sdk/log" // Initialize WASM logging handler
 )
 
@@ -46,8 +47,9 @@ func _describe() uint64 {
 		if userPlugin == nil {
 			return nil, fmt.Errorf("plugin not registered")
 		}
-		// Context propagation is for a later phase, using Background for now.
-		metadata, err := userPlugin.Describe(context.Background())
+		// Use current context or create one with timeout
+		ctx := sdkcontext.GetCurrentContext()
+		metadata, err := userPlugin.Describe(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -65,8 +67,9 @@ func _schema() uint64 {
 		if userPlugin == nil {
 			return nil, fmt.Errorf("plugin not registered")
 		}
-		// Context propagation is for a later phase, using Background for now.
-		schemaBytes, err := userPlugin.Schema(context.Background())
+		// Use current context or create one with timeout
+		ctx := sdkcontext.GetCurrentContext()
+		schemaBytes, err := userPlugin.Schema(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -90,8 +93,14 @@ func _observe(configPtr uint32, configLen uint32) uint64 {
 			return nil, fmt.Errorf("failed to parse config: %w", err)
 		}
 
-		// Context propagation is for a later phase, using Background for now.
-		evidence, err := userPlugin.Check(context.Background(), config)
+		// Use current context or create one with timeout
+		ctx := sdkcontext.GetCurrentContext()
+
+		// Store context for SDK functions to use
+		sdkcontext.SetCurrentContext(ctx)
+		defer sdkcontext.SetCurrentContext(context.Background()) // Reset after execution
+
+		evidence, err := userPlugin.Check(ctx, config)
 		if err != nil {
 			// If user's check returns an error, embed it in Evidence
 			evidence.Status = false

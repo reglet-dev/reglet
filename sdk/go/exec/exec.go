@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	sdkcontext "github.com/whiskeyjimbo/reglet/sdk/internal/context"
 	"github.com/whiskeyjimbo/reglet/sdk/internal/abi"
 	"github.com/whiskeyjimbo/reglet/wireformat"
 )
@@ -35,12 +36,9 @@ type CommandResponse struct {
 // Run executes a command on the host system.
 // Requires "exec:<command>" capability.
 func Run(ctx context.Context, req CommandRequest) (*CommandResponse, error) {
-	// 1. Prepare wire request
+	// 1. Prepare wire request with context
 	wireReq := wireformat.ExecRequestWire{
-		Context: wireformat.ContextWireFormat{
-			// Context propagation not fully implemented in this snippet,
-			// but would map timeout/cancellation here
-		},
+		Context: sdkcontext.ContextToWire(ctx),
 		Command: req.Command,
 		Args:    req.Args,
 		Dir:     req.Dir,

@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"testing"
 	"time"
+
+	sdkcontext "github.com/whiskeyjimbo/reglet/sdk/internal/context"
 )
 
 func TestCreateContextWireFormat(t *testing.T) {
 	// 1. Background context (empty)
 	ctx := context.Background()
-	wire := createContextWireFormat(ctx)
+	wire := sdkcontext.ContextToWire(ctx)
 	if wire.Cancelled {
 		t.Error("Background context should not be cancelled")
 	}
@@ -21,7 +23,7 @@ func TestCreateContextWireFormat(t *testing.T) {
 	// 2. Cancelled context
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	wire = createContextWireFormat(ctx)
+	wire = sdkcontext.ContextToWire(ctx)
 	if !wire.Cancelled {
 		t.Error("Context should be cancelled")
 	}
@@ -30,7 +32,7 @@ func TestCreateContextWireFormat(t *testing.T) {
 	deadline := time.Now().Add(1 * time.Hour)
 	ctx, cancel = context.WithDeadline(context.Background(), deadline)
 	defer cancel()
-	wire = createContextWireFormat(ctx)
+	wire = sdkcontext.ContextToWire(ctx)
 	if wire.Deadline == nil {
 		t.Error("Context should have deadline")
 	}
