@@ -1,3 +1,4 @@
+// Package sdk provides core types and functions for building Reglet plugins.
 package sdk
 
 import (
@@ -26,7 +27,7 @@ type Metadata struct {
 	Name           string       `json:"name"`
 	Version        string       `json:"version"`
 	Description    string       `json:"description"`
-	SDKVersion     string       `json:"sdk_version"`     // Auto-populated
+	SDKVersion     string       `json:"sdk_version"`      // Auto-populated
 	MinHostVersion string       `json:"min_host_version"` // Minimum compatible host
 	Capabilities   []Capability `json:"capabilities"`
 }
@@ -52,17 +53,17 @@ func ToErrorDetail(err error) *ErrorDetail {
 
 	// Check for custom SDK error types and categorize appropriately
 	var (
-		netErr    *NetworkError
-		dnsErr    *DNSError
-		httpErr   *HTTPError
-		tcpErr    *TCPError
+		netErr     *NetworkError
+		dnsErr     *DNSError
+		httpErr    *HTTPError
+		tcpErr     *TCPError
 		timeoutErr *TimeoutError
-		capErr    *CapabilityError
-		confErr   *ConfigError
-		execErr   *ExecError
-		schemaErr *SchemaError
-		memErr    *MemoryError
-		wireErr   *WireFormatError
+		capErr     *CapabilityError
+		confErr    *ConfigError
+		execErr    *ExecError
+		schemaErr  *SchemaError
+		memErr     *MemoryError
+		wireErr    *WireFormatError
 	)
 
 	switch {
@@ -168,9 +169,17 @@ func Failure(errType, message string) Evidence {
 }
 
 // ConfigFailure creates a config validation error Evidence.
-// Deprecated: Use ConfigError type and proper error handling instead.
+//
+// Deprecated: Use &ConfigError{Field: "...", Err: err} with proper error handling instead.
+// This function will be removed in a future version.
+//
+// Example replacement:
+//
+//	return sdk.Evidence{
+//	    Status: false,
+//	    Error:  sdk.ToErrorDetail(&sdk.ConfigError{Field: "hostname", Err: err}),
+//	}, nil
 func ConfigFailure(err error) Evidence {
-	// ToErrorDetail will handle if err is already a *wireformat.ErrorDetail
 	return Evidence{
 		Status: false,
 		Error:  ToErrorDetail(err),
@@ -178,14 +187,27 @@ func ConfigFailure(err error) Evidence {
 }
 
 // NetworkFailure creates a network error Evidence with wrapped error.
-// Deprecated: Use NetworkError type and proper error handling instead.
+//
+// Deprecated: Use &NetworkError{Operation: "...", Target: "...", Err: err} instead.
+// This function will be removed in a future version.
+//
+// Example replacement:
+//
+//	return sdk.Evidence{
+//	    Status: false,
+//	    Error:  sdk.ToErrorDetail(&sdk.NetworkError{
+//	        Operation: "http_request",
+//	        Target:    "api.example.com:443",
+//	        Err:       err,
+//	    }),
+//	}, nil
 func NetworkFailure(message string, err error) Evidence {
 	return Evidence{
 		Status: false,
 		Error: &ErrorDetail{
 			Message: message,
 			Type:    "network",
-			Wrapped: ToErrorDetail(err), // Wrapped error is now also processed by ToErrorDetail
+			Wrapped: ToErrorDetail(err),
 		},
 	}
 }

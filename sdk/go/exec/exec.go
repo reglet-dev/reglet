@@ -7,8 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	sdkcontext "github.com/whiskeyjimbo/reglet/sdk/internal/context"
 	"github.com/whiskeyjimbo/reglet/sdk/internal/abi"
+	sdkcontext "github.com/whiskeyjimbo/reglet/sdk/internal/context"
 	"github.com/whiskeyjimbo/reglet/wireformat"
 )
 

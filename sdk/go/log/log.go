@@ -9,13 +9,14 @@ import (
 	"log/slog"
 	"time"
 
-	sdkcontext "github.com/whiskeyjimbo/reglet/sdk/internal/context"
 	"github.com/whiskeyjimbo/reglet/sdk/internal/abi"
+	sdkcontext "github.com/whiskeyjimbo/reglet/sdk/internal/context"
 	"github.com/whiskeyjimbo/reglet/wireformat"
 )
 
 // Define the host function signature for logging messages.
 // This matches the signature defined in internal/wasm/hostfuncs/registry.go.
+//
 //go:wasmimport reglet_host log_message
 func host_log_message(messagePacked uint64)
 

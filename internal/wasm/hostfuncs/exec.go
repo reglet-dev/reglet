@@ -80,7 +80,7 @@ func ExecCommand(ctx context.Context, mod api.Module, stack []uint64, checker *C
 	}
 
 	// Execute command
-	// SECURITY: exec.CommandContext does NOT use shell 
+	// SECURITY: exec.CommandContext does NOT use shell
 	// Arguments are passed directly to the binary, preventing shell injection
 	// Only shell execution can interpret arguments as shell commands
 	cmd := exec.CommandContext(execCtx, request.Command, request.Args...)

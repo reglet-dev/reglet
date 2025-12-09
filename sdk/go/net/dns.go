@@ -17,11 +17,12 @@ import (
 
 // Define the host function signature for DNS lookups.
 // This matches the signature defined in internal/wasm/hostfuncs/registry.go.
+//
 //go:wasmimport reglet_host dns_lookup
 func host_dns_lookup(requestPacked uint64) uint64
 
 // WasmResolver implements net.Resolver functionality for the WASM environment.
-type WasmResolver struct{
+type WasmResolver struct {
 	// Nameserver is the address of the nameserver to use for resolution (e.g. "8.8.8.8:53").
 	// If empty, the host's default resolver is used.
 	Nameserver string
@@ -111,16 +112,16 @@ func init() {
 		// We implement LookupIPAddr directly to handle A/AAAA lookups through hostfuncs.
 		// For other lookup types (MX, TXT, etc.), plugin authors will need to call specific
 		// SDK functions (e.g., sdknet.LookupMX) if we don't implement them here directly.
-		
+
 		// NOTE: 'LookupIPAddr' is a method, not a field we can set on the struct literal.
 		// net.Resolver struct only has PreferGo (bool) and Dial (func).
 		// To customize LookupIPAddr behavior, we rely on PreferGo=true and the Dial function intercepting network traffic.
 		// BUT, since we cannot easily intercept the DNS protocol parsing inside net.Resolver via Dial without a full DNS server stub,
 		// we are removing the attempt to patch LookupIPAddr here.
-		
+
 		// Plugins MUST use the sdk/net package directly for lookups if they want WASM host function support.
 		// Standard net.LookupHost will likely fail or try to dial on prohibited ports.
-		
+
 		Dial: func(ctx context.Context, network, address string) (stdnet.Conn, error) {
 			slog.WarnContext(ctx, "sdk: net.DefaultResolver.Dial called, not implemented via hostfunc", "network", network, "address", address)
 			return (&stdnet.Dialer{Timeout: 5 * time.Second}).DialContext(ctx, network, address)

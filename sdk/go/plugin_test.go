@@ -86,7 +86,7 @@ func TestEvidence_Serialization(t *testing.T) {
 			evidence: Evidence{
 				Status: true,
 				Data: map[string]interface{}{
-					"stdout": "hello world",
+					"stdout":    "hello world",
 					"exit_code": 0,
 				},
 			},

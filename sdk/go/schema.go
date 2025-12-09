@@ -15,11 +15,11 @@ func GenerateSchema(v interface{}) ([]byte, error) {
 		ExpandedStruct: true, // Expand struct definitions inline
 	}
 	schema := reflector.Reflect(v)
-	
+
 	jsonBytes, err := json.MarshalIndent(schema, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal schema: %w", err)
 	}
-	
+
 	return jsonBytes, nil
 }

@@ -1,12 +1,13 @@
+// Package sdk provides the Reglet plugin SDK for building WASM compliance check plugins.
+//
+// This package includes custom error types for better error handling and inspection.
+// All error types support error unwrapping via errors.As() and errors.Is().
 package sdk
 
 import (
 	"fmt"
 	"time"
 )
-
-// Custom error types for better error handling and inspection.
-// These errors can be inspected using errors.As() and errors.Is().
 
 // NetworkError represents a network operation failure.
 type NetworkError struct {

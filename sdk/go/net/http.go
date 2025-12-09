@@ -22,6 +22,7 @@ const MaxHTTPBodySize = 10 * 1024 * 1024 // 10 MB
 
 // Define the host function signature for HTTP requests.
 // This matches the signature defined in internal/wasm/hostfuncs/registry.go.
+//
 //go:wasmimport reglet_host http_request
 func host_http_request(requestPacked uint64) uint64
 
@@ -129,11 +130,12 @@ var defaultClient = &http.Client{
 // It's equivalent to http.Get() but uses the WASM host function.
 //
 // Example:
-//     resp, err := net.Get(ctx, "https://api.example.com/status")
-//     if err != nil {
-//         return err
-//     }
-//     defer resp.Body.Close()
+//
+//	resp, err := net.Get(ctx, "https://api.example.com/status")
+//	if err != nil {
+//	    return err
+//	}
+//	defer resp.Body.Close()
 func Get(ctx context.Context, url string) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -145,8 +147,9 @@ func Get(ctx context.Context, url string) (*http.Response, error) {
 // Post is a convenience function for making HTTP POST requests using WasmTransport.
 //
 // Example:
-//     body := bytes.NewReader([]byte(`{"key":"value"}`))
-//     resp, err := net.Post(ctx, "https://api.example.com/data", "application/json", body)
+//
+//	body := bytes.NewReader([]byte(`{"key":"value"}`))
+//	resp, err := net.Post(ctx, "https://api.example.com/data", "application/json", body)
 func Post(ctx context.Context, url, contentType string, body io.Reader) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
 	if err != nil {
@@ -160,9 +163,10 @@ func Post(ctx context.Context, url, contentType string, body io.Reader) (*http.R
 // This is useful when you need full control over the request.
 //
 // Example:
-//     req, _ := http.NewRequestWithContext(ctx, "PUT", url, body)
-//     req.Header.Set("Authorization", "Bearer "+token)
-//     resp, err := net.Do(req)
+//
+//	req, _ := http.NewRequestWithContext(ctx, "PUT", url, body)
+//	req.Header.Set("Authorization", "Bearer "+token)
+//	resp, err := net.Do(req)
 func Do(req *http.Request) (*http.Response, error) {
 	return defaultClient.Do(req)
 }
