@@ -54,7 +54,7 @@ Filtering:
 func init() {
 	rootCmd.AddCommand(checkCmd)
 
-	checkCmd.Flags().StringVar(&format, "format", "table", "Output format: table, json, yaml")
+	checkCmd.Flags().StringVar(&format, "format", "table", "Output format: table, json, yaml, junit")
 	checkCmd.Flags().StringVarP(&outFile, "output", "o", "", "Output file path (default: stdout)")
 	checkCmd.Flags().BoolVar(&trustPlugins, "trust-plugins", false, "Auto-grant all plugin capabilities (use with caution)")
 
@@ -300,7 +300,10 @@ func formatOutput(writer *os.File, result *engine.ExecutionResult, format string
 	case "yaml":
 		formatter := output.NewYAMLFormatter(writer)
 		return formatter.Format(result)
+	case "junit":
+		formatter := output.NewJUnitFormatter(writer)
+		return formatter.Format(result)
 	default:
-		return fmt.Errorf("unknown format: %s (supported: table, json, yaml)", format)
+		return fmt.Errorf("unknown format: %s (supported: table, json, yaml, junit)", format)
 	}
 }
