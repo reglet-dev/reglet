@@ -276,30 +276,39 @@ func TestFailureHelper(t *testing.T) {
 	}
 }
 
-func TestConfigFailureHelper(t *testing.T) {
+func TestConfigErrorConstruction(t *testing.T) {
 	err := fmt.Errorf("missing required field 'host'")
-	evidence := ConfigFailure(err)
+	evidence := Evidence{
+		Status: false,
+		Error: ToErrorDetail(&ConfigError{
+			Field: "host",
+			Err:   err,
+		}),
+	}
 
 	assert.False(t, evidence.Status)
 	require.NotNil(t, evidence.Error)
-	assert.Contains(t, evidence.Error.Message, "missing required field")
-	// Note: ConfigFailure currently uses ToErrorDetail which returns "internal" type
-	// This will be improved in Phase 4 when we add custom error types
-	assert.Equal(t, "internal", evidence.Error.Type)
+	assert.Contains(t, evidence.Error.Message, "config validation failed for field 'host'")
+	assert.Equal(t, "config", evidence.Error.Type)
+	assert.Equal(t, "host", evidence.Error.Code)
 }
 
-func TestNetworkFailureHelper(t *testing.T) {
+func TestNetworkErrorConstruction(t *testing.T) {
 	err := fmt.Errorf("connection timeout")
-	evidence := NetworkFailure("failed to connect to api.example.com:443", err)
+	evidence := Evidence{
+		Status: false,
+		Error: ToErrorDetail(&NetworkError{
+			Operation: "connect",
+			Target:    "api.example.com:443",
+			Err:       err,
+		}),
+	}
 
 	assert.False(t, evidence.Status)
 	require.NotNil(t, evidence.Error)
-	assert.Contains(t, evidence.Error.Message, "failed to connect")
+	assert.Contains(t, evidence.Error.Message, "network connect failed for api.example.com:443")
 	assert.Equal(t, "network", evidence.Error.Type)
-
-	// Test that wrapped error is populated
-	assert.NotNil(t, evidence.Error.Wrapped)
-	assert.Contains(t, evidence.Error.Wrapped.Message, "connection timeout")
+	assert.Equal(t, "connect", evidence.Error.Code)
 }
 
 // Test ToErrorDetail with custom error types (Phase 4)

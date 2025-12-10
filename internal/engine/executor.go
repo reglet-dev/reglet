@@ -3,8 +3,10 @@ package engine
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/expr-lang/expr"
@@ -114,18 +116,22 @@ func (e *ObservationExecutor) Execute(ctx context.Context, obs config.Observatio
 		return result
 	}
 
-	// Check if plugin returned an error
-	if wasmResult.Error != nil {
+	// Now that wasmResult is *ObservationResult from internal/wasm/plugin.go
+	// It already contains wasm.Evidence (with Status, Error, Data) and potentially wasm.PluginError
+
+	// If the plugin returned an error (Go error in observeFn.Call or processing failure)
+	if wasmResult.Error != nil { // This error is a Go error, not from Evidence
 		result.Status = StatusError
-		result.Error = wasmResult.Error
+		result.Error = wasmResult.Error // Use the top-level error from wasmResult
 		result.Duration = time.Since(startTime)
 		return result
 	}
 
 	// Plugin returned evidence
 	if wasmResult.Evidence != nil {
-		// Determine status BEFORE redaction to ensure tests run against raw data
-		// Evaluate expect expressions if provided, otherwise fall back to status field
+		result.Evidence = wasmResult.Evidence // Set the full Evidence from wasmResult
+
+		// Determine status based on top-level Evidence.Status and expect expressions
 		result.Status = determineStatusWithExpect(wasmResult.Evidence, obs.Expect)
 
 		// Redact sensitive data from evidence before returning/storing it
@@ -136,7 +142,11 @@ func (e *ObservationExecutor) Execute(ctx context.Context, obs config.Observatio
 			}
 		}
 
-		result.Evidence = wasmResult.Evidence
+		// If the Evidence itself contains an error, propagate it to ObservationResult.Error
+		if wasmResult.Evidence.Error != nil {
+			result.Error = wasmResult.Evidence.Error
+		}
+
 		result.Duration = time.Since(startTime)
 		return result
 	}
@@ -174,27 +184,34 @@ func (e *ObservationExecutor) LoadPlugin(ctx context.Context, pluginName string)
 }
 
 // determineStatusWithExpect determines the observation status by evaluating expect expressions.
-// If no expect expressions provided, falls back to checking evidence.Data["status"].
+// If no expect expressions provided, falls back to checking evidence.Status.
 func determineStatusWithExpect(evidence *wasm.Evidence, expectations []string) Status {
-	if evidence.Data == nil {
+	// If the evidence itself indicates an error, then the observation errored.
+	if evidence.Error != nil {
 		return StatusError
 	}
 
-	// If no expectations provided, fall back to checking status field
+	// If no expectations provided, fall back to checking top-level Evidence.Status
 	if len(expectations) == 0 {
-		return determineStatusFromField(evidence)
+		return determineStatusFromEvidenceStatus(evidence)
 	}
 
 	// Create environment for expression evaluation
-	// The evidence data is available under "data" namespace
+	// The evidence data is available under "data" namespace, plus top-level fields
 	env := map[string]interface{}{
-		"data": evidence.Data,
+		"data":      evidence.Data,      // The original data map
+		"status":    evidence.Status,    // Top-level status
+		"timestamp": evidence.Timestamp, // Top-level timestamp
+		"error":     evidence.Error,     // Top-level error
 	}
+
+	// Get common expr options including custom functions
+	options := getExprOptions(env)
 
 	// Evaluate all expect expressions
 	// ALL expressions must evaluate to true for the observation to pass
 	for _, expectExpr := range expectations {
-		program, err := expr.Compile(expectExpr, expr.Env(env), expr.AsBool())
+		program, err := expr.Compile(expectExpr, options...)
 		if err != nil {
 			// Expression compilation error - treat as error
 			return StatusError
@@ -219,32 +236,51 @@ func determineStatusWithExpect(evidence *wasm.Evidence, expectations []string) S
 		}
 	}
 
-	// All expressions evaluated to true
+	// All expressions evaluated to true and no top-level Evidence.Error
 	return StatusPass
 }
 
-// determineStatusFromField checks the evidence.Data["status"] field.
+// getExprOptions returns a list of expr options including custom helper functions.
+func getExprOptions(env map[string]interface{}) []expr.Option {
+	return []expr.Option{
+		expr.Env(env),
+		expr.AsBool(),
+		expr.Function("strContains", func(params ...interface{}) (interface{}, error) {
+			if len(params) != 2 {
+				return nil, fmt.Errorf("strContains expects 2 arguments")
+			}
+			s, ok := params[0].(string)
+			if !ok {
+				return nil, fmt.Errorf("strContains: first argument must be a string")
+			}
+			substr, ok := params[1].(string)
+			if !ok {
+				return nil, fmt.Errorf("strContains: second argument must be a string")
+			}
+			return strings.Contains(s, substr), nil
+		}),
+		expr.Function("isIPv4", func(params ...interface{}) (interface{}, error) {
+			if len(params) != 1 {
+				return nil, fmt.Errorf("isIPv4 expects 1 argument")
+			}
+			ipStr, ok := params[0].(string)
+			if !ok {
+				return nil, fmt.Errorf("isIPv4: argument must be a string")
+			}
+			ip := net.ParseIP(ipStr)
+			return ip != nil && ip.To4() != nil, nil
+		}),
+	}
+}
+
+// determineStatusFromEvidenceStatus checks the top-level Evidence.Status field.
 // Used as fallback when no expect expressions are provided.
-func determineStatusFromField(evidence *wasm.Evidence) Status {
-	if evidence.Data == nil {
+func determineStatusFromEvidenceStatus(evidence *wasm.Evidence) Status {
+	// If Evidence.Error is present, it implies an error status.
+	if evidence.Error != nil {
 		return StatusError
 	}
-
-	// Look for "status" field in evidence data
-	statusValue, ok := evidence.Data["status"]
-	if !ok {
-		// No status field - treat as error
-		return StatusError
-	}
-
-	// Check if status is boolean true/false
-	statusBool, ok := statusValue.(bool)
-	if !ok {
-		// Status field is not a boolean - treat as error
-		return StatusError
-	}
-
-	if statusBool {
+	if evidence.Status {
 		return StatusPass
 	}
 	return StatusFail

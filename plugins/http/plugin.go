@@ -11,18 +11,12 @@ import (
 	"time"
 
 	regletsdk "github.com/whiskeyjimbo/reglet/sdk"
-	_ "github.com/whiskeyjimbo/reglet/sdk/net" // Import to enable WASM HTTP transport
+	regletnet "github.com/whiskeyjimbo/reglet/sdk/net"
 )
 
 // httpPlugin implements the sdk.Plugin interface.
 type httpPlugin struct {
-	// client interface for testing?
-	// The SDK intercepts http.DefaultTransport.
-	// For testing, we can just use http.Client with a custom Transport (mock).
-	// But the plugin code just uses http.NewRequest or http.Get.
-	// We can inject a client if we want, or just use http.DefaultClient.
-	// Using a field allows injection.
-	client *http.Client
+	// No fields needed - uses SDK's HTTP helpers with WasmTransport
 }
 
 // Describe returns plugin metadata.
@@ -68,7 +62,10 @@ func (p *httpPlugin) Check(ctx context.Context, config regletsdk.Config) (reglet
 
 	var cfg HTTPConfig
 	if err := regletsdk.ValidateConfig(config, &cfg); err != nil {
-		return regletsdk.ConfigError(err), nil
+		return regletsdk.Evidence{
+			Status: false,
+			Error:  regletsdk.ToErrorDetail(&regletsdk.ConfigError{Err: err}),
+		}, nil
 	}
 
 	// Prepare Request
@@ -79,29 +76,40 @@ func (p *httpPlugin) Check(ctx context.Context, config regletsdk.Config) (reglet
 
 	req, err := http.NewRequestWithContext(ctx, cfg.Method, cfg.URL, bodyReader)
 	if err != nil {
-		return regletsdk.ConfigError(fmt.Errorf("failed to create request: %w", err)), nil
-	}
+		        return regletsdk.Evidence{Status: false, Error: regletsdk.ToErrorDetail(&regletsdk.ConfigError{Err: fmt.Errorf("failed to create request: %w", err)})}, nil	}
 
-	// Use injected client or default
-	client := p.client
-	if client == nil {
-		client = http.DefaultClient
-		client.Timeout = 10 * time.Second // Default timeout
-	}
-
-	// Execute Request
+	// Execute Request using SDK's HTTP helper (which uses WasmTransport)
+	// This is more efficient than creating a new client each time
 	start := time.Now()
-	resp, err := client.Do(req)
+	resp, err := regletnet.Do(req)
 	duration := time.Since(start).Milliseconds()
 	if err != nil {
-		return regletsdk.NetworkError(fmt.Sprintf("HTTP request failed: %v", err), err), nil
+		return regletsdk.Evidence{
+			Status: false,
+			Error: regletsdk.ToErrorDetail(
+				&regletsdk.NetworkError{
+					Operation: "http_request",
+					Target:    cfg.URL,
+					Err:       err,
+				},
+			),
+		}, nil
 	}
 	defer resp.Body.Close()
 
 	// Read Body
 	respBodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return regletsdk.NetworkError(fmt.Sprintf("failed to read response body: %v", err), err), nil
+		return regletsdk.Evidence{
+			Status: false,
+			Error: regletsdk.ToErrorDetail(
+				&regletsdk.NetworkError{
+					Operation: "http_read_body",
+					Target: cfg.URL,
+					Err: err,
+				},
+			),
+		}, nil
 	}
 
 	// Calculate body hash for verification

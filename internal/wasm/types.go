@@ -29,6 +29,8 @@ type Config struct {
 // Evidence represents observation results
 // Maps to the WIT evidence record
 type Evidence struct {
+	Status    bool
+	Error     *PluginError // Use PluginError defined in this package
 	Timestamp time.Time
 	Data      map[string]interface{}
 	Raw       *string // Optional raw data

@@ -74,9 +74,9 @@ func TestPlugin_Observe_Concurrent(t *testing.T) {
 		assert.NotNil(t, result, "Result %d should not be nil", i)
 		assert.NotNil(t, result.Evidence, "Evidence for result %d should not be nil", i)
 
-		status, ok := result.Evidence.Data["status"].(bool)
-		require.True(t, ok, "Result %d should have status field", i)
-		assert.True(t, status, "Result %d status should be true", i)
+		// Verify Evidence status
+		assert.True(t, result.Evidence.Status, "Result %d Evidence.Status should be true", i)
+		require.Nil(t, result.Evidence.Error, "Result %d Evidence.Error should be nil", i)
 
 		path, ok := result.Evidence.Data["path"].(string)
 		require.True(t, ok, "Result %d should have path field", i)

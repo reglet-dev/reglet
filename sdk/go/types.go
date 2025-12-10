@@ -4,6 +4,7 @@ package sdk
 import (
 	"errors"
 	"fmt"
+	"time" // Added for Timestamp
 
 	"github.com/whiskeyjimbo/reglet/wireformat"
 )
@@ -12,10 +13,14 @@ import (
 type Config map[string]interface{}
 
 // Evidence represents the structured data returned by a plugin observation.
+// This struct directly mirrors the WIT 'evidence' record for direct mapping
+// across the WebAssembly boundary.
 type Evidence struct {
-	Status bool                   `json:"status"`
-	Data   map[string]interface{} `json:"data,omitempty"`
-	Error  *ErrorDetail           `json:"error,omitempty"` // Structured error details
+	Status    bool                   // Corresponds to WIT 'status'
+	Error     *ErrorDetail           // Corresponds to WIT 'error'
+	Timestamp time.Time              // Corresponds to WIT 'timestamp'
+	Data      map[string]interface{} // Corresponds to WIT 'data'
+	Raw       *string                // Corresponds to WIT 'raw'
 }
 
 // ErrorDetail is re-exported from wireformat for backward compatibility.
@@ -157,58 +162,15 @@ func ToErrorDetail(err error) *ErrorDetail {
 
 // Success creates a successful Evidence with data.
 func Success(data map[string]interface{}) Evidence {
-	return Evidence{Status: true, Data: data}
+	return Evidence{Status: true, Data: data, Timestamp: time.Now()}
 }
 
 // Failure creates a failed Evidence with an error.
 func Failure(errType, message string) Evidence {
 	return Evidence{
-		Status: false,
-		Error:  &ErrorDetail{Message: message, Type: errType},
-	}
-}
-
-// ConfigFailure creates a config validation error Evidence.
-//
-// Deprecated: Use &ConfigError{Field: "...", Err: err} with proper error handling instead.
-// This function will be removed in a future version.
-//
-// Example replacement:
-//
-//	return sdk.Evidence{
-//	    Status: false,
-//	    Error:  sdk.ToErrorDetail(&sdk.ConfigError{Field: "hostname", Err: err}),
-//	}, nil
-func ConfigFailure(err error) Evidence {
-	return Evidence{
-		Status: false,
-		Error:  ToErrorDetail(err),
-	}
-}
-
-// NetworkFailure creates a network error Evidence with wrapped error.
-//
-// Deprecated: Use &NetworkError{Operation: "...", Target: "...", Err: err} instead.
-// This function will be removed in a future version.
-//
-// Example replacement:
-//
-//	return sdk.Evidence{
-//	    Status: false,
-//	    Error:  sdk.ToErrorDetail(&sdk.NetworkError{
-//	        Operation: "http_request",
-//	        Target:    "api.example.com:443",
-//	        Err:       err,
-//	    }),
-//	}, nil
-func NetworkFailure(message string, err error) Evidence {
-	return Evidence{
-		Status: false,
-		Error: &ErrorDetail{
-			Message: message,
-			Type:    "network",
-			Wrapped: ToErrorDetail(err),
-		},
+		Status:    false,
+		Error:     &ErrorDetail{Message: message, Type: errType},
+		Timestamp: time.Now(),
 	}
 }
 

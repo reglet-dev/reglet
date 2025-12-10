@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"runtime/debug" // For stack traces in panic recovery
+	"time"          // For time.Now()
 
 	"github.com/whiskeyjimbo/reglet/sdk/internal/abi"
 	sdkcontext "github.com/whiskeyjimbo/reglet/sdk/internal/context"
@@ -109,9 +110,14 @@ func _observe(configPtr uint32, configLen uint32) uint64 {
 
 		evidence, err := userPlugin.Check(ctx, config)
 		if err != nil {
-			// If user's check returns an error, embed it in Evidence
-			evidence.Status = false
-			evidence.Error = ToErrorDetail(err)
+			// If user's check returns an error, create a Failure Evidence from it.
+			// This ensures all returned values are of type Evidence.
+			evidence = Failure("plugin_error", err.Error())
+		}
+
+		// Ensure Timestamp is always set, even if plugin didn't explicitly set it.
+		if evidence.Timestamp.IsZero() {
+			evidence.Timestamp = time.Now()
 		}
 		return evidence, nil
 	})
@@ -133,14 +139,14 @@ func handleExportedCall(f func() (interface{}, error)) (packedResult uint64) {
 				Stack:   debug.Stack(), // Capture stack trace for panics
 			}
 			slog.Error("sdk: plugin panic recovered", "error", errDetail.Message)
-			packedResult = packEvidenceWithError(Evidence{Status: false, Error: errDetail})
+			packedResult = packEvidenceWithError(Evidence{Status: false, Error: errDetail, Timestamp: time.Now()})
 		}
 	}()
 
 	result, err := f()
 	if err != nil {
 		slog.Error("sdk: plugin function returned error", "error", err.Error())
-		packedResult = packEvidenceWithError(Evidence{Status: false, Error: ToErrorDetail(err)})
+		packedResult = packEvidenceWithError(Evidence{Status: false, Error: ToErrorDetail(err), Timestamp: time.Now()})
 		return
 	}
 
@@ -153,7 +159,7 @@ func handleExportedCall(f func() (interface{}, error)) (packedResult uint64) {
 		dataToMarshal, marshalErr = json.Marshal(v)
 		if marshalErr != nil {
 			slog.Error("sdk: failed to marshal result", "error", marshalErr.Error())
-			packedResult = packEvidenceWithError(Evidence{Status: false, Error: ToErrorDetail(marshalErr)})
+			packedResult = packEvidenceWithError(Evidence{Status: false, Error: ToErrorDetail(marshalErr), Timestamp: time.Now()})
 			return
 		}
 	}
@@ -170,7 +176,7 @@ func packEvidenceWithError(ev Evidence) uint64 {
 		// Fallback if even marshaling the error fails
 		slog.Error("sdk: critical - failed to marshal error evidence", "original_error", ev.Error.Message, "marshal_error", err.Error())
 		fallbackErr := &ErrorDetail{Message: "sdk: critical error during error marshalling", Type: "internal"}
-		data, _ = json.Marshal(Evidence{Status: false, Error: fallbackErr}) // Try to marshal a generic error
+		data, _ = json.Marshal(Evidence{Status: false, Error: fallbackErr, Timestamp: time.Now()}) // Try to marshal a generic error
 	}
 	return abi.PtrFromBytes(data)
 }

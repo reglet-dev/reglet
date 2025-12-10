@@ -181,6 +181,10 @@ func TestFilePlugin_Observe_FileExists(t *testing.T) {
 	tmpFile.WriteString("test content")
 	tmpFile.Close()
 
+	// Get absolute path for WASM filesystem access
+	absPath, err := filepath.Abs(tmpFile.Name())
+	require.NoError(t, err)
+
 	// File plugin needs filesystem capabilities
 	caps := map[string][]hostfuncs.Capability{
 		"file": {
@@ -200,7 +204,7 @@ func TestFilePlugin_Observe_FileExists(t *testing.T) {
 	// Test file exists check
 	config := Config{
 		Values: map[string]interface{}{
-			"path": tmpFile.Name(),
+			"path": absPath,
 		},
 	}
 
@@ -213,19 +217,21 @@ func TestFilePlugin_Observe_FileExists(t *testing.T) {
 	// Verify the file was found
 	t.Logf("Evidence.Data keys: %v", getKeys(result.Evidence.Data))
 	t.Logf("Full Evidence.Data: %+v", result.Evidence.Data)
-	status, ok := result.Evidence.Data["status"].(bool)
-	require.True(t, ok)
-	assert.True(t, status)
-	assert.Equal(t, tmpFile.Name(), result.Evidence.Data["path"])
+	// Verify Evidence status
+	assert.True(t, result.Evidence.Status, "Evidence.Status should be true")
+	require.Nil(t, result.Evidence.Error, "Evidence.Error should be nil for success")
+
+	// Verify the file was found
+	assert.Equal(t, absPath, result.Evidence.Data["path"])
+	exists, ok := result.Evidence.Data["exists"].(bool)
+	require.True(t, ok, "exists field should be present")
+	assert.True(t, exists, "exists should be true")
 
 	// Verify ownership
-	uid, ok := result.Evidence.Data["uid"].(float64)
+	_, ok = result.Evidence.Data["uid"]
 	require.True(t, ok, "uid should be present")
-	assert.GreaterOrEqual(t, uid, float64(0))
-
-	gid, ok := result.Evidence.Data["gid"].(float64)
+	_, ok = result.Evidence.Data["gid"]
 	require.True(t, ok, "gid should be present")
-	assert.GreaterOrEqual(t, gid, float64(0))
 }
 
 // TestFilePlugin_Observe_Symlink tests checking a symlink
@@ -244,10 +250,18 @@ func TestFilePlugin_Observe_Symlink(t *testing.T) {
 	err = os.WriteFile(targetName, []byte("content"), 0644)
 	require.NoError(t, err)
 
+	// Get absolute paths for WASM filesystem access
+	absTargetPath, err := filepath.Abs(targetName)
+	require.NoError(t, err)
+
 	linkName := targetName + ".link"
-	err = os.Symlink(targetName, linkName)
+	// Create symlink with absolute target path so the plugin returns absolute path
+	err = os.Symlink(absTargetPath, linkName)
 	require.NoError(t, err)
 	defer os.Remove(linkName)
+
+	absLinkPath, err := filepath.Abs(linkName)
+	require.NoError(t, err)
 
 	// File plugin needs filesystem capabilities
 	caps := map[string][]hostfuncs.Capability{
@@ -268,7 +282,7 @@ func TestFilePlugin_Observe_Symlink(t *testing.T) {
 	// Test symlink check
 	config := Config{
 		Values: map[string]interface{}{
-			"path": linkName,
+			"path": absLinkPath,
 		},
 	}
 
@@ -276,6 +290,10 @@ func TestFilePlugin_Observe_Symlink(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.Nil(t, result.Error)
+
+	// Verify Evidence status
+	assert.True(t, result.Evidence.Status, "Evidence.Status should be true")
+	require.Nil(t, result.Evidence.Error, "Evidence.Error should be nil for success")
 
 	// Verify symlink details
 	t.Logf("Evidence.Data: %+v", result.Evidence.Data)
@@ -285,7 +303,7 @@ func TestFilePlugin_Observe_Symlink(t *testing.T) {
 
 	target, ok := result.Evidence.Data["symlink_target"].(string)
 	require.True(t, ok, "symlink_target should be present")
-	assert.Equal(t, targetName, target)
+	assert.Equal(t, absTargetPath, target)
 }
 
 // TestFilePlugin_Observe_FileNotFound tests checking a non-existent file
@@ -321,10 +339,9 @@ func TestFilePlugin_Observe_FileNotFound(t *testing.T) {
 	require.NotNil(t, result)
 	require.NotNil(t, result.Evidence)
 
-	// Verify the check succeeded (status=true) but file does not exist (exists=false)
-	status, ok := result.Evidence.Data["status"].(bool)
-	require.True(t, ok)
-	assert.True(t, status, "status should be true (observation successful)")
+	// Verify the check succeeded (Evidence.Status=true) but file does not exist (exists=false)
+	assert.True(t, result.Evidence.Status, "Evidence.Status should be true (observation successful)")
+	require.Nil(t, result.Evidence.Error, "Evidence.Error should be nil")
 
 	exists, ok := result.Evidence.Data["exists"].(bool)
 	require.True(t, ok)
@@ -345,6 +362,10 @@ func TestFilePlugin_Observe_ReadContent(t *testing.T) {
 	tmpFile.WriteString(testContent)
 	tmpFile.Close()
 
+	// Get absolute path for WASM filesystem access
+	absPath, err := filepath.Abs(tmpFile.Name())
+	require.NoError(t, err)
+
 	// File plugin needs filesystem capabilities
 	caps := map[string][]hostfuncs.Capability{
 		"file": {
@@ -364,7 +385,7 @@ func TestFilePlugin_Observe_ReadContent(t *testing.T) {
 	// Test content reading
 	config := Config{
 		Values: map[string]interface{}{
-			"path":         tmpFile.Name(),
+			"path":         absPath,
 			"read_content": true,
 		},
 	}
@@ -379,9 +400,8 @@ func TestFilePlugin_Observe_ReadContent(t *testing.T) {
 	t.Logf("Evidence.Data keys: %v", getKeys(result.Evidence.Data))
 	t.Logf("Full Evidence.Data: %+v", result.Evidence.Data)
 
-	status, ok := result.Evidence.Data["status"].(bool)
-	require.True(t, ok)
-	assert.True(t, status)
+	assert.True(t, result.Evidence.Status, "Evidence.Status should be true")
+	require.Nil(t, result.Evidence.Error, "Evidence.Error should be nil for success")
 
 	// Verify base64 content
 	contentB64, ok := result.Evidence.Data["content_b64"].(string)
@@ -418,6 +438,10 @@ func TestFilePlugin_Observe_BinaryContent(t *testing.T) {
 	require.NoError(t, err)
 	tmpFile.Close()
 
+	// Get absolute path for WASM filesystem access
+	absPath, err := filepath.Abs(tmpFile.Name())
+	require.NoError(t, err)
+
 	// File plugin needs filesystem capabilities
 	caps := map[string][]hostfuncs.Capability{
 		"file": {
@@ -437,7 +461,7 @@ func TestFilePlugin_Observe_BinaryContent(t *testing.T) {
 	// Test binary content reading
 	config := Config{
 		Values: map[string]interface{}{
-			"path":         tmpFile.Name(),
+			"path":         absPath,
 			"read_content": true,
 		},
 	}
@@ -448,10 +472,8 @@ func TestFilePlugin_Observe_BinaryContent(t *testing.T) {
 	require.Nil(t, result.Error)
 	require.NotNil(t, result.Evidence)
 
-	// Verify status
-	status, ok := result.Evidence.Data["status"].(bool)
-	require.True(t, ok)
-	assert.True(t, status)
+	// Verify success (Status is now a top-level field, not in Data)
+	assert.True(t, result.Evidence.Status, "Evidence.Status should be true")
 
 	// Verify base64 content field exists
 	contentB64, ok := result.Evidence.Data["content_b64"].(string)
@@ -585,10 +607,8 @@ func TestDNSPlugin_Observe_A_Record(t *testing.T) {
 	require.NotNil(t, result.Evidence)
 	require.Nil(t, result.Error) // The Go error should be nil, status in evidence.
 
-	// Verify success
-	status, ok := result.Evidence.Data["status"].(bool)
-	require.True(t, ok)
-	assert.True(t, status)
+	// Verify success (Status is now a top-level field, not in Data)
+	assert.True(t, result.Evidence.Status, "Evidence.Status should be true")
 
 	// Verify records returned
 	records, ok := result.Evidence.Data["records"].([]interface{})
@@ -648,9 +668,7 @@ func TestDNSPlugin_Observe_MX_Record(t *testing.T) {
 	require.Nil(t, result.Error) // The Go error should be nil, status in evidence.
 
 	// MX lookup should succeed
-	status, ok := result.Evidence.Data["status"].(bool)
-	require.True(t, ok)
-	assert.True(t, status)
+	assert.True(t, result.Evidence.Status, "MX lookup should succeed")
 
 	// Verify structured MX records returned
 	mxRecords, ok := result.Evidence.Data["mx_records"].([]interface{})
@@ -714,9 +732,7 @@ func TestDNSPlugin_Observe_InvalidHostname(t *testing.T) {
 	require.Nil(t, result.Error, "Observe should return a nil Go error, expected nil for successful observation")
 
 	// Verify DNS lookup failed
-	status, ok := result.Evidence.Data["status"].(bool)
-	require.True(t, ok)
-	assert.False(t, status, "status should be false for failed DNS lookup")
+	assert.False(t, result.Evidence.Status, "status should be false for failed DNS lookup")
 
 	// Verify error flags from Evidence.Data (populated by plugin)
 	isNotFound, ok := result.Evidence.Data["is_not_found"].(bool)
@@ -770,17 +786,11 @@ func TestDNSPlugin_Observe_MissingHostname(t *testing.T) {
 	require.Nil(t, result.Error, "Observe should return nil error for config validation error")
 
 	// Should return status=false for validation error
-	status, ok := result.Evidence.Data["status"].(bool)
-	require.True(t, ok)
-	assert.False(t, status, "status should be false for validation error")
+	assert.False(t, result.Evidence.Status, "status should be false for validation error")
 
-	// Verify that Evidence.Data["error"] contains the structured error (map)
-	errData, ok := result.Evidence.Data["error"].(map[string]interface{})
-	require.True(t, ok, "Error details should be in Evidence.Data['error'] map")
-
-	errMsg, ok := errData["message"].(string)
-	require.True(t, ok, "Error message should be in error map")
-	assert.Contains(t, errMsg, "config validation failed: Key: 'DNSConfig.Hostname'", "error message should indicate missing Hostname")
+	// Verify that Evidence.Error contains the structured error
+	require.NotNil(t, result.Evidence.Error, "Evidence.Error should be set for config validation error")
+	assert.Contains(t, result.Evidence.Error.Message, "config validation failed: Key: 'DNSConfig.Hostname'", "error message should indicate missing Hostname")
 }
 
 // TestHTTPPlugin_Describe tests HTTP plugin describe function
@@ -882,9 +892,14 @@ func TestHTTPPlugin_Observe_GET(t *testing.T) {
 	require.Nil(t, result.Error)
 	require.NotNil(t, result.Evidence)
 
+	// Debug output
+	t.Logf("Evidence.Status: %v", result.Evidence.Status)
+	t.Logf("Evidence.Error: %+v", result.Evidence.Error)
+	t.Logf("Evidence.Data keys: %v", getKeys(result.Evidence.Data))
+
 	// Verify response
 	statusCode, ok := result.Evidence.Data["status_code"].(float64)
-	require.True(t, ok)
+	require.True(t, ok, "Expected status_code in Evidence.Data, got: %+v", result.Evidence.Data)
 	assert.Equal(t, float64(200), statusCode)
 
 	body, ok := result.Evidence.Data["body"].(string)

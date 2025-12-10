@@ -47,7 +47,10 @@ func (p *filePlugin) Schema(ctx context.Context) ([]byte, error) {
 func (p *filePlugin) Check(ctx context.Context, config regletsdk.Config) (regletsdk.Evidence, error) {
 	var cfg FileConfig
 	if err := regletsdk.ValidateConfig(config, &cfg); err != nil {
-		return regletsdk.ConfigError(err), nil
+		return regletsdk.Evidence{
+			Status: false,
+			Error:  regletsdk.ToErrorDetail(&regletsdk.ConfigError{Err: err}),
+		}, nil
 	}
 
 	result := map[string]interface{}{

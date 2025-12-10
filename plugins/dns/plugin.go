@@ -1,3 +1,5 @@
+//go:build wasip1
+
 package main
 
 import (
@@ -51,11 +53,15 @@ func (p *dnsPlugin) Check(ctx context.Context, config regletsdk.Config) (reglets
 
 	var cfg DNSConfig
 	if err := regletsdk.ValidateConfig(config, &cfg); err != nil {
-		return regletsdk.ConfigError(err), nil
+		return regletsdk.Evidence{
+			Status: false,
+			Error:  regletsdk.ToErrorDetail(&regletsdk.ConfigError{Err: err}),
+		}, nil
 	}
 
 	start := time.Now()
-	dnsResponseWire, sdkErr := regletnet.LookupRaw(ctx, cfg.Hostname, cfg.RecordType, cfg.Nameserver) // sdkErr is *wireformat.ErrorDetail or other Go error type
+	resolver := &regletnet.WasmResolver{Nameserver: cfg.Nameserver}
+	dnsResponseWire, sdkErr := resolver.Lookup(ctx, cfg.Hostname, cfg.RecordType) // sdkErr is *wireformat.ErrorDetail or other Go error type
 	queryTime := time.Since(start).Milliseconds()
 
 	// Prepare data for evidence.
@@ -73,9 +79,19 @@ func (p *dnsPlugin) Check(ctx context.Context, config regletsdk.Config) (reglets
 		// sdkErr is *wireformat.ErrorDetail (due to SDK's LookupRaw function mapping it).
 		if errors.As(sdkErr, &finalErrorDetail) {
 			if finalErrorDetail.Type == "config" {
-				evidence = regletsdk.ConfigError(finalErrorDetail)
+				evidence = regletsdk.Evidence{
+					Status: false,
+					Error:  regletsdk.ToErrorDetail(&regletsdk.ConfigError{Err: finalErrorDetail}),
+				}
 			} else {
-				evidence = regletsdk.NetworkError(finalErrorDetail.Message, finalErrorDetail)
+				evidence = regletsdk.Evidence{
+					Status: false,
+					Error: regletsdk.ToErrorDetail(&regletsdk.NetworkError{
+						Operation: "dns_lookup",
+						Target:    cfg.Hostname,
+						Err:       finalErrorDetail,
+					}),
+				}
 			}
 		} else {
 			// Generic Go error from SDK, not specific wireformat error.
@@ -89,9 +105,19 @@ func (p *dnsPlugin) Check(ctx context.Context, config regletsdk.Config) (reglets
 		// Host returned a structured error in the wire response (e.g. DNS NXDOMAIN, timeout)
 		finalErrorDetail = dnsResponseWire.Error
 		if finalErrorDetail.Type == "config" {
-			evidence = regletsdk.ConfigError(finalErrorDetail)
+			evidence = regletsdk.Evidence{
+				Status: false,
+				Error:  regletsdk.ToErrorDetail(&regletsdk.ConfigError{Err: finalErrorDetail}),
+			}
 		} else {
-			evidence = regletsdk.NetworkError(finalErrorDetail.Message, finalErrorDetail)
+			evidence = regletsdk.Evidence{
+				Status: false,
+				Error: regletsdk.ToErrorDetail(&regletsdk.NetworkError{
+					Operation: "dns_lookup",
+					Target:    cfg.Hostname,
+					Err:       finalErrorDetail,
+				}),
+			}
 		}
 	} else {
 		// Success path: host returned no error, populate records

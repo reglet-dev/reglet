@@ -15,6 +15,8 @@ interface types {
     /// Evidence returned by a plugin observation
     /// Contains the observation results and collected data
     record evidence {
+        status: bool,
+        error: option<error>,
         timestamp: string,                          // ISO 8601 timestamp
         data: list<tuple<string, value>>,          // Structured key-value evidence
         raw: option<string>,                       // Optional raw data (logs, file contents, etc.)

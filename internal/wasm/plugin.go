@@ -276,7 +276,7 @@ func (p *Plugin) Observe(ctx context.Context, cfg Config) (*ObservationResult, e
 		return nil, fmt.Errorf("observe() returned no results")
 	}
 
-	// FIX: Unpack ptr and length from uint64
+	// Unpack ptr and length from uint64
 	packed := results[0]
 	resultPtr := uint32(packed >> 32)
 	resultSize := uint32(packed & 0xFFFFFFFF)
@@ -291,71 +291,21 @@ func (p *Plugin) Observe(ctx context.Context, cfg Config) (*ObservationResult, e
 		return nil, fmt.Errorf("failed to read observe() result: %w", err)
 	}
 
-	// Parse JSON result
-	var rawResult map[string]interface{}
-	if err := json.Unmarshal(resultData, &rawResult); err != nil {
-		return nil, fmt.Errorf("failed to parse observe() result: %w", err)
+	// Parse JSON result directly into internal/wasm/types.Evidence
+	var hostEvidence Evidence
+	if err := json.Unmarshal(resultData, &hostEvidence); err != nil {
+		return nil, fmt.Errorf("failed to parse observe() result into internal/wasm/types.Evidence: %w", err)
 	}
 
-	// Check if result contains an error WITHOUT a status field
-	// If there's a status field, it's a valid observation result (even if it includes an error message)
-	// If there's ONLY an error field, it's a plugin execution error
-	_, hasStatus := rawResult["status"]
-	errMsg, hasError := rawResult["error"].(string)
-
-	if hasError && !hasStatus {
-		// This is a plugin execution error (e.g., invalid config, marshaling failure)
-		return &ObservationResult{
-			Error: &PluginError{
-				Code:    "plugin_error",
-				Message: errMsg,
-			},
-		}, nil
-	}
-
-	// Normalize SDK evidence format:
-	// SDK returns { "status": bool, "data": { ... }, "error": { ... } }
-	// Host expects flattened structure in Evidence.Data
-	if dataMap, ok := rawResult["data"].(map[string]interface{}); ok {
-		if status, ok := rawResult["status"].(bool); ok {
-			// It looks like SDK format. Flatten it.
-			// Use the inner data map as base
-			finalData := dataMap
-			// Inject outer status ONLY if data doesn't already have a status field
-			// This allows plugins to override the evidence status (e.g., command plugin sets status based on exit code)
-			if _, hasDataStatus := finalData["status"]; !hasDataStatus {
-				finalData["status"] = status
-			}
-			// Inject error (convert to string if possible for compatibility)
-			if errVal, ok := rawResult["error"]; ok && errVal != nil {
-				if errMap, ok := errVal.(map[string]interface{}); ok {
-					if msg, ok := errMap["message"].(string); ok {
-						finalData["error"] = msg
-						finalData["error_message"] = msg
-					} else {
-						finalData["error"] = fmt.Sprintf("%v", errMap)
-					}
-					// Extract structured error flags
-					if isTimeout, ok := errMap["is_timeout"].(bool); ok && isTimeout {
-						finalData["is_timeout"] = true
-					}
-					if isNotFound, ok := errMap["is_not_found"].(bool); ok && isNotFound {
-						finalData["is_not_found"] = true
-					}
-				} else {
-					finalData["error"] = errVal
-				}
-			}
-			return &ObservationResult{Evidence: &Evidence{Data: finalData}}, nil
-		}
-	}
-
-	// Parse as evidence (includes results with status=false and error messages)
+	// Construct and return ObservationResult
+	// Note: Evidence.Error represents application-level errors (validation, lookup failures, etc.)
+	// ObservationResult.Error represents WASM execution errors (panics, plugin failures)
+	// Don't propagate Evidence.Error to ObservationResult.Error - they serve different purposes
 	return &ObservationResult{
-		Evidence: &Evidence{
-			Data: rawResult,
-		},
-	}, nil
+		Evidence: &hostEvidence,
+		Error:    nil, // Plugin executed successfully, errors are in Evidence
+	},
+	nil
 }
 
 // Close closes the plugin and frees resources
@@ -425,7 +375,7 @@ func (p *Plugin) writeToMemory(ctx context.Context, instance api.Module, data []
 	// if !ok {
 	// 	return 0, fmt.Errorf("failed to read back written data at offset %d", ptr)
 	// }
-	// fmt.Printf("DEBUG writeToMemory: Wrote %d bytes to ptr %d. Readback hex: % x\n", len(data), ptr, readBack)
+	// fmt.Printf("DEBUG writeToMemory: Wrote %d bytes to ptr %d. Readback hex: %% x\n", len(data), ptr, readBack)
 
 	return ptr, nil
 }

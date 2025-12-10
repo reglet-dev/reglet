@@ -59,7 +59,7 @@ controls:
             env:
               - "MY_API_KEY=top-secret-value"
           expect:
-            - exit_code == 0
+            - data.exit_code == 0
 `
 	err = os.WriteFile(profilePath, []byte(profileContent), 0600)
 	require.NoError(t, err)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	regletsdk "github.com/whiskeyjimbo/reglet/sdk"
 	"github.com/whiskeyjimbo/reglet/sdk/exec"
@@ -46,15 +47,28 @@ func (p *commandPlugin) Schema(ctx context.Context) ([]byte, error) {
 func (p *commandPlugin) Check(ctx context.Context, config regletsdk.Config) (regletsdk.Evidence, error) {
 	var cfg CommandConfig
 	if err := regletsdk.ValidateConfig(config, &cfg); err != nil {
-		return regletsdk.ConfigError(err), nil
+		return regletsdk.Evidence{
+			Status: false,
+			Error:  regletsdk.ToErrorDetail(&regletsdk.ConfigError{Err: err}),
+		}, nil
 	}
 
 	// Validate mutual exclusivity
 	if cfg.Run == "" && cfg.Command == "" {
-		return regletsdk.ConfigError(fmt.Errorf("either 'run' or 'command' must be specified")), nil
+		return regletsdk.Evidence{
+			Status: false,
+			Error: regletsdk.ToErrorDetail(&regletsdk.ConfigError{
+				Err: fmt.Errorf("either 'run' or 'command' must be specified"),
+			}),
+		}, nil
 	}
 	if cfg.Run != "" && cfg.Command != "" {
-		return regletsdk.ConfigError(fmt.Errorf("cannot specify both 'run' and 'command' - choose one")), nil
+		return regletsdk.Evidence{
+			Status: false,
+			Error: regletsdk.ToErrorDetail(&regletsdk.ConfigError{
+				Err: fmt.Errorf("cannot specify both 'run' and 'command' - choose one"),
+			}),
+		}, nil
 	}
 
 	var cmd string
@@ -108,7 +122,6 @@ func (p *commandPlugin) Check(ctx context.Context, config regletsdk.Config) (reg
 
 		// Execution results
 		"exit_code":   resp.ExitCode,
-		"status":      statusPass, // Status determines pass/fail
 		"duration_ms": resp.DurationMs,
 		"is_timeout":  resp.IsTimeout,
 
@@ -128,5 +141,10 @@ func (p *commandPlugin) Check(ctx context.Context, config regletsdk.Config) (reg
 		result["command_args"] = cfg.Args
 	}
 
-	return regletsdk.Success(result), nil
+	// Return Evidence with Status based on exit code
+	return regletsdk.Evidence{
+		Status:    statusPass,
+		Data:      result,
+		Timestamp: time.Now(),
+	}, nil
 }

@@ -1,3 +1,5 @@
+//go:build wasip1
+
 package main
 
 import (
@@ -52,8 +54,17 @@ func (p *tcpPlugin) Check(ctx context.Context, config regletsdk.Config) (reglets
 
 	var cfg TCPConfig
 	if err := regletsdk.ValidateConfig(config, &cfg); err != nil {
-		return regletsdk.ConfigError(err), nil
+		return regletsdk.Evidence{
+			Status: false,
+			Error: regletsdk.ToErrorDetail(
+				&regletsdk.ConfigError{
+					Err: err,
+				},
+			),
+		}, nil
 	}
+
+	address := fmt.Sprintf("%s:%s", cfg.Host, cfg.Port) // Add this line
 
 	if p.DialTCP == nil {
 		return regletsdk.Failure("internal", "DialTCP not initialized"), nil
@@ -61,7 +72,16 @@ func (p *tcpPlugin) Check(ctx context.Context, config regletsdk.Config) (reglets
 
 	result, err := p.DialTCP(ctx, cfg.Host, cfg.Port, cfg.TimeoutMs, cfg.TLS)
 	if err != nil {
-		return regletsdk.NetworkError(fmt.Sprintf("TCP connection failed: %v", err), err), nil
+		return regletsdk.Evidence{
+			Status: false,
+			Error: regletsdk.ToErrorDetail(
+				&regletsdk.NetworkError{
+					Operation: "tcp_connect",
+					Target:    address,
+					Err:       err,
+				},
+			),
+		}, nil
 	}
 
 	// Prepare evidence data from result

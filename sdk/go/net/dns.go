@@ -30,13 +30,13 @@ type WasmResolver struct {
 
 // LookupHost resolves IP addresses for a given host using the host function.
 func (r *WasmResolver) LookupHost(ctx context.Context, host string) ([]string, error) {
-	resp, err := r.lookup(ctx, host, "A")
+	resp, err := r.Lookup(ctx, host, "A")
 	if err != nil {
 		return nil, err
 	}
 	recordsA := resp.Records
 
-	resp, err = r.lookup(ctx, host, "AAAA")
+	resp, err = r.Lookup(ctx, host, "AAAA")
 	if err != nil {
 		return nil, err
 	}
@@ -47,13 +47,13 @@ func (r *WasmResolver) LookupHost(ctx context.Context, host string) ([]string, e
 
 // LookupIPAddr resolves IP addresses for a given host using the host function.
 func (r *WasmResolver) LookupIPAddr(ctx context.Context, host string) ([]stdnet.IPAddr, error) {
-	resp, err := r.lookup(ctx, host, "A") // Get A records
+	resp, err := r.Lookup(ctx, host, "A") // Get A records
 	if err != nil {
 		return nil, err
 	}
 	records := resp.Records
 
-	resp, err = r.lookup(ctx, host, "AAAA") // Get AAAA records
+	resp, err = r.Lookup(ctx, host, "AAAA") // Get AAAA records
 	if err != nil {
 		return nil, err
 	}
@@ -68,8 +68,8 @@ func (r *WasmResolver) LookupIPAddr(ctx context.Context, host string) ([]stdnet.
 	return ipAddrs, nil
 }
 
-// lookup performs the actual DNS query via the host function.
-func (r *WasmResolver) lookup(ctx context.Context, hostname, recordType string) (*wireformat.DNSResponseWire, error) {
+// Lookup performs the actual DNS query via the host function.
+func (r *WasmResolver) Lookup(ctx context.Context, hostname, recordType string) (*wireformat.DNSResponseWire, error) {
 	wireCtx := createContextWireFormat(ctx)
 	request := wireformat.DNSRequestWire{ // Use wireformat's DNSRequestWire
 		Context:    wireCtx,
@@ -132,7 +132,7 @@ func init() {
 
 // LookupCNAME returns the canonical name for the given host
 func (r *WasmResolver) LookupCNAME(ctx context.Context, host string) (string, error) {
-	resp, err := r.lookup(ctx, host, "CNAME")
+	resp, err := r.Lookup(ctx, host, "CNAME")
 	if err != nil {
 		return "", err
 	}
@@ -144,7 +144,7 @@ func (r *WasmResolver) LookupCNAME(ctx context.Context, host string) (string, er
 
 // LookupMX returns MX records as strings "Pref Host" (for compatibility)
 func (r *WasmResolver) LookupMX(ctx context.Context, host string) ([]string, error) {
-	resp, err := r.lookup(ctx, host, "MX")
+	resp, err := r.Lookup(ctx, host, "MX")
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +157,7 @@ func (r *WasmResolver) LookupMX(ctx context.Context, host string) ([]string, err
 
 // LookupMXRecords returns structured MX records
 func (r *WasmResolver) LookupMXRecords(ctx context.Context, host string) ([]wireformat.MXRecordWire, error) {
-	resp, err := r.lookup(ctx, host, "MX")
+	resp, err := r.Lookup(ctx, host, "MX")
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +166,7 @@ func (r *WasmResolver) LookupMXRecords(ctx context.Context, host string) ([]wire
 
 // LookupTXT returns TXT records
 func (r *WasmResolver) LookupTXT(ctx context.Context, host string) ([]string, error) {
-	resp, err := r.lookup(ctx, host, "TXT")
+	resp, err := r.Lookup(ctx, host, "TXT")
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +175,7 @@ func (r *WasmResolver) LookupTXT(ctx context.Context, host string) ([]string, er
 
 // LookupNS returns NS records (nameservers)
 func (r *WasmResolver) LookupNS(ctx context.Context, host string) ([]string, error) {
-	resp, err := r.lookup(ctx, host, "NS")
+	resp, err := r.Lookup(ctx, host, "NS")
 	if err != nil {
 		return nil, err
 	}

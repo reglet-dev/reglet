@@ -2,7 +2,6 @@ package wasm
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -53,8 +52,7 @@ func TestCommandPlugin_Integration(t *testing.T) {
 		require.Nil(t, result.Error, "Should not have error")
 		require.NotNil(t, result.Evidence)
 
-		status, _ := result.Evidence.Data["status"].(bool)
-		assert.True(t, status, "Command should succeed")
+		assert.True(t, result.Evidence.Status, "Command should succeed")
 
 		stdout, _ := result.Evidence.Data["stdout"].(string)
 		assert.Equal(t, "hello world", stdout)
@@ -75,8 +73,7 @@ func TestCommandPlugin_Integration(t *testing.T) {
 		require.Nil(t, result.Error)
 		require.NotNil(t, result.Evidence)
 
-		status, _ := result.Evidence.Data["status"].(bool)
-		assert.True(t, status, "Shell command should succeed")
+		assert.True(t, result.Evidence.Status, "Shell command should succeed")
 
 		stdout, _ := result.Evidence.Data["stdout"].(string)
 		assert.Equal(t, "test output", stdout)
@@ -96,9 +93,7 @@ func TestCommandPlugin_Integration(t *testing.T) {
 		require.NotNil(t, result.Evidence)
 
 		// Exit code 42 should result in status=false
-		status, ok := result.Evidence.Data["status"].(bool)
-		require.True(t, ok, "status field should be present and boolean")
-		assert.False(t, status, "Non-zero exit should set status=false")
+		assert.False(t, result.Evidence.Status, "Non-zero exit should set status=false")
 
 		exitCode, ok := result.Evidence.Data["exit_code"].(float64)
 		require.True(t, ok, "exit_code field should be present")
@@ -171,15 +166,11 @@ func TestCommandPlugin_Capabilities(t *testing.T) {
 		require.NotNil(t, result)
 
 		// Should fail due to missing capability
-		// Capability errors are returned in Evidence.Data, not as PluginError
+		// Capability errors are returned in Evidence.Error
 		require.NotNil(t, result.Evidence)
-		if errorData, ok := result.Evidence.Data["error"].(map[string]interface{}); ok {
-			assert.Contains(t, errorData["message"], "permission denied")
-		} else if errorMsg, ok := result.Evidence.Data["error"].(string); ok {
-			assert.Contains(t, errorMsg, "permission denied")
-		} else {
-			t.Fatalf("Expected error in evidence data, got: %+v", result.Evidence.Data)
-		}
+		assert.False(t, result.Evidence.Status, "Should fail without capability")
+		require.NotNil(t, result.Evidence.Error, "Evidence.Error should be set for capability error")
+		assert.Contains(t, result.Evidence.Error.Message, "permission denied")
 	})
 
 	t.Run("Denied_ShellExecution", func(t *testing.T) {
@@ -194,16 +185,11 @@ func TestCommandPlugin_Capabilities(t *testing.T) {
 		require.NotNil(t, result)
 
 		// Should fail - requires exec:/bin/sh capability
-		// Capability errors are returned in Evidence.Data, not as PluginError
+		// Capability errors are returned in Evidence.Error
 		require.NotNil(t, result.Evidence)
-		if errorData, ok := result.Evidence.Data["error"].(map[string]interface{}); ok {
-			msgStr := fmt.Sprintf("%v", errorData["message"])
-			assert.Contains(t, msgStr, "shell execution requires")
-		} else if errorMsg, ok := result.Evidence.Data["error"].(string); ok {
-			assert.Contains(t, errorMsg, "shell execution requires")
-		} else {
-			t.Fatalf("Expected error in evidence data, got: %+v", result.Evidence.Data)
-		}
+		assert.False(t, result.Evidence.Status, "Should fail without shell capability")
+		require.NotNil(t, result.Evidence.Error, "Evidence.Error should be set for capability error")
+		assert.Contains(t, result.Evidence.Error.Message, "shell execution requires")
 	})
 }
 

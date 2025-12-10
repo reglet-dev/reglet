@@ -351,10 +351,23 @@ return sdk.Success(map[string]interface{}{
 return sdk.Failure("validation", "Invalid hostname format"), nil
 
 // Network error
-return sdk.NetworkFailure("Failed to connect", err), nil
+return sdk.Evidence{
+    Status: false,
+    Error: sdk.ToErrorDetail(&sdk.NetworkError{
+        Operation: "connect",
+        Target:    "example.com:443",
+        Err:       err,
+    }),
+}, nil
 
 // Configuration error
-return sdk.ConfigFailure(fmt.Errorf("missing required field: hostname")), nil
+return sdk.Evidence{
+    Status: false,
+    Error: sdk.ToErrorDetail(&sdk.ConfigError{
+        Field: "hostname",
+        Err:   fmt.Errorf("missing required field"),
+    }),
+}, nil
 ```
 
 ## Capabilities
