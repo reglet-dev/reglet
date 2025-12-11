@@ -1,3 +1,5 @@
+//go:build wasip1
+
 package main
 
 import (
@@ -12,7 +14,6 @@ import (
 func TestTCPPlugin_Check_Success(t *testing.T) {
 	mockDialer := func(ctx context.Context, host, port string, timeoutMs int, useTLS bool) (*regletnet.TCPConnectResult, error) {
 		return &regletnet.TCPConnectResult{
-			Status:         true,
 			Connected:      true,
 			Address:        host + ":" + port,
 			ResponseTimeMs: 10,
@@ -63,7 +64,6 @@ func TestTCPPlugin_Check_ConnectionRefused(t *testing.T) {
 func TestTCPPlugin_Check_TLS_Version_Pass(t *testing.T) {
 	mockDialer := func(ctx context.Context, host, port string, timeoutMs int, useTLS bool) (*regletnet.TCPConnectResult, error) {
 		return &regletnet.TCPConnectResult{
-			Status:     true,
 			Connected:  true,
 			TLS:        true,
 			TLSVersion: "TLS 1.3",
@@ -91,7 +91,6 @@ func TestTCPPlugin_Check_TLS_Version_Pass(t *testing.T) {
 func TestTCPPlugin_Check_TLS_Version_Fail(t *testing.T) {
 	mockDialer := func(ctx context.Context, host, port string, timeoutMs int, useTLS bool) (*regletnet.TCPConnectResult, error) {
 		return &regletnet.TCPConnectResult{
-			Status:     true,
 			Connected:  true,
 			TLS:        true,
 			TLSVersion: "TLS 1.0",
