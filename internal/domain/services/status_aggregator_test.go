@@ -5,71 +5,71 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/whiskeyjimbo/reglet/internal/engine"
+	"github.com/whiskeyjimbo/reglet/internal/domain"
 	"github.com/whiskeyjimbo/reglet/internal/wasm"
 )
 
 func Test_StatusAggregator_AggregateControlStatus(t *testing.T) {
 	tests := []struct {
-		name         string
-		observations []engine.ObservationResult
-		expected     engine.Status
+		name     string
+		statuses []domain.Status
+		expected domain.Status
 	}{
 		{
-			name:         "empty observations returns skipped",
-			observations: []engine.ObservationResult{},
-			expected:     engine.StatusSkipped,
+			name:     "empty observations returns skipped",
+			statuses: []domain.Status{},
+			expected: domain.StatusSkipped,
 		},
 		{
 			name: "all pass returns pass",
-			observations: []engine.ObservationResult{
-				{Status: engine.StatusPass},
-				{Status: engine.StatusPass},
-				{Status: engine.StatusPass},
+			statuses: []domain.Status{
+				domain.StatusPass,
+				domain.StatusPass,
+				domain.StatusPass,
 			},
-			expected: engine.StatusPass,
+			expected: domain.StatusPass,
 		},
 		{
 			name: "any failure returns fail (even with errors)",
-			observations: []engine.ObservationResult{
-				{Status: engine.StatusPass},
-				{Status: engine.StatusFail},
-				{Status: engine.StatusError},
+			statuses: []domain.Status{
+				domain.StatusPass,
+				domain.StatusFail,
+				domain.StatusError,
 			},
-			expected: engine.StatusFail,
+			expected: domain.StatusFail,
 		},
 		{
 			name: "any error without failures returns error",
-			observations: []engine.ObservationResult{
-				{Status: engine.StatusPass},
-				{Status: engine.StatusError},
-				{Status: engine.StatusPass},
+			statuses: []domain.Status{
+				domain.StatusPass,
+				domain.StatusError,
+				domain.StatusPass,
 			},
-			expected: engine.StatusError,
+			expected: domain.StatusError,
 		},
 		{
 			name: "skipped observations don't affect pass",
-			observations: []engine.ObservationResult{
-				{Status: engine.StatusPass},
-				{Status: engine.StatusSkipped},
-				{Status: engine.StatusPass},
+			statuses: []domain.Status{
+				domain.StatusPass,
+				domain.StatusSkipped,
+				domain.StatusPass,
 			},
-			expected: engine.StatusPass,
+			expected: domain.StatusPass,
 		},
 		{
 			name: "all skipped returns skipped",
-			observations: []engine.ObservationResult{
-				{Status: engine.StatusSkipped},
-				{Status: engine.StatusSkipped},
+			statuses: []domain.Status{
+				domain.StatusSkipped,
+				domain.StatusSkipped,
 			},
-			expected: engine.StatusSkipped,
+			expected: domain.StatusSkipped,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			aggregator := NewStatusAggregator()
-			result := aggregator.AggregateControlStatus(tt.observations)
+			result := aggregator.AggregateControlStatus(tt.statuses)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -80,7 +80,7 @@ func Test_StatusAggregator_DetermineObservationStatus(t *testing.T) {
 		name           string
 		evidence       *wasm.Evidence
 		expects        []string
-		expectedStatus engine.Status
+		expectedStatus domain.Status
 		expectedError  string
 	}{
 		{
@@ -90,7 +90,7 @@ func Test_StatusAggregator_DetermineObservationStatus(t *testing.T) {
 				Data:   map[string]interface{}{},
 			},
 			expects:        []string{},
-			expectedStatus: engine.StatusPass,
+			expectedStatus: domain.StatusPass,
 		},
 		{
 			name: "no expects uses evidence status false",
@@ -99,7 +99,7 @@ func Test_StatusAggregator_DetermineObservationStatus(t *testing.T) {
 				Data:   map[string]interface{}{},
 			},
 			expects:        []string{},
-			expectedStatus: engine.StatusFail,
+			expectedStatus: domain.StatusFail,
 		},
 		{
 			name: "simple expect passes",
@@ -109,8 +109,8 @@ func Test_StatusAggregator_DetermineObservationStatus(t *testing.T) {
 					"status_code": 200,
 				},
 			},
-			expects:        []string{"status_code == 200"},
-			expectedStatus: engine.StatusPass,
+			expects:        []string{"data.status_code == 200"},
+			expectedStatus: domain.StatusPass,
 		},
 		{
 			name: "simple expect fails",
@@ -120,9 +120,9 @@ func Test_StatusAggregator_DetermineObservationStatus(t *testing.T) {
 					"status_code": 500,
 				},
 			},
-			expects:        []string{"status_code == 200"},
-			expectedStatus: engine.StatusFail,
-			expectedError:  "expectation failed: status_code == 200",
+			expects:        []string{"data.status_code == 200"},
+			expectedStatus: domain.StatusFail,
+			expectedError:  "expectation failed: data.status_code == 200",
 		},
 		{
 			name: "multiple expects all pass",
@@ -133,8 +133,8 @@ func Test_StatusAggregator_DetermineObservationStatus(t *testing.T) {
 					"connected":   true,
 				},
 			},
-			expects:        []string{"status_code == 200", "connected == true"},
-			expectedStatus: engine.StatusPass,
+			expects:        []string{"data.status_code == 200", "data.connected == true"},
+			expectedStatus: domain.StatusPass,
 		},
 		{
 			name: "any expect fails results in fail",
@@ -145,9 +145,9 @@ func Test_StatusAggregator_DetermineObservationStatus(t *testing.T) {
 					"connected":   false,
 				},
 			},
-			expects:        []string{"status_code == 200", "connected == true"},
-			expectedStatus: engine.StatusFail,
-			expectedError:  "expectation failed: connected == true",
+			expects:        []string{"data.status_code == 200", "data.connected == true"},
+			expectedStatus: domain.StatusFail,
+			expectedError:  "expectation failed: data.connected == true",
 		},
 		{
 			name: "invalid expect expression returns error",
@@ -156,7 +156,7 @@ func Test_StatusAggregator_DetermineObservationStatus(t *testing.T) {
 				Data:   map[string]interface{}{},
 			},
 			expects:        []string{"invalid syntax ==="},
-			expectedStatus: engine.StatusError,
+			expectedStatus: domain.StatusError,
 		},
 		{
 			name: "evidence error skips expect evaluation",
@@ -166,7 +166,7 @@ func Test_StatusAggregator_DetermineObservationStatus(t *testing.T) {
 				Data:   map[string]interface{}{},
 			},
 			expects:        []string{"some_field == true"},
-			expectedStatus: engine.StatusError,
+			expectedStatus: domain.StatusError,
 			expectedError:  "connection failed",
 		},
 	}

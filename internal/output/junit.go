@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/whiskeyjimbo/reglet/internal/domain"
 	"github.com/whiskeyjimbo/reglet/internal/engine"
 )
 
@@ -86,17 +87,17 @@ func (f *JUnitFormatter) Format(result *engine.ExecutionResult) error {
 		}
 
 		switch ctrl.Status {
-		case engine.StatusFail:
+		case domain.StatusFail:
 			c.Failure = &JUnitFailure{
 				Message: ctrl.Message,
 				Content: formatObservations(ctrl),
 			}
-		case engine.StatusError:
+		case domain.StatusError:
 			c.Error = &JUnitError{
 				Message: ctrl.Message,
 				Content: formatObservations(ctrl),
 			}
-		case engine.StatusSkipped:
+		case domain.StatusSkipped:
 			c.Skipped = &JUnitSkipped{
 				Message: ctrl.SkipReason,
 			}
@@ -132,7 +133,7 @@ func (f *JUnitFormatter) Format(result *engine.ExecutionResult) error {
 func formatObservations(ctrl engine.ControlResult) string {
 	var out string
 	for _, obs := range ctrl.Observations {
-		if obs.Status != engine.StatusPass {
+		if obs.Status != domain.StatusPass {
 			out += fmt.Sprintf("Observation (%s): %s\n", obs.Plugin, obs.Status)
 			if obs.Error != nil {
 				out += fmt.Sprintf("Error: %s\n", obs.Error.Message)

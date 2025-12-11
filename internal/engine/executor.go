@@ -11,6 +11,8 @@ import (
 
 	"github.com/expr-lang/expr"
 	"github.com/whiskeyjimbo/reglet/internal/config"
+	"github.com/whiskeyjimbo/reglet/internal/domain"
+	"github.com/whiskeyjimbo/reglet/internal/domain/services"
 	"github.com/whiskeyjimbo/reglet/internal/redaction"
 	"github.com/whiskeyjimbo/reglet/internal/wasm"
 )
@@ -89,7 +91,7 @@ func (e *ObservationExecutor) Execute(ctx context.Context, obs config.Observatio
 	// Load the plugin
 	plugin, err := e.LoadPlugin(ctx, obs.Plugin)
 	if err != nil {
-		result.Status = StatusError
+		result.Status = domain.StatusError
 		result.Error = &wasm.PluginError{
 			Code:    "plugin_load_error",
 			Message: err.Error(),
@@ -107,7 +109,7 @@ func (e *ObservationExecutor) Execute(ctx context.Context, obs config.Observatio
 	// Execute the observation
 	wasmResult, err := plugin.Observe(ctx, wasmConfig)
 	if err != nil {
-		result.Status = StatusError
+		result.Status = domain.StatusError
 		result.Error = &wasm.PluginError{
 			Code:    "plugin_execution_error",
 			Message: err.Error(),
@@ -121,7 +123,7 @@ func (e *ObservationExecutor) Execute(ctx context.Context, obs config.Observatio
 
 	// If the plugin returned an error (Go error in observeFn.Call or processing failure)
 	if wasmResult.Error != nil { // This error is a Go error, not from Evidence
-		result.Status = StatusError
+		result.Status = domain.StatusError
 		result.Error = wasmResult.Error // Use the top-level error from wasmResult
 		result.Duration = time.Since(startTime)
 		return result
@@ -132,7 +134,23 @@ func (e *ObservationExecutor) Execute(ctx context.Context, obs config.Observatio
 		result.Evidence = wasmResult.Evidence // Set the full Evidence from wasmResult
 
 		// Determine status based on top-level Evidence.Status and expect expressions
-		result.Status = determineStatusWithExpect(wasmResult.Evidence, obs.Expect)
+		status, errMsg := e.determineStatusWithExpect(ctx, wasmResult, obs.Expect)
+		result.Status = status
+
+		// If validation failed with error message
+		if errMsg != "" {
+			// If we already have an error, append to it, otherwise create new one
+			if result.Evidence.Error != nil {
+				result.Evidence.Error.Message = fmt.Sprintf("%s; %s", result.Evidence.Error.Message, errMsg)
+			} else {
+				// Note: We don't necessarily want to set Evidence.Error for expectation failures
+				// as that changes semantics. Expect failures are StatusFail, not necessarily StatusError.
+				// However, if the service returned StatusError, we should propagate it.
+				if status == domain.StatusError {
+					result.Error = &wasm.PluginError{Message: errMsg}
+				}
+			}
+		}
 
 		// Redact sensitive data from evidence before returning/storing it
 		if e.redactor != nil && wasmResult.Evidence.Data != nil {
@@ -152,7 +170,7 @@ func (e *ObservationExecutor) Execute(ctx context.Context, obs config.Observatio
 	}
 
 	// Neither error nor evidence (unexpected)
-	result.Status = StatusError
+	result.Status = domain.StatusError
 	result.Error = &wasm.PluginError{
 		Code:    "invalid_plugin_result",
 		Message: "plugin returned neither evidence nor error",
@@ -184,60 +202,14 @@ func (e *ObservationExecutor) LoadPlugin(ctx context.Context, pluginName string)
 }
 
 // determineStatusWithExpect determines the observation status by evaluating expect expressions.
-// If no expect expressions provided, falls back to checking evidence.Status.
-func determineStatusWithExpect(evidence *wasm.Evidence, expectations []string) Status {
-	// If the evidence itself indicates an error, then the observation errored.
-	if evidence.Error != nil {
-		return StatusError
-	}
+func (e *ObservationExecutor) determineStatusWithExpect(ctx context.Context, wasmResult *wasm.ObservationResult, expects []string) (domain.Status, string) {
+	aggregator := services.NewStatusAggregator()
+	return aggregator.DetermineObservationStatus(ctx, wasmResult.Evidence, expects)
+}
 
-	// If no expectations provided, fall back to checking top-level Evidence.Status
-	if len(expectations) == 0 {
-		return determineStatusFromEvidenceStatus(evidence)
-	}
-
-	// Create environment for expression evaluation
-	// The evidence data is available under "data" namespace, plus top-level fields
-	env := map[string]interface{}{
-		"data":      evidence.Data,      // The original data map
-		"status":    evidence.Status,    // Top-level status
-		"timestamp": evidence.Timestamp, // Top-level timestamp
-		"error":     evidence.Error,     // Top-level error
-	}
-
-	// Get common expr options including custom functions
-	options := getExprOptions(env)
-
-	// Evaluate all expect expressions
-	// ALL expressions must evaluate to true for the observation to pass
-	for _, expectExpr := range expectations {
-		program, err := expr.Compile(expectExpr, options...)
-		if err != nil {
-			// Expression compilation error - treat as error
-			return StatusError
-		}
-
-		result, err := expr.Run(program, env)
-		if err != nil {
-			// Expression evaluation error - treat as error
-			return StatusError
-		}
-
-		// Check if result is boolean true
-		resultBool, ok := result.(bool)
-		if !ok {
-			// Expression didn't return boolean - treat as error
-			return StatusError
-		}
-
-		// If any expression is false, observation fails
-		if !resultBool {
-			return StatusFail
-		}
-	}
-
-	// All expressions evaluated to true and no top-level Evidence.Error
-	return StatusPass
+func determineStatusFromEvidenceStatus(evidenceStatus bool) domain.Status {
+	aggregator := services.NewStatusAggregator()
+	return aggregator.StatusFromEvidenceStatus(evidenceStatus)
 }
 
 // getExprOptions returns a list of expr options including custom helper functions.
@@ -271,17 +243,4 @@ func getExprOptions(env map[string]interface{}) []expr.Option {
 			return ip != nil && ip.To4() != nil, nil
 		}),
 	}
-}
-
-// determineStatusFromEvidenceStatus checks the top-level Evidence.Status field.
-// Used as fallback when no expect expressions are provided.
-func determineStatusFromEvidenceStatus(evidence *wasm.Evidence) Status {
-	// If Evidence.Error is present, it implies an error status.
-	if evidence.Error != nil {
-		return StatusError
-	}
-	if evidence.Status {
-		return StatusPass
-	}
-	return StatusFail
 }

@@ -6,21 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/whiskeyjimbo/reglet/internal/domain"
 	"github.com/whiskeyjimbo/reglet/internal/wasm"
-)
-
-// Status represents the status of a control or observation.
-type Status string
-
-const (
-	// StatusPass indicates the check passed
-	StatusPass Status = "pass"
-	// StatusFail indicates the check failed (but ran successfully)
-	StatusFail Status = "fail"
-	// StatusError indicates the check encountered an error
-	StatusError Status = "error"
-	// StatusSkipped indicates the check was skipped (dependency failure or filtered)
-	StatusSkipped Status = "skipped"
 )
 
 // ExecutionResult represents the complete result of executing a profile.
@@ -42,7 +29,7 @@ type ControlResult struct {
 	Description  string              `json:"description,omitempty" yaml:"description,omitempty"`
 	Severity     string              `json:"severity,omitempty" yaml:"severity,omitempty"`
 	Tags         []string            `json:"tags,omitempty" yaml:"tags,omitempty"`
-	Status       Status              `json:"status" yaml:"status"`
+	Status       domain.Status       `json:"status" yaml:"status"`
 	Observations []ObservationResult `json:"observations" yaml:"observations"`
 	Message      string              `json:"message,omitempty" yaml:"message,omitempty"`
 	SkipReason   string              `json:"skip_reason,omitempty" yaml:"skip_reason,omitempty"`
@@ -53,7 +40,7 @@ type ControlResult struct {
 type ObservationResult struct {
 	Plugin   string                 `json:"plugin" yaml:"plugin"`
 	Config   map[string]interface{} `json:"config" yaml:"config"`
-	Status   Status                 `json:"status" yaml:"status"`
+	Status   domain.Status          `json:"status" yaml:"status"`
 	Evidence *wasm.Evidence         `json:"evidence,omitempty" yaml:"evidence,omitempty"`
 	Error    *wasm.PluginError      `json:"error,omitempty" yaml:"error,omitempty"`
 	Duration time.Duration          `json:"duration_ms" yaml:"duration_ms"`
@@ -93,7 +80,7 @@ func (r *ExecutionResult) AddControlResult(cr ControlResult) {
 // GetControlStatus returns the status of a control by ID.
 // Returns the status and a boolean indicating if the control was found.
 // Thread-safe.
-func (r *ExecutionResult) GetControlStatus(id string) (Status, bool) {
+func (r *ExecutionResult) GetControlStatus(id string) (domain.Status, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -121,13 +108,13 @@ func (r *ExecutionResult) calculateSummary() {
 	for _, ctrl := range r.Controls {
 		// Count control statuses
 		switch ctrl.Status {
-		case StatusPass:
+		case domain.StatusPass:
 			r.Summary.PassedControls++
-		case StatusFail:
+		case domain.StatusFail:
 			r.Summary.FailedControls++
-		case StatusError:
+		case domain.StatusError:
 			r.Summary.ErrorControls++
-		case StatusSkipped:
+		case domain.StatusSkipped:
 			r.Summary.SkippedControls++
 		}
 
@@ -135,11 +122,11 @@ func (r *ExecutionResult) calculateSummary() {
 		r.Summary.TotalObservations += len(ctrl.Observations)
 		for _, obs := range ctrl.Observations {
 			switch obs.Status {
-			case StatusPass:
+			case domain.StatusPass:
 				r.Summary.PassedObservations++
-			case StatusFail:
+			case domain.StatusFail:
 				r.Summary.FailedObservations++
-			case StatusError:
+			case domain.StatusError:
 				r.Summary.ErrorObservations++
 			}
 		}

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/whiskeyjimbo/reglet/internal/domain"
 	"github.com/whiskeyjimbo/reglet/internal/engine"
 )
 
@@ -283,15 +284,15 @@ func (f *TableFormatter) formatErrorDetail(errMap map[string]interface{}, indent
 }
 
 // getStatusInfo returns a symbol and color for the given status.
-func (f *TableFormatter) getStatusInfo(status engine.Status) (string, string) {
+func (f *TableFormatter) getStatusInfo(status domain.Status) (string, string) {
 	switch status {
-	case engine.StatusPass:
+	case domain.StatusPass:
 		return "✓", colorGreen
-	case engine.StatusFail:
+	case domain.StatusFail:
 		return "✗", colorRed
-	case engine.StatusError:
+	case domain.StatusError:
 		return "⚠", colorYellow
-	case engine.StatusSkipped:
+	case domain.StatusSkipped:
 		return "⊘", colorGray
 	default:
 		return "?", colorReset
@@ -299,7 +300,7 @@ func (f *TableFormatter) getStatusInfo(status engine.Status) (string, string) {
 }
 
 // getStatusSymbol returns a symbol for the given status (legacy helper)
-func (f *TableFormatter) getStatusSymbol(status engine.Status) string {
+func (f *TableFormatter) getStatusSymbol(status domain.Status) string {
 	s, _ := f.getStatusInfo(status)
 	return s
 }

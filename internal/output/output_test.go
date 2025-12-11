@@ -10,6 +10,7 @@ import (
 	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/whiskeyjimbo/reglet/internal/domain"
 	"github.com/whiskeyjimbo/reglet/internal/engine"
 	"github.com/whiskeyjimbo/reglet/internal/wasm"
 )
@@ -25,7 +26,7 @@ func createTestResult() *engine.ExecutionResult {
 		Description: "A test control that passes",
 		Severity:    "high",
 		Tags:        []string{"security", "test"},
-		Status:      engine.StatusPass,
+		Status:      domain.StatusPass,
 		Message:     "All 2 checks passed",
 		Duration:    100 * time.Millisecond,
 		Observations: []engine.ObservationResult{
@@ -35,7 +36,7 @@ func createTestResult() *engine.ExecutionResult {
 					"path": "/etc/test",
 					"mode": "exists",
 				},
-				Status: engine.StatusPass,
+				Status: domain.StatusPass,
 				Evidence: &wasm.Evidence{
 					Timestamp: time.Now(),
 					Data: map[string]interface{}{
@@ -52,7 +53,7 @@ func createTestResult() *engine.ExecutionResult {
 					"path": "/etc/test2",
 					"mode": "exists",
 				},
-				Status: engine.StatusPass,
+				Status: domain.StatusPass,
 				Evidence: &wasm.Evidence{
 					Timestamp: time.Now(),
 					Data: map[string]interface{}{
@@ -72,7 +73,7 @@ func createTestResult() *engine.ExecutionResult {
 		Name:        "Test Control 2",
 		Description: "A test control that fails",
 		Severity:    "medium",
-		Status:      engine.StatusFail,
+		Status:      domain.StatusFail,
 		Message:     "1 check failed",
 		Duration:    50 * time.Millisecond,
 		Observations: []engine.ObservationResult{
@@ -82,7 +83,7 @@ func createTestResult() *engine.ExecutionResult {
 					"path": "/etc/missing",
 					"mode": "exists",
 				},
-				Status: engine.StatusFail,
+				Status: domain.StatusFail,
 				Evidence: &wasm.Evidence{
 					Timestamp: time.Now(),
 					Data: map[string]interface{}{
@@ -101,7 +102,7 @@ func createTestResult() *engine.ExecutionResult {
 		ID:       "ctrl-3",
 		Name:     "Test Control 3",
 		Severity: "critical",
-		Status:   engine.StatusError,
+		Status:   domain.StatusError,
 		Message:  "Plugin load failed",
 		Duration: 10 * time.Millisecond,
 		Observations: []engine.ObservationResult{
@@ -110,7 +111,7 @@ func createTestResult() *engine.ExecutionResult {
 				Config: map[string]interface{}{
 					"test": "value",
 				},
-				Status: engine.StatusError,
+				Status: domain.StatusError,
 				Error: &wasm.PluginError{
 					Code:    "plugin_load_error",
 					Message: "unknown plugin: nonexistent",
@@ -303,12 +304,12 @@ func TestTableFormatter_StatusSymbols(t *testing.T) {
 	formatter := NewTableFormatter(&buf)
 
 	tests := []struct {
-		status   engine.Status
+		status   domain.Status
 		expected string
 	}{
-		{engine.StatusPass, "✓"},
-		{engine.StatusFail, "✗"},
-		{engine.StatusError, "⚠"},
+		{domain.StatusPass, "✓"},
+		{domain.StatusFail, "✗"},
+		{domain.StatusError, "⚠"},
 		{"unknown", "?"},
 	}
 
@@ -340,9 +341,9 @@ func TestJSONFormatter_PreservesTypes(t *testing.T) {
 	assert.Greater(t, decoded.Controls[0].Observations[0].Duration, time.Duration(0))
 
 	// Verify status types
-	assert.Equal(t, engine.StatusPass, decoded.Controls[0].Status)
-	assert.Equal(t, engine.StatusFail, decoded.Controls[1].Status)
-	assert.Equal(t, engine.StatusError, decoded.Controls[2].Status)
+	assert.Equal(t, domain.StatusPass, decoded.Controls[0].Status)
+	assert.Equal(t, domain.StatusFail, decoded.Controls[1].Status)
+	assert.Equal(t, domain.StatusError, decoded.Controls[2].Status)
 }
 
 func TestYAMLFormatter_PreservesTypes(t *testing.T) {
@@ -365,7 +366,7 @@ func TestYAMLFormatter_PreservesTypes(t *testing.T) {
 	assert.Len(t, decoded.Controls, len(result.Controls))
 
 	// Verify status types
-	assert.Equal(t, engine.StatusPass, decoded.Controls[0].Status)
-	assert.Equal(t, engine.StatusFail, decoded.Controls[1].Status)
-	assert.Equal(t, engine.StatusError, decoded.Controls[2].Status)
+	assert.Equal(t, domain.StatusPass, decoded.Controls[0].Status)
+	assert.Equal(t, domain.StatusFail, decoded.Controls[1].Status)
+	assert.Equal(t, domain.StatusError, decoded.Controls[2].Status)
 }

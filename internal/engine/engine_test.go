@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/whiskeyjimbo/reglet/internal/config"
+	"github.com/whiskeyjimbo/reglet/internal/domain"
 	"github.com/whiskeyjimbo/reglet/internal/wasm"
 )
 
@@ -28,120 +29,48 @@ func TestNewEngine(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestAggregateControlStatus_AllPass(t *testing.T) {
-	t.Parallel()
-	observations := []ObservationResult{
-		{Status: StatusPass},
-		{Status: StatusPass},
-		{Status: StatusPass},
-	}
-
-	status := aggregateControlStatus(observations)
-	assert.Equal(t, StatusPass, status)
-}
-
-func TestAggregateControlStatus_OneFail(t *testing.T) {
-	t.Parallel()
-	observations := []ObservationResult{
-		{Status: StatusPass},
-		{Status: StatusFail},
-		{Status: StatusPass},
-	}
-
-	status := aggregateControlStatus(observations)
-	assert.Equal(t, StatusFail, status)
-}
-
-func TestAggregateControlStatus_OneError(t *testing.T) {
-	t.Parallel()
-	observations := []ObservationResult{
-		{Status: StatusPass},
-		{Status: StatusError, Error: &wasm.PluginError{Code: "test", Message: "test error"}},
-		{Status: StatusPass},
-	}
-
-	status := aggregateControlStatus(observations)
-	assert.Equal(t, StatusError, status)
-}
-
-func TestAggregateControlStatus_FailTakesPrecedenceOverError(t *testing.T) {
-	t.Parallel()
-	observations := []ObservationResult{
-		{Status: StatusPass},
-		{Status: StatusFail},
-		{Status: StatusError, Error: &wasm.PluginError{Code: "test", Message: "test error"}},
-	}
-
-	// CRITICAL: Fail should take precedence over Error for compliance reporting
-	// If we proved non-compliance (fail), that's more important than a technical error
-	// Scenario: 9 observations FAIL, 1 errors -> control should be FAIL (not ERROR)
-	status := aggregateControlStatus(observations)
-	assert.Equal(t, StatusFail, status, "Proven failures must take precedence over errors")
-}
-
-func TestAggregateControlStatus_ErrorWithoutFail(t *testing.T) {
-	t.Parallel()
-	observations := []ObservationResult{
-		{Status: StatusPass},
-		{Status: StatusPass},
-		{Status: StatusError, Error: &wasm.PluginError{Code: "test", Message: "test error"}},
-	}
-
-	// Errors should still be reported when there are no failures
-	status := aggregateControlStatus(observations)
-	assert.Equal(t, StatusError, status, "Errors should be reported when there are no proven failures")
-}
-
-func TestAggregateControlStatus_NoObservations(t *testing.T) {
-	t.Parallel()
-	observations := []ObservationResult{}
-
-	status := aggregateControlStatus(observations)
-	assert.Equal(t, StatusError, status)
-}
-
 func TestGenerateControlMessage_SinglePass(t *testing.T) {
 	t.Parallel()
 	observations := []ObservationResult{
-		{Status: StatusPass},
+		{Status: domain.StatusPass},
 	}
 
-	msg := generateControlMessage(StatusPass, observations)
+	msg := generateControlMessage(domain.StatusPass, observations)
 	assert.Equal(t, "Check passed", msg)
 }
 
 func TestGenerateControlMessage_MultiplePass(t *testing.T) {
 	t.Parallel()
 	observations := []ObservationResult{
-		{Status: StatusPass},
-		{Status: StatusPass},
-		{Status: StatusPass},
+		{Status: domain.StatusPass},
+		{Status: domain.StatusPass},
+		{Status: domain.StatusPass},
 	}
 
-	msg := generateControlMessage(StatusPass, observations)
+	msg := generateControlMessage(domain.StatusPass, observations)
 	assert.Equal(t, "All 3 checks passed", msg)
 }
 
 func TestGenerateControlMessage_SingleFail(t *testing.T) {
 	t.Parallel()
 	observations := []ObservationResult{
-		{Status: StatusPass},
-		{Status: StatusFail},
+		{Status: domain.StatusPass},
+		{Status: domain.StatusFail},
 	}
 
-	msg := generateControlMessage(StatusFail, observations)
+	msg := generateControlMessage(domain.StatusFail, observations)
 	assert.Equal(t, "1 check failed", msg)
 }
 
 func TestGenerateControlMessage_MultipleFail(t *testing.T) {
 	t.Parallel()
 	observations := []ObservationResult{
-		{Status: StatusFail},
-		{Status: StatusFail},
-		{Status: StatusPass},
+		{Status: domain.StatusFail},
+		{Status: domain.StatusFail},
+		{Status: domain.StatusPass},
 	}
 
-	msg := generateControlMessage(StatusFail, observations)
+	msg := generateControlMessage(domain.StatusFail, observations)
 	assert.Equal(t, "2 checks failed", msg)
 }
 
@@ -149,12 +78,12 @@ func TestGenerateControlMessage_SingleError(t *testing.T) {
 	t.Parallel()
 	observations := []ObservationResult{
 		{
-			Status: StatusError,
+			Status: domain.StatusError,
 			Error:  &wasm.PluginError{Code: "test", Message: "something went wrong"},
 		},
 	}
 
-	msg := generateControlMessage(StatusError, observations)
+	msg := generateControlMessage(domain.StatusError, observations)
 	assert.Equal(t, "something went wrong", msg)
 }
 
@@ -162,24 +91,24 @@ func TestGenerateControlMessage_SingleErrorNoMessage(t *testing.T) {
 	t.Parallel()
 	observations := []ObservationResult{
 		{
-			Status: StatusError,
+			Status: domain.StatusError,
 			Error:  nil, // No error object
 		},
 	}
 
-	msg := generateControlMessage(StatusError, observations)
+	msg := generateControlMessage(domain.StatusError, observations)
 	assert.Equal(t, "Check encountered an error", msg)
 }
 
 func TestGenerateControlMessage_MultipleErrors(t *testing.T) {
 	t.Parallel()
 	observations := []ObservationResult{
-		{Status: StatusError, Error: &wasm.PluginError{Code: "test", Message: "error 1"}},
-		{Status: StatusError, Error: &wasm.PluginError{Code: "test", Message: "error 2"}},
-		{Status: StatusPass},
+		{Status: domain.StatusError, Error: &wasm.PluginError{Code: "test", Message: "error 1"}},
+		{Status: domain.StatusError, Error: &wasm.PluginError{Code: "test", Message: "error 2"}},
+		{Status: domain.StatusPass},
 	}
 
-	msg := generateControlMessage(StatusError, observations)
+	msg := generateControlMessage(domain.StatusError, observations)
 	assert.Equal(t, "2 checks encountered errors", msg)
 }
 
@@ -480,9 +409,9 @@ func TestExecute_InvalidPlugin(t *testing.T) {
 	require.NoError(t, err) // Execute should not return error, but result should show error
 
 	assert.Len(t, result.Controls, 1)
-	assert.Equal(t, StatusError, result.Controls[0].Status)
+	assert.Equal(t, domain.StatusError, result.Controls[0].Status)
 	assert.Len(t, result.Controls[0].Observations, 1)
-	assert.Equal(t, StatusError, result.Controls[0].Observations[0].Status)
+	assert.Equal(t, domain.StatusError, result.Controls[0].Observations[0].Status)
 	assert.NotNil(t, result.Controls[0].Observations[0].Error)
 	assert.Contains(t, result.Controls[0].Observations[0].Error.Message, "failed to read plugin")
 }

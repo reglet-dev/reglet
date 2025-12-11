@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/whiskeyjimbo/reglet/internal/capabilities"
 	"github.com/whiskeyjimbo/reglet/internal/config"
+	"github.com/whiskeyjimbo/reglet/internal/domain"
 )
 
 // TestFiltering_EndToEnd simulates a full run with 20 controls and filtering.
@@ -129,7 +130,7 @@ func TestFiltering_EndToEnd(t *testing.T) {
 
 		if i < 5 {
 			// Should be executed and pass
-			if !assert.Equal(t, StatusPass, ctrl.Status, "Control %s should pass", id) {
+			if !assert.Equal(t, domain.StatusPass, ctrl.Status, "Control %s should pass", id) {
 				// Dump details if failed
 				t.Logf("Control %s failed. Message: %s", id, ctrl.Message)
 				for _, obs := range ctrl.Observations {
@@ -146,7 +147,7 @@ func TestFiltering_EndToEnd(t *testing.T) {
 			assert.NotEmpty(t, ctrl.Observations)
 		} else {
 			// Should be skipped
-			assert.Equal(t, StatusSkipped, ctrl.Status, "Control %s should be skipped", id)
+			assert.Equal(t, domain.StatusSkipped, ctrl.Status, "Control %s should be skipped", id)
 			assert.Contains(t, ctrl.SkipReason, "excluded by --tags filter", "Control %s skip reason incorrect", id)
 			assert.Empty(t, ctrl.Observations) // No observations should run
 		}

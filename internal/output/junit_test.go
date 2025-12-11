@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/whiskeyjimbo/reglet/internal/domain"
 	"github.com/whiskeyjimbo/reglet/internal/engine"
 	"github.com/whiskeyjimbo/reglet/internal/wasm"
 )
@@ -19,10 +20,10 @@ func TestJUnitFormatter_Format(t *testing.T) {
 	result.AddControlResult(engine.ControlResult{
 		ID:       "control-1",
 		Name:     "Passed Control",
-		Status:   engine.StatusPass,
+		Status:   domain.StatusPass,
 		Duration: 100 * time.Millisecond,
 		Observations: []engine.ObservationResult{
-			{Plugin: "test", Status: engine.StatusPass},
+			{Plugin: "test", Status: domain.StatusPass},
 		},
 	})
 
@@ -30,13 +31,13 @@ func TestJUnitFormatter_Format(t *testing.T) {
 	result.AddControlResult(engine.ControlResult{
 		ID:       "control-2",
 		Name:     "Failed Control",
-		Status:   engine.StatusFail,
+		Status:   domain.StatusFail,
 		Message:  "Something failed",
 		Duration: 200 * time.Millisecond,
 		Observations: []engine.ObservationResult{
 			{
 				Plugin: "test",
-				Status: engine.StatusFail,
+				Status: domain.StatusFail,
 				Evidence: &wasm.Evidence{
 					Data: map[string]interface{}{"key": "value"},
 				},
@@ -48,13 +49,13 @@ func TestJUnitFormatter_Format(t *testing.T) {
 	result.AddControlResult(engine.ControlResult{
 		ID:       "control-3",
 		Name:     "Error Control",
-		Status:   engine.StatusError,
+		Status:   domain.StatusError,
 		Message:  "Something errored",
 		Duration: 300 * time.Millisecond,
 		Observations: []engine.ObservationResult{
 			{
 				Plugin: "test",
-				Status: engine.StatusError,
+				Status: domain.StatusError,
 				Error:  &wasm.PluginError{Message: "runtime error"},
 			},
 		},
@@ -64,7 +65,7 @@ func TestJUnitFormatter_Format(t *testing.T) {
 	result.AddControlResult(engine.ControlResult{
 		ID:         "control-4",
 		Name:       "Skipped Control",
-		Status:     engine.StatusSkipped,
+		Status:     domain.StatusSkipped,
 		SkipReason: "dependency failed",
 		Duration:   0,
 	})
