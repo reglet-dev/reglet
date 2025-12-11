@@ -82,6 +82,29 @@ type TCPResponseWire struct {
 	Error           *ErrorDetail `json:"error,omitempty"` // Structured error
 }
 
+// SMTPRequestWire is the JSON wire format for an SMTP connection request from Guest to Host.
+type SMTPRequestWire struct {
+	Context   ContextWireFormat `json:"context"`
+	Host      string            `json:"host"`
+	Port      string            `json:"port"`
+	TimeoutMs int               `json:"timeout_ms,omitempty"` // Optional timeout in milliseconds
+	TLS       bool              `json:"tls"`                  // Whether to use TLS (SMTPS on port 465)
+	StartTLS  bool              `json:"starttls"`             // Whether to use STARTTLS (upgrade to TLS)
+}
+
+// SMTPResponseWire is the JSON wire format for an SMTP connection response from Host to Guest.
+type SMTPResponseWire struct {
+	Connected      bool         `json:"connected"`
+	Address        string       `json:"address,omitempty"`
+	Banner         string       `json:"banner,omitempty"`          // SMTP banner message
+	ResponseTimeMs int64        `json:"response_time_ms,omitempty"`
+	TLS            bool         `json:"tls,omitempty"`
+	TLSVersion     string       `json:"tls_version,omitempty"`
+	TLSCipherSuite string       `json:"tls_cipher_suite,omitempty"`
+	TLSServerName  string       `json:"tls_server_name,omitempty"`
+	Error          *ErrorDetail `json:"error,omitempty"` // Structured error
+}
+
 // ExecRequestWire is the JSON wire format for an exec request from Guest to Host.
 type ExecRequestWire struct {
 	Context ContextWireFormat `json:"context"`

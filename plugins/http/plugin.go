@@ -1,3 +1,5 @@
+//go:build wasip1
+
 package main
 
 import (
@@ -16,7 +18,9 @@ import (
 
 // httpPlugin implements the sdk.Plugin interface.
 type httpPlugin struct {
-	// No fields needed - uses SDK's HTTP helpers with WasmTransport
+	// client is an optional HTTP client for testing purposes.
+	// If nil, the SDK's default WASM transport is used.
+	client *http.Client
 }
 
 // Describe returns plugin metadata.
@@ -76,12 +80,18 @@ func (p *httpPlugin) Check(ctx context.Context, config regletsdk.Config) (reglet
 
 	req, err := http.NewRequestWithContext(ctx, cfg.Method, cfg.URL, bodyReader)
 	if err != nil {
-		        return regletsdk.Evidence{Status: false, Error: regletsdk.ToErrorDetail(&regletsdk.ConfigError{Err: fmt.Errorf("failed to create request: %w", err)})}, nil	}
+		return regletsdk.Evidence{Status: false, Error: regletsdk.ToErrorDetail(&regletsdk.ConfigError{Err: fmt.Errorf("failed to create request: %w", err)})}, nil
+	}
 
 	// Execute Request using SDK's HTTP helper (which uses WasmTransport)
 	// This is more efficient than creating a new client each time
 	start := time.Now()
-	resp, err := regletnet.Do(req)
+	var resp *http.Response
+	if p.client != nil {
+		resp, err = p.client.Do(req)
+	} else {
+		resp, err = regletnet.Do(req)
+	}
 	duration := time.Since(start).Milliseconds()
 	if err != nil {
 		return regletsdk.Evidence{
@@ -105,8 +115,8 @@ func (p *httpPlugin) Check(ctx context.Context, config regletsdk.Config) (reglet
 			Error: regletsdk.ToErrorDetail(
 				&regletsdk.NetworkError{
 					Operation: "http_read_body",
-					Target: cfg.URL,
-					Err: err,
+					Target:    cfg.URL,
+					Err:       err,
 				},
 			),
 		}, nil

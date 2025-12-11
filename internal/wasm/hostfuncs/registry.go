@@ -41,6 +41,15 @@ func RegisterHostFunctions(ctx context.Context, runtime wazero.Runtime, caps map
 		}), []api.ValueType{api.ValueTypeI64}, []api.ValueType{api.ValueTypeI64}).
 		Export("tcp_connect")
 
+	// Register SMTP connect function
+	// Parameters: smtp_requestPacked (i64) - packed ptr+len of SMTPRequestWire JSON
+	// Returns: smtp_responsePacked (i64) - packed ptr+len of SMTPResponseWire JSON
+	builder.NewFunctionBuilder().
+		WithGoModuleFunction(api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
+			SMTPConnect(ctx, mod, stack, checker)
+		}), []api.ValueType{api.ValueTypeI64}, []api.ValueType{api.ValueTypeI64}).
+		Export("smtp_connect")
+
 	// Register Exec command function
 	// Parameters: exec_requestPacked (i64) - packed ptr+len of ExecRequestWire JSON
 	// Returns: exec_responsePacked (i64) - packed ptr+len of ExecResponseWire JSON
