@@ -152,7 +152,11 @@ func (e *Engine) Execute(ctx context.Context, profile *config.Profile) (*Executi
 	// Calculate required dependencies if enabled
 	var requiredControls map[string]bool
 	if e.config.IncludeDependencies {
-		requiredControls = e.resolveDependencies(profile)
+		var err error
+		requiredControls, err = e.resolveDependencies(profile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve dependencies: %w", err)
+		}
 	}
 
 	// Execute controls
@@ -176,43 +180,28 @@ func (e *Engine) Execute(ctx context.Context, profile *config.Profile) (*Executi
 }
 
 // resolveDependencies calculates the transitive closure of dependencies for matched controls.
-func (e *Engine) resolveDependencies(profile *config.Profile) map[string]bool {
-	required := make(map[string]bool)
-	queue := make([]string, 0)
-	controlMap := make(map[string]config.Control)
-
-	// Index controls for fast lookup
-	for _, ctrl := range profile.Controls.Items {
-		controlMap[ctrl.ID] = ctrl
+func (e *Engine) resolveDependencies(profile *config.Profile) (map[string]bool, error) {
+	resolver := services.NewDependencyResolver()
+	allDependencies, err := resolver.ResolveDependencies(profile.Controls.Items)
+	if err != nil {
+		return nil, err
 	}
+
+	required := make(map[string]bool)
 
 	// Identify initial targets (controls that match filters)
 	for _, ctrl := range profile.Controls.Items {
 		if should, _ := e.shouldRun(ctrl); should {
-			// Add dependencies to queue
-			queue = append(queue, ctrl.DependsOn...)
+			// Add all transitive dependencies for this control to required set
+			if deps, ok := allDependencies[ctrl.ID]; ok {
+				for depID := range deps {
+					required[depID] = true
+				}
+			}
 		}
 	}
 
-	// Process queue to find all transitive dependencies
-	visited := make(map[string]bool)
-	for len(queue) > 0 {
-		id := queue[0]
-		queue = queue[1:]
-
-		if visited[id] {
-			continue
-		}
-		visited[id] = true
-
-		// If dependency exists in profile, mark as required and add its dependencies
-		if ctrl, exists := controlMap[id]; exists {
-			required[id] = true
-			queue = append(queue, ctrl.DependsOn...)
-		}
-	}
-
-	return required
+	return required, nil
 }
 
 // executeControlsParallel executes controls in parallel, respecting dependencies.
@@ -220,7 +209,8 @@ func (e *Engine) resolveDependencies(profile *config.Profile) map[string]bool {
 // sequentially while controls within a level run in parallel.
 func (e *Engine) executeControlsParallel(ctx context.Context, controls []config.Control, result *ExecutionResult, requiredDeps map[string]bool) error {
 	// Build dependency graph and get control levels
-	levels, err := BuildControlDAG(controls)
+	resolver := services.NewDependencyResolver()
+	levels, err := resolver.BuildControlDAG(controls)
 	if err != nil {
 		return fmt.Errorf("failed to build control dependency graph: %w", err)
 	}

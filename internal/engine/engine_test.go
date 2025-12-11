@@ -616,7 +616,8 @@ func TestResolveDependencies(t *testing.T) {
 
 	e := &Engine{config: cfg}
 
-	required := e.resolveDependencies(profile)
+	required, err := e.resolveDependencies(profile)
+	require.NoError(t, err)
 
 	assert.True(t, required["c1"], "c1 should be required as transitive dependency")
 	assert.True(t, required["c2"], "c2 should be required as direct dependency")
