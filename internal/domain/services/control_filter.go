@@ -8,6 +8,15 @@ import (
 	"github.com/whiskeyjimbo/reglet/internal/config"
 )
 
+// ControlEnv exposes control metadata for expression evaluation.
+type ControlEnv struct {
+	ID       string   `expr:"id"`
+	Name     string   `expr:"name"`
+	Severity string   `expr:"severity"`
+	Owner    string   `expr:"owner"`
+	Tags     []string `expr:"tags"`
+}
+
 // ControlFilter encapsulates all control filtering logic
 type ControlFilter struct {
 	// Exclusive mode: only include specified controls
@@ -121,15 +130,12 @@ func (f *ControlFilter) ShouldRun(ctrl config.Control) (bool, string) {
 	// 5. Advanced filter expression
 	if f.filterProgram != nil {
 		// Create evaluation environment
-		// Note: Must match ControlEnv in engine if used there, or we define it here.
-		// For now, using map to be safe and simple.
-		env := map[string]interface{}{
-			"id":          ctrl.ID,
-			"name":        ctrl.Name,
-			"description": ctrl.Description,
-			"severity":    ctrl.Severity,
-			"owner":       ctrl.Owner,
-			"tags":        ctrl.Tags,
+		env := ControlEnv{
+			ID:       ctrl.ID,
+			Name:     ctrl.Name,
+			Severity: ctrl.Severity,
+			Owner:    ctrl.Owner,
+			Tags:     ctrl.Tags,
 		}
 
 		output, err := expr.Run(f.filterProgram, env)

@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/whiskeyjimbo/reglet/internal/capabilities"
 	"github.com/whiskeyjimbo/reglet/internal/config"
+	"github.com/whiskeyjimbo/reglet/internal/domain/services"
 	"github.com/whiskeyjimbo/reglet/internal/engine"
 	"github.com/whiskeyjimbo/reglet/internal/output"
 	"github.com/whiskeyjimbo/reglet/internal/redaction"
@@ -236,7 +237,7 @@ func validateFilterConfig(profile *config.Profile, cfg *engine.ExecutionConfig) 
 	// 2. Compile --filter expression ONCE at startup
 	if filterExpr != "" {
 		program, err := expr.Compile(filterExpr,
-			expr.Env(engine.ControlEnv{}),
+			expr.Env(services.ControlEnv{}),
 			expr.AsBool())
 		if err != nil {
 			return fmt.Errorf("invalid --filter expression: %w\nExample: severity in ['critical', 'high'] && !('slow' in tags)", err)

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/expr-lang/expr"
 	"github.com/expr-lang/expr/vm"
 	"github.com/whiskeyjimbo/reglet/internal/config"
 	"github.com/whiskeyjimbo/reglet/internal/domain"
@@ -39,15 +38,6 @@ type ExecutionConfig struct {
 
 	// Dependency Strategy
 	IncludeDependencies bool
-}
-
-// ControlEnv exposes control metadata for expression evaluation.
-type ControlEnv struct {
-	ID       string   `expr:"id"`
-	Name     string   `expr:"name"`
-	Severity string   `expr:"severity"`
-	Owner    string   `expr:"owner"`
-	Tags     []string `expr:"tags"`
 }
 
 // DefaultExecutionConfig returns sensible defaults for parallel execution.
@@ -326,78 +316,15 @@ func (e *Engine) executeControl(ctx context.Context, ctrl config.Control, execRe
 
 // shouldRun determines if a control should run based on the configuration filters.
 func (e *Engine) shouldRun(ctrl config.Control) (bool, string) {
-	// 0. EXCLUSIVE MODE: --control overrides all other filters
-	if len(e.config.IncludeControlIDs) > 0 {
-		if contains(e.config.IncludeControlIDs, ctrl.ID) {
-			return true, ""
-		}
-		return false, "excluded by --control filter"
-	}
+	filter := services.NewControlFilter().
+		WithExclusiveControls(e.config.IncludeControlIDs).
+		WithExcludedControls(e.config.ExcludeControlIDs).
+		WithExcludedTags(e.config.ExcludeTags).
+		WithIncludedTags(e.config.IncludeTags).
+		WithIncludedSeverities(e.config.IncludeSeverities).
+		WithFilterExpression(e.config.FilterProgram)
 
-	// 1. EXCLUSIONS: Check explicit exclusions first
-	if contains(e.config.ExcludeControlIDs, ctrl.ID) {
-		return false, "excluded by --exclude-control"
-	}
-
-	// 2. EXCLUSIONS: Check tag exclusions
-	if len(e.config.ExcludeTags) > 0 {
-		for _, tag := range ctrl.Tags {
-			if contains(e.config.ExcludeTags, tag) {
-				return false, fmt.Sprintf("excluded by --exclude-tags %s", tag)
-			}
-		}
-	}
-
-	// 3. INCLUDES: Check Severity filter (OR within list)
-	if len(e.config.IncludeSeverities) > 0 {
-		if !contains(e.config.IncludeSeverities, ctrl.Severity) {
-			return false, "excluded by --severity filter"
-		}
-	}
-
-	// 4. INCLUDES: Check Tags filter (OR within list - any match)
-	if len(e.config.IncludeTags) > 0 {
-		match := false
-		for _, tag := range ctrl.Tags {
-			if contains(e.config.IncludeTags, tag) {
-				match = true
-				break
-			}
-		}
-		if !match {
-			return false, "excluded by --tags filter"
-		}
-	}
-
-	// 5. ADVANCED: Check Expression Filter
-	if e.config.FilterProgram != nil {
-		env := ControlEnv{
-			ID:       ctrl.ID,
-			Name:     ctrl.Name,
-			Severity: ctrl.Severity,
-			Owner:    ctrl.Owner,
-			Tags:     ctrl.Tags,
-		}
-		output, err := expr.Run(e.config.FilterProgram, env)
-		if err != nil {
-			return false, fmt.Sprintf("filter expression error: %v", err)
-		}
-		if !output.(bool) {
-			return false, "excluded by --filter expression"
-		}
-	}
-
-	return true, ""
-}
-
-// contains checks if a string is present in a slice.
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
+	return filter.ShouldRun(ctrl)
 }
 
 // executeObservationsParallel executes observations in parallel with concurrency limits.

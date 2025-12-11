@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/whiskeyjimbo/reglet/internal/config"
 	"github.com/whiskeyjimbo/reglet/internal/domain"
+	"github.com/whiskeyjimbo/reglet/internal/domain/services"
 	"github.com/whiskeyjimbo/reglet/internal/wasm"
 )
 
@@ -554,11 +555,11 @@ func TestShouldRun_ExcludeControlIDs(t *testing.T) {
 
 func TestShouldRun_AdvancedFilter(t *testing.T) {
 	// Expression: severity == 'critical' && 'prod' in tags
-	program, err := expr.Compile("severity == 'critical' && 'prod' in tags", expr.Env(ControlEnv{}), expr.AsBool())
+	program, err := expr.Compile("severity == 'critical' && 'prod' in tags", expr.Env(services.ControlEnv{}), expr.AsBool())
 	require.NoError(t, err)
 
 	// Expression: owner == 'security-team'
-	ownerProgram, err := expr.Compile("owner == 'security-team'", expr.Env(ControlEnv{}), expr.AsBool())
+	ownerProgram, err := expr.Compile("owner == 'security-team'", expr.Env(services.ControlEnv{}), expr.AsBool())
 	require.NoError(t, err)
 
 	e := &Engine{config: DefaultExecutionConfig()}
