@@ -133,7 +133,7 @@ func Test_ControlFilter_IncludeSeverities(t *testing.T) {
 
 func Test_ControlFilter_FilterExpression(t *testing.T) {
 	// Compile expression: owner == "platform"
-	program, err := expr.Compile("owner == \"platform\"", expr.AsBool())
+	program, err := expr.Compile("owner == \"platform\"", expr.Env(ControlEnv{}), expr.AsBool())
 	require.NoError(t, err)
 
 	filter := NewControlFilter().
