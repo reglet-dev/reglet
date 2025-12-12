@@ -138,7 +138,8 @@ func runCheckAction(ctx context.Context, profilePath string) error {
 	capMgr := capabilities.NewManager(trustPlugins)
 
 	// Create execution engine with capability manager and config
-	eng, err := engine.NewEngineWithCapabilities(ctx, capMgr, pluginDir, profile, execConfig, redactor)
+	// Pass nil for repository as persistence is not yet enabled via CLI
+	eng, err := engine.NewEngineWithCapabilities(ctx, capMgr, pluginDir, profile, execConfig, redactor, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create engine: %w", err)
 	}

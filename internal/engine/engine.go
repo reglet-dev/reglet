@@ -3,12 +3,14 @@ package engine
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/expr-lang/expr/vm"
 	"github.com/whiskeyjimbo/reglet/internal/config"
 	"github.com/whiskeyjimbo/reglet/internal/domain"
 	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
+	"github.com/whiskeyjimbo/reglet/internal/domain/repositories"
 	"github.com/whiskeyjimbo/reglet/internal/domain/services"
 	"github.com/whiskeyjimbo/reglet/internal/redaction"
 	"github.com/whiskeyjimbo/reglet/internal/wasm"
@@ -52,9 +54,10 @@ func DefaultExecutionConfig() ExecutionConfig {
 
 // Engine coordinates profile execution.
 type Engine struct {
-	runtime  *wasm.Runtime
-	executor *ObservationExecutor
-	config   ExecutionConfig
+	runtime    *wasm.Runtime
+	executor   *ObservationExecutor
+	config     ExecutionConfig
+	repository repositories.ExecutionResultRepository // Optional repository for persistence
 }
 
 // CapabilityManager defines the interface for capability management
@@ -69,7 +72,16 @@ func NewEngine(ctx context.Context) (*Engine, error) {
 }
 
 // NewEngineWithCapabilities creates an engine with interactive capability prompts
-func NewEngineWithCapabilities(ctx context.Context, capMgr CapabilityManager, pluginDir string, profile *config.Profile, cfg ExecutionConfig, redactor *redaction.Redactor) (*Engine, error) {
+// and optional repository support.
+func NewEngineWithCapabilities(
+	ctx context.Context,
+	capMgr CapabilityManager,
+	pluginDir string,
+	profile *config.Profile,
+	cfg ExecutionConfig,
+	redactor *redaction.Redactor,
+	repo repositories.ExecutionResultRepository, // Optional repository
+) (*Engine, error) {
 	// Create temporary runtime with no capabilities to load plugins and get requirements
 	tempRuntime, err := wasm.NewRuntime(ctx)
 	if err != nil {
@@ -111,9 +123,10 @@ func NewEngineWithCapabilities(ctx context.Context, capMgr CapabilityManager, pl
 	}
 
 	return &Engine{
-		runtime:  runtime,
-		executor: executor,
-		config:   cfg,
+		runtime:    runtime,
+		executor:   executor,
+		config:     cfg,
+		repository: repo,
 	}, nil
 }
 
@@ -166,6 +179,14 @@ func (e *Engine) Execute(ctx context.Context, profile *config.Profile) (*executi
 
 	// Finalize result (calculate summary, set end time)
 	result.Finalize()
+
+	// Persist result if repository is configured
+	if e.repository != nil {
+		if err := e.repository.Save(ctx, result); err != nil {
+			// Log error but don't fail execution
+			slog.Warn("failed to persist execution result", "error", err, "execution_id", result.GetID())
+		}
+	}
 
 	return result, nil
 }
