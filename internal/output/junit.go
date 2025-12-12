@@ -6,7 +6,7 @@ import (
 	"io"
 
 	"github.com/whiskeyjimbo/reglet/internal/domain"
-	"github.com/whiskeyjimbo/reglet/internal/engine"
+	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
 )
 
 // JUnitFormatter formats execution results as JUnit XML.
@@ -68,7 +68,7 @@ type JUnitSkipped struct {
 }
 
 // Format writes the execution result as JUnit XML.
-func (f *JUnitFormatter) Format(result *engine.ExecutionResult) error {
+func (f *JUnitFormatter) Format(result *execution.ExecutionResult) error {
 	// Create a single test suite for the profile execution
 	suite := JUnitTestSuite{
 		Name:     result.ProfileName,
@@ -130,7 +130,7 @@ func (f *JUnitFormatter) Format(result *engine.ExecutionResult) error {
 	return err
 }
 
-func formatObservations(ctrl engine.ControlResult) string {
+func formatObservations(ctrl execution.ControlResult) string {
 	var out string
 	for _, obs := range ctrl.Observations {
 		if obs.Status != domain.StatusPass {

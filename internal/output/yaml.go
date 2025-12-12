@@ -4,7 +4,7 @@ import (
 	"io"
 
 	"github.com/goccy/go-yaml"
-	"github.com/whiskeyjimbo/reglet/internal/engine"
+	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
 )
 
 // YAMLFormatter formats execution results as YAML.
@@ -18,7 +18,7 @@ func NewYAMLFormatter(w io.Writer) *YAMLFormatter {
 }
 
 // Format writes the execution result as YAML.
-func (f *YAMLFormatter) Format(result *engine.ExecutionResult) error {
+func (f *YAMLFormatter) Format(result *execution.ExecutionResult) error {
 	encoder := yaml.NewEncoder(f.writer, yaml.Indent(2))
 
 	if err := encoder.Encode(result); err != nil {

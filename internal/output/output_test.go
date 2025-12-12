@@ -11,16 +11,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/whiskeyjimbo/reglet/internal/domain"
-	"github.com/whiskeyjimbo/reglet/internal/engine"
+	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
 	"github.com/whiskeyjimbo/reglet/internal/wasm"
 )
 
 // createTestResult creates a sample execution result for testing.
-func createTestResult() *engine.ExecutionResult {
-	result := engine.NewExecutionResult("test-profile", "1.0.0")
+func createTestResult() *execution.ExecutionResult {
+	result := execution.NewExecutionResult("test-profile", "1.0.0")
 
 	// Add a passing control
-	passingControl := engine.ControlResult{
+	passingControl := execution.ControlResult{
 		ID:          "ctrl-1",
 		Name:        "Test Control 1",
 		Description: "A test control that passes",
@@ -29,7 +29,7 @@ func createTestResult() *engine.ExecutionResult {
 		Status:      domain.StatusPass,
 		Message:     "All 2 checks passed",
 		Duration:    100 * time.Millisecond,
-		Observations: []engine.ObservationResult{
+		Observations: []execution.ObservationResult{
 			{
 				Plugin: "file",
 				Config: map[string]interface{}{
@@ -68,7 +68,7 @@ func createTestResult() *engine.ExecutionResult {
 	}
 
 	// Add a failing control
-	failingControl := engine.ControlResult{
+	failingControl := execution.ControlResult{
 		ID:          "ctrl-2",
 		Name:        "Test Control 2",
 		Description: "A test control that fails",
@@ -76,7 +76,7 @@ func createTestResult() *engine.ExecutionResult {
 		Status:      domain.StatusFail,
 		Message:     "1 check failed",
 		Duration:    50 * time.Millisecond,
-		Observations: []engine.ObservationResult{
+		Observations: []execution.ObservationResult{
 			{
 				Plugin: "file",
 				Config: map[string]interface{}{
@@ -98,14 +98,14 @@ func createTestResult() *engine.ExecutionResult {
 	}
 
 	// Add an error control
-	errorControl := engine.ControlResult{
+	errorControl := execution.ControlResult{
 		ID:       "ctrl-3",
 		Name:     "Test Control 3",
 		Severity: "critical",
 		Status:   domain.StatusError,
 		Message:  "Plugin load failed",
 		Duration: 10 * time.Millisecond,
-		Observations: []engine.ObservationResult{
+		Observations: []execution.ObservationResult{
 			{
 				Plugin: "nonexistent",
 				Config: map[string]interface{}{
@@ -153,7 +153,7 @@ func TestTableFormatter_Format(t *testing.T) {
 func TestTableFormatter_EmptyResult(t *testing.T) {
 	result := createTestResult()
 	result.ProfileName = "empty-profile"
-	result.Controls = []engine.ControlResult{}
+	result.Controls = []execution.ControlResult{}
 
 	var buf bytes.Buffer
 	formatter := NewTableFormatter(&buf)
@@ -179,7 +179,7 @@ func TestJSONFormatter_Format_Indented(t *testing.T) {
 	output := buf.String()
 
 	// Verify it's valid JSON
-	var decoded engine.ExecutionResult
+	var decoded execution.ExecutionResult
 	err = json.Unmarshal([]byte(output), &decoded)
 	require.NoError(t, err)
 
@@ -207,7 +207,7 @@ func TestJSONFormatter_Format_Compact(t *testing.T) {
 	output := buf.String()
 
 	// Verify it's valid JSON
-	var decoded engine.ExecutionResult
+	var decoded execution.ExecutionResult
 	err = json.Unmarshal([]byte(output), &decoded)
 	require.NoError(t, err)
 
@@ -234,7 +234,7 @@ func TestYAMLFormatter_Format(t *testing.T) {
 	output := buf.String()
 
 	// Verify it's valid YAML
-	var decoded engine.ExecutionResult
+	var decoded execution.ExecutionResult
 	err = yaml.Unmarshal([]byte(output), &decoded)
 	require.NoError(t, err)
 
@@ -331,7 +331,7 @@ func TestJSONFormatter_PreservesTypes(t *testing.T) {
 	require.NoError(t, err)
 
 	// Decode and verify types are preserved
-	var decoded engine.ExecutionResult
+	var decoded execution.ExecutionResult
 	err = json.Unmarshal(buf.Bytes(), &decoded)
 	require.NoError(t, err)
 
@@ -356,7 +356,7 @@ func TestYAMLFormatter_PreservesTypes(t *testing.T) {
 	require.NoError(t, err)
 
 	// Decode and verify types are preserved
-	var decoded engine.ExecutionResult
+	var decoded execution.ExecutionResult
 	err = yaml.Unmarshal(buf.Bytes(), &decoded)
 	require.NoError(t, err)
 

@@ -8,6 +8,7 @@ import (
 	"github.com/expr-lang/expr/vm"
 	"github.com/whiskeyjimbo/reglet/internal/config"
 	"github.com/whiskeyjimbo/reglet/internal/domain"
+	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
 	"github.com/whiskeyjimbo/reglet/internal/domain/services"
 	"github.com/whiskeyjimbo/reglet/internal/redaction"
 	"github.com/whiskeyjimbo/reglet/internal/wasm"
@@ -135,9 +136,9 @@ func NewEngineWithConfig(ctx context.Context, cfg ExecutionConfig) (*Engine, err
 }
 
 // Execute runs a complete profile and returns the result.
-func (e *Engine) Execute(ctx context.Context, profile *config.Profile) (*ExecutionResult, error) {
+func (e *Engine) Execute(ctx context.Context, profile *config.Profile) (*execution.ExecutionResult, error) {
 	// Create execution result
-	result := NewExecutionResult(profile.Metadata.Name, profile.Metadata.Version)
+	result := execution.NewExecutionResult(profile.Metadata.Name, profile.Metadata.Version)
 
 	// Calculate required dependencies if enabled
 	var requiredControls map[string]bool
@@ -197,7 +198,7 @@ func (e *Engine) resolveDependencies(profile *config.Profile) (map[string]bool, 
 // executeControlsParallel executes controls in parallel, respecting dependencies.
 // Controls are organized into levels by BuildControlDAG, and each level is executed
 // sequentially while controls within a level run in parallel.
-func (e *Engine) executeControlsParallel(ctx context.Context, controls []config.Control, result *ExecutionResult, requiredDeps map[string]bool) error {
+func (e *Engine) executeControlsParallel(ctx context.Context, controls []config.Control, result *execution.ExecutionResult, requiredDeps map[string]bool) error {
 	// Build dependency graph and get control levels
 	resolver := services.NewDependencyResolver()
 	levels, err := resolver.BuildControlDAG(controls)
@@ -234,16 +235,16 @@ func (e *Engine) executeControlsParallel(ctx context.Context, controls []config.
 }
 
 // executeControl executes a single control and returns its result.
-func (e *Engine) executeControl(ctx context.Context, ctrl config.Control, execResult *ExecutionResult, requiredDeps map[string]bool) ControlResult {
+func (e *Engine) executeControl(ctx context.Context, ctrl config.Control, execResult *execution.ExecutionResult, requiredDeps map[string]bool) execution.ControlResult {
 	startTime := time.Now()
 
-	result := ControlResult{
+	result := execution.ControlResult{
 		ID:           ctrl.ID,
 		Name:         ctrl.Name,
 		Description:  ctrl.Description,
 		Severity:     ctrl.Severity,
 		Tags:         ctrl.Tags,
-		Observations: make([]ObservationResult, 0, len(ctrl.Observations)),
+		Observations: make([]execution.ObservationResult, 0, len(ctrl.Observations)),
 	}
 
 	// Check if control should run (filtering)
@@ -328,7 +329,7 @@ func (e *Engine) shouldRun(ctrl config.Control) (bool, string) {
 }
 
 // executeObservationsParallel executes observations in parallel with concurrency limits.
-func (e *Engine) executeObservationsParallel(ctx context.Context, observations []config.Observation) []ObservationResult {
+func (e *Engine) executeObservationsParallel(ctx context.Context, observations []config.Observation) []execution.ObservationResult {
 	g, ctx := errgroup.WithContext(ctx)
 
 	// Apply concurrency limit if specified
@@ -338,7 +339,7 @@ func (e *Engine) executeObservationsParallel(ctx context.Context, observations [
 
 	// Pre-allocate results slice to exact size needed
 	// Each goroutine writes to a unique index - no mutex needed
-	results := make([]ObservationResult, len(observations))
+	results := make([]execution.ObservationResult, len(observations))
 
 	// Execute each observation in parallel
 	for i, obs := range observations {
@@ -357,7 +358,7 @@ func (e *Engine) executeObservationsParallel(ctx context.Context, observations [
 }
 
 // generateControlMessage generates a human-readable message for the control result.
-func generateControlMessage(status domain.Status, observations []ObservationResult) string {
+func generateControlMessage(status domain.Status, observations []execution.ObservationResult) string {
 	switch status {
 	case domain.StatusPass:
 		if len(observations) == 1 {

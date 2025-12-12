@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/whiskeyjimbo/reglet/internal/engine"
+	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
 )
 
 // JSONFormatter formats execution results as JSON.
@@ -23,7 +23,7 @@ func NewJSONFormatter(w io.Writer, indent bool) *JSONFormatter {
 }
 
 // Format writes the execution result as JSON.
-func (f *JSONFormatter) Format(result *engine.ExecutionResult) error {
+func (f *JSONFormatter) Format(result *execution.ExecutionResult) error {
 	var data []byte
 	var err error
 

@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/whiskeyjimbo/reglet/internal/config"
 	"github.com/whiskeyjimbo/reglet/internal/domain"
+	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
 	"github.com/whiskeyjimbo/reglet/internal/domain/services"
 	"github.com/whiskeyjimbo/reglet/internal/wasm"
 )
@@ -32,7 +33,7 @@ func TestNewEngine(t *testing.T) {
 
 func TestGenerateControlMessage_SinglePass(t *testing.T) {
 	t.Parallel()
-	observations := []ObservationResult{
+	observations := []execution.ObservationResult{
 		{Status: domain.StatusPass},
 	}
 
@@ -42,7 +43,7 @@ func TestGenerateControlMessage_SinglePass(t *testing.T) {
 
 func TestGenerateControlMessage_MultiplePass(t *testing.T) {
 	t.Parallel()
-	observations := []ObservationResult{
+	observations := []execution.ObservationResult{
 		{Status: domain.StatusPass},
 		{Status: domain.StatusPass},
 		{Status: domain.StatusPass},
@@ -54,7 +55,7 @@ func TestGenerateControlMessage_MultiplePass(t *testing.T) {
 
 func TestGenerateControlMessage_SingleFail(t *testing.T) {
 	t.Parallel()
-	observations := []ObservationResult{
+	observations := []execution.ObservationResult{
 		{Status: domain.StatusPass},
 		{Status: domain.StatusFail},
 	}
@@ -65,7 +66,7 @@ func TestGenerateControlMessage_SingleFail(t *testing.T) {
 
 func TestGenerateControlMessage_MultipleFail(t *testing.T) {
 	t.Parallel()
-	observations := []ObservationResult{
+	observations := []execution.ObservationResult{
 		{Status: domain.StatusFail},
 		{Status: domain.StatusFail},
 		{Status: domain.StatusPass},
@@ -77,7 +78,7 @@ func TestGenerateControlMessage_MultipleFail(t *testing.T) {
 
 func TestGenerateControlMessage_SingleError(t *testing.T) {
 	t.Parallel()
-	observations := []ObservationResult{
+	observations := []execution.ObservationResult{
 		{
 			Status: domain.StatusError,
 			Error:  &wasm.PluginError{Code: "test", Message: "something went wrong"},
@@ -90,7 +91,7 @@ func TestGenerateControlMessage_SingleError(t *testing.T) {
 
 func TestGenerateControlMessage_SingleErrorNoMessage(t *testing.T) {
 	t.Parallel()
-	observations := []ObservationResult{
+	observations := []execution.ObservationResult{
 		{
 			Status: domain.StatusError,
 			Error:  nil, // No error object
@@ -103,7 +104,7 @@ func TestGenerateControlMessage_SingleErrorNoMessage(t *testing.T) {
 
 func TestGenerateControlMessage_MultipleErrors(t *testing.T) {
 	t.Parallel()
-	observations := []ObservationResult{
+	observations := []execution.ObservationResult{
 		{Status: domain.StatusError, Error: &wasm.PluginError{Code: "test", Message: "error 1"}},
 		{Status: domain.StatusError, Error: &wasm.PluginError{Code: "test", Message: "error 2"}},
 		{Status: domain.StatusPass},
@@ -139,7 +140,7 @@ func TestExecuteControl_SingleObservation(t *testing.T) {
 	}
 
 	// Create empty execution result for dependency checking
-	execResult := NewExecutionResult("test", "1.0.0")
+	execResult := execution.NewExecutionResult("test", "1.0.0")
 	result := engine.executeControl(ctx, ctrl, execResult, nil)
 
 	assert.Equal(t, "test-control", result.ID)
@@ -181,7 +182,7 @@ func TestExecuteControl_MultipleObservations(t *testing.T) {
 	}
 
 	// Create empty execution result for dependency checking
-	execResult := NewExecutionResult("test", "1.0.0")
+	execResult := execution.NewExecutionResult("test", "1.0.0")
 	result := engine.executeControl(ctx, ctrl, execResult, nil)
 
 	assert.Equal(t, "multi-test", result.ID)

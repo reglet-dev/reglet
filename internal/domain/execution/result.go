@@ -1,6 +1,5 @@
-// Package engine provides profile execution orchestration for Reglet.
-// It coordinates plugin execution and aggregates results.
-package engine
+// Package execution provides domain models for execution results.
+package execution
 
 import (
 	"sync"
@@ -123,10 +122,7 @@ func (r *ExecutionResult) GetControlStatus(id string) (domain.Status, bool) {
 }
 
 // GetControlResultByID returns a pointer to the control result with the given ID, or nil if not found.
-// Thread-safe. Note: Returning a pointer to an element in a slice that might be reallocated
-// is risky if concurrent appends happen. However, AddControlResult uses lock.
-// This method should ideally be used after execution or with care.
-// For read-only access after execution, it's fine.
+// Thread-safe.
 func (r *ExecutionResult) GetControlResultByID(id string) *ControlResult {
 	r.mu.Lock()
 	defer r.mu.Unlock()

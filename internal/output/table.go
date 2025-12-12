@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/whiskeyjimbo/reglet/internal/domain"
-	"github.com/whiskeyjimbo/reglet/internal/engine"
+	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
 )
 
 const (
@@ -47,7 +47,7 @@ func (f *TableFormatter) colorize(text, code string) string {
 // Format writes the execution result as a table.
 //
 //nolint:errcheck // Table formatting errors are non-critical (best-effort terminal output)
-func (f *TableFormatter) Format(result *engine.ExecutionResult) error {
+func (f *TableFormatter) Format(result *execution.ExecutionResult) error {
 	// Print header
 	fmt.Fprintln(f.writer, f.colorize(strings.Repeat("─", 80), colorGray))
 	fmt.Fprintf(f.writer, "Profile: %s (v%s)\n", f.colorize(result.ProfileName, colorBold), result.ProfileVersion)
@@ -80,7 +80,7 @@ func (f *TableFormatter) Format(result *engine.ExecutionResult) error {
 // formatControl formats a single control.
 //
 //nolint:errcheck // Best-effort terminal output
-func (f *TableFormatter) formatControl(ctrl engine.ControlResult) {
+func (f *TableFormatter) formatControl(ctrl execution.ControlResult) {
 	// Status symbol and color
 	statusSymbol, statusColor := f.getStatusInfo(ctrl.Status)
 	coloredSymbol := f.colorize(statusSymbol, statusColor)
@@ -133,7 +133,7 @@ func (f *TableFormatter) formatControl(ctrl engine.ControlResult) {
 // formatObservation formats a single observation.
 //
 //nolint:errcheck // Best-effort terminal output
-func (f *TableFormatter) formatObservation(obs engine.ObservationResult, index int) {
+func (f *TableFormatter) formatObservation(obs execution.ObservationResult, index int) {
 	statusSymbol, statusColor := f.getStatusInfo(obs.Status)
 	coloredSymbol := f.colorize(statusSymbol, statusColor)
 
@@ -233,7 +233,7 @@ func (f *TableFormatter) formatValue(value interface{}) string {
 // formatSummary formats the summary statistics.
 //
 //nolint:errcheck // Best-effort terminal output
-func (f *TableFormatter) formatSummary(summary engine.ResultSummary) {
+func (f *TableFormatter) formatSummary(summary execution.ResultSummary) {
 	fmt.Fprintln(f.writer, f.colorize("Summary:", colorBold))
 	fmt.Fprintln(f.writer, f.colorize(strings.Repeat("─", 80), colorGray))
 

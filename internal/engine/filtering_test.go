@@ -12,6 +12,7 @@ import (
 	"github.com/whiskeyjimbo/reglet/internal/capabilities"
 	"github.com/whiskeyjimbo/reglet/internal/config"
 	"github.com/whiskeyjimbo/reglet/internal/domain"
+	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
 )
 
 // TestFiltering_EndToEnd simulates a full run with 20 controls and filtering.
@@ -117,7 +118,7 @@ func TestFiltering_EndToEnd(t *testing.T) {
 	assert.Equal(t, 0, result.Summary.ErrorControls)
 
 	// Map results by ID for verification (since parallel exec makes order non-deterministic)
-	resultsMap := make(map[string]ControlResult)
+	resultsMap := make(map[string]execution.ControlResult)
 	for _, ctrl := range result.Controls {
 		resultsMap[ctrl.ID] = ctrl
 	}

@@ -12,6 +12,7 @@ import (
 	"github.com/expr-lang/expr"
 	"github.com/whiskeyjimbo/reglet/internal/config"
 	"github.com/whiskeyjimbo/reglet/internal/domain"
+	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
 	"github.com/whiskeyjimbo/reglet/internal/domain/services"
 	"github.com/whiskeyjimbo/reglet/internal/redaction"
 	"github.com/whiskeyjimbo/reglet/internal/wasm"
@@ -79,10 +80,10 @@ func findProjectRoot() string {
 }
 
 // Execute runs a single observation and returns the result.
-func (e *ObservationExecutor) Execute(ctx context.Context, obs config.Observation) ObservationResult {
+func (e *ObservationExecutor) Execute(ctx context.Context, obs config.Observation) execution.ObservationResult {
 	startTime := time.Now()
 
-	result := ObservationResult{
+	result := execution.ObservationResult{
 		Plugin:   obs.Plugin,
 		Config:   obs.Config,
 		Duration: 0,

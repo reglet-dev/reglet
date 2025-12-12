@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/whiskeyjimbo/reglet/internal/capabilities"
 	"github.com/whiskeyjimbo/reglet/internal/config"
+	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
 	"github.com/whiskeyjimbo/reglet/internal/domain/services"
 	"github.com/whiskeyjimbo/reglet/internal/engine"
 	"github.com/whiskeyjimbo/reglet/internal/output"
@@ -290,7 +291,7 @@ func determinePluginDir() (string, error) {
 }
 
 // formatOutput formats the result using the specified formatter
-func formatOutput(writer *os.File, result *engine.ExecutionResult, format string) error {
+func formatOutput(writer *os.File, result *execution.ExecutionResult, format string) error {
 	switch format {
 	case "table":
 		formatter := output.NewTableFormatter(writer)
