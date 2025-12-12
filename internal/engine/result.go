@@ -7,19 +7,22 @@ import (
 	"time"
 
 	"github.com/whiskeyjimbo/reglet/internal/domain"
+	"github.com/whiskeyjimbo/reglet/internal/domain/valueobjects"
 	"github.com/whiskeyjimbo/reglet/internal/wasm"
 )
 
 // ExecutionResult represents the complete result of executing a profile.
 type ExecutionResult struct {
-	ProfileName    string          `json:"profile_name" yaml:"profile_name"`
-	ProfileVersion string          `json:"profile_version" yaml:"profile_version"`
-	StartTime      time.Time       `json:"start_time" yaml:"start_time"`
-	EndTime        time.Time       `json:"end_time" yaml:"end_time"`
-	Duration       time.Duration   `json:"duration_ms" yaml:"duration_ms"`
-	Controls       []ControlResult `json:"controls" yaml:"controls"`
-	Summary        ResultSummary   `json:"summary" yaml:"summary"`
-	mu             sync.Mutex      // Protects Controls for concurrent AddControlResult calls
+	ExecutionID    valueobjects.ExecutionID `json:"execution_id" yaml:"execution_id"`
+	Version        int                      `json:"version" yaml:"version"` // For optimistic locking
+	ProfileName    string                   `json:"profile_name" yaml:"profile_name"`
+	ProfileVersion string                   `json:"profile_version" yaml:"profile_version"`
+	StartTime      time.Time                `json:"start_time" yaml:"start_time"`
+	EndTime        time.Time                `json:"end_time" yaml:"end_time"`
+	Duration       time.Duration            `json:"duration_ms" yaml:"duration_ms"`
+	Controls       []ControlResult          `json:"controls" yaml:"controls"`
+	Summary        ResultSummary            `json:"summary" yaml:"summary"`
+	mu             sync.Mutex               // Protects Controls for concurrent AddControlResult calls
 }
 
 // ControlResult represents the result of executing a single control.
@@ -62,10 +65,12 @@ type ResultSummary struct {
 // NewExecutionResult creates a new execution result.
 func NewExecutionResult(profileName, profileVersion string) *ExecutionResult {
 	return &ExecutionResult{
+		ExecutionID:    valueobjects.NewExecutionID(),
 		ProfileName:    profileName,
 		ProfileVersion: profileVersion,
 		StartTime:      time.Now(),
 		Controls:       make([]ControlResult, 0),
+		Version:        1,
 	}
 }
 
@@ -75,6 +80,11 @@ func (r *ExecutionResult) AddControlResult(cr ControlResult) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.Controls = append(r.Controls, cr)
+}
+
+// AddPartialResult adds a control result from a partial execution (e.g. worker).
+func (r *ExecutionResult) AddPartialResult(cr ControlResult) {
+	r.AddControlResult(cr)
 }
 
 // GetControlStatus returns the status of a control by ID.
