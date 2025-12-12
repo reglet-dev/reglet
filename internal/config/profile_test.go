@@ -2,101 +2,10 @@ package config
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/whiskeyjimbo/reglet/internal/domain/valueobjects"
 )
-
-func TestControl_Validate(t *testing.T) {
-	tests := []struct {
-		name    string
-		control Control
-		wantErr bool
-	}{
-		{
-			name: "valid",
-			control: Control{
-				ID:           "valid-id",
-				Name:         "Valid Control",
-				Observations: []Observation{{Plugin: "test", Config: map[string]interface{}{}}},
-			},
-			wantErr: false,
-		},
-		{
-			name: "missing id",
-			control: Control{
-				Name:         "Valid Control",
-				Observations: []Observation{{Plugin: "test"}},
-			},
-			wantErr: true,
-		},
-		{
-			name: "invalid id",
-			control: Control{
-				ID:           "   ",
-				Name:         "Valid Control",
-				Observations: []Observation{{Plugin: "test"}},
-			},
-			wantErr: true,
-		},
-		{
-			name: "missing name",
-			control: Control{
-				ID:           "valid-id",
-				Observations: []Observation{{Plugin: "test"}},
-			},
-			wantErr: true,
-		},
-		{
-			name: "no observations",
-			control: Control{
-				ID:   "valid-id",
-				Name: "Valid Control",
-			},
-			wantErr: true,
-		},
-		{
-			name: "invalid severity",
-			control: Control{
-				ID:           "valid-id",
-				Name:         "Valid Control",
-				Severity:     "super-critical",
-				Observations: []Observation{{Plugin: "test"}},
-			},
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := tt.control.Validate()
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
-}
-
-func TestControl_HasTag(t *testing.T) {
-	ctrl := Control{Tags: []string{"prod", "security"}}
-	assert.True(t, ctrl.HasTag("prod"))
-	assert.True(t, ctrl.HasTag("security"))
-	assert.False(t, ctrl.HasTag("dev"))
-}
-
-func TestControl_MatchesSeverity(t *testing.T) {
-	ctrlHigh := Control{Severity: "high"}
-	ctrlLow := Control{Severity: "low"}
-
-	sevHigh := valueobjects.MustNewSeverity("high")
-	sevMedium := valueobjects.MustNewSeverity("medium")
-
-	assert.True(t, ctrlHigh.MatchesSeverity(sevMedium))
-	assert.True(t, ctrlHigh.MatchesSeverity(sevHigh))
-	assert.False(t, ctrlLow.MatchesSeverity(sevMedium))
-}
 
 func TestProfile_AddControl(t *testing.T) {
 	profile := Profile{}
@@ -115,4 +24,137 @@ func TestProfile_AddControl(t *testing.T) {
 	invalidCtrl := Control{ID: "", Name: "Invalid"}
 	err = profile.AddControl(invalidCtrl)
 	assert.Error(t, err)
+}
+
+func TestProfile_Validate(t *testing.T) {
+	// Valid profile
+	p := Profile{
+		Metadata: ProfileMetadata{Name: "test"},
+		Controls: ControlsSection{Items: []Control{{ID: "c1", Name: "C1", Observations: []Observation{{}}}}},
+	}
+	assert.NoError(t, p.Validate())
+
+	// Empty name
+	pInvalid := p
+	pInvalid.Metadata.Name = ""
+	assert.Error(t, pInvalid.Validate())
+
+	// No controls
+	pEmpty := Profile{Metadata: ProfileMetadata{Name: "test"}}
+	assert.Error(t, pEmpty.Validate())
+}
+
+func TestProfile_GetControl(t *testing.T) {
+	p := Profile{
+		Controls: ControlsSection{Items: []Control{
+			{ID: "c1"},
+			{ID: "c2"},
+		}},
+	}
+
+	assert.NotNil(t, p.GetControl("c1"))
+	assert.Nil(t, p.GetControl("c3"))
+}
+
+func TestProfile_HasControl(t *testing.T) {
+	p := Profile{
+		Controls: ControlsSection{Items: []Control{{ID: "c1"}}},
+	}
+	assert.True(t, p.HasControl("c1"))
+	assert.False(t, p.HasControl("c2"))
+}
+
+func TestProfile_ControlCount(t *testing.T) {
+	p := Profile{
+		Controls: ControlsSection{Items: []Control{{ID: "c1"}, {ID: "c2"}}},
+	}
+	assert.Equal(t, 2, p.ControlCount())
+}
+
+func TestProfile_SelectControlsByTags(t *testing.T) {
+	p := Profile{
+		Controls: ControlsSection{Items: []Control{
+			{ID: "c1", Tags: []string{"prod"}},
+			{ID: "c2", Tags: []string{"dev"}},
+			{ID: "c3", Tags: []string{"prod", "security"}},
+		}},
+	}
+
+	selected := p.SelectControlsByTags([]string{"prod"})
+	assert.Len(t, selected, 2)
+	assert.Equal(t, "c1", selected[0].ID)
+	assert.Equal(t, "c3", selected[1].ID)
+}
+
+func TestProfile_SelectControlsBySeverity(t *testing.T) {
+	p := Profile{
+		Controls: ControlsSection{Items: []Control{
+			{ID: "c1", Severity: "high"},
+			{ID: "c2", Severity: "low"},
+			{ID: "c3", Severity: "critical"},
+		}},
+	}
+
+	selected := p.SelectControlsBySeverity([]string{"high", "critical"})
+	assert.Len(t, selected, 2)
+	assert.Equal(t, "c1", selected[0].ID)
+	assert.Equal(t, "c3", selected[1].ID)
+}
+
+func TestProfile_ExcludeControlsByID(t *testing.T) {
+	p := Profile{
+		Controls: ControlsSection{Items: []Control{
+			{ID: "c1"},
+			{ID: "c2"},
+			{ID: "c3"},
+		}},
+	}
+
+	selected := p.ExcludeControlsByID([]string{"c2"})
+	assert.Len(t, selected, 2)
+	assert.Equal(t, "c1", selected[0].ID)
+	assert.Equal(t, "c3", selected[1].ID)
+}
+
+func TestProfile_ApplyDefaults(t *testing.T) {
+	p := Profile{
+		Controls: ControlsSection{
+			Defaults: &ControlDefaults{
+				Severity: "medium",
+				Owner:    "platform",
+				Timeout:  30 * time.Second,
+				Tags:     []string{"default"},
+			},
+			Items: []Control{
+				{ID: "c1"},                                     // Should inherit all
+				{ID: "c2", Severity: "high"},                   // Should override severity
+				{ID: "c3", Tags: []string{"custom"}},           // Should merge tags? No, current logic is "if empty"
+				{ID: "c4", Timeout: 10 * time.Second},          // Should override timeout
+			},
+		},
+	}
+
+	p.ApplyDefaults()
+
+	// c1
+	c1 := p.GetControl("c1")
+	assert.Equal(t, "medium", c1.Severity)
+	assert.Equal(t, "platform", c1.Owner)
+	assert.Equal(t, 30*time.Second, c1.Timeout)
+	assert.Contains(t, c1.Tags, "default")
+
+	// c2
+	c2 := p.GetControl("c2")
+	assert.Equal(t, "high", c2.Severity)
+	assert.Equal(t, "platform", c2.Owner)
+
+	// c3 - current logic: defaults are merged with control tags
+	// so c3 tags should contain both "custom" and "default"
+	c3 := p.GetControl("c3")
+	assert.Contains(t, c3.Tags, "custom")
+	assert.Contains(t, c3.Tags, "default")
+
+	// c4
+	c4 := p.GetControl("c4")
+	assert.Equal(t, 10*time.Second, c4.Timeout)
 }

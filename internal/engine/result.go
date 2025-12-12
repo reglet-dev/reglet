@@ -64,14 +64,34 @@ type ResultSummary struct {
 
 // NewExecutionResult creates a new execution result.
 func NewExecutionResult(profileName, profileVersion string) *ExecutionResult {
+	return NewExecutionResultWithID(valueobjects.NewExecutionID(), profileName, profileVersion)
+}
+
+// NewExecutionResultWithID creates a new execution result with a specific ID.
+func NewExecutionResultWithID(id valueobjects.ExecutionID, profileName, profileVersion string) *ExecutionResult {
 	return &ExecutionResult{
-		ExecutionID:    valueobjects.NewExecutionID(),
+		ExecutionID:    id,
 		ProfileName:    profileName,
 		ProfileVersion: profileVersion,
 		StartTime:      time.Now(),
 		Controls:       make([]ControlResult, 0),
 		Version:        1,
 	}
+}
+
+// GetID returns the execution ID.
+func (r *ExecutionResult) GetID() valueobjects.ExecutionID {
+	return r.ExecutionID
+}
+
+// GetVersion returns the optimistic locking version.
+func (r *ExecutionResult) GetVersion() int {
+	return r.Version
+}
+
+// IncrementVersion increments the version counter.
+func (r *ExecutionResult) IncrementVersion() {
+	r.Version++
 }
 
 // AddControlResult adds a control result to the execution result.
@@ -100,6 +120,30 @@ func (r *ExecutionResult) GetControlStatus(id string) (domain.Status, bool) {
 		}
 	}
 	return "", false
+}
+
+// GetControlResultByID returns a pointer to the control result with the given ID, or nil if not found.
+// Thread-safe. Note: Returning a pointer to an element in a slice that might be reallocated
+// is risky if concurrent appends happen. However, AddControlResult uses lock.
+// This method should ideally be used after execution or with care.
+// For read-only access after execution, it's fine.
+func (r *ExecutionResult) GetControlResultByID(id string) *ControlResult {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	for i := range r.Controls {
+		if r.Controls[i].ID == id {
+			return &r.Controls[i]
+		}
+	}
+	return nil
+}
+
+// IsComplete checks if the number of executed controls matches the expected count.
+func (r *ExecutionResult) IsComplete(expectedControlCount int) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return len(r.Controls) >= expectedControlCount
 }
 
 // Finalize completes the execution result and calculates the summary.
