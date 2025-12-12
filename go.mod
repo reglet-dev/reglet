@@ -5,6 +5,7 @@ go 1.25.4
 require (
 	github.com/expr-lang/expr v1.17.6
 	github.com/goccy/go-yaml v1.19.0
+	github.com/google/uuid v1.6.0
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
