@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
 )
 
 // mockSchemaProvider is a mock implementation of PluginSchemaProvider for testing
@@ -58,17 +59,17 @@ func Test_ValidateWithSchemas_Success(t *testing.T) {
 		"required": []string{"path"},
 	})
 
-	profile := &Profile{
-		Metadata: ProfileMetadata{
+	profile := &entities.Profile{
+		Metadata: entities.ProfileMetadata{
 			Name:    "test-profile",
 			Version: "1.0.0",
 		},
-		Controls: ControlsSection{
-			Items: []Control{
+		Controls: entities.ControlsSection{
+			Items: []entities.Control{
 				{
 					ID:   "test-1",
 					Name: "Test Control",
-					Observations: []Observation{
+					Observations: []entities.Observation{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{
@@ -102,17 +103,17 @@ func Test_ValidateWithSchemas_TypeMismatch(t *testing.T) {
 		"required": []string{"url", "port"},
 	})
 
-	profile := &Profile{
-		Metadata: ProfileMetadata{
+	profile := &entities.Profile{
+		Metadata: entities.ProfileMetadata{
 			Name:    "test-profile",
 			Version: "1.0.0",
 		},
-		Controls: ControlsSection{
-			Items: []Control{
+		Controls: entities.ControlsSection{
+			Items: []entities.Control{
 				{
 					ID:   "test-1",
 					Name: "Test Control",
-					Observations: []Observation{
+					Observations: []entities.Observation{
 						{
 							Plugin: "http",
 							Config: map[string]interface{}{
@@ -146,17 +147,17 @@ func Test_ValidateWithSchemas_MissingRequiredField(t *testing.T) {
 		"required": []string{"path"},
 	})
 
-	profile := &Profile{
-		Metadata: ProfileMetadata{
+	profile := &entities.Profile{
+		Metadata: entities.ProfileMetadata{
 			Name:    "test-profile",
 			Version: "1.0.0",
 		},
-		Controls: ControlsSection{
-			Items: []Control{
+		Controls: entities.ControlsSection{
+			Items: []entities.Control{
 				{
 					ID:   "test-1",
 					Name: "Test Control",
-					Observations: []Observation{
+					Observations: []entities.Observation{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{
@@ -180,17 +181,17 @@ func Test_ValidateWithSchemas_NoSchema(t *testing.T) {
 	// Provider has no schema for the plugin
 	provider := newMockSchemaProvider()
 
-	profile := &Profile{
-		Metadata: ProfileMetadata{
+	profile := &entities.Profile{
+		Metadata: entities.ProfileMetadata{
 			Name:    "test-profile",
 			Version: "1.0.0",
 		},
-		Controls: ControlsSection{
-			Items: []Control{
+		Controls: entities.ControlsSection{
+			Items: []entities.Control{
 				{
 					ID:   "test-1",
 					Name: "Test Control",
-					Observations: []Observation{
+					Observations: []entities.Observation{
 						{
 							Plugin: "unknown",
 							Config: map[string]interface{}{
@@ -221,17 +222,17 @@ func Test_ValidateWithSchemas_StructuralValidationFirst(t *testing.T) {
 	})
 
 	// Profile with structural errors (should fail before schema validation)
-	profile := &Profile{
-		Metadata: ProfileMetadata{
+	profile := &entities.Profile{
+		Metadata: entities.ProfileMetadata{
 			Name:    "", // Missing required name
 			Version: "1.0.0",
 		},
-		Controls: ControlsSection{
-			Items: []Control{
+		Controls: entities.ControlsSection{
+			Items: []entities.Control{
 				{
 					ID:   "test-1",
 					Name: "Test Control",
-					Observations: []Observation{
+					Observations: []entities.Observation{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{
@@ -275,17 +276,17 @@ func Test_ValidateWithSchemas_MultipleErrors(t *testing.T) {
 		"required": []string{"url"},
 	})
 
-	profile := &Profile{
-		Metadata: ProfileMetadata{
+	profile := &entities.Profile{
+		Metadata: entities.ProfileMetadata{
 			Name:    "test-profile",
 			Version: "1.0.0",
 		},
-		Controls: ControlsSection{
-			Items: []Control{
+		Controls: entities.ControlsSection{
+			Items: []entities.Control{
 				{
 					ID:   "test-1",
 					Name: "Test Control 1",
-					Observations: []Observation{
+					Observations: []entities.Observation{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{
@@ -298,7 +299,7 @@ func Test_ValidateWithSchemas_MultipleErrors(t *testing.T) {
 				{
 					ID:   "test-2",
 					Name: "Test Control 2",
-					Observations: []Observation{
+					Observations: []entities.Observation{
 						{
 							Plugin: "http",
 							Config: map[string]interface{}{
@@ -499,12 +500,12 @@ func Test_ValidateWithSchemas_UsesCachedSchemas(t *testing.T) {
 	})
 
 	// Profile with 50 observations using the same plugin
-	controls := make([]Control, 50)
+	controls := make([]entities.Control, 50)
 	for i := 0; i < 50; i++ {
-		controls[i] = Control{
+		controls[i] = entities.Control{
 			ID:   fmt.Sprintf("test-%d", i),
 			Name: "Test Control",
-			Observations: []Observation{
+			Observations: []entities.Observation{
 				{
 					Plugin: "file",
 					Config: map[string]interface{}{
@@ -515,12 +516,12 @@ func Test_ValidateWithSchemas_UsesCachedSchemas(t *testing.T) {
 		}
 	}
 
-	profile := &Profile{
-		Metadata: ProfileMetadata{
+	profile := &entities.Profile{
+		Metadata: entities.ProfileMetadata{
 			Name:    "test-profile",
 			Version: "1.0.0",
 		},
-		Controls: ControlsSection{
+		Controls: entities.ControlsSection{
 			Items: controls,
 		},
 	}

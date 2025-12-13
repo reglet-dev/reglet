@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+
+	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
 )
 
 // Variable pattern: {{ .vars.key }} or {{ .vars.nested.key }}
@@ -14,7 +16,7 @@ var varPattern = regexp.MustCompile(`\{\{\s*\.vars\.([a-zA-Z0-9_.]+)\s*\}\}`)
 // It replaces {{ .vars.key }} patterns with values from the profile's vars map.
 // Supports nested paths like {{ .vars.paths.config }}.
 // Returns an error if a referenced variable is not found.
-func SubstituteVariables(profile *Profile) error {
+func SubstituteVariables(profile *entities.Profile) error {
 	if len(profile.Vars) == 0 {
 		// No variables defined, nothing to substitute
 		return nil

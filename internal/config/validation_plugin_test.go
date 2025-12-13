@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
 )
 
 // Test_validatePluginName_ValidNames tests that valid plugin names are accepted
@@ -143,13 +144,13 @@ func Test_validatePluginName_EdgeCases(t *testing.T) {
 func Test_validateObservation_WithInvalidPluginName(t *testing.T) {
 	tests := []struct {
 		name        string
-		obs         Observation
+		obs         entities.Observation
 		expectError bool
 		errorMsg    string
 	}{
 		{
 			name: "valid plugin name",
-			obs: Observation{
+			obs: entities.Observation{
 				Plugin: "file",
 				Config: map[string]interface{}{},
 			},
@@ -157,7 +158,7 @@ func Test_validateObservation_WithInvalidPluginName(t *testing.T) {
 		},
 		{
 			name: "path traversal in plugin name",
-			obs: Observation{
+			obs: entities.Observation{
 				Plugin: "../etc/passwd",
 				Config: map[string]interface{}{},
 			},
@@ -166,7 +167,7 @@ func Test_validateObservation_WithInvalidPluginName(t *testing.T) {
 		},
 		{
 			name: "empty plugin name",
-			obs: Observation{
+			obs: entities.Observation{
 				Plugin: "",
 				Config: map[string]interface{}{},
 			},
@@ -175,7 +176,7 @@ func Test_validateObservation_WithInvalidPluginName(t *testing.T) {
 		},
 		{
 			name: "plugin name with slash",
-			obs: Observation{
+			obs: entities.Observation{
 				Plugin: "plugins/file",
 				Config: map[string]interface{}{},
 			},

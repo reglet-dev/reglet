@@ -1,0 +1,106 @@
+package config
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	infraconfig "github.com/whiskeyjimbo/reglet/internal/infrastructure/config"
+)
+
+func TestSubstituteVariables_Simple(t *testing.T) {
+	yaml := `
+profile:
+  name: test-profile
+  version: 1.0.0
+
+vars:
+  test_file: /tmp/test.txt
+  environment: production
+
+controls:
+  items:
+    - id: test-control
+      name: Test Control
+      description: "Checking file in {{ .vars.environment }}"
+      observations:
+        - plugin: file
+          config:
+            path: "{{ .vars.test_file }}"
+            mode: exists
+`
+
+	loader := infraconfig.NewProfileLoader()
+	profile, err := loader.LoadProfileFromReader(strings.NewReader(yaml))
+	require.NoError(t, err)
+
+	err = SubstituteVariables(profile)
+	require.NoError(t, err)
+
+	// Verify substitution in description
+	assert.Equal(t, "Checking file in production", profile.Controls.Items[0].Description)
+
+	// Verify substitution in observation config
+	assert.Equal(t, "/tmp/test.txt", profile.Controls.Items[0].Observations[0].Config["path"])
+}
+
+func TestSubstituteVariables_Nested(t *testing.T) {
+	yaml := `
+profile:
+  name: test-profile
+  version: 1.0.0
+
+vars:
+  paths:
+    config: /etc/app/config.yaml
+    data: /var/lib/app/data
+
+controls:
+  items:
+    - id: test-control
+      name: Test Control
+      observations:
+        - plugin: file
+          config:
+            path: "{{ .vars.paths.config }}"
+`
+
+	loader := infraconfig.NewProfileLoader()
+	profile, err := loader.LoadProfileFromReader(strings.NewReader(yaml))
+	require.NoError(t, err)
+
+	err = SubstituteVariables(profile)
+	require.NoError(t, err)
+
+	// Verify nested variable substitution
+	assert.Equal(t, "/etc/app/config.yaml", profile.Controls.Items[0].Observations[0].Config["path"])
+}
+
+func TestSubstituteVariables_Missing(t *testing.T) {
+	yaml := `
+profile:
+  name: test-profile
+  version: 1.0.0
+
+vars:
+  existing_var: value
+
+controls:
+  items:
+    - id: test-control
+      name: Test Control
+      observations:
+        - plugin: file
+          config:
+            path: "{{ .vars.missing_var }}"
+`
+
+	loader := infraconfig.NewProfileLoader()
+	profile, err := loader.LoadProfileFromReader(strings.NewReader(yaml))
+	require.NoError(t, err)
+
+	err = SubstituteVariables(profile)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "variable not found: missing_var")
+}

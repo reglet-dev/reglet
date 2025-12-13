@@ -9,7 +9,8 @@ import (
 	"strings"
 	"sync"
 
-	jsonschema "github.com/santhosh-tekuri/jsonschema/v5"
+	"github.com/santhosh-tekuri/jsonschema/v5"
+	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
 )
 
 // Control ID must be alphanumeric with dashes and underscores
@@ -92,7 +93,7 @@ func (sc *SchemaCompiler) GetCompiledSchema(ctx context.Context, pluginName stri
 // Validate performs comprehensive validation of a profile.
 // Returns an error describing all validation failures found.
 // This performs structural validation only - no schema validation.
-func Validate(profile *Profile) error {
+func Validate(profile *entities.Profile) error {
 	var errors []string
 
 	// Validate metadata
@@ -115,7 +116,7 @@ func Validate(profile *Profile) error {
 // ValidateWithSchemas performs comprehensive validation including plugin config schema validation.
 // This requires a PluginSchemaProvider to fetch plugin schemas during validation.
 // Use this for pre-flight validation before execution.
-func ValidateWithSchemas(ctx context.Context, profile *Profile, provider PluginSchemaProvider) error {
+func ValidateWithSchemas(ctx context.Context, profile *entities.Profile, provider PluginSchemaProvider) error {
 	// First run basic structural validation
 	if err := Validate(profile); err != nil {
 		return err
@@ -142,7 +143,7 @@ func ValidateWithSchemas(ctx context.Context, profile *Profile, provider PluginS
 }
 
 // validateMetadata validates profile metadata fields.
-func validateMetadata(meta ProfileMetadata) error {
+func validateMetadata(meta entities.ProfileMetadata) error {
 	var errors []string
 
 	if meta.Name == "" {
@@ -166,7 +167,7 @@ func validateMetadata(meta ProfileMetadata) error {
 }
 
 // validateControls validates the controls section.
-func validateControls(controls ControlsSection) error {
+func validateControls(controls entities.ControlsSection) error {
 	if len(controls.Items) == 0 {
 		return fmt.Errorf("at least one control is required")
 	}
@@ -196,7 +197,7 @@ func validateControls(controls ControlsSection) error {
 }
 
 // validateControl validates a single control.
-func validateControl(ctrl Control) error {
+func validateControl(ctrl entities.Control) error {
 	var errors []string
 
 	// ID is required and must be valid format
@@ -259,7 +260,7 @@ func validatePluginName(name string) error {
 }
 
 // validateObservation validates a single observation.
-func validateObservation(obs Observation) error {
+func validateObservation(obs entities.Observation) error {
 	var errors []string
 
 	// Plugin is required
@@ -286,7 +287,7 @@ func validateObservation(obs Observation) error {
 
 // validateObservationSchemaCompiled validates an observation's config using a schema compiler.
 // This uses cached compiled schemas to avoid repeated compilation overhead.
-func validateObservationSchemaCompiled(ctx context.Context, obs Observation, compiler *SchemaCompiler) error {
+func validateObservationSchemaCompiled(ctx context.Context, obs entities.Observation, compiler *SchemaCompiler) error {
 	// Get compiled schema from cache or compile if needed
 	schema, err := compiler.GetCompiledSchema(ctx, obs.Plugin)
 	if err != nil {
