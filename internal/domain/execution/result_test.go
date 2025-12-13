@@ -4,11 +4,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/whiskeyjimbo/reglet/internal/domain/valueobjects"
+	"github.com/whiskeyjimbo/reglet/internal/domain/values"
 )
 
 func TestNewExecutionResultWithID(t *testing.T) {
-	id := valueobjects.NewExecutionID()
+	id := values.NewExecutionID()
 	result := NewExecutionResultWithID(id, "test", "1.0")
 
 	assert.True(t, result.GetID().Equals(id))
@@ -48,7 +48,7 @@ func TestExecutionResult_GetControlResultByID(t *testing.T) {
 func TestExecutionResult_AddPartialResult(t *testing.T) {
 	result := NewExecutionResult("test", "1.0")
 	result.AddPartialResult(ControlResult{ID: "c1"})
-	
+
 	assert.Len(t, result.Controls, 1)
 	assert.Equal(t, "c1", result.Controls[0].ID)
 }

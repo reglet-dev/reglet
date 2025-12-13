@@ -8,8 +8,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/whiskeyjimbo/reglet/internal/domain"
 	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
+	"github.com/whiskeyjimbo/reglet/internal/domain/values"
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/wasm"
 )
 
@@ -20,10 +20,10 @@ func TestJUnitFormatter_Format(t *testing.T) {
 	passingCtrl := execution.ControlResult{
 		ID:       "ctrl-1",
 		Name:     "Passing Control",
-		Status:   domain.StatusPass,
+		Status:   values.StatusPass,
 		Duration: 100 * time.Millisecond,
 		Observations: []execution.ObservationResult{
-			{Plugin: "test", Status: domain.StatusPass},
+			{Plugin: "test", Status: values.StatusPass},
 		},
 	}
 
@@ -31,13 +31,13 @@ func TestJUnitFormatter_Format(t *testing.T) {
 	failingCtrl := execution.ControlResult{
 		ID:       "ctrl-2",
 		Name:     "Failing Control",
-		Status:   domain.StatusFail,
+		Status:   values.StatusFail,
 		Message:  "Control failed",
 		Duration: 50 * time.Millisecond,
 		Observations: []execution.ObservationResult{
 			{
 				Plugin: "test",
-				Status: domain.StatusFail,
+				Status: values.StatusFail,
 				Evidence: &wasm.Evidence{
 					Data: map[string]interface{}{"key": "value"},
 				},
@@ -49,13 +49,13 @@ func TestJUnitFormatter_Format(t *testing.T) {
 	errorCtrl := execution.ControlResult{
 		ID:       "ctrl-3",
 		Name:     "Error Control",
-		Status:   domain.StatusError,
+		Status:   values.StatusError,
 		Message:  "Control error",
 		Duration: 10 * time.Millisecond,
 		Observations: []execution.ObservationResult{
 			{
 				Plugin: "test",
-				Status: domain.StatusError,
+				Status: values.StatusError,
 				Error:  &wasm.PluginError{Message: "Internal error"},
 			},
 		},
@@ -65,7 +65,7 @@ func TestJUnitFormatter_Format(t *testing.T) {
 	skippedCtrl := execution.ControlResult{
 		ID:         "ctrl-4",
 		Name:       "Skipped Control",
-		Status:     domain.StatusSkipped,
+		Status:     values.StatusSkipped,
 		SkipReason: "Not applicable",
 		Duration:   0,
 	}

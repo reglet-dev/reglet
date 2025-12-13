@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/expr-lang/expr"
-	"github.com/whiskeyjimbo/reglet/internal/domain"
 	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
 	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
 	"github.com/whiskeyjimbo/reglet/internal/domain/services"
+	"github.com/whiskeyjimbo/reglet/internal/domain/values"
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/redaction"
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/wasm"
 )
@@ -92,7 +92,7 @@ func (e *ObservationExecutor) Execute(ctx context.Context, obs entities.Observat
 	// Load the plugin
 	plugin, err := e.LoadPlugin(ctx, obs.Plugin)
 	if err != nil {
-		result.Status = domain.StatusError
+		result.Status = values.StatusError
 		result.Error = &wasm.PluginError{
 			Code:    "plugin_load_error",
 			Message: err.Error(),
@@ -110,7 +110,7 @@ func (e *ObservationExecutor) Execute(ctx context.Context, obs entities.Observat
 	// Execute the observation
 	wasmResult, err := plugin.Observe(ctx, wasmConfig)
 	if err != nil {
-		result.Status = domain.StatusError
+		result.Status = values.StatusError
 		result.Error = &wasm.PluginError{
 			Code:    "plugin_execution_error",
 			Message: err.Error(),
@@ -124,7 +124,7 @@ func (e *ObservationExecutor) Execute(ctx context.Context, obs entities.Observat
 
 	// If the plugin returned an error (Go error in observeFn.Call or processing failure)
 	if wasmResult.Error != nil { // This error is a Go error, not from Evidence
-		result.Status = domain.StatusError
+		result.Status = values.StatusError
 		result.Error = wasmResult.Error // Use the top-level error from wasmResult
 		result.Duration = time.Since(startTime)
 		return result
@@ -147,7 +147,7 @@ func (e *ObservationExecutor) Execute(ctx context.Context, obs entities.Observat
 				// Note: We don't necessarily want to set Evidence.Error for expectation failures
 				// as that changes semantics. Expect failures are StatusFail, not necessarily StatusError.
 				// However, if the service returned StatusError, we should propagate it.
-				if status == domain.StatusError {
+				if status == values.StatusError {
 					result.Error = &wasm.PluginError{Message: errMsg}
 				}
 			}
@@ -171,7 +171,7 @@ func (e *ObservationExecutor) Execute(ctx context.Context, obs entities.Observat
 	}
 
 	// Neither error nor evidence (unexpected)
-	result.Status = domain.StatusError
+	result.Status = values.StatusError
 	result.Error = &wasm.PluginError{
 		Code:    "invalid_plugin_result",
 		Message: "plugin returned neither evidence nor error",
@@ -203,12 +203,12 @@ func (e *ObservationExecutor) LoadPlugin(ctx context.Context, pluginName string)
 }
 
 // determineStatusWithExpect determines the observation status by evaluating expect expressions.
-func (e *ObservationExecutor) determineStatusWithExpect(ctx context.Context, wasmResult *wasm.ObservationResult, expects []string) (domain.Status, string) {
+func (e *ObservationExecutor) determineStatusWithExpect(ctx context.Context, wasmResult *wasm.ObservationResult, expects []string) (values.Status, string) {
 	aggregator := services.NewStatusAggregator()
 	return aggregator.DetermineObservationStatus(ctx, wasmResult.Evidence, expects)
 }
 
-func determineStatusFromEvidenceStatus(evidenceStatus bool) domain.Status {
+func determineStatusFromEvidenceStatus(evidenceStatus bool) values.Status {
 	aggregator := services.NewStatusAggregator()
 	return aggregator.StatusFromEvidenceStatus(evidenceStatus)
 }

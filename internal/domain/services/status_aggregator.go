@@ -10,8 +10,8 @@ import (
 	"strings"
 
 	"github.com/expr-lang/expr"
-	"github.com/whiskeyjimbo/reglet/internal/domain"
 	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
+	"github.com/whiskeyjimbo/reglet/internal/domain/values"
 )
 
 // StatusAggregator determines status at different levels of the execution hierarchy
@@ -32,9 +32,9 @@ func NewStatusAggregator() *StatusAggregator {
 // Rationale: If 9 observations FAIL and 1 errors, the control FAILED (not errored).
 // A proven compliance violation is more important than a technical error.
 // Auditors need to see definitive failures, not have them masked by errors.
-func (s *StatusAggregator) AggregateControlStatus(observationStatuses []domain.Status) domain.Status {
+func (s *StatusAggregator) AggregateControlStatus(observationStatuses []values.Status) values.Status {
 	if len(observationStatuses) == 0 {
-		return domain.StatusSkipped
+		return values.StatusSkipped
 	}
 
 	hasFailure := false
@@ -42,14 +42,14 @@ func (s *StatusAggregator) AggregateControlStatus(observationStatuses []domain.S
 
 	for _, status := range observationStatuses {
 		switch status {
-		case domain.StatusFail:
+		case values.StatusFail:
 			hasFailure = true
-		case domain.StatusError:
+		case values.StatusError:
 			hasError = true
-		case domain.StatusSkipped:
+		case values.StatusSkipped:
 			// Skipped observations don't affect control status
 			continue
-		case domain.StatusPass:
+		case values.StatusPass:
 			// Continue checking other observations
 			continue
 		}
@@ -57,26 +57,26 @@ func (s *StatusAggregator) AggregateControlStatus(observationStatuses []domain.S
 
 	// Precedence: Fail > Error > Pass
 	if hasFailure {
-		return domain.StatusFail
+		return values.StatusFail
 	}
 	if hasError {
-		return domain.StatusError
+		return values.StatusError
 	}
 
 	// All observations passed (or were skipped)
 	allSkipped := true
 	for _, status := range observationStatuses {
-		if status != domain.StatusSkipped {
+		if status != values.StatusSkipped {
 			allSkipped = false
 			break
 		}
 	}
 
 	if allSkipped {
-		return domain.StatusSkipped
+		return values.StatusSkipped
 	}
 
-	return domain.StatusPass
+	return values.StatusPass
 }
 
 // DetermineObservationStatus evaluates expect expressions against evidence data.
@@ -91,7 +91,7 @@ func (s *StatusAggregator) DetermineObservationStatus(
 	ctx context.Context,
 	evidence *execution.Evidence,
 	expects []string,
-) (domain.Status, string) {
+) (values.Status, string) {
 	// No expectations → use evidence status directly
 	if len(expects) == 0 {
 		return s.StatusFromEvidenceStatus(evidence.Status), ""
@@ -99,7 +99,7 @@ func (s *StatusAggregator) DetermineObservationStatus(
 
 	// Evidence failed with error → don't evaluate expects
 	if evidence.Error != nil {
-		return domain.StatusError, evidence.Error.Message
+		return values.StatusError, evidence.Error.Message
 	}
 
 	// Create environment for expression evaluation
@@ -145,33 +145,33 @@ func (s *StatusAggregator) DetermineObservationStatus(
 	for _, expectExpr := range expects {
 		program, err := expr.Compile(expectExpr, options...)
 		if err != nil {
-			return domain.StatusError, fmt.Sprintf("expect compilation failed: %v", err)
+			return values.StatusError, fmt.Sprintf("expect compilation failed: %v", err)
 		}
 
 		output, err := expr.Run(program, env)
 		if err != nil {
-			return domain.StatusError, fmt.Sprintf("expect evaluation failed: %v", err)
+			return values.StatusError, fmt.Sprintf("expect evaluation failed: %v", err)
 		}
 
 		result, ok := output.(bool)
 		if !ok {
-			return domain.StatusError, fmt.Sprintf("expect expression did not return boolean: %v", output)
+			return values.StatusError, fmt.Sprintf("expect expression did not return boolean: %v", output)
 		}
 
 		// ANY false expression fails the observation
 		if !result {
-			return domain.StatusFail, fmt.Sprintf("expectation failed: %s", expectExpr)
+			return values.StatusFail, fmt.Sprintf("expectation failed: %s", expectExpr)
 		}
 	}
 
 	// All expectations passed
-	return domain.StatusPass, ""
+	return values.StatusPass, ""
 }
 
 // StatusFromEvidenceStatus converts evidence boolean status to observation status
-func (s *StatusAggregator) StatusFromEvidenceStatus(evidenceStatus bool) domain.Status {
+func (s *StatusAggregator) StatusFromEvidenceStatus(evidenceStatus bool) values.Status {
 	if evidenceStatus {
-		return domain.StatusPass
+		return values.StatusPass
 	}
-	return domain.StatusFail
+	return values.StatusFail
 }

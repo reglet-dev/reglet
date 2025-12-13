@@ -17,14 +17,14 @@ import (
 
 // CheckProfileUseCase orchestrates the complete profile check workflow.
 type CheckProfileUseCase struct {
-	profileLoader    ports.ProfileLoader
-	profileValidator ports.ProfileValidator
-	configProvider   ports.SystemConfigProvider
-	pluginResolver   ports.PluginDirectoryResolver
+	profileLoader       ports.ProfileLoader
+	profileValidator    ports.ProfileValidator
+	configProvider      ports.SystemConfigProvider
+	pluginResolver      ports.PluginDirectoryResolver
 	capabilityCollector ports.CapabilityCollector
-	capabilityGranter ports.CapabilityGranter
-	engineFactory    ports.EngineFactory
-	logger           *slog.Logger
+	capabilityGranter   ports.CapabilityGranter
+	engineFactory       ports.EngineFactory
+	logger              *slog.Logger
 }
 
 // NewCheckProfileUseCase creates a new check profile use case.
@@ -43,14 +43,14 @@ func NewCheckProfileUseCase(
 	}
 
 	return &CheckProfileUseCase{
-		profileLoader:    profileLoader,
-		profileValidator: profileValidator,
-		configProvider:   configProvider,
-		pluginResolver:   pluginResolver,
+		profileLoader:       profileLoader,
+		profileValidator:    profileValidator,
+		configProvider:      configProvider,
+		pluginResolver:      pluginResolver,
 		capabilityCollector: capCollector,
-		capabilityGranter: capGranter,
-		engineFactory:    engineFactory,
-		logger:           logger,
+		capabilityGranter:   capGranter,
+		engineFactory:       engineFactory,
+		logger:              logger,
 	}
 }
 

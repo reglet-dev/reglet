@@ -10,8 +10,8 @@ import (
 	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/whiskeyjimbo/reglet/internal/domain"
 	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
+	"github.com/whiskeyjimbo/reglet/internal/domain/values"
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/wasm"
 )
 
@@ -26,7 +26,7 @@ func createTestResult() *execution.ExecutionResult {
 		Description: "A test control that passes",
 		Severity:    "high",
 		Tags:        []string{"security", "test"},
-		Status:      domain.StatusPass,
+		Status:      values.StatusPass,
 		Message:     "All 2 checks passed",
 		Duration:    100 * time.Millisecond,
 		Observations: []execution.ObservationResult{
@@ -36,7 +36,7 @@ func createTestResult() *execution.ExecutionResult {
 					"path": "/etc/test",
 					"mode": "exists",
 				},
-				Status: domain.StatusPass,
+				Status: values.StatusPass,
 				Evidence: &wasm.Evidence{
 					Timestamp: time.Now(),
 					Data: map[string]interface{}{
@@ -53,7 +53,7 @@ func createTestResult() *execution.ExecutionResult {
 					"path": "/etc/test2",
 					"mode": "exists",
 				},
-				Status: domain.StatusPass,
+				Status: values.StatusPass,
 				Evidence: &wasm.Evidence{
 					Timestamp: time.Now(),
 					Data: map[string]interface{}{
@@ -73,7 +73,7 @@ func createTestResult() *execution.ExecutionResult {
 		Name:        "Test Control 2",
 		Description: "A test control that fails",
 		Severity:    "medium",
-		Status:      domain.StatusFail,
+		Status:      values.StatusFail,
 		Message:     "1 check failed",
 		Duration:    50 * time.Millisecond,
 		Observations: []execution.ObservationResult{
@@ -83,7 +83,7 @@ func createTestResult() *execution.ExecutionResult {
 					"path": "/etc/missing",
 					"mode": "exists",
 				},
-				Status: domain.StatusFail,
+				Status: values.StatusFail,
 				Evidence: &wasm.Evidence{
 					Timestamp: time.Now(),
 					Data: map[string]interface{}{
@@ -102,7 +102,7 @@ func createTestResult() *execution.ExecutionResult {
 		ID:       "ctrl-3",
 		Name:     "Test Control 3",
 		Severity: "critical",
-		Status:   domain.StatusError,
+		Status:   values.StatusError,
 		Message:  "Plugin load failed",
 		Duration: 10 * time.Millisecond,
 		Observations: []execution.ObservationResult{
@@ -111,7 +111,7 @@ func createTestResult() *execution.ExecutionResult {
 				Config: map[string]interface{}{
 					"test": "value",
 				},
-				Status: domain.StatusError,
+				Status: values.StatusError,
 				Error: &wasm.PluginError{
 					Code:    "plugin_load_error",
 					Message: "unknown plugin: nonexistent",
@@ -304,12 +304,12 @@ func TestTableFormatter_StatusSymbols(t *testing.T) {
 	formatter := NewTableFormatter(&buf)
 
 	tests := []struct {
-		status   domain.Status
+		status   values.Status
 		expected string
 	}{
-		{domain.StatusPass, "✓"},
-		{domain.StatusFail, "✗"},
-		{domain.StatusError, "⚠"},
+		{values.StatusPass, "✓"},
+		{values.StatusFail, "✗"},
+		{values.StatusError, "⚠"},
 		{"unknown", "?"},
 	}
 
@@ -341,9 +341,9 @@ func TestJSONFormatter_PreservesTypes(t *testing.T) {
 	assert.Greater(t, decoded.Controls[0].Observations[0].Duration, time.Duration(0))
 
 	// Verify status types
-	assert.Equal(t, domain.StatusPass, decoded.Controls[0].Status)
-	assert.Equal(t, domain.StatusFail, decoded.Controls[1].Status)
-	assert.Equal(t, domain.StatusError, decoded.Controls[2].Status)
+	assert.Equal(t, values.StatusPass, decoded.Controls[0].Status)
+	assert.Equal(t, values.StatusFail, decoded.Controls[1].Status)
+	assert.Equal(t, values.StatusError, decoded.Controls[2].Status)
 }
 
 func TestYAMLFormatter_PreservesTypes(t *testing.T) {
@@ -366,7 +366,7 @@ func TestYAMLFormatter_PreservesTypes(t *testing.T) {
 	assert.Len(t, decoded.Controls, len(result.Controls))
 
 	// Verify status types
-	assert.Equal(t, domain.StatusPass, decoded.Controls[0].Status)
-	assert.Equal(t, domain.StatusFail, decoded.Controls[1].Status)
-	assert.Equal(t, domain.StatusError, decoded.Controls[2].Status)
+	assert.Equal(t, values.StatusPass, decoded.Controls[0].Status)
+	assert.Equal(t, values.StatusFail, decoded.Controls[1].Status)
+	assert.Equal(t, values.StatusError, decoded.Controls[2].Status)
 }

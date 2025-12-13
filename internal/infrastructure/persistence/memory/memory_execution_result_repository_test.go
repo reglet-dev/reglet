@@ -8,14 +8,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
-	"github.com/whiskeyjimbo/reglet/internal/domain/valueobjects"
+	"github.com/whiskeyjimbo/reglet/internal/domain/values"
 )
 
 func TestMemoryExecutionResultRepository_SaveAndFind(t *testing.T) {
 	repo := NewExecutionResultRepository()
 	ctx := context.Background()
 
-	id := valueobjects.NewExecutionID()
+	id := values.NewExecutionID()
 	result := execution.NewExecutionResultWithID(id, "test-profile", "1.0.0")
 
 	// Save
@@ -29,7 +29,7 @@ func TestMemoryExecutionResultRepository_SaveAndFind(t *testing.T) {
 	assert.True(t, found.GetID().Equals(id))
 
 	// FindByID Not Found
-	_, err = repo.FindByID(ctx, valueobjects.NewExecutionID().UUID())
+	_, err = repo.FindByID(ctx, values.NewExecutionID().UUID())
 	assert.Error(t, err)
 }
 

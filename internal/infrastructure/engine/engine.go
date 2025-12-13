@@ -7,12 +7,12 @@ import (
 	"time"
 
 	"github.com/expr-lang/expr/vm"
-	"github.com/whiskeyjimbo/reglet/internal/domain"
 	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
 	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
 	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
 	"github.com/whiskeyjimbo/reglet/internal/domain/repositories"
 	"github.com/whiskeyjimbo/reglet/internal/domain/services"
+	"github.com/whiskeyjimbo/reglet/internal/domain/values"
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/redaction"
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/wasm"
 	"golang.org/x/sync/errgroup"
@@ -278,7 +278,7 @@ func (e *Engine) executeControl(ctx context.Context, ctrl entities.Control, exec
 	}
 
 	if !shouldRun {
-		result.Status = domain.StatusSkipped
+		result.Status = values.StatusSkipped
 		result.SkipReason = skipReason
 		result.Message = skipReason
 		result.Duration = time.Since(startTime)
@@ -292,8 +292,8 @@ func (e *Engine) executeControl(ctx context.Context, ctrl entities.Control, exec
 			depStatus, found := execResult.GetControlStatus(depID)
 
 			// If dependency not found or failed/error, skip this control
-			if !found || depStatus == domain.StatusFail || depStatus == domain.StatusError || depStatus == domain.StatusSkipped {
-				result.Status = domain.StatusSkipped
+			if !found || depStatus == values.StatusFail || depStatus == values.StatusError || depStatus == values.StatusSkipped {
+				result.Status = values.StatusSkipped
 				if !found {
 					result.Message = fmt.Sprintf("Skipped: dependency '%s' not found", depID)
 				} else {
@@ -319,7 +319,7 @@ func (e *Engine) executeControl(ctx context.Context, ctrl entities.Control, exec
 
 	// Aggregate observation results to determine control status
 	// Extract statuses from observations
-	observationStatuses := make([]domain.Status, len(result.Observations))
+	observationStatuses := make([]values.Status, len(result.Observations))
 	for i, obs := range result.Observations {
 		observationStatuses[i] = obs.Status
 	}
@@ -379,18 +379,18 @@ func (e *Engine) executeObservationsParallel(ctx context.Context, observations [
 }
 
 // generateControlMessage generates a human-readable message for the control result.
-func generateControlMessage(status domain.Status, observations []execution.ObservationResult) string {
+func generateControlMessage(status values.Status, observations []execution.ObservationResult) string {
 	switch status {
-	case domain.StatusPass:
+	case values.StatusPass:
 		if len(observations) == 1 {
 			return "Check passed"
 		}
 		return fmt.Sprintf("All %d checks passed", len(observations))
 
-	case domain.StatusFail:
+	case values.StatusFail:
 		failCount := 0
 		for _, obs := range observations {
-			if obs.Status == domain.StatusFail {
+			if obs.Status == values.StatusFail {
 				failCount++
 			}
 		}
@@ -399,17 +399,17 @@ func generateControlMessage(status domain.Status, observations []execution.Obser
 		}
 		return fmt.Sprintf("%d checks failed", failCount)
 
-	case domain.StatusError:
+	case values.StatusError:
 		errorCount := 0
 		for _, obs := range observations {
-			if obs.Status == domain.StatusError {
+			if obs.Status == values.StatusError {
 				errorCount++
 			}
 		}
 		if errorCount == 1 {
 			// Return the specific error message
 			for _, obs := range observations {
-				if obs.Status == domain.StatusError && obs.Error != nil {
+				if obs.Status == values.StatusError && obs.Error != nil {
 					return obs.Error.Message
 				}
 			}
@@ -417,7 +417,7 @@ func generateControlMessage(status domain.Status, observations []execution.Obser
 		}
 		return fmt.Sprintf("%d checks encountered errors", errorCount)
 
-	case domain.StatusSkipped:
+	case values.StatusSkipped:
 		return "Skipped due to failed dependency"
 
 	default:

@@ -5,22 +5,21 @@ import (
 	"sync"
 	"time"
 
-	"github.com/whiskeyjimbo/reglet/internal/domain"
-	"github.com/whiskeyjimbo/reglet/internal/domain/valueobjects"
+	"github.com/whiskeyjimbo/reglet/internal/domain/values"
 )
 
 // ExecutionResult represents the complete result of executing a profile.
 type ExecutionResult struct {
-	ExecutionID    valueobjects.ExecutionID `json:"execution_id" yaml:"execution_id"`
-	Version        int                      `json:"version" yaml:"version"` // For optimistic locking
-	ProfileName    string                   `json:"profile_name" yaml:"profile_name"`
-	ProfileVersion string                   `json:"profile_version" yaml:"profile_version"`
-	StartTime      time.Time                `json:"start_time" yaml:"start_time"`
-	EndTime        time.Time                `json:"end_time" yaml:"end_time"`
-	Duration       time.Duration            `json:"duration_ms" yaml:"duration_ms"`
-	Controls       []ControlResult          `json:"controls" yaml:"controls"`
-	Summary        ResultSummary            `json:"summary" yaml:"summary"`
-	mu             sync.Mutex               // Protects Controls for concurrent AddControlResult calls
+	ExecutionID    values.ExecutionID `json:"execution_id" yaml:"execution_id"`
+	Version        int                `json:"version" yaml:"version"` // For optimistic locking
+	ProfileName    string             `json:"profile_name" yaml:"profile_name"`
+	ProfileVersion string             `json:"profile_version" yaml:"profile_version"`
+	StartTime      time.Time          `json:"start_time" yaml:"start_time"`
+	EndTime        time.Time          `json:"end_time" yaml:"end_time"`
+	Duration       time.Duration      `json:"duration_ms" yaml:"duration_ms"`
+	Controls       []ControlResult    `json:"controls" yaml:"controls"`
+	Summary        ResultSummary      `json:"summary" yaml:"summary"`
+	mu             sync.Mutex         // Protects Controls for concurrent AddControlResult calls
 }
 
 // ControlResult represents the result of executing a single control.
@@ -30,7 +29,7 @@ type ControlResult struct {
 	Description  string              `json:"description,omitempty" yaml:"description,omitempty"`
 	Severity     string              `json:"severity,omitempty" yaml:"severity,omitempty"`
 	Tags         []string            `json:"tags,omitempty" yaml:"tags,omitempty"`
-	Status       domain.Status       `json:"status" yaml:"status"`
+	Status       values.Status       `json:"status" yaml:"status"`
 	Observations []ObservationResult `json:"observations" yaml:"observations"`
 	Message      string              `json:"message,omitempty" yaml:"message,omitempty"`
 	SkipReason   string              `json:"skip_reason,omitempty" yaml:"skip_reason,omitempty"`
@@ -41,9 +40,9 @@ type ControlResult struct {
 type ObservationResult struct {
 	Plugin   string                 `json:"plugin" yaml:"plugin"`
 	Config   map[string]interface{} `json:"config" yaml:"config"`
-	Status   domain.Status          `json:"status" yaml:"status"`
-	Evidence *Evidence         `json:"evidence,omitempty" yaml:"evidence,omitempty"`
-	Error    *PluginError      `json:"error,omitempty" yaml:"error,omitempty"`
+	Status   values.Status          `json:"status" yaml:"status"`
+	Evidence *Evidence              `json:"evidence,omitempty" yaml:"evidence,omitempty"`
+	Error    *PluginError           `json:"error,omitempty" yaml:"error,omitempty"`
 	Duration time.Duration          `json:"duration_ms" yaml:"duration_ms"`
 }
 
@@ -62,11 +61,11 @@ type ResultSummary struct {
 
 // NewExecutionResult creates a new execution result.
 func NewExecutionResult(profileName, profileVersion string) *ExecutionResult {
-	return NewExecutionResultWithID(valueobjects.NewExecutionID(), profileName, profileVersion)
+	return NewExecutionResultWithID(values.NewExecutionID(), profileName, profileVersion)
 }
 
 // NewExecutionResultWithID creates a new execution result with a specific ID.
-func NewExecutionResultWithID(id valueobjects.ExecutionID, profileName, profileVersion string) *ExecutionResult {
+func NewExecutionResultWithID(id values.ExecutionID, profileName, profileVersion string) *ExecutionResult {
 	return &ExecutionResult{
 		ExecutionID:    id,
 		ProfileName:    profileName,
@@ -78,7 +77,7 @@ func NewExecutionResultWithID(id valueobjects.ExecutionID, profileName, profileV
 }
 
 // GetID returns the execution ID.
-func (r *ExecutionResult) GetID() valueobjects.ExecutionID {
+func (r *ExecutionResult) GetID() values.ExecutionID {
 	return r.ExecutionID
 }
 
@@ -108,7 +107,7 @@ func (r *ExecutionResult) AddPartialResult(cr ControlResult) {
 // GetControlStatus returns the status of a control by ID.
 // Returns the status and a boolean indicating if the control was found.
 // Thread-safe.
-func (r *ExecutionResult) GetControlStatus(id string) (domain.Status, bool) {
+func (r *ExecutionResult) GetControlStatus(id string) (values.Status, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -157,13 +156,13 @@ func (r *ExecutionResult) calculateSummary() {
 	for _, ctrl := range r.Controls {
 		// Count control statuses
 		switch ctrl.Status {
-		case domain.StatusPass:
+		case values.StatusPass:
 			r.Summary.PassedControls++
-		case domain.StatusFail:
+		case values.StatusFail:
 			r.Summary.FailedControls++
-		case domain.StatusError:
+		case values.StatusError:
 			r.Summary.ErrorControls++
-		case domain.StatusSkipped:
+		case values.StatusSkipped:
 			r.Summary.SkippedControls++
 		}
 
@@ -171,11 +170,11 @@ func (r *ExecutionResult) calculateSummary() {
 		r.Summary.TotalObservations += len(ctrl.Observations)
 		for _, obs := range ctrl.Observations {
 			switch obs.Status {
-			case domain.StatusPass:
+			case values.StatusPass:
 				r.Summary.PassedObservations++
-			case domain.StatusFail:
+			case values.StatusFail:
 				r.Summary.FailedObservations++
-			case domain.StatusError:
+			case values.StatusError:
 				r.Summary.ErrorObservations++
 			}
 		}

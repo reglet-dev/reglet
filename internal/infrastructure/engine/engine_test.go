@@ -9,10 +9,10 @@ import (
 	"github.com/expr-lang/expr/vm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/whiskeyjimbo/reglet/internal/domain"
 	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
 	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
 	"github.com/whiskeyjimbo/reglet/internal/domain/services"
+	"github.com/whiskeyjimbo/reglet/internal/domain/values"
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/wasm"
 )
 
@@ -34,45 +34,45 @@ func TestNewEngine(t *testing.T) {
 func TestGenerateControlMessage_SinglePass(t *testing.T) {
 	t.Parallel()
 	observations := []execution.ObservationResult{
-		{Status: domain.StatusPass},
+		{Status: values.StatusPass},
 	}
 
-	msg := generateControlMessage(domain.StatusPass, observations)
+	msg := generateControlMessage(values.StatusPass, observations)
 	assert.Equal(t, "Check passed", msg)
 }
 
 func TestGenerateControlMessage_MultiplePass(t *testing.T) {
 	t.Parallel()
 	observations := []execution.ObservationResult{
-		{Status: domain.StatusPass},
-		{Status: domain.StatusPass},
-		{Status: domain.StatusPass},
+		{Status: values.StatusPass},
+		{Status: values.StatusPass},
+		{Status: values.StatusPass},
 	}
 
-	msg := generateControlMessage(domain.StatusPass, observations)
+	msg := generateControlMessage(values.StatusPass, observations)
 	assert.Equal(t, "All 3 checks passed", msg)
 }
 
 func TestGenerateControlMessage_SingleFail(t *testing.T) {
 	t.Parallel()
 	observations := []execution.ObservationResult{
-		{Status: domain.StatusPass},
-		{Status: domain.StatusFail},
+		{Status: values.StatusPass},
+		{Status: values.StatusFail},
 	}
 
-	msg := generateControlMessage(domain.StatusFail, observations)
+	msg := generateControlMessage(values.StatusFail, observations)
 	assert.Equal(t, "1 check failed", msg)
 }
 
 func TestGenerateControlMessage_MultipleFail(t *testing.T) {
 	t.Parallel()
 	observations := []execution.ObservationResult{
-		{Status: domain.StatusFail},
-		{Status: domain.StatusFail},
-		{Status: domain.StatusPass},
+		{Status: values.StatusFail},
+		{Status: values.StatusFail},
+		{Status: values.StatusPass},
 	}
 
-	msg := generateControlMessage(domain.StatusFail, observations)
+	msg := generateControlMessage(values.StatusFail, observations)
 	assert.Equal(t, "2 checks failed", msg)
 }
 
@@ -80,12 +80,12 @@ func TestGenerateControlMessage_SingleError(t *testing.T) {
 	t.Parallel()
 	observations := []execution.ObservationResult{
 		{
-			Status: domain.StatusError,
+			Status: values.StatusError,
 			Error:  &wasm.PluginError{Code: "test", Message: "something went wrong"},
 		},
 	}
 
-	msg := generateControlMessage(domain.StatusError, observations)
+	msg := generateControlMessage(values.StatusError, observations)
 	assert.Equal(t, "something went wrong", msg)
 }
 
@@ -93,24 +93,24 @@ func TestGenerateControlMessage_SingleErrorNoMessage(t *testing.T) {
 	t.Parallel()
 	observations := []execution.ObservationResult{
 		{
-			Status: domain.StatusError,
+			Status: values.StatusError,
 			Error:  nil, // No error object
 		},
 	}
 
-	msg := generateControlMessage(domain.StatusError, observations)
+	msg := generateControlMessage(values.StatusError, observations)
 	assert.Equal(t, "Check encountered an error", msg)
 }
 
 func TestGenerateControlMessage_MultipleErrors(t *testing.T) {
 	t.Parallel()
 	observations := []execution.ObservationResult{
-		{Status: domain.StatusError, Error: &wasm.PluginError{Code: "test", Message: "error 1"}},
-		{Status: domain.StatusError, Error: &wasm.PluginError{Code: "test", Message: "error 2"}},
-		{Status: domain.StatusPass},
+		{Status: values.StatusError, Error: &wasm.PluginError{Code: "test", Message: "error 1"}},
+		{Status: values.StatusError, Error: &wasm.PluginError{Code: "test", Message: "error 2"}},
+		{Status: values.StatusPass},
 	}
 
-	msg := generateControlMessage(domain.StatusError, observations)
+	msg := generateControlMessage(values.StatusError, observations)
 	assert.Equal(t, "2 checks encountered errors", msg)
 }
 
@@ -411,9 +411,9 @@ func TestExecute_InvalidPlugin(t *testing.T) {
 	require.NoError(t, err) // Execute should not return error, but result should show error
 
 	assert.Len(t, result.Controls, 1)
-	assert.Equal(t, domain.StatusError, result.Controls[0].Status)
+	assert.Equal(t, values.StatusError, result.Controls[0].Status)
 	assert.Len(t, result.Controls[0].Observations, 1)
-	assert.Equal(t, domain.StatusError, result.Controls[0].Observations[0].Status)
+	assert.Equal(t, values.StatusError, result.Controls[0].Observations[0].Status)
 	assert.NotNil(t, result.Controls[0].Observations[0].Error)
 	assert.Contains(t, result.Controls[0].Observations[0].Error.Message, "failed to read plugin")
 }

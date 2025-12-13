@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/whiskeyjimbo/reglet/internal/domain"
 	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
+	"github.com/whiskeyjimbo/reglet/internal/domain/values"
 )
 
 // JUnitFormatter formats execution results as JUnit XML.
@@ -23,12 +23,12 @@ func NewJUnitFormatter(w io.Writer) *JUnitFormatter {
 
 // JUnit XML structures
 type JUnitTestSuites struct {
-	XMLName   xml.Name         `xml:"testsuites"`
-	Name      string           `xml:"name,attr"`
-	Tests     int              `xml:"tests,attr"`
-	Failures  int              `xml:"failures,attr"`
-	Errors    int              `xml:"errors,attr"`
-	Time      float64          `xml:"time,attr"`
+	XMLName    xml.Name         `xml:"testsuites"`
+	Name       string           `xml:"name,attr"`
+	Tests      int              `xml:"tests,attr"`
+	Failures   int              `xml:"failures,attr"`
+	Errors     int              `xml:"errors,attr"`
+	Time       float64          `xml:"time,attr"`
 	TestSuites []JUnitTestSuite `xml:"testsuite"`
 }
 
@@ -81,23 +81,23 @@ func (f *JUnitFormatter) Format(result *execution.ExecutionResult) error {
 
 	for _, ctrl := range result.Controls {
 		c := JUnitTestCase{
-			Name:      ctrl.ID,      // Control ID as test name
-			ClassName: ctrl.Name,    // Control Name as classname
+			Name:      ctrl.ID,   // Control ID as test name
+			ClassName: ctrl.Name, // Control Name as classname
 			Time:      ctrl.Duration.Seconds(),
 		}
 
 		switch ctrl.Status {
-		case domain.StatusFail:
+		case values.StatusFail:
 			c.Failure = &JUnitFailure{
 				Message: ctrl.Message,
 				Content: formatObservations(ctrl),
 			}
-		case domain.StatusError:
+		case values.StatusError:
 			c.Error = &JUnitError{
 				Message: ctrl.Message,
 				Content: formatObservations(ctrl),
 			}
-		case domain.StatusSkipped:
+		case values.StatusSkipped:
 			c.Skipped = &JUnitSkipped{
 				Message: ctrl.SkipReason,
 			}
@@ -133,7 +133,7 @@ func (f *JUnitFormatter) Format(result *execution.ExecutionResult) error {
 func formatObservations(ctrl execution.ControlResult) string {
 	var out string
 	for _, obs := range ctrl.Observations {
-		if obs.Status != domain.StatusPass {
+		if obs.Status != values.StatusPass {
 			out += fmt.Sprintf("Observation (%s): %s\n", obs.Plugin, obs.Status)
 			if obs.Error != nil {
 				out += fmt.Sprintf("Error: %s\n", obs.Error.Message)

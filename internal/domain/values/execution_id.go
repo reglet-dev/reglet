@@ -1,6 +1,6 @@
-// Package valueobjects contains domain value objects that encapsulate
-// primitive types with validation and business semantics.
-package valueobjects
+// Package values contains domain value objects that encapsulate
+// primitive types with validation and such.
+package values
 
 import (
 	"database/sql/driver"

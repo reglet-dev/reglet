@@ -22,8 +22,8 @@ func TestTerminalPrompter_PromptForCapability(t *testing.T) {
 	cap := capabilities.Capability{Kind: "fs", Pattern: "read:/etc/passwd"}
 
 	tests := []struct {
-		name         string
-		input        string
+		name            string
+		input           string
 		expectedGranted bool
 		expectedAlways  bool
 	}{
@@ -49,60 +49,60 @@ func TestTerminalPrompter_PromptForCapability(t *testing.T) {
 			r, w, err := os.Pipe()
 			assert.NoError(t, err)
 			os.Stdin = r
-			
-			            _, err = w.WriteString(tt.input)
-			            assert.NoError(t, err)
-			            w.Close()
-			
-			            // Capture stderr output
-			            oldStderr := os.Stderr
-			            defer func() { os.Stderr = oldStderr }()
-			            
-			            r2, w2, err := os.Pipe()
-			            assert.NoError(t, err)
-			            os.Stderr = w2
-			            
-			            granted, always, err := prompter.PromptForCapability(cap)
-			            w2.Close() // Close writer after prompt
-			
-			            output, _ := io.ReadAll(r2) // Read all content from the pipe
-			            r2.Close() // Close reader
-			
-			            assert.NoError(t, err)
-			            assert.Equal(t, tt.expectedGranted, granted)
-			            assert.Equal(t, tt.expectedAlways, always)
-			
-			            // Read captured stderr for verification
-			                        assert.Contains(t, string(output), "Plugin requires permission")
-			                        assert.Contains(t, string(output), "Read files: /etc/passwd")
-			            		})
-			            	}
-			            }
-			            
-			            func TestTerminalPrompter_describeCapability(t *testing.T) {
-			            	t.Parallel()
-			            
-			            	prompter := NewTerminalPrompter()
-			            
-			            	tests := []struct {
-			            		cap      capabilities.Capability
-			            		expected string
-			            	}{
-			            		{capabilities.Capability{Kind: "network", Pattern: "outbound:*"}, "Network access to any port"},
-			            		{capabilities.Capability{Kind: "network", Pattern: "outbound:private"}, "Network access to private/reserved IPs (localhost, 192.168.x.x, 10.x.x.x, 169.254.169.254, etc.)"},
-			            		{capabilities.Capability{Kind: "network", Pattern: "outbound:80"}, "Network access to port 80"},
-			            		{capabilities.Capability{Kind: "fs", Pattern: "read:/var/log"}, "Read files: /var/log"},
-			            		{capabilities.Capability{Kind: "exec", Pattern: "/bin/sh"}, "Shell execution (executes shell commands)"},
-			            		{capabilities.Capability{Kind: "env", Pattern: "AWS_ACCESS_KEY"}, "Read environment variables: AWS_ACCESS_KEY"},
-			            		{capabilities.Capability{Kind: "unknown", Pattern: "foo"}, "unknown: foo"},
-			            	}
-			            
-			            	for _, tt := range tests {
-			            		t.Run(tt.expected, func(t *testing.T) {
-			            			assert.Equal(t, tt.expected, prompter.describeCapability(tt.cap))
-			            		})
-			            	}
-			            }
+
+			_, err = w.WriteString(tt.input)
+			assert.NoError(t, err)
+			w.Close()
+
+			// Capture stderr output
+			oldStderr := os.Stderr
+			defer func() { os.Stderr = oldStderr }()
+
+			r2, w2, err := os.Pipe()
+			assert.NoError(t, err)
+			os.Stderr = w2
+
+			granted, always, err := prompter.PromptForCapability(cap)
+			w2.Close() // Close writer after prompt
+
+			output, _ := io.ReadAll(r2) // Read all content from the pipe
+			r2.Close()                  // Close reader
+
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expectedGranted, granted)
+			assert.Equal(t, tt.expectedAlways, always)
+
+			// Read captured stderr for verification
+			assert.Contains(t, string(output), "Plugin requires permission")
+			assert.Contains(t, string(output), "Read files: /etc/passwd")
+		})
+	}
+}
+
+func TestTerminalPrompter_describeCapability(t *testing.T) {
+	t.Parallel()
+
+	prompter := NewTerminalPrompter()
+
+	tests := []struct {
+		cap      capabilities.Capability
+		expected string
+	}{
+		{capabilities.Capability{Kind: "network", Pattern: "outbound:*"}, "Network access to any port"},
+		{capabilities.Capability{Kind: "network", Pattern: "outbound:private"}, "Network access to private/reserved IPs (localhost, 192.168.x.x, 10.x.x.x, 169.254.169.254, etc.)"},
+		{capabilities.Capability{Kind: "network", Pattern: "outbound:80"}, "Network access to port 80"},
+		{capabilities.Capability{Kind: "fs", Pattern: "read:/var/log"}, "Read files: /var/log"},
+		{capabilities.Capability{Kind: "exec", Pattern: "/bin/sh"}, "Shell execution (executes shell commands)"},
+		{capabilities.Capability{Kind: "env", Pattern: "AWS_ACCESS_KEY"}, "Read environment variables: AWS_ACCESS_KEY"},
+		{capabilities.Capability{Kind: "unknown", Pattern: "foo"}, "unknown: foo"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.expected, func(t *testing.T) {
+			assert.Equal(t, tt.expected, prompter.describeCapability(tt.cap))
+		})
+	}
+}
 func TestTerminalPrompter_FormatNonInteractiveError(t *testing.T) {
 	t.Parallel()
 
