@@ -15,7 +15,6 @@ import (
 	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
 	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
 	"github.com/whiskeyjimbo/reglet/internal/wasm"
-	"github.com/whiskeyjimbo/reglet/internal/wasm/hostfuncs"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -24,7 +23,7 @@ type Manager struct {
 	configPath  string
 	trustAll    bool
 	interactive bool
-	grants      []capabilities.Capability
+	grants      capabilities.Grant
 }
 
 // NewManager creates a capability manager
@@ -36,7 +35,7 @@ func NewManager(trustAll bool) *Manager {
 		configPath:  configPath,
 		trustAll:    trustAll,
 		interactive: isInteractive(),
-		grants:      []capabilities.Capability{},
+		grants:      capabilities.NewGrant(),
 	}
 }
 
@@ -122,16 +121,10 @@ func (m *Manager) CollectRequiredCapabilities(ctx context.Context, profile *enti
 // GrantCapabilities determines which capabilities to grant based on user input
 func (m *Manager) GrantCapabilities(required map[string][]capabilities.Capability) (map[string][]capabilities.Capability, error) {
 	// Flatten all required capabilities to a unique set for user prompting
-	flatRequired := make([]capabilities.Capability, 0)
-	seen := make(map[string]bool)
-
+	flatRequired := capabilities.NewGrant()
 	for _, caps := range required {
 		for _, cap := range caps {
-			key := fmt.Sprintf("%s:%s", cap.Kind, cap.Pattern)
-			if !seen[key] {
-				flatRequired = append(flatRequired, cap)
-				seen[key] = true
-			}
+			flatRequired.Add(cap)
 		}
 	}
 
@@ -146,13 +139,13 @@ func (m *Manager) GrantCapabilities(required map[string][]capabilities.Capabilit
 	existingGrants, err := m.loadConfig()
 	if err != nil {
 		// Config file doesn't exist yet - that's okay
-		existingGrants = []capabilities.Capability{}
+		existingGrants = capabilities.NewGrant()
 	}
 
 	// Determine which capabilities are not already granted
 	missing := m.findMissingCapabilities(flatRequired, existingGrants)
 
-	var grantedGlobal []capabilities.Capability
+	var grantedGlobal capabilities.Grant
 	if len(missing) == 0 {
 		// All capabilities already granted
 		grantedGlobal = existingGrants
@@ -174,7 +167,7 @@ func (m *Manager) GrantCapabilities(required map[string][]capabilities.Capabilit
 			}
 
 			if granted {
-				newGrants = append(newGrants, cap)
+				newGrants.Add(cap)
 				if always {
 					shouldSave = true
 				}
@@ -199,18 +192,11 @@ func (m *Manager) GrantCapabilities(required map[string][]capabilities.Capabilit
 	// Filter the requested capabilities against the globally granted ones
 	// ensuring each plugin only gets what it requested AND what was granted
 	grantedPerPlugin := make(map[string][]capabilities.Capability)
-	grantedGlobalMap := make(map[string]bool)
-	for _, cap := range grantedGlobal {
-		key := fmt.Sprintf("%s:%s", cap.Kind, cap.Pattern)
-		grantedGlobalMap[key] = true
-	}
-
 	for name, caps := range required {
-		var allowed []capabilities.Capability
+		var allowed capabilities.Grant
 		for _, cap := range caps {
-			key := fmt.Sprintf("%s:%s", cap.Kind, cap.Pattern)
-			if grantedGlobalMap[key] {
-				allowed = append(allowed, cap)
+			if grantedGlobal.Contains(cap) {
+				allowed.Add(cap)
 			}
 		}
 		if len(allowed) > 0 {
@@ -222,21 +208,13 @@ func (m *Manager) GrantCapabilities(required map[string][]capabilities.Capabilit
 }
 
 // findMissingCapabilities returns capabilities in required that are not in granted
-func (m *Manager) findMissingCapabilities(required, granted []capabilities.Capability) []capabilities.Capability {
-	grantedMap := make(map[string]bool)
-	for _, cap := range granted {
-		key := fmt.Sprintf("%s:%s", cap.Kind, cap.Pattern)
-		grantedMap[key] = true
-	}
-
-	var missing []capabilities.Capability
+func (m *Manager) findMissingCapabilities(required, granted capabilities.Grant) capabilities.Grant {
+	missing := capabilities.NewGrant()
 	for _, cap := range required {
-		key := fmt.Sprintf("%s:%s", cap.Kind, cap.Pattern)
-		if !grantedMap[key] {
-			missing = append(missing, cap)
+		if !granted.Contains(cap) {
+			missing.Add(cap)
 		}
 	}
-
 	return missing
 }
 
@@ -308,7 +286,7 @@ func (m *Manager) describeCapability(cap capabilities.Capability) string {
 }
 
 // formatNonInteractiveError creates a helpful error message for non-interactive mode
-func (m *Manager) formatNonInteractiveError(missing []capabilities.Capability) error {
+func (m *Manager) formatNonInteractiveError(missing capabilities.Grant) error {
 	var msg strings.Builder
 	msg.WriteString("Plugins require additional permissions (running in non-interactive mode)\n\n")
 	msg.WriteString("Required permissions:\n")
@@ -334,10 +312,10 @@ type configFile struct {
 }
 
 // loadConfig loads capability grants from ~/.reglet/config.yaml
-func (m *Manager) loadConfig() ([]capabilities.Capability, error) {
+func (m *Manager) loadConfig() (capabilities.Grant, error) {
 	// Check if config file exists
 	if _, err := os.Stat(m.configPath); os.IsNotExist(err) {
-		return []capabilities.Capability{}, nil
+		return capabilities.NewGrant(), nil
 	}
 
 	// Read config file
@@ -353,9 +331,9 @@ func (m *Manager) loadConfig() ([]capabilities.Capability, error) {
 	}
 
 	// Convert to capability slice
-	caps := make([]capabilities.Capability, 0, len(cfg.Capabilities))
+	caps := capabilities.NewGrant()
 	for _, c := range cfg.Capabilities {
-		caps = append(caps, capabilities.Capability{
+		caps.Add(capabilities.Capability{
 			Kind:    c.Kind,
 			Pattern: c.Pattern,
 		})
@@ -365,7 +343,7 @@ func (m *Manager) loadConfig() ([]capabilities.Capability, error) {
 }
 
 // saveConfig saves capability grants to ~/.reglet/config.yaml
-func (m *Manager) saveConfig(grants []capabilities.Capability) error {
+func (m *Manager) saveConfig(grants capabilities.Grant) error {
 	// Create directory if it doesn't exist
 	dir := filepath.Dir(m.configPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
