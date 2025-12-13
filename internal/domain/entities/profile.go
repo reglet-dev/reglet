@@ -21,32 +21,32 @@ import (
 // - Profile name and version are required
 // - Controls must have at least one observation
 type Profile struct {
-	Metadata ProfileMetadata
-	Plugins  []string
-	Vars     map[string]interface{}
-	Controls ControlsSection
+	Metadata ProfileMetadata        `yaml:"profile"`
+	Plugins  []string               `yaml:"plugins,omitempty"`
+	Vars     map[string]interface{} `yaml:"vars,omitempty"`
+	Controls ControlsSection        `yaml:"controls"`
 }
 
 // ProfileMetadata contains metadata about the profile.
 type ProfileMetadata struct {
-	Name        string
-	Version     string
-	Description string
+	Name        string `yaml:"name"`
+	Version     string `yaml:"version"`
+	Description string `yaml:"description,omitempty"`
 }
 
 // ControlsSection contains control defaults and individual controls.
 type ControlsSection struct {
-	Defaults *ControlDefaults
-	Items    []Control
+	Defaults *ControlDefaults `yaml:"defaults,omitempty"`
+	Items    []Control        `yaml:"items"`
 }
 
 // ControlDefaults defines default values applied to all controls.
 // Individual controls can override these defaults.
 type ControlDefaults struct {
-	Severity string
-	Owner    string
-	Tags     []string
-	Timeout  time.Duration
+	Severity string        `yaml:"severity,omitempty"`
+	Owner    string        `yaml:"owner,omitempty"`
+	Tags     []string      `yaml:"tags,omitempty"`
+	Timeout  time.Duration `yaml:"timeout,omitempty"`
 }
 
 // Control represents a single compliance or infrastructure control to validate.
@@ -54,23 +54,23 @@ type ControlDefaults struct {
 //
 // Entity Identity: ID field uniquely identifies each control within a profile.
 type Control struct {
-	ID           string
-	Name         string
-	Description  string
-	Severity     string
-	Owner        string
-	Tags         []string
-	DependsOn    []string
-	Timeout      time.Duration
-	Observations []Observation
+	ID           string        `yaml:"id"`
+	Name         string        `yaml:"name"`
+	Description  string        `yaml:"description,omitempty"`
+	Severity     string        `yaml:"severity,omitempty"`
+	Owner        string        `yaml:"owner,omitempty"`
+	Tags         []string      `yaml:"tags,omitempty"`
+	DependsOn    []string      `yaml:"depends_on,omitempty"`
+	Timeout      time.Duration `yaml:"timeout,omitempty"`
+	Observations []Observation `yaml:"observations"`
 }
 
 // Observation defines a single check to execute via a plugin.
 // Observations are value objects (immutable configuration).
 type Observation struct {
-	Plugin string
-	Config map[string]interface{}
-	Expect []string
+	Plugin string                 `yaml:"plugin"`
+	Config map[string]interface{} `yaml:"config,omitempty"`
+	Expect []string               `yaml:"expect,omitempty"`
 }
 
 // ===== PROFILE AGGREGATE ROOT METHODS =====
