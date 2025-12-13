@@ -167,9 +167,9 @@ func TestSMTPResponseWire_Serialization(t *testing.T) {
 
 func TestSMTPCommonPorts(t *testing.T) {
 	ports := map[string]string{
-		"SMTP":          "25",
-		"SMTPS":         "465",
-		"Submission":    "587",
+		"SMTP":            "25",
+		"SMTPS":           "465",
+		"Submission":      "587",
 		"AlternativeSMTP": "2525",
 	}
 

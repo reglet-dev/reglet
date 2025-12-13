@@ -8,7 +8,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	regletsdk "github.com/whiskeyjimbo/reglet/sdk"
 )
 
 func TestCommandPlugin_Describe(t *testing.T) {

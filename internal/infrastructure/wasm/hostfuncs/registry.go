@@ -12,7 +12,6 @@ import (
 func RegisterHostFunctions(ctx context.Context, runtime wazero.Runtime, caps map[string][]capabilities.Capability) error {
 	checker := NewCapabilityChecker(caps)
 
-
 	// Create host module "reglet_host"
 	builder := runtime.NewHostModuleBuilder("reglet_host")
 

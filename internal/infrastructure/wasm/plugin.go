@@ -303,10 +303,10 @@ func (p *Plugin) Observe(ctx context.Context, cfg Config) (*ObservationResult, e
 	// ObservationResult.Error represents WASM execution errors (panics, plugin failures)
 	// Don't propagate Evidence.Error to ObservationResult.Error - they serve different purposes
 	return &ObservationResult{
-		Evidence: &hostEvidence,
-		Error:    nil, // Plugin executed successfully, errors are in Evidence
-	},
-	nil
+			Evidence: &hostEvidence,
+			Error:    nil, // Plugin executed successfully, errors are in Evidence
+		},
+		nil
 }
 
 // Close closes the plugin and frees resources

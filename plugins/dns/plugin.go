@@ -13,22 +13,22 @@ import (
 )
 
 // dnsPlugin implements the sdk.Plugin interface.
-type dnsPlugin struct {}
+type dnsPlugin struct{}
 
 // Describe returns plugin metadata.
 func (p *dnsPlugin) Describe(ctx context.Context) (regletsdk.Metadata, error) {
 	return regletsdk.Metadata{
-		Name:        "dns",
-		Version:     "1.0.0",
-		Description: "DNS resolution and record validation",
-		Capabilities: []regletsdk.Capability{
-			{
-				Kind:    "network",
-				Pattern: "outbound:53", // Required for DNS lookups
+			Name:        "dns",
+			Version:     "1.0.0",
+			Description: "DNS resolution and record validation",
+			Capabilities: []regletsdk.Capability{
+				{
+					Kind:    "network",
+					Pattern: "outbound:53", // Required for DNS lookups
+				},
 			},
 		},
-	},
-	nil
+		nil
 }
 
 type DNSConfig struct {
@@ -97,7 +97,7 @@ func (p *dnsPlugin) Check(ctx context.Context, config regletsdk.Config) (reglets
 			// Generic Go error from SDK, not specific wireformat error.
 			finalErrorDetail = &wireformat.ErrorDetail{
 				Message: sdkErr.Error(),
-				Type: "internal",
+				Type:    "internal",
 			}
 			evidence = regletsdk.Failure("dns_sdk_error", finalErrorDetail.Message)
 		}
@@ -147,7 +147,7 @@ func (p *dnsPlugin) Check(ctx context.Context, config regletsdk.Config) (reglets
 		data["is_timeout"] = false
 		data["is_not_found"] = false
 	}
-    evidence.Data = data
+	evidence.Data = data
 
 	return evidence, nil
 }

@@ -127,8 +127,8 @@ func (p *commandPlugin) Check(ctx context.Context, config regletsdk.Config) (reg
 
 		// Command metadata (for debugging and auditing)
 		"exec_mode":      execMode, // "shell" or "direct"
-		"command":        cmd,       // Actual command executed
-		"args":           args,      // Actual arguments used
+		"command":        cmd,      // Actual command executed
+		"args":           args,     // Actual arguments used
 		"working_dir":    cfg.Dir,
 		"timeout_config": cfg.Timeout,
 	}

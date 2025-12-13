@@ -96,7 +96,7 @@ type SMTPRequestWire struct {
 type SMTPResponseWire struct {
 	Connected      bool         `json:"connected"`
 	Address        string       `json:"address,omitempty"`
-	Banner         string       `json:"banner,omitempty"`          // SMTP banner message
+	Banner         string       `json:"banner,omitempty"` // SMTP banner message
 	ResponseTimeMs int64        `json:"response_time_ms,omitempty"`
 	TLS            bool         `json:"tls,omitempty"`
 	TLSVersion     string       `json:"tls_version,omitempty"`

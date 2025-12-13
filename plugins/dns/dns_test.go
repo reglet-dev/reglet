@@ -64,8 +64,8 @@ func TestDNSPlugin_Check_ConfigValidation(t *testing.T) {
 			errMsg:    "RecordType' failed on the 'oneof' tag",
 		},
 		{
-			name: "Empty config (missing hostname)",
-			config: regletsdk.Config{},
+			name:      "Empty config (missing hostname)",
+			config:    regletsdk.Config{},
 			wantError: true,
 			errMsg:    "Hostname' failed on the 'required' tag",
 		},

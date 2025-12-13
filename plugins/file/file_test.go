@@ -103,7 +103,7 @@ func TestFilePlugin_Check_Hash(t *testing.T) {
 	// echo -n "test hash" | sha256sum
 	// 54a6483b8aca55c9df2a35baf71d9965ddfd623468d81d51229bd5eb7d1e1c1b
 	expectedHash := "54a6483b8aca55c9df2a35baf71d9965ddfd623468d81d51229bd5eb7d1e1c1b"
-	
+
 	hash, ok := evidence.Data["sha256"].(string)
 	if !ok {
 		t.Errorf("Expected sha256 string")
@@ -145,7 +145,7 @@ func TestFilePlugin_Check_MissingPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Check returned unexpected error: %v", err)
 	}
-	
+
 	if evidence.Status {
 		t.Error("Expected status false for missing path config")
 	}
