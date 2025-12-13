@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
 )
 
 func TestIsPrivateOrReservedIP(t *testing.T) {
@@ -79,7 +80,7 @@ func TestValidateDestination_PublicIPs(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	checker := NewCapabilityChecker(map[string][]Capability{
+	checker := NewCapabilityChecker(map[string][]capabilities.Capability{
 		"test-plugin": {
 			{Kind: "network", Pattern: "outbound:80"},
 		},
@@ -113,7 +114,7 @@ func TestValidateDestination_PrivateIPs_Blocked(t *testing.T) {
 
 	ctx := context.Background()
 	// Checker WITHOUT network:outbound:private capability
-	checker := NewCapabilityChecker(map[string][]Capability{
+	checker := NewCapabilityChecker(map[string][]capabilities.Capability{
 		"test-plugin": {
 			{Kind: "network", Pattern: "outbound:80"},
 		},
@@ -148,7 +149,7 @@ func TestValidateDestination_PrivateIPs_AllowedWithCapability(t *testing.T) {
 
 	ctx := context.Background()
 	// Checker WITH network:outbound:private capability
-	checker := NewCapabilityChecker(map[string][]Capability{
+	checker := NewCapabilityChecker(map[string][]capabilities.Capability{
 		"test-plugin": {
 			{Kind: "network", Pattern: "outbound:80"},
 			{Kind: "network", Pattern: "outbound:private"},
@@ -181,7 +182,7 @@ func TestValidateDestination_DNSResolutionError(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	checker := NewCapabilityChecker(map[string][]Capability{
+	checker := NewCapabilityChecker(map[string][]capabilities.Capability{
 		"test-plugin": {
 			{Kind: "network", Pattern: "outbound:80"},
 		},

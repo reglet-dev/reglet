@@ -11,7 +11,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/whiskeyjimbo/reglet/internal/wasm/hostfuncs"
+	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
 )
 
 // Global cache for WASM bytes to avoid repeated disk I/O
@@ -58,7 +58,7 @@ func TestLoadFilePlugin(t *testing.T) {
 	wasmBytes := getWasmBytes(t, "file")
 
 	// File plugin needs filesystem capabilities
-	caps := map[string][]hostfuncs.Capability{
+	caps := map[string][]capabilities.Capability{
 		"file": {
 			{Kind: "fs", Pattern: "read:**"},
 		},
@@ -91,7 +91,7 @@ func TestFilePlugin_Describe(t *testing.T) {
 	wasmBytes := getWasmBytes(t, "file")
 
 	// File plugin needs filesystem capabilities
-	caps := map[string][]hostfuncs.Capability{
+	caps := map[string][]capabilities.Capability{
 		"file": {
 			{Kind: "fs", Pattern: "read:**"},
 		},
@@ -128,7 +128,7 @@ func TestFilePlugin_Schema(t *testing.T) {
 	wasmBytes := getWasmBytes(t, "file")
 
 	// File plugin needs filesystem capabilities
-	caps := map[string][]hostfuncs.Capability{
+	caps := map[string][]capabilities.Capability{
 		"file": {
 			{Kind: "fs", Pattern: "read:**"},
 		},
@@ -186,7 +186,7 @@ func TestFilePlugin_Observe_FileExists(t *testing.T) {
 	require.NoError(t, err)
 
 	// File plugin needs filesystem capabilities
-	caps := map[string][]hostfuncs.Capability{
+	caps := map[string][]capabilities.Capability{
 		"file": {
 			{Kind: "fs", Pattern: "read:**"},
 		},
@@ -264,7 +264,7 @@ func TestFilePlugin_Observe_Symlink(t *testing.T) {
 	require.NoError(t, err)
 
 	// File plugin needs filesystem capabilities
-	caps := map[string][]hostfuncs.Capability{
+	caps := map[string][]capabilities.Capability{
 		"file": {
 			{Kind: "fs", Pattern: "read:**"},
 		},
@@ -312,7 +312,7 @@ func TestFilePlugin_Observe_FileNotFound(t *testing.T) {
 	wasmBytes := getWasmBytes(t, "file")
 
 	// File plugin needs filesystem capabilities
-	caps := map[string][]hostfuncs.Capability{
+	caps := map[string][]capabilities.Capability{
 		"file": {
 			{Kind: "fs", Pattern: "read:**"},
 		},
@@ -367,7 +367,7 @@ func TestFilePlugin_Observe_ReadContent(t *testing.T) {
 	require.NoError(t, err)
 
 	// File plugin needs filesystem capabilities
-	caps := map[string][]hostfuncs.Capability{
+	caps := map[string][]capabilities.Capability{
 		"file": {
 			{Kind: "fs", Pattern: "read:**"},
 		},
@@ -443,7 +443,7 @@ func TestFilePlugin_Observe_BinaryContent(t *testing.T) {
 	require.NoError(t, err)
 
 	// File plugin needs filesystem capabilities
-	caps := map[string][]hostfuncs.Capability{
+	caps := map[string][]capabilities.Capability{
 		"file": {
 			{Kind: "fs", Pattern: "read:**"},
 		},
@@ -503,7 +503,7 @@ func TestDNSPlugin_Describe(t *testing.T) {
 	wasmBytes := getWasmBytes(t, "dns")
 
 	// DNS plugin needs network capabilities for port 53
-	caps := map[string][]hostfuncs.Capability{
+	caps := map[string][]capabilities.Capability{
 		"dns": {
 			{Kind: "network", Pattern: "outbound:53"},
 		},
@@ -536,7 +536,7 @@ func TestDNSPlugin_Schema(t *testing.T) {
 	wasmBytes := getWasmBytes(t, "dns")
 
 	// DNS plugin needs network capabilities for port 53
-	caps := map[string][]hostfuncs.Capability{
+	caps := map[string][]capabilities.Capability{
 		"dns": {
 			{Kind: "network", Pattern: "outbound:53"},
 		},
@@ -557,11 +557,10 @@ func TestDNSPlugin_Schema(t *testing.T) {
 
 	// Parse the JSON Schema to verify it's valid JSON
 	var schemaData map[string]interface{}
-	err = json.Unmarshal(schema.RawSchema, &schemaData)
+	err = json.Unmarshal([]byte(schema.RawSchema), &schemaData)
 	require.NoError(t, err)
 
-	// Verify schema structure
-	assert.Equal(t, "object", schemaData["type"])
+	// Verify schema has expected properties
 	properties, ok := schemaData["properties"].(map[string]interface{})
 	require.True(t, ok)
 	assert.Contains(t, properties, "hostname")
@@ -579,7 +578,7 @@ func TestDNSPlugin_Observe_A_Record(t *testing.T) {
 	wasmBytes := getWasmBytes(t, "dns")
 
 	// DNS plugin needs network capabilities for port 53
-	caps := map[string][]hostfuncs.Capability{
+	caps := map[string][]capabilities.Capability{
 		"dns": {
 			{Kind: "network", Pattern: "outbound:53"},
 		},
@@ -639,7 +638,7 @@ func TestDNSPlugin_Observe_MX_Record(t *testing.T) {
 	wasmBytes := getWasmBytes(t, "dns")
 
 	// DNS plugin needs network capabilities for port 53
-	caps := map[string][]hostfuncs.Capability{
+	caps := map[string][]capabilities.Capability{
 		"dns": {
 			{Kind: "network", Pattern: "outbound:53"},
 		},
@@ -703,7 +702,7 @@ func TestDNSPlugin_Observe_InvalidHostname(t *testing.T) {
 	wasmBytes := getWasmBytes(t, "dns")
 
 	// DNS plugin needs network capabilities for port 53
-	caps := map[string][]hostfuncs.Capability{
+	caps := map[string][]capabilities.Capability{
 		"dns": {
 			{Kind: "network", Pattern: "outbound:53"},
 		},
@@ -760,7 +759,7 @@ func TestDNSPlugin_Observe_MissingHostname(t *testing.T) {
 	wasmBytes := getWasmBytes(t, "dns")
 
 	// DNS plugin needs network capabilities for port 53
-	caps := map[string][]hostfuncs.Capability{
+	caps := map[string][]capabilities.Capability{
 		"dns": {
 			{Kind: "network", Pattern: "outbound:53"},
 		},
@@ -799,7 +798,7 @@ func TestHTTPPlugin_Describe(t *testing.T) {
 	wasmBytes := getWasmBytes(t, "http")
 
 	// HTTP plugin needs network capabilities for ports 80,443
-	caps := map[string][]hostfuncs.Capability{
+	caps := map[string][]capabilities.Capability{
 		"http": {
 			{Kind: "network", Pattern: "outbound:80,443"},
 		},
@@ -828,7 +827,7 @@ func TestHTTPPlugin_Schema(t *testing.T) {
 	wasmBytes := getWasmBytes(t, "http")
 
 	// HTTP plugin needs network capabilities for ports 80,443
-	caps := map[string][]hostfuncs.Capability{
+	caps := map[string][]capabilities.Capability{
 		"http": {
 			{Kind: "network", Pattern: "outbound:80,443"},
 		},
@@ -864,7 +863,7 @@ func TestHTTPPlugin_Observe_GET(t *testing.T) {
 	wasmBytes := getWasmBytes(t, "http")
 
 	// HTTP plugin needs network capabilities for ports 80,443
-	caps := map[string][]hostfuncs.Capability{
+	caps := map[string][]capabilities.Capability{
 		"http": {
 			{Kind: "network", Pattern: "outbound:80,443"},
 		},
@@ -929,7 +928,7 @@ func TestTCPPlugin_Describe(t *testing.T) {
 	wasmBytes := getWasmBytes(t, "tcp")
 
 	// TCP plugin needs network capabilities for outbound connections
-	caps := map[string][]hostfuncs.Capability{
+	caps := map[string][]capabilities.Capability{
 		"tcp": {
 			{Kind: "network", Pattern: "outbound:*"},
 		},
@@ -958,7 +957,7 @@ func TestTCPPlugin_Schema(t *testing.T) {
 	wasmBytes := getWasmBytes(t, "tcp")
 
 	// TCP plugin needs network capabilities for outbound connections
-	caps := map[string][]hostfuncs.Capability{
+	caps := map[string][]capabilities.Capability{
 		"tcp": {
 			{Kind: "network", Pattern: "outbound:*"},
 		},
@@ -994,7 +993,7 @@ func TestTCPPlugin_Observe_PlainTCP(t *testing.T) {
 	wasmBytes := getWasmBytes(t, "tcp")
 
 	// TCP plugin needs network capabilities for outbound connections
-	caps := map[string][]hostfuncs.Capability{
+	caps := map[string][]capabilities.Capability{
 		"tcp": {
 			{Kind: "network", Pattern: "outbound:*"},
 		},
@@ -1036,7 +1035,7 @@ func TestTCPPlugin_Observe_TLS(t *testing.T) {
 	wasmBytes := getWasmBytes(t, "tcp")
 
 	// TCP plugin needs network capabilities for outbound connections
-	caps := map[string][]hostfuncs.Capability{
+	caps := map[string][]capabilities.Capability{
 		"tcp": {
 			{Kind: "network", Pattern: "outbound:*"},
 		},

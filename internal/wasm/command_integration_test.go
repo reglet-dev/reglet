@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/whiskeyjimbo/reglet/internal/wasm/hostfuncs"
+	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
 )
 
 // TestCommandPlugin_Integration tests the command plugin end-to-end with WASM runtime.
@@ -17,7 +17,7 @@ func TestCommandPlugin_Integration(t *testing.T) {
 	ctx := context.Background()
 
 	// Grant exec capabilities for testing
-	capabilities := map[string][]hostfuncs.Capability{
+	grantedCaps := map[string][]capabilities.Capability{
 		"command": {
 			{Kind: "exec", Pattern: "/bin/echo"},
 			{Kind: "exec", Pattern: "/bin/sh"},
@@ -25,7 +25,7 @@ func TestCommandPlugin_Integration(t *testing.T) {
 		},
 	}
 
-	runtime, err := NewRuntimeWithCapabilities(ctx, capabilities)
+	runtime, err := NewRuntimeWithCapabilities(ctx, grantedCaps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 

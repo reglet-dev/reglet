@@ -5,11 +5,13 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
+	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
 )
 
 // RegisterHostFunctions registers all host functions with the wazero runtime
-func RegisterHostFunctions(ctx context.Context, runtime wazero.Runtime, caps map[string][]Capability) error {
+func RegisterHostFunctions(ctx context.Context, runtime wazero.Runtime, caps map[string][]capabilities.Capability) error {
 	checker := NewCapabilityChecker(caps)
+
 
 	// Create host module "reglet_host"
 	builder := runtime.NewHostModuleBuilder("reglet_host")

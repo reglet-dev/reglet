@@ -3,21 +3,38 @@ package hostfuncs
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
 )
 
 // CapabilityChecker checks if operations are allowed based on granted capabilities
 type CapabilityChecker struct {
-	// Map of plugin name to granted capabilities
+	policy              *capabilities.Policy
 	grantedCapabilities map[string][]capabilities.Capability
 }
 
 // NewCapabilityChecker creates a new capability checker with the given capabilities
 func NewCapabilityChecker(caps map[string][]capabilities.Capability) *CapabilityChecker {
 	return &CapabilityChecker{
+		policy:              capabilities.NewPolicy(),
 		grantedCapabilities: caps,
 	}
+}
+
+// Check verifies if a requested capability is granted for a specific plugin.
+func (c *CapabilityChecker) Check(pluginName, kind, pattern string) error {
+	requested := capabilities.Capability{Kind: kind, Pattern: pattern}
+	pluginGrants, ok := c.grantedCapabilities[pluginName]
+	if !ok {
+		return fmt.Errorf("no capabilities granted to plugin %s", pluginName)
+	}
+
+	if c.policy.IsGranted(requested, pluginGrants) {
+		return nil
+	}
+
+	return fmt.Errorf("capability denied: %s:%s", kind, pattern)
 }
 
 type contextKey struct {

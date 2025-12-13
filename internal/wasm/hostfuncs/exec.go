@@ -158,3 +158,4 @@ func isShellExecution(command string) bool {
 
 	return false
 }
+
