@@ -5,7 +5,7 @@ import (
 
 	"github.com/expr-lang/expr"
 	"github.com/expr-lang/expr/vm"
-	"github.com/whiskeyjimbo/reglet/internal/config"
+	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
 )
 
 // ControlEnv exposes control metadata for expression evaluation.
@@ -85,7 +85,7 @@ func (f *ControlFilter) WithFilterExpression(program *vm.Program) *ControlFilter
 // 3. INCLUDES: IncludeSeverities
 // 4. INCLUDES: IncludeTags
 // 5. ADVANCED: FilterProgram (expr language)
-func (f *ControlFilter) ShouldRun(ctrl config.Control) (bool, string) {
+func (f *ControlFilter) ShouldRun(ctrl entities.Control) (bool, string) {
 	// 0. Exclusive mode: ONLY specified controls run
 	if len(f.exclusiveControlIDs) > 0 {
 		if contains(f.exclusiveControlIDs, ctrl.ID) {

@@ -5,12 +5,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/whiskeyjimbo/reglet/internal/config"
+	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
 )
 
 func Test_DependencyResolver_BuildControlDAG_NoDependencies(t *testing.T) {
 	resolver := NewDependencyResolver()
-	controls := []config.Control{
+	controls := []entities.Control{
 		{ID: "ctrl-1"},
 		{ID: "ctrl-2"},
 		{ID: "ctrl-3"},
@@ -25,7 +25,7 @@ func Test_DependencyResolver_BuildControlDAG_NoDependencies(t *testing.T) {
 
 func Test_DependencyResolver_BuildControlDAG_LinearDependencies(t *testing.T) {
 	resolver := NewDependencyResolver()
-	controls := []config.Control{
+	controls := []entities.Control{
 		{ID: "ctrl-1"},
 		{ID: "ctrl-2", DependsOn: []string{"ctrl-1"}},
 		{ID: "ctrl-3", DependsOn: []string{"ctrl-2"}},
@@ -53,7 +53,7 @@ func Test_DependencyResolver_BuildControlDAG_LinearDependencies(t *testing.T) {
 
 func Test_DependencyResolver_BuildControlDAG_ParallelExecution(t *testing.T) {
 	resolver := NewDependencyResolver()
-	controls := []config.Control{
+	controls := []entities.Control{
 		{ID: "ctrl-base"},
 		{ID: "ctrl-a", DependsOn: []string{"ctrl-base"}},
 		{ID: "ctrl-b", DependsOn: []string{"ctrl-base"}},
@@ -76,7 +76,7 @@ func Test_DependencyResolver_BuildControlDAG_ParallelExecution(t *testing.T) {
 
 func Test_DependencyResolver_BuildControlDAG_CircularDependency(t *testing.T) {
 	resolver := NewDependencyResolver()
-	controls := []config.Control{
+	controls := []entities.Control{
 		{ID: "ctrl-1", DependsOn: []string{"ctrl-2"}},
 		{ID: "ctrl-2", DependsOn: []string{"ctrl-1"}},
 	}
@@ -88,7 +88,7 @@ func Test_DependencyResolver_BuildControlDAG_CircularDependency(t *testing.T) {
 
 func Test_DependencyResolver_BuildControlDAG_NonExistentDependency(t *testing.T) {
 	resolver := NewDependencyResolver()
-	controls := []config.Control{
+	controls := []entities.Control{
 		{ID: "ctrl-1", DependsOn: []string{"ctrl-nonexistent"}},
 	}
 
@@ -99,7 +99,7 @@ func Test_DependencyResolver_BuildControlDAG_NonExistentDependency(t *testing.T)
 
 func Test_DependencyResolver_ResolveDependencies_NoDeps(t *testing.T) {
 	resolver := NewDependencyResolver()
-	controls := []config.Control{
+	controls := []entities.Control{
 		{ID: "ctrl-1"},
 		{ID: "ctrl-2"},
 	}
@@ -112,7 +112,7 @@ func Test_DependencyResolver_ResolveDependencies_NoDeps(t *testing.T) {
 
 func Test_DependencyResolver_ResolveDependencies_DirectDeps(t *testing.T) {
 	resolver := NewDependencyResolver()
-	controls := []config.Control{
+	controls := []entities.Control{
 		{ID: "ctrl-1"},
 		{ID: "ctrl-2", DependsOn: []string{"ctrl-1"}},
 	}
@@ -126,7 +126,7 @@ func Test_DependencyResolver_ResolveDependencies_DirectDeps(t *testing.T) {
 
 func Test_DependencyResolver_ResolveDependencies_TransitiveDeps(t *testing.T) {
 	resolver := NewDependencyResolver()
-	controls := []config.Control{
+	controls := []entities.Control{
 		{ID: "ctrl-1"},
 		{ID: "ctrl-2", DependsOn: []string{"ctrl-1"}},
 		{ID: "ctrl-3", DependsOn: []string{"ctrl-2"}},
@@ -143,7 +143,7 @@ func Test_DependencyResolver_ResolveDependencies_TransitiveDeps(t *testing.T) {
 
 func Test_DependencyResolver_ResolveDependencies_CircularDependency(t *testing.T) {
 	resolver := NewDependencyResolver()
-	controls := []config.Control{
+	controls := []entities.Control{
 		{ID: "ctrl-1", DependsOn: []string{"ctrl-2"}},
 		{ID: "ctrl-2", DependsOn: []string{"ctrl-1"}},
 	}

@@ -3,7 +3,7 @@ package services
 import (
 	"fmt"
 
-	"github.com/whiskeyjimbo/reglet/internal/config"
+	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
 )
 
 // DependencyResolver handles control dependency graph operations
@@ -17,7 +17,7 @@ func NewDependencyResolver() *DependencyResolver {
 // ControlLevel represents controls at a specific dependency level
 type ControlLevel struct {
 	Level    int
-	Controls []config.Control
+	Controls []entities.Control
 }
 
 // BuildControlDAG builds a dependency graph using Kahn's algorithm.
@@ -28,9 +28,9 @@ type ControlLevel struct {
 // 2. Find all controls with no dependencies (in-degree 0)
 // 3. Process controls level by level, decrementing in-degrees
 // 4. Detect cycles (remaining controls with in-degree > 0)
-func (r *DependencyResolver) BuildControlDAG(controls []config.Control) ([]ControlLevel, error) {
+func (r *DependencyResolver) BuildControlDAG(controls []entities.Control) ([]ControlLevel, error) {
 	// Build maps for efficient lookup
-	controlByID := make(map[string]config.Control)
+	controlByID := make(map[string]entities.Control)
 	inDegree := make(map[string]int)
 	dependencies := make(map[string][]string) // reverse map: controlID -> dependents
 
@@ -58,7 +58,7 @@ func (r *DependencyResolver) BuildControlDAG(controls []config.Control) ([]Contr
 	level := 0
 
 	for len(processed) < len(controls) {
-		var currentLevel []config.Control
+		var currentLevel []entities.Control
 
 		// Find all controls with in-degree 0 (no unmet dependencies)
 		for _, ctrl := range controls {
@@ -107,9 +107,9 @@ func (r *DependencyResolver) BuildControlDAG(controls []config.Control) ([]Contr
 // Returns map of controlID → set of all dependencies (direct + transitive).
 //
 // Used by --include-dependencies flag to include all controls in dependency chain.
-func (r *DependencyResolver) ResolveDependencies(controls []config.Control) (map[string]map[string]bool, error) {
+func (r *DependencyResolver) ResolveDependencies(controls []entities.Control) (map[string]map[string]bool, error) {
 	result := make(map[string]map[string]bool)
-	controlByID := make(map[string]config.Control)
+	controlByID := make(map[string]entities.Control)
 
 	for _, ctrl := range controls {
 		controlByID[ctrl.ID] = ctrl
