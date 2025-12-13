@@ -3,9 +3,9 @@ package capabilities
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
+	"github.com/goccy/go-yaml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
@@ -40,10 +40,10 @@ func TestFileStore_LoadAndSave(t *testing.T) {
 	content, err := os.ReadFile(configPath)
 	require.NoError(t, err)
 	expectedContent := `capabilities:
-    - kind: fs
-      pattern: read:/etc/passwd
-    - kind: network
-      pattern: outbound:80
+  - kind: fs
+    pattern: read:/etc/passwd
+  - kind: network
+    pattern: outbound:80
 `
 	assert.Equal(t, expectedContent, string(content))
 
@@ -113,5 +113,9 @@ func TestFileStore_Save_EmptyCapabilities(t *testing.T) {
 
 	content, err := os.ReadFile(configPath)
 	require.NoError(t, err)
-	assert.Equal(t, "capabilities: []\n", strings.Split(string(content), "\n")[3]) // Check relevant line after header
+
+	var cfg configFile // Use the infrastructure configFile struct
+	err = yaml.Unmarshal(content, &cfg)
+	require.NoError(t, err)
+	assert.Empty(t, cfg.Capabilities, "Expected no capabilities in saved config for empty grant")
 }

@@ -11,7 +11,7 @@ import (
 
 	"github.com/expr-lang/expr"
 	"github.com/whiskeyjimbo/reglet/internal/domain"
-	"github.com/whiskeyjimbo/reglet/internal/wasm"
+	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
 )
 
 // StatusAggregator determines status at different levels of the execution hierarchy
@@ -89,7 +89,7 @@ func (s *StatusAggregator) AggregateControlStatus(observationStatuses []domain.S
 // Returns: Status and optional error message
 func (s *StatusAggregator) DetermineObservationStatus(
 	ctx context.Context,
-	evidence *wasm.Evidence,
+	evidence *execution.Evidence,
 	expects []string,
 ) (domain.Status, string) {
 	// No expectations → use evidence status directly

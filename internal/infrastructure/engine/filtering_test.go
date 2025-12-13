@@ -9,9 +9,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/whiskeyjimbo/reglet/internal/capabilities"
-	"github.com/whiskeyjimbo/reglet/internal/config"
+	appservices "github.com/whiskeyjimbo/reglet/internal/application/services"
 	"github.com/whiskeyjimbo/reglet/internal/domain"
+	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
 	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
 )
 
@@ -50,7 +50,7 @@ func TestFiltering_EndToEnd(t *testing.T) {
 	// 1. Define a profile with 20 controls
 	// 5 controls: tag "target", severity "high"
 	// 15 controls: tag "other", severity "low"
-	var controls []config.Control
+	var controls []entities.Control
 	for i := 0; i < 20; i++ {
 		tag := "other"
 		severity := "low"
@@ -59,12 +59,12 @@ func TestFiltering_EndToEnd(t *testing.T) {
 			severity = "high"
 		}
 
-		ctrl := config.Control{
+		ctrl := entities.Control{
 			ID:       fmt.Sprintf("control-%d", i),
 			Name:     fmt.Sprintf("Control %d", i),
 			Severity: severity,
 			Tags:     []string{tag},
-			Observations: []config.Observation{
+			Observations: []entities.Observation{
 				{
 					Plugin: "file",
 					Config: map[string]interface{}{
@@ -77,12 +77,12 @@ func TestFiltering_EndToEnd(t *testing.T) {
 		controls = append(controls, ctrl)
 	}
 
-	profile := &config.Profile{
-		Metadata: config.ProfileMetadata{
+	profile := &entities.Profile{
+		Metadata: entities.ProfileMetadata{
 			Name:    "filtering-e2e-profile",
 			Version: "1.0.0",
 		},
-		Controls: config.ControlsSection{
+		Controls: entities.ControlsSection{
 			Items: controls,
 		},
 	}
@@ -94,7 +94,7 @@ func TestFiltering_EndToEnd(t *testing.T) {
 	cfg.Parallel = true
 
 	// Create capability manager that trusts all plugins (auto-grant)
-	capMgr := capabilities.NewManager(true)
+	capMgr := appservices.NewCapabilityOrchestrator(true)
 
 	// Initialize Engine with Capabilities and Config
 	engine, err := NewEngineWithCapabilities(ctx, capMgr, pluginDir, profile, cfg, nil, nil)

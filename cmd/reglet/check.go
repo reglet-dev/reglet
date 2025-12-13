@@ -10,16 +10,16 @@ import (
 
 	"github.com/expr-lang/expr"
 	"github.com/spf13/cobra"
-	"github.com/whiskeyjimbo/reglet/internal/capabilities"
+	appservices "github.com/whiskeyjimbo/reglet/internal/application/services"
 	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
 	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
 	"github.com/whiskeyjimbo/reglet/internal/domain/services"
-	"github.com/whiskeyjimbo/reglet/internal/engine"
+	"github.com/whiskeyjimbo/reglet/internal/infrastructure/engine"
 	infraconfig "github.com/whiskeyjimbo/reglet/internal/infrastructure/config"
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/system"
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/validation"
-	"github.com/whiskeyjimbo/reglet/internal/output"
-	"github.com/whiskeyjimbo/reglet/internal/redaction"
+	"github.com/whiskeyjimbo/reglet/internal/infrastructure/output"
+	"github.com/whiskeyjimbo/reglet/internal/infrastructure/redaction"
 )
 
 var (
@@ -139,8 +139,8 @@ func runCheckAction(ctx context.Context, profilePath string) error {
 		return fmt.Errorf("failed to determine plugin directory: %w", err)
 	}
 
-	// Create capability manager
-	capMgr := capabilities.NewManager(trustPlugins)
+	// Create capability orchestrator
+	capMgr := appservices.NewCapabilityOrchestrator(trustPlugins)
 
 	// Create execution engine with capability manager and config
 	// Pass nil for repository as persistence is not yet enabled via CLI

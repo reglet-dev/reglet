@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/goccy/go-yaml"
 	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
@@ -20,6 +19,11 @@ func NewFileStore(configPath string) *FileStore {
 	return &FileStore{
 		configPath: configPath,
 	}
+}
+
+// ConfigPath returns the path to the config file.
+func (s *FileStore) ConfigPath() string {
+	return s.configPath
 }
 
 // configFile represents the YAML structure of ~/.reglet/config.yaml

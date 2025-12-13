@@ -7,7 +7,6 @@ import (
 
 	"github.com/whiskeyjimbo/reglet/internal/domain"
 	"github.com/whiskeyjimbo/reglet/internal/domain/valueobjects"
-	"github.com/whiskeyjimbo/reglet/internal/wasm"
 )
 
 // ExecutionResult represents the complete result of executing a profile.
@@ -43,8 +42,8 @@ type ObservationResult struct {
 	Plugin   string                 `json:"plugin" yaml:"plugin"`
 	Config   map[string]interface{} `json:"config" yaml:"config"`
 	Status   domain.Status          `json:"status" yaml:"status"`
-	Evidence *wasm.Evidence         `json:"evidence,omitempty" yaml:"evidence,omitempty"`
-	Error    *wasm.PluginError      `json:"error,omitempty" yaml:"error,omitempty"`
+	Evidence *Evidence         `json:"evidence,omitempty" yaml:"evidence,omitempty"`
+	Error    *PluginError      `json:"error,omitempty" yaml:"error,omitempty"`
 	Duration time.Duration          `json:"duration_ms" yaml:"duration_ms"`
 }
 
@@ -181,4 +180,26 @@ func (r *ExecutionResult) calculateSummary() {
 			}
 		}
 	}
+}
+
+// Evidence represents observation results (proof of compliance state).
+// This is a core domain concept representing the evidence collected during a check.
+type Evidence struct {
+	Status    bool
+	Error     *PluginError // Plugin execution error
+	Timestamp time.Time
+	Data      map[string]interface{}
+	Raw       *string // Optional raw data
+}
+
+// PluginError represents an error from plugin execution.
+// This is a domain concept representing a failure in collecting evidence.
+type PluginError struct {
+	Code    string
+	Message string
+}
+
+// Error implements the error interface
+func (e *PluginError) Error() string {
+	return e.Code + ": " + e.Message
 }

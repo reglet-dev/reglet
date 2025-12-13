@@ -199,7 +199,7 @@ func findCommandPlugin(t *testing.T) string {
 
 	// Try common locations
 	locations := []string{
-		"../../plugins/command/command.wasm",
+		"../../../plugins/command/command.wasm",
 		"plugins/command/command.wasm",
 		"./plugins/command/command.wasm",
 	}

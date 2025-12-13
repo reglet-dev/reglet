@@ -6,7 +6,8 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
-	"github.com/whiskeyjimbo/reglet/internal/wasm/hostfuncs"
+	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
+	"github.com/whiskeyjimbo/reglet/internal/infrastructure/wasm/hostfuncs"
 )
 
 // globalCache is a shared compilation cache for wazero runtimes.
@@ -27,7 +28,7 @@ func NewRuntime(ctx context.Context) (*Runtime, error) {
 }
 
 // NewRuntimeWithCapabilities creates a new WASM runtime with specific capabilities
-func NewRuntimeWithCapabilities(ctx context.Context, caps map[string][]hostfuncs.Capability) (*Runtime, error) {
+func NewRuntimeWithCapabilities(ctx context.Context, caps map[string][]capabilities.Capability) (*Runtime, error) {
 	// Create wazero runtime with compilation cache
 	// This is a pure Go WASM runtime - no CGO required
 	config := wazero.NewRuntimeConfig().WithCompilationCache(globalCache)

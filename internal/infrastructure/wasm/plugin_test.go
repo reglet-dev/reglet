@@ -20,7 +20,7 @@ func TestPlugin_Observe_Concurrent(t *testing.T) {
 	defer runtime.Close(ctx)
 
 	// Load file plugin
-	wasmBytes, err := os.ReadFile("../../plugins/file/file.wasm")
+	wasmBytes, err := os.ReadFile("../../../plugins/file/file.wasm")
 	require.NoError(t, err)
 
 	plugin, err := runtime.LoadPlugin(ctx, "file", wasmBytes)
@@ -101,7 +101,7 @@ func TestPlugin_ConcurrentDifferentMethods(t *testing.T) {
 	defer runtime.Close(ctx)
 
 	// Load file plugin
-	wasmBytes, err := os.ReadFile("../../plugins/file/file.wasm")
+	wasmBytes, err := os.ReadFile("../../../plugins/file/file.wasm")
 	require.NoError(t, err)
 
 	plugin, err := runtime.LoadPlugin(ctx, "file", wasmBytes)

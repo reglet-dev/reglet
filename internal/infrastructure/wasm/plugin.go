@@ -10,7 +10,8 @@ import (
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	"github.com/whiskeyjimbo/reglet/internal/wasm/hostfuncs"
+	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
+	"github.com/whiskeyjimbo/reglet/internal/infrastructure/wasm/hostfuncs"
 )
 
 //nolint:gosec // G115: uint64->uint32 conversions are safe for WASM32 address space

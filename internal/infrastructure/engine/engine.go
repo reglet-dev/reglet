@@ -13,8 +13,8 @@ import (
 	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
 	"github.com/whiskeyjimbo/reglet/internal/domain/repositories"
 	"github.com/whiskeyjimbo/reglet/internal/domain/services"
-	"github.com/whiskeyjimbo/reglet/internal/redaction"
-	"github.com/whiskeyjimbo/reglet/internal/wasm"
+	"github.com/whiskeyjimbo/reglet/internal/infrastructure/redaction"
+	"github.com/whiskeyjimbo/reglet/internal/infrastructure/wasm"
 	"golang.org/x/sync/errgroup"
 )
 

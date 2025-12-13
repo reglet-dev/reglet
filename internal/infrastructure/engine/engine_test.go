@@ -9,11 +9,11 @@ import (
 	"github.com/expr-lang/expr/vm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/whiskeyjimbo/reglet/internal/config"
 	"github.com/whiskeyjimbo/reglet/internal/domain"
+	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
 	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
 	"github.com/whiskeyjimbo/reglet/internal/domain/services"
-	"github.com/whiskeyjimbo/reglet/internal/wasm"
+	"github.com/whiskeyjimbo/reglet/internal/infrastructure/wasm"
 )
 
 func TestNewEngine(t *testing.T) {
@@ -121,13 +121,13 @@ func TestExecuteControl_SingleObservation(t *testing.T) {
 	require.NoError(t, err)
 	defer engine.Close(ctx)
 
-	ctrl := config.Control{
+	ctrl := entities.Control{
 		ID:          "test-control",
 		Name:        "Test Control",
 		Description: "A test control",
 		Severity:    "medium",
 		Tags:        []string{"test"},
-		Observations: []config.Observation{
+		Observations: []entities.Observation{
 			{
 				Plugin: "file",
 				Config: map[string]interface{}{
@@ -160,10 +160,10 @@ func TestExecuteControl_MultipleObservations(t *testing.T) {
 	require.NoError(t, err)
 	defer engine.Close(ctx)
 
-	ctrl := config.Control{
+	ctrl := entities.Control{
 		ID:   "multi-test",
 		Name: "Multi Observation Test",
-		Observations: []config.Observation{
+		Observations: []entities.Observation{
 			{
 				Plugin: "file",
 				Config: map[string]interface{}{
@@ -197,17 +197,17 @@ func TestExecute_SingleControl(t *testing.T) {
 	require.NoError(t, err)
 	defer engine.Close(ctx)
 
-	profile := &config.Profile{
-		Metadata: config.ProfileMetadata{
+	profile := &entities.Profile{
+		Metadata: entities.ProfileMetadata{
 			Name:    "test-profile",
 			Version: "1.0.0",
 		},
-		Controls: config.ControlsSection{
-			Items: []config.Control{
+		Controls: entities.ControlsSection{
+			Items: []entities.Control{
 				{
 					ID:   "control-1",
 					Name: "Control 1",
-					Observations: []config.Observation{
+					Observations: []entities.Observation{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{
@@ -242,17 +242,17 @@ func TestExecute_MultipleControls(t *testing.T) {
 	require.NoError(t, err)
 	defer engine.Close(ctx)
 
-	profile := &config.Profile{
-		Metadata: config.ProfileMetadata{
+	profile := &entities.Profile{
+		Metadata: entities.ProfileMetadata{
 			Name:    "multi-control-profile",
 			Version: "2.0.0",
 		},
-		Controls: config.ControlsSection{
-			Items: []config.Control{
+		Controls: entities.ControlsSection{
+			Items: []entities.Control{
 				{
 					ID:   "control-1",
 					Name: "Control 1",
-					Observations: []config.Observation{
+					Observations: []entities.Observation{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{
@@ -265,7 +265,7 @@ func TestExecute_MultipleControls(t *testing.T) {
 				{
 					ID:   "control-2",
 					Name: "Control 2",
-					Observations: []config.Observation{
+					Observations: []entities.Observation{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{
@@ -296,17 +296,17 @@ func TestExecute_SummaryStatistics(t *testing.T) {
 	require.NoError(t, err)
 	defer engine.Close(ctx)
 
-	profile := &config.Profile{
-		Metadata: config.ProfileMetadata{
+	profile := &entities.Profile{
+		Metadata: entities.ProfileMetadata{
 			Name:    "summary-test",
 			Version: "1.0.0",
 		},
-		Controls: config.ControlsSection{
-			Items: []config.Control{
+		Controls: entities.ControlsSection{
+			Items: []entities.Control{
 				{
 					ID:   "control-1",
 					Name: "Control 1",
-					Observations: []config.Observation{
+					Observations: []entities.Observation{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{
@@ -341,17 +341,17 @@ func TestExecute_TimingInfo(t *testing.T) {
 	require.NoError(t, err)
 	defer engine.Close(ctx)
 
-	profile := &config.Profile{
-		Metadata: config.ProfileMetadata{
+	profile := &entities.Profile{
+		Metadata: entities.ProfileMetadata{
 			Name:    "timing-test",
 			Version: "1.0.0",
 		},
-		Controls: config.ControlsSection{
-			Items: []config.Control{
+		Controls: entities.ControlsSection{
+			Items: []entities.Control{
 				{
 					ID:   "control-1",
 					Name: "Control 1",
-					Observations: []config.Observation{
+					Observations: []entities.Observation{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{
@@ -384,17 +384,17 @@ func TestExecute_InvalidPlugin(t *testing.T) {
 	require.NoError(t, err)
 	defer engine.Close(ctx)
 
-	profile := &config.Profile{
-		Metadata: config.ProfileMetadata{
+	profile := &entities.Profile{
+		Metadata: entities.ProfileMetadata{
 			Name:    "invalid-plugin-test",
 			Version: "1.0.0",
 		},
-		Controls: config.ControlsSection{
-			Items: []config.Control{
+		Controls: entities.ControlsSection{
+			Items: []entities.Control{
 				{
 					ID:   "control-1",
 					Name: "Control 1",
-					Observations: []config.Observation{
+					Observations: []entities.Observation{
 						{
 							Plugin: "nonexistent-plugin",
 							Config: map[string]interface{}{
@@ -441,7 +441,7 @@ func TestShouldRun_IncludeTags(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := config.Control{Tags: tt.tags}
+			ctrl := entities.Control{Tags: tt.tags}
 			got, _ := e.shouldRun(ctrl)
 			assert.Equal(t, tt.want, got)
 		})
@@ -467,7 +467,7 @@ func TestShouldRun_ExcludeTags(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := config.Control{Tags: tt.tags}
+			ctrl := entities.Control{Tags: tt.tags}
 			got, _ := e.shouldRun(ctrl)
 			assert.Equal(t, tt.want, got)
 		})
@@ -493,7 +493,7 @@ func TestShouldRun_IncludeSeverity(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := config.Control{Severity: tt.severity}
+			ctrl := entities.Control{Severity: tt.severity}
 			got, _ := e.shouldRun(ctrl)
 			assert.Equal(t, tt.want, got)
 		})
@@ -523,7 +523,7 @@ func TestShouldRun_IncludeControlIDs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := config.Control{ID: tt.id, Tags: tt.tags}
+			ctrl := entities.Control{ID: tt.id, Tags: tt.tags}
 			got, _ := e.shouldRun(ctrl)
 			assert.Equal(t, tt.want, got)
 		})
@@ -547,7 +547,7 @@ func TestShouldRun_ExcludeControlIDs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := config.Control{ID: tt.id}
+			ctrl := entities.Control{ID: tt.id}
 			got, _ := e.shouldRun(ctrl)
 			assert.Equal(t, tt.want, got)
 		})
@@ -583,7 +583,7 @@ func TestShouldRun_AdvancedFilter(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			e.config.FilterProgram = tt.program
-			ctrl := config.Control{Severity: tt.severity, Tags: tt.tags, Owner: tt.owner}
+			ctrl := entities.Control{Severity: tt.severity, Tags: tt.tags, Owner: tt.owner}
 			got, _ := e.shouldRun(ctrl)
 			assert.Equal(t, tt.want, got)
 		})
@@ -601,9 +601,9 @@ func TestResolveDependencies(t *testing.T) {
 	// Result should be: c3, c2 (matched), c1 (dependency)
 	// c4 should be excluded
 
-	profile := &config.Profile{
-		Controls: config.ControlsSection{
-			Items: []config.Control{
+	profile := &entities.Profile{
+		Controls: entities.ControlsSection{
+			Items: []entities.Control{
 				{ID: "c1", Tags: []string{"security"}},
 				{ID: "c2", Tags: []string{"app"}, DependsOn: []string{"c1"}},
 				{ID: "c3", Tags: []string{"app"}, DependsOn: []string{"c2"}},

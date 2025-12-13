@@ -10,12 +10,12 @@ import (
 	"time"
 
 	"github.com/expr-lang/expr"
-	"github.com/whiskeyjimbo/reglet/internal/config"
 	"github.com/whiskeyjimbo/reglet/internal/domain"
+	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
 	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
 	"github.com/whiskeyjimbo/reglet/internal/domain/services"
-	"github.com/whiskeyjimbo/reglet/internal/redaction"
-	"github.com/whiskeyjimbo/reglet/internal/wasm"
+	"github.com/whiskeyjimbo/reglet/internal/infrastructure/redaction"
+	"github.com/whiskeyjimbo/reglet/internal/infrastructure/wasm"
 )
 
 // ObservationExecutor executes observations using WASM plugins.
@@ -80,7 +80,7 @@ func findProjectRoot() string {
 }
 
 // Execute runs a single observation and returns the result.
-func (e *ObservationExecutor) Execute(ctx context.Context, obs config.Observation) execution.ObservationResult {
+func (e *ObservationExecutor) Execute(ctx context.Context, obs entities.Observation) execution.ObservationResult {
 	startTime := time.Now()
 
 	result := execution.ObservationResult{

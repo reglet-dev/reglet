@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/whiskeyjimbo/reglet/internal/domain"
-	"github.com/whiskeyjimbo/reglet/internal/wasm"
+	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
 )
 
 func Test_StatusAggregator_AggregateControlStatus(t *testing.T) {
@@ -78,14 +78,14 @@ func Test_StatusAggregator_AggregateControlStatus(t *testing.T) {
 func Test_StatusAggregator_DetermineObservationStatus(t *testing.T) {
 	tests := []struct {
 		name           string
-		evidence       *wasm.Evidence
+		evidence       *execution.Evidence
 		expects        []string
 		expectedStatus domain.Status
 		expectedError  string
 	}{
 		{
 			name: "no expects uses evidence status true",
-			evidence: &wasm.Evidence{
+			evidence: &execution.Evidence{
 				Status: true,
 				Data:   map[string]interface{}{},
 			},
@@ -94,7 +94,7 @@ func Test_StatusAggregator_DetermineObservationStatus(t *testing.T) {
 		},
 		{
 			name: "no expects uses evidence status false",
-			evidence: &wasm.Evidence{
+			evidence: &execution.Evidence{
 				Status: false,
 				Data:   map[string]interface{}{},
 			},
@@ -103,7 +103,7 @@ func Test_StatusAggregator_DetermineObservationStatus(t *testing.T) {
 		},
 		{
 			name: "simple expect passes",
-			evidence: &wasm.Evidence{
+			evidence: &execution.Evidence{
 				Status: true,
 				Data: map[string]interface{}{
 					"status_code": 200,
@@ -114,7 +114,7 @@ func Test_StatusAggregator_DetermineObservationStatus(t *testing.T) {
 		},
 		{
 			name: "simple expect fails",
-			evidence: &wasm.Evidence{
+			evidence: &execution.Evidence{
 				Status: true,
 				Data: map[string]interface{}{
 					"status_code": 500,
@@ -126,7 +126,7 @@ func Test_StatusAggregator_DetermineObservationStatus(t *testing.T) {
 		},
 		{
 			name: "multiple expects all pass",
-			evidence: &wasm.Evidence{
+			evidence: &execution.Evidence{
 				Status: true,
 				Data: map[string]interface{}{
 					"status_code": 200,
@@ -138,7 +138,7 @@ func Test_StatusAggregator_DetermineObservationStatus(t *testing.T) {
 		},
 		{
 			name: "any expect fails results in fail",
-			evidence: &wasm.Evidence{
+			evidence: &execution.Evidence{
 				Status: true,
 				Data: map[string]interface{}{
 					"status_code": 200,
@@ -151,7 +151,7 @@ func Test_StatusAggregator_DetermineObservationStatus(t *testing.T) {
 		},
 		{
 			name: "invalid expect expression returns error",
-			evidence: &wasm.Evidence{
+			evidence: &execution.Evidence{
 				Status: true,
 				Data:   map[string]interface{}{},
 			},
@@ -160,9 +160,9 @@ func Test_StatusAggregator_DetermineObservationStatus(t *testing.T) {
 		},
 		{
 			name: "evidence error skips expect evaluation",
-			evidence: &wasm.Evidence{
+			evidence: &execution.Evidence{
 				Status: false,
-				Error:  &wasm.PluginError{Message: "connection failed"},
+				Error:  &execution.PluginError{Message: "connection failed"},
 				Data:   map[string]interface{}{},
 			},
 			expects:        []string{"some_field == true"},

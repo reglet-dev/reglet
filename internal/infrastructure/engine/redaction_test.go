@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/whiskeyjimbo/reglet/internal/redaction"
-	"github.com/whiskeyjimbo/reglet/internal/wasm"
+	"github.com/whiskeyjimbo/reglet/internal/infrastructure/redaction"
+	"github.com/whiskeyjimbo/reglet/internal/infrastructure/wasm"
 )
 
 func TestExecutor_Redaction(t *testing.T) {

@@ -3,9 +3,8 @@
 package wasm
 
 import (
-	"time"
-
 	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
+	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
 )
 
 // PluginInfo contains metadata about a plugin
@@ -23,27 +22,13 @@ type Config struct {
 	Values map[string]interface{}
 }
 
-// Evidence represents observation results
-// Maps to the WIT evidence record
-type Evidence struct {
-	Status    bool
-	Error     *PluginError // Use PluginError defined in this package
-	Timestamp time.Time
-	Data      map[string]interface{}
-	Raw       *string // Optional raw data
-}
+// Evidence is re-exported from domain for backward compatibility in this package.
+// Use execution.Evidence from domain layer.
+type Evidence = execution.Evidence
 
-// PluginError represents an error from plugin execution
-// Maps to the WIT error record
-type PluginError struct {
-	Code    string
-	Message string
-}
-
-// Error implements the error interface
-func (e *PluginError) Error() string {
-	return e.Code + ": " + e.Message
-}
+// PluginError is re-exported from domain for backward compatibility in this package.
+// Use execution.PluginError from domain layer.
+type PluginError = execution.PluginError
 
 // ConfigSchema represents the JSON Schema for plugin configuration
 // Maps to the WIT config-schema record
@@ -63,6 +48,6 @@ type FieldDef struct {
 
 // ObservationResult is the result of running an observation
 type ObservationResult struct {
-	Evidence *Evidence
-	Error    *PluginError
+	Evidence *execution.Evidence
+	Error    *execution.PluginError
 }
