@@ -18,7 +18,7 @@ func TestProfile_AddControl(t *testing.T) {
 	// Duplicate
 	err = profile.AddControl(ctrl1)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "duplicate")
+	assert.Contains(t, err.Error(), "already exists") // Message changed in entities
 
 	// Invalid
 	invalidCtrl := Control{ID: "", Name: "Invalid"}
@@ -29,7 +29,7 @@ func TestProfile_AddControl(t *testing.T) {
 func TestProfile_Validate(t *testing.T) {
 	// Valid profile
 	p := Profile{
-		Metadata: ProfileMetadata{Name: "test"},
+		Metadata: ProfileMetadata{Name: "test", Version: "1.0.0"},
 		Controls: ControlsSection{Items: []Control{{ID: "c1", Name: "C1", Observations: []Observation{{}}}}},
 	}
 	assert.NoError(t, p.Validate())
@@ -40,7 +40,7 @@ func TestProfile_Validate(t *testing.T) {
 	assert.Error(t, pInvalid.Validate())
 
 	// No controls
-	pEmpty := Profile{Metadata: ProfileMetadata{Name: "test"}}
+	pEmpty := Profile{Metadata: ProfileMetadata{Name: "test", Version: "1.0.0"}}
 	assert.Error(t, pEmpty.Validate())
 }
 
@@ -128,7 +128,7 @@ func TestProfile_ApplyDefaults(t *testing.T) {
 			Items: []Control{
 				{ID: "c1"},                                     // Should inherit all
 				{ID: "c2", Severity: "high"},                   // Should override severity
-				{ID: "c3", Tags: []string{"custom"}},           // Should merge tags? No, current logic is "if empty"
+				{ID: "c3", Tags: []string{"custom"}},           // Should merge tags
 				{ID: "c4", Timeout: 10 * time.Second},          // Should override timeout
 			},
 		},
@@ -148,8 +148,7 @@ func TestProfile_ApplyDefaults(t *testing.T) {
 	assert.Equal(t, "high", c2.Severity)
 	assert.Equal(t, "platform", c2.Owner)
 
-	// c3 - current logic: defaults are merged with control tags
-	// so c3 tags should contain both "custom" and "default"
+	// c3
 	c3 := p.GetControl("c3")
 	assert.Contains(t, c3.Tags, "custom")
 	assert.Contains(t, c3.Tags, "default")

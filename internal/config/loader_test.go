@@ -65,7 +65,8 @@ profile:
 
 	_, err := LoadProfileFromReader(strings.NewReader(yaml))
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to parse YAML")
+	// The new infrastructure loader returns "failed to decode profile YAML"
+	assert.Contains(t, err.Error(), "failed to decode")
 }
 
 func TestApplyDefaults(t *testing.T) {
@@ -76,7 +77,7 @@ profile:
 
 controls:
   defaults:
-    severity: warning
+    severity: medium
     owner: security-team
     tags: [default-tag]
     timeout: 30s
@@ -99,12 +100,13 @@ controls:
             path: /etc/test2
 `
 
+	// This now uses the infrastructure loader which calls ApplyDefaults internally
 	profile, err := LoadProfileFromReader(strings.NewReader(yaml))
 	require.NoError(t, err)
 
 	// First control should have defaults applied
 	ctrl1 := profile.Controls.Items[0]
-	assert.Equal(t, "warning", ctrl1.Severity)
+	assert.Equal(t, "medium", ctrl1.Severity)
 	assert.Equal(t, "security-team", ctrl1.Owner)
 	assert.Equal(t, 30*time.Second, ctrl1.Timeout)
 	assert.Contains(t, ctrl1.Tags, "default-tag")
@@ -234,6 +236,7 @@ controls:
 }
 
 func TestValidate_MissingName(t *testing.T) {
+	// Infrastructure loader validates profile name is required, so LoadProfileFromReader fails first
 	yaml := `
 profile:
   version: 1.0.0
@@ -248,15 +251,13 @@ controls:
             path: /etc/test
 `
 
-	profile, err := LoadProfileFromReader(strings.NewReader(yaml))
-	require.NoError(t, err)
-
-	err = Validate(profile)
+	_, err := LoadProfileFromReader(strings.NewReader(yaml))
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "profile name is required")
+	assert.Contains(t, err.Error(), "name cannot be empty")
 }
 
 func TestValidate_InvalidVersion(t *testing.T) {
+	// Infrastructure loader validates existence, Validate checks format
 	yaml := `
 profile:
   name: test-profile
@@ -282,6 +283,7 @@ controls:
 }
 
 func TestValidate_MissingControlID(t *testing.T) {
+	// Infrastructure loader validates Control ID
 	yaml := `
 profile:
   name: test-profile
@@ -296,15 +298,13 @@ controls:
             path: /etc/test
 `
 
-	profile, err := LoadProfileFromReader(strings.NewReader(yaml))
-	require.NoError(t, err)
-
-	err = Validate(profile)
+	_, err := LoadProfileFromReader(strings.NewReader(yaml))
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "control ID is required")
+	assert.Contains(t, err.Error(), "control ID cannot be empty")
 }
 
 func TestValidate_InvalidControlID(t *testing.T) {
+	// Infrastructure loader DOES NOT validate format strictly, but Validate DOES
 	yaml := `
 profile:
   name: test-profile
@@ -330,6 +330,7 @@ controls:
 }
 
 func TestValidate_DuplicateControlIDs(t *testing.T) {
+	// Infrastructure loader checks for duplicates
 	yaml := `
 profile:
   name: test-profile
@@ -352,15 +353,13 @@ controls:
             path: /etc/test2
 `
 
-	profile, err := LoadProfileFromReader(strings.NewReader(yaml))
-	require.NoError(t, err)
-
-	err = Validate(profile)
+	_, err := LoadProfileFromReader(strings.NewReader(yaml))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "duplicate control ID")
 }
 
 func TestValidate_NoObservations(t *testing.T) {
+	// Infrastructure loader checks this
 	yaml := `
 profile:
   name: test-profile
@@ -373,15 +372,15 @@ controls:
       observations: []
 `
 
-	profile, err := LoadProfileFromReader(strings.NewReader(yaml))
-	require.NoError(t, err)
-
-	err = Validate(profile)
+	_, err := LoadProfileFromReader(strings.NewReader(yaml))
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "at least one observation is required")
+	assert.Contains(t, err.Error(), "must have at least one observation")
 }
 
 func TestValidate_MissingPlugin(t *testing.T) {
+	// Infrastructure loader does NOT check this (Observation.Validate not called in loader?)
+	// Actually entity.Control.Validate calls nothing on Observation struct as there is no Validate method on Observation.
+	// But config.Validate DOES.
 	yaml := `
 profile:
   name: test-profile

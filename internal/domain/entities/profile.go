@@ -85,6 +85,11 @@ func (p *Profile) Validate() error {
 		return fmt.Errorf("profile version cannot be empty")
 	}
 
+	// Invariant: Profile must have at least one control
+	if len(p.Controls.Items) == 0 {
+		return fmt.Errorf("at least one control is required")
+	}
+
 	// Validate all controls (entities within aggregate)
 	controlIDs := make(map[string]bool)
 	for i, ctrl := range p.Controls.Items {
