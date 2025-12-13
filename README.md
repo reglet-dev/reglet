@@ -1,71 +1,158 @@
 # Reglet
+> **Compliance as Code. Secure by Design.**
 
-Reglet is a modular compliance and infrastructure validation engine. It allows engineering teams to define policy as code, execute validation logic in sandboxed WebAssembly environments, and generate standardized audit artifacts.
+Reglet is a modern, modular compliance and infrastructure validation engine. It empowers engineering teams to define policy as code, execute validation logic in securely sandboxed WebAssembly (WASM) environments, and generate standardized audit artifacts.
 
-Designed to bridge the gap between DevOps workflows and rigid compliance frameworks, Reglet treats compliance checks as testable, versioned code rather than manual checklists.
+Unlike traditional tools that run scripts with full host privileges, Reglet enforces a strict Capability-Based Security model. Plugins must explicitly request permissions (e.g., "I need to read /etc/passwd" or "I need to connect to port 443"), and these permissions must be granted by the user or policy.
+
+[![Build Status](https://github.com/whiskeyjimbo/reglet/workflows/CI/badge.svg)](https://github.com/whiskeyjimbo/reglet/actions)
+[![Go Report Card](https://goreportcard.com/badge/github.com/whiskeyjimbo/reglet)](https://goreportcard.com/report/github.com/whiskeyjimbo/reglet)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 ## Core Features
+- Secure Sandbox: All validation logic runs inside a CGO-free WebAssembly runtime (wazero). Plugins are memory-safe and isolated from the host OS.
 
-*   **Declarative Policy**: Define validation rules in clear, human-readable YAML profiles.
-*   **WASM Extensibility**: All validation logic runs within secure WebAssembly sandboxes (via wazero). This ensures plugin isolation and allows checks to be written in any language that compiles to WASM.
-*   **Stateless Architecture**: Runs as a single binary without external database dependencies. Results are strictly a function of the input profile and current system state.
-*   **Standardized Output**: Generates machine-readable results (JSON, YAML) designed for integration with the NIST Open Security Controls Assessment Language (OSCAL).
-*   **Performance**: Supports parallel execution of controls and observations for fast feedback loops in CI/CD.
+- Capability-Based Security: "Least Privilege" is enforced at the system call level. A plugin cannot access files, networks, or environment variables unless explicitly allowed.
 
-## Getting Started
+- Declarative Profiles: Define validation rules in simple, versioned YAML.
 
-### Prerequisites
+- Automatic Redaction: Sensitive data (secrets, tokens) in plugin output is automatically detected and redacted or hashed before reporting.
 
-*   Go 1.25 or later
-*   Make
+- Parallel Execution: Optimized for CI/CD with concurrent execution of independent controls.
 
-### Installation
+- Standardized Output: Generates machine-readable results (JSON, YAML, JUnit) ready for compliance platforms or OSCAL integration(future).
 
-Clone the repository and build the binary:
+## Architecture
+Reglet follows an open-core philosophy with a strict focus on security and portability.
+
+- Host: The core engine (Go) manages the lifecycle, capability grants, and reporting.
+
+- SDK: A Go SDK allowing developers to write plugins that compile to WASM/WASI.
+
+- WIT Contracts: The boundary between Host and Plugin is strictly typed using WASM Interface Types (WIT).
+# Reglet
+
+> Infrastructure compliance validation with WASM plugins
+
+Reglet validates your infrastructure against compliance frameworks (SOC2, ISO27001, FedRAMP) using declarative YAML profiles. Unlike policy-as-code tools, Reglet validates **runtime state** - your actual running systems, not just configs.
+
+[![Build Status](https://github.com/whiskeyjimbo/reglet/workflows/CI/badge.svg)](https://github.com/whiskeyjimbo/reglet/actions)
+[![Go Report Card](https://goreportcard.com/badge/github.com/whiskeyjimbo/reglet)](https://goreportcard.com/report/github.com/whiskeyjimbo/reglet)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+## Quick Start (30 seconds)
+
+```bash
+# Clone and build
+git clone https://github.com/whiskeyjimbo/reglet.git
+cd reglet
+make build
+
+# Try it
+./bin/reglet check examples/01-quickstart.yaml
+
+# Example output:
+# ✓ root-home-permissions - Root home directory permissions
+# ✓ shadow-file-permissions - Shadow file is not world-readable
+# ✓ tmp-directory-exists - Temporary directory exists and is writable
+#
+# 3 passed, 0 failed
+```
+
+## What Does It Check?
+
+**File permissions and content:**
+```yaml
+controls:
+  - id: sshd-config
+    name: SSH password authentication disabled
+    observations:
+      - plugin: file
+        config:
+          path: /etc/ssh/sshd_config
+        expect: |
+          data.content.contains("PasswordAuthentication no")
+```
+
+**Command execution:**
+```yaml
+controls:
+  - id: nginx-running
+    name: Nginx is active
+    observations:
+      - plugin: command
+        capabilities:
+          - exec:/usr/bin/systemctl
+        config:
+          command: /usr/bin/systemctl
+          args: ["is-active", "nginx"]
+        expect: |
+          data.exit_code == 0
+```
+
+**Also available:** HTTP endpoints, DNS records, TCP ports (see examples/03-05)
+
+## Installation
+
+### From Source (current)
 
 ```bash
 git clone https://github.com/whiskeyjimbo/reglet.git
 cd reglet
+
+# Build core binary
 make build
+
+# Build WASM plugins
+for d in plugins/*/; do (cd "$d" && make build); done
+cd ../..
+
+# Run
+./bin/reglet check examples/01-quickstart.yaml
 ```
 
-The resulting binary will be located at `bin/reglet`.
+### Prerequisites
+- Go 1.25+
+- Make
 
-### Basic Usage
+## Examples
 
-Reglet operates by executing a **Profile**, which defines the controls to validate.
+Reglet includes working examples you can try immediately:
 
-**1. Check a profile:**
+- **[01-quickstart.yaml](docs/examples/01-quickstart.yaml)** - Basic system security checks
+- **[02-ssh-hardening.yaml](docs/examples/02-ssh-hardening.yaml)** - SSH hardening (SOC2 CC6.1)
+- **[03-web-security.yaml](docs/examples/03-web-security.yaml)** - HTTP/HTTPS validation
+- **[04-dns-validation.yaml](docs/examples/04-dns-validation.yaml)** - DNS resolution and records
+- **[05-tcp-connectivity.yaml](docs/examples/05-tcp-connectivity.yaml)** - TCP ports and TLS testing
 
-```bash
-./bin/reglet check test-profile.yaml
-```
+## Status: Alpha (v0.2.0-alpha)
 
-**2. Output results as JSON:**
+Reglet is in active development. Core features work, but expect breaking changes before 1.0.
 
-```bash
-./bin/reglet check test-profile.yaml --format json
-```
+## Roadmap
 
-**3. Save results to a file:**
+**v0.2.0-alpha** (Current)
+- ✅ Core execution engine
+- ✅ File, HTTP, DNS, TCP and command plugins
+- ✅ Capability system
+- ✅ Output formatters
 
-```bash
-./bin/reglet check test-profile.yaml --output report.json --format json
-```
+**v0.3.0-alpha**
+- Profile inheritance
+- OSCAL/SARIF output
+- Binary releases for Linux/macOS/Windows
 
-## Architecture
+**v1.0**
+- Cloud provider plugins
+- compliance packs (SOC2, ISO27001, FedRAMP)
+- CI/CD integrations
+- Plugin SDK documentation
 
-Reglet follows an open-core philosophy with a strict focus on security and portability.
+## Community
 
-*   **Runtime**: The core engine embeds the `wazero` runtime, requiring no CGO or external dependencies.
-*   **Plugins**: Functionality is delivered exclusively through WASM modules. Core plugins (File, HTTP, TCP, etc.) are embedded in the binary but run with the same isolation guarantees as third-party plugins.
-*   **Capabilities**: Plugins operate under a capability-based security model. They must explicitly request permissions (e.g., `fs:read:/etc`, `network:outbound:443`) which the user controls via configuration.
+- **Issues:** [GitHub Issues](https://github.com/whiskeyjimbo/reglet/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/whiskeyjimbo/reglet/discussions)
 
-## Development Status
+## License
 
-**Current Status:**
-
-The project is currently in active development. The core execution engine, configuration loader, and CLI foundation are stable.
-
-*   **Completed**: WASM runtime integration, parallel execution engine, file system plugin, structured output formatters, CLI (Cobra/Viper).
-*   **In Progress**: Advanced networking plugins (HTTP, DNS), profile inheritance, and expanded OSCAL support.
+Apache-2.0 - See [LICENSE](LICENSE)
