@@ -30,15 +30,6 @@ Reglet follows an open-core philosophy with a strict focus on security and porta
 - SDK: A Go SDK allowing developers to write plugins that compile to WASM/WASI.
 
 - WIT Contracts: The boundary between Host and Plugin is strictly typed using WASM Interface Types (WIT).
-# Reglet
-
-> Infrastructure compliance validation with WASM plugins
-
-Reglet validates your infrastructure against compliance frameworks (SOC2, ISO27001, FedRAMP) using declarative YAML profiles. Unlike policy-as-code tools, Reglet validates **runtime state** - your actual running systems, not just configs.
-
-[![Build Status](https://github.com/whiskeyjimbo/reglet/workflows/CI/badge.svg)](https://github.com/whiskeyjimbo/reglet/actions)
-[![Go Report Card](https://goreportcard.com/badge/github.com/whiskeyjimbo/reglet)](https://goreportcard.com/report/github.com/whiskeyjimbo/reglet)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Quick Start (30 seconds)
 
