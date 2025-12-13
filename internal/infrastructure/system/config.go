@@ -8,7 +8,7 @@ import (
 	"os"
 
 	"github.com/goccy/go-yaml"
-	"github.com/whiskeyjimbo/reglet/internal/wasm/hostfuncs"
+	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
 )
 
 // Config represents the global configuration file (~/.reglet/config.yaml).
@@ -72,10 +72,10 @@ func (l *ConfigLoader) Load(path string) (*Config, error) {
 }
 
 // ToHostFuncsCapabilities converts the config capability format to the internal hostfuncs format.
-func (c *Config) ToHostFuncsCapabilities() []hostfuncs.Capability {
-	caps := make([]hostfuncs.Capability, 0, len(c.Capabilities))
+func (c *Config) ToHostFuncsCapabilities() []capabilities.Capability {
+	caps := make([]capabilities.Capability, 0, len(c.Capabilities))
 	for _, cap := range c.Capabilities {
-		caps = append(caps, hostfuncs.Capability{
+		caps = append(caps, capabilities.Capability{
 			Kind:    cap.Kind,
 			Pattern: cap.Pattern,
 		})

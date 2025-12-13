@@ -7,14 +7,14 @@ import (
 	"time"
 
 	"github.com/expr-lang/expr/vm"
-	"github.com/whiskeyjimbo/reglet/internal/config"
 	"github.com/whiskeyjimbo/reglet/internal/domain"
+	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
+	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
 	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
 	"github.com/whiskeyjimbo/reglet/internal/domain/repositories"
 	"github.com/whiskeyjimbo/reglet/internal/domain/services"
 	"github.com/whiskeyjimbo/reglet/internal/redaction"
 	"github.com/whiskeyjimbo/reglet/internal/wasm"
-	"github.com/whiskeyjimbo/reglet/internal/wasm/hostfuncs"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -62,8 +62,8 @@ type Engine struct {
 
 // CapabilityManager defines the interface for capability management
 type CapabilityManager interface {
-	CollectRequiredCapabilities(ctx context.Context, profile *config.Profile, runtime *wasm.Runtime, pluginDir string) (map[string][]hostfuncs.Capability, error)
-	GrantCapabilities(required map[string][]hostfuncs.Capability) (map[string][]hostfuncs.Capability, error)
+	CollectRequiredCapabilities(ctx context.Context, profile *entities.Profile, runtime *wasm.Runtime, pluginDir string) (map[string][]capabilities.Capability, error)
+	GrantCapabilities(required map[string][]capabilities.Capability) (map[string][]capabilities.Capability, error)
 }
 
 // NewEngine creates a new execution engine with default configuration.
@@ -77,7 +77,7 @@ func NewEngineWithCapabilities(
 	ctx context.Context,
 	capMgr CapabilityManager,
 	pluginDir string,
-	profile *config.Profile,
+	profile *entities.Profile,
 	cfg ExecutionConfig,
 	redactor *redaction.Redactor,
 	repo repositories.ExecutionResultRepository, // Optional repository
@@ -149,7 +149,7 @@ func NewEngineWithConfig(ctx context.Context, cfg ExecutionConfig) (*Engine, err
 }
 
 // Execute runs a complete profile and returns the result.
-func (e *Engine) Execute(ctx context.Context, profile *config.Profile) (*execution.ExecutionResult, error) {
+func (e *Engine) Execute(ctx context.Context, profile *entities.Profile) (*execution.ExecutionResult, error) {
 	// Create execution result
 	result := execution.NewExecutionResult(profile.Metadata.Name, profile.Metadata.Version)
 
@@ -192,7 +192,7 @@ func (e *Engine) Execute(ctx context.Context, profile *config.Profile) (*executi
 }
 
 // resolveDependencies calculates the transitive closure of dependencies for matched controls.
-func (e *Engine) resolveDependencies(profile *config.Profile) (map[string]bool, error) {
+func (e *Engine) resolveDependencies(profile *entities.Profile) (map[string]bool, error) {
 	resolver := services.NewDependencyResolver()
 	allDependencies, err := resolver.ResolveDependencies(profile.Controls.Items)
 	if err != nil {
@@ -219,7 +219,7 @@ func (e *Engine) resolveDependencies(profile *config.Profile) (map[string]bool, 
 // executeControlsParallel executes controls in parallel, respecting dependencies.
 // Controls are organized into levels by BuildControlDAG, and each level is executed
 // sequentially while controls within a level run in parallel.
-func (e *Engine) executeControlsParallel(ctx context.Context, controls []config.Control, result *execution.ExecutionResult, requiredDeps map[string]bool) error {
+func (e *Engine) executeControlsParallel(ctx context.Context, controls []entities.Control, result *execution.ExecutionResult, requiredDeps map[string]bool) error {
 	// Build dependency graph and get control levels
 	resolver := services.NewDependencyResolver()
 	levels, err := resolver.BuildControlDAG(controls)
@@ -256,7 +256,7 @@ func (e *Engine) executeControlsParallel(ctx context.Context, controls []config.
 }
 
 // executeControl executes a single control and returns its result.
-func (e *Engine) executeControl(ctx context.Context, ctrl config.Control, execResult *execution.ExecutionResult, requiredDeps map[string]bool) execution.ControlResult {
+func (e *Engine) executeControl(ctx context.Context, ctrl entities.Control, execResult *execution.ExecutionResult, requiredDeps map[string]bool) execution.ControlResult {
 	startTime := time.Now()
 
 	result := execution.ControlResult{
@@ -337,7 +337,7 @@ func (e *Engine) executeControl(ctx context.Context, ctrl config.Control, execRe
 }
 
 // shouldRun determines if a control should run based on the configuration filters.
-func (e *Engine) shouldRun(ctrl config.Control) (bool, string) {
+func (e *Engine) shouldRun(ctrl entities.Control) (bool, string) {
 	filter := services.NewControlFilter().
 		WithExclusiveControls(e.config.IncludeControlIDs).
 		WithExcludedControls(e.config.ExcludeControlIDs).
@@ -350,7 +350,7 @@ func (e *Engine) shouldRun(ctrl config.Control) (bool, string) {
 }
 
 // executeObservationsParallel executes observations in parallel with concurrency limits.
-func (e *Engine) executeObservationsParallel(ctx context.Context, observations []config.Observation) []execution.ObservationResult {
+func (e *Engine) executeObservationsParallel(ctx context.Context, observations []entities.Observation) []execution.ObservationResult {
 	g, ctx := errgroup.WithContext(ctx)
 
 	// Apply concurrency limit if specified
