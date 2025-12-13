@@ -11,10 +11,13 @@ import (
 	"github.com/expr-lang/expr"
 	"github.com/spf13/cobra"
 	"github.com/whiskeyjimbo/reglet/internal/capabilities"
-	"github.com/whiskeyjimbo/reglet/internal/config"
+	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
 	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
 	"github.com/whiskeyjimbo/reglet/internal/domain/services"
 	"github.com/whiskeyjimbo/reglet/internal/engine"
+	infraconfig "github.com/whiskeyjimbo/reglet/internal/infrastructure/config"
+	"github.com/whiskeyjimbo/reglet/internal/infrastructure/system"
+	"github.com/whiskeyjimbo/reglet/internal/infrastructure/validation"
 	"github.com/whiskeyjimbo/reglet/internal/output"
 	"github.com/whiskeyjimbo/reglet/internal/redaction"
 )
@@ -74,8 +77,9 @@ func init() {
 func runCheckAction(ctx context.Context, profilePath string) error {
 	slog.Info("loading profile", "path", profilePath)
 
-	// Load profile
-	profile, err := config.LoadProfile(profilePath)
+	// Load profile using infrastructure loader
+	loader := infraconfig.NewProfileLoader()
+	profile, err := loader.LoadProfile(profilePath)
 	if err != nil {
 		return fmt.Errorf("failed to load profile: %w", err)
 	}
@@ -83,24 +87,25 @@ func runCheckAction(ctx context.Context, profilePath string) error {
 	slog.Info("profile loaded", "name", profile.Metadata.Name, "version", profile.Metadata.Version)
 
 	// Apply variable substitution
-	if err := config.SubstituteVariables(profile); err != nil {
+	substitutor := infraconfig.NewVariableSubstitutor()
+	if err := substitutor.Substitute(profile); err != nil {
 		return fmt.Errorf("failed to substitute variables: %w", err)
 	}
 
 	// Validate profile structure
-	if err := config.Validate(profile); err != nil {
+	validator := validation.NewProfileValidator()
+	if err := validator.Validate(profile); err != nil {
 		return fmt.Errorf("profile validation failed: %w", err)
 	}
 
 	slog.Info("profile validated", "controls", len(profile.Controls.Items))
 
 	// Load system config for redaction and capabilities
-	// TODO: Centralize system config loading in root.go or config package
 	sysConfig, err := loadSystemConfig()
 	if err != nil {
 		// Log warning but continue with defaults
 		slog.Debug("failed to load system config, using defaults", "error", err)
-		sysConfig = &config.SystemConfig{}
+		sysConfig = &system.Config{}
 	}
 
 	// Initialize Redactor
@@ -150,7 +155,7 @@ func runCheckAction(ctx context.Context, profilePath string) error {
 	// Pre-flight schema validation
 	// This validates observation configs against plugin schemas BEFORE execution
 	slog.Info("validating observation configs against plugin schemas")
-	if err := config.ValidateWithSchemas(ctx, profile, eng.Runtime()); err != nil {
+	if err := validator.ValidateWithSchemas(ctx, profile, eng.Runtime()); err != nil {
 		return fmt.Errorf("schema validation failed: %w", err)
 	}
 	slog.Info("schema validation complete")
@@ -203,20 +208,18 @@ func runCheckAction(ctx context.Context, profilePath string) error {
 }
 
 // loadSystemConfig loads the global configuration.
-// This duplicates logic from capabilities/manager.go slightly, but we need the struct here.
-// Ideally this should be refactored into config package.
-func loadSystemConfig() (*config.SystemConfig, error) {
+func loadSystemConfig() (*system.Config, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return nil, err
 	}
 	configPath := filepath.Join(homeDir, ".reglet", "config.yaml")
 
-	return config.LoadSystemConfig(configPath)
+	return system.NewConfigLoader().Load(configPath)
 }
 
 // validateFilterConfig validates the filter configuration against the profile.
-func validateFilterConfig(profile *config.Profile, cfg *engine.ExecutionConfig) error {
+func validateFilterConfig(profile *entities.Profile, cfg *engine.ExecutionConfig) error {
 	// 1. Validate --control references exist
 	if len(cfg.IncludeControlIDs) > 0 {
 		controlMap := make(map[string]bool)

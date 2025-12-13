@@ -19,6 +19,8 @@ controls:
       name: Test Control
       observations:
         - plugin: http
+          config:
+            url: http://example.com
 `
 	loader := NewProfileLoader()
 	profile, err := loader.LoadProfileFromReader(strings.NewReader(yaml))
@@ -69,6 +71,8 @@ controls:
       name: Test
       observations:
         - plugin: http
+          config:
+            url: http://example.com
 `
 	loader := NewProfileLoader()
 	profile, err := loader.LoadProfileFromReader(strings.NewReader(yaml))

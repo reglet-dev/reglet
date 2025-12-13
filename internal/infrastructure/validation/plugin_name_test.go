@@ -1,4 +1,4 @@
-package config
+package validation
 
 import (
 	"testing"
@@ -21,7 +21,7 @@ func Test_validatePluginName_ValidNames(t *testing.T) {
 
 	for _, name := range validNames {
 		t.Run(name, func(t *testing.T) {
-			err := validatePluginName(name)
+			err := ValidatePluginName(name)
 			assert.NoError(t, err, "valid plugin name should not produce error")
 		})
 	}
@@ -68,7 +68,7 @@ func Test_validatePluginName_PathTraversal(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validatePluginName(tt.pluginName)
+			err := ValidatePluginName(tt.pluginName)
 			assert.Error(t, err, "path traversal attempt should be rejected")
 			assert.Contains(t, err.Error(), tt.expectedErr)
 		})
@@ -105,7 +105,7 @@ func Test_validatePluginName_InvalidCharacters(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validatePluginName(tt.pluginName)
+			err := ValidatePluginName(tt.pluginName)
 			assert.Error(t, err, "invalid characters should be rejected")
 			assert.Contains(t, err.Error(), "must contain only alphanumeric characters, underscores, and hyphens")
 		})
@@ -133,7 +133,7 @@ func Test_validatePluginName_EdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validatePluginName(tt.pluginName)
+			err := ValidatePluginName(tt.pluginName)
 			assert.Error(t, err, "edge case should be rejected")
 			assert.Contains(t, err.Error(), tt.expectedErr)
 		})

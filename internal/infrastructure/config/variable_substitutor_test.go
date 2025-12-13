@@ -6,7 +6,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	infraconfig "github.com/whiskeyjimbo/reglet/internal/infrastructure/config"
 )
 
 func TestSubstituteVariables_Simple(t *testing.T) {
@@ -31,11 +30,12 @@ controls:
             mode: exists
 `
 
-	loader := infraconfig.NewProfileLoader()
+	loader := NewProfileLoader()
 	profile, err := loader.LoadProfileFromReader(strings.NewReader(yaml))
 	require.NoError(t, err)
 
-	err = SubstituteVariables(profile)
+	substitutor := NewVariableSubstitutor()
+	err = substitutor.Substitute(profile)
 	require.NoError(t, err)
 
 	// Verify substitution in description
@@ -66,11 +66,12 @@ controls:
             path: "{{ .vars.paths.config }}"
 `
 
-	loader := infraconfig.NewProfileLoader()
+	loader := NewProfileLoader()
 	profile, err := loader.LoadProfileFromReader(strings.NewReader(yaml))
 	require.NoError(t, err)
 
-	err = SubstituteVariables(profile)
+	substitutor := NewVariableSubstitutor()
+	err = substitutor.Substitute(profile)
 	require.NoError(t, err)
 
 	// Verify nested variable substitution
@@ -96,11 +97,12 @@ controls:
             path: "{{ .vars.missing_var }}"
 `
 
-	loader := infraconfig.NewProfileLoader()
+	loader := NewProfileLoader()
 	profile, err := loader.LoadProfileFromReader(strings.NewReader(yaml))
 	require.NoError(t, err)
 
-	err = SubstituteVariables(profile)
+	substitutor := NewVariableSubstitutor()
+	err = substitutor.Substitute(profile)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "variable not found: missing_var")
 }

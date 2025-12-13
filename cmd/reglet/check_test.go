@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/whiskeyjimbo/reglet/internal/config"
+	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
 	"github.com/whiskeyjimbo/reglet/internal/engine"
 )
 
@@ -15,9 +15,9 @@ func TestValidateFilterConfig(t *testing.T) {
 	defer func() { filterExpr = originalFilterExpr }()
 
 	// Create a dummy profile
-	profile := &config.Profile{
-		Controls: config.ControlsSection{
-			Items: []config.Control{
+	profile := &entities.Profile{
+		Controls: entities.ControlsSection{
+			Items: []entities.Control{
 				{ID: "c1"},
 				{ID: "c2"},
 			},

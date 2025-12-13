@@ -1,4 +1,6 @@
-package config
+// Package validation provides infrastructure for validating profile configurations.
+// This includes structural validation and JSON Schema validation for plugin configs.
+package validation
 
 import (
 	"bytes"
@@ -90,10 +92,18 @@ func (sc *SchemaCompiler) GetCompiledSchema(ctx context.Context, pluginName stri
 	return schema, nil
 }
 
-// Validate performs comprehensive validation of a profile.
+// ProfileValidator validates profile configurations.
+type ProfileValidator struct{}
+
+// NewProfileValidator creates a new profile validator.
+func NewProfileValidator() *ProfileValidator {
+	return &ProfileValidator{}
+}
+
+// Validate performs comprehensive structural validation of a profile.
 // Returns an error describing all validation failures found.
 // This performs structural validation only - no schema validation.
-func Validate(profile *entities.Profile) error {
+func (v *ProfileValidator) Validate(profile *entities.Profile) error {
 	var errors []string
 
 	// Validate metadata
@@ -116,9 +126,9 @@ func Validate(profile *entities.Profile) error {
 // ValidateWithSchemas performs comprehensive validation including plugin config schema validation.
 // This requires a PluginSchemaProvider to fetch plugin schemas during validation.
 // Use this for pre-flight validation before execution.
-func ValidateWithSchemas(ctx context.Context, profile *entities.Profile, provider PluginSchemaProvider) error {
+func (v *ProfileValidator) ValidateWithSchemas(ctx context.Context, profile *entities.Profile, provider PluginSchemaProvider) error {
 	// First run basic structural validation
-	if err := Validate(profile); err != nil {
+	if err := v.Validate(profile); err != nil {
 		return err
 	}
 
@@ -231,9 +241,10 @@ func validateControl(ctrl entities.Control) error {
 	return nil
 }
 
-// validatePluginName validates that a plugin name is safe to use in filesystem paths.
+// ValidatePluginName validates that a plugin name is safe to use in filesystem paths.
 // This prevents path traversal attacks when loading plugins.
-func validatePluginName(name string) error {
+// EXPORTED for use by other packages that need to validate plugin names.
+func ValidatePluginName(name string) error {
 	if name == "" {
 		return fmt.Errorf("plugin name cannot be empty")
 	}
@@ -268,7 +279,7 @@ func validateObservation(obs entities.Observation) error {
 		errors = append(errors, "plugin name is required")
 	} else {
 		// Validate plugin name format for security
-		if err := validatePluginName(obs.Plugin); err != nil {
+		if err := ValidatePluginName(obs.Plugin); err != nil {
 			errors = append(errors, fmt.Sprintf("invalid plugin name: %v", err))
 		}
 	}

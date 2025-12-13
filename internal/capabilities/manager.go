@@ -12,7 +12,7 @@ import (
 	"sync"
 
 	"github.com/goccy/go-yaml"
-	"github.com/whiskeyjimbo/reglet/internal/config"
+	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
 	"github.com/whiskeyjimbo/reglet/internal/wasm"
 	"github.com/whiskeyjimbo/reglet/internal/wasm/hostfuncs"
 	"golang.org/x/sync/errgroup"
@@ -51,7 +51,7 @@ func isInteractive() bool {
 }
 
 // CollectRequiredCapabilities loads all plugins in parallel and collects their required capabilities
-func (m *Manager) CollectRequiredCapabilities(ctx context.Context, profile *config.Profile, runtime *wasm.Runtime, pluginDir string) (map[string][]hostfuncs.Capability, error) {
+func (m *Manager) CollectRequiredCapabilities(ctx context.Context, profile *entities.Profile, runtime *wasm.Runtime, pluginDir string) (map[string][]hostfuncs.Capability, error) {
 	// Get unique plugin names from profile
 	pluginNames := make(map[string]bool)
 	for _, ctrl := range profile.Controls.Items {

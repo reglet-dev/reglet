@@ -12,11 +12,20 @@ import (
 // Variable pattern: {{ .vars.key }} or {{ .vars.nested.key }}
 var varPattern = regexp.MustCompile(`\{\{\s*\.vars\.([a-zA-Z0-9_.]+)\s*\}\}`)
 
-// SubstituteVariables performs simple variable substitution in a profile.
+// VariableSubstitutor performs variable substitution in profiles.
+type VariableSubstitutor struct{}
+
+// NewVariableSubstitutor creates a new variable substitutor.
+func NewVariableSubstitutor() *VariableSubstitutor {
+	return &VariableSubstitutor{}
+}
+
+// Substitute performs simple variable substitution in a profile.
 // It replaces {{ .vars.key }} patterns with values from the profile's vars map.
 // Supports nested paths like {{ .vars.paths.config }}.
 // Returns an error if a referenced variable is not found.
-func SubstituteVariables(profile *entities.Profile) error {
+// Modifies the profile in place.
+func (s *VariableSubstitutor) Substitute(profile *entities.Profile) error {
 	if len(profile.Vars) == 0 {
 		// No variables defined, nothing to substitute
 		return nil

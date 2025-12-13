@@ -1,4 +1,7 @@
-package config
+// Package system provides infrastructure for system-level configuration.
+// This includes loading system config files (~/.reglet/config.yaml) and
+// capability grants.
+package system
 
 import (
 	"fmt"
@@ -8,8 +11,9 @@ import (
 	"github.com/whiskeyjimbo/reglet/internal/wasm/hostfuncs"
 )
 
-// SystemConfig represents the global configuration file (~/.reglet/config.yaml).
-type SystemConfig struct {
+// Config represents the global configuration file (~/.reglet/config.yaml).
+// This is infrastructure-level configuration separate from profile configuration.
+type Config struct {
 	// Plugin capability grants
 	Capabilities []struct {
 		Kind    string `yaml:"kind"`
@@ -30,17 +34,26 @@ type RedactionConfig struct {
 	HashMode HashModeConfig `yaml:"hash_mode"`
 }
 
+// HashModeConfig controls hash-based redaction.
 type HashModeConfig struct {
 	Enabled bool   `yaml:"enabled"`
 	Salt    string `yaml:"salt"` // Optional salt for stable hashing
 }
 
-// LoadSystemConfig loads the system configuration from the specified path.
+// ConfigLoader loads system configuration from disk.
+type ConfigLoader struct{}
+
+// NewConfigLoader creates a new system config loader.
+func NewConfigLoader() *ConfigLoader {
+	return &ConfigLoader{}
+}
+
+// Load loads the system configuration from the specified path.
 // If the file does not exist, it returns an empty config without error.
-func LoadSystemConfig(path string) (*SystemConfig, error) {
+func (l *ConfigLoader) Load(path string) (*Config, error) {
 	// Check if file exists
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return &SystemConfig{}, nil
+		return &Config{}, nil
 	}
 
 	// Read config file
@@ -50,7 +63,7 @@ func LoadSystemConfig(path string) (*SystemConfig, error) {
 	}
 
 	// Parse YAML
-	var config SystemConfig
+	var config Config
 	if err := yaml.Unmarshal(data, &config); err != nil {
 		return nil, fmt.Errorf("failed to parse system config: %w", err)
 	}
@@ -59,12 +72,12 @@ func LoadSystemConfig(path string) (*SystemConfig, error) {
 }
 
 // ToHostFuncsCapabilities converts the config capability format to the internal hostfuncs format.
-func (sc *SystemConfig) ToHostFuncsCapabilities() []hostfuncs.Capability {
-	caps := make([]hostfuncs.Capability, 0, len(sc.Capabilities))
-	for _, c := range sc.Capabilities {
+func (c *Config) ToHostFuncsCapabilities() []hostfuncs.Capability {
+	caps := make([]hostfuncs.Capability, 0, len(c.Capabilities))
+	for _, cap := range c.Capabilities {
 		caps = append(caps, hostfuncs.Capability{
-			Kind:    c.Kind,
-			Pattern: c.Pattern,
+			Kind:    cap.Kind,
+			Pattern: cap.Pattern,
 		})
 	}
 	return caps
