@@ -1,23 +1,20 @@
 // Package hostfuncs provides host functions for WASM plugins
 package hostfuncs
 
-import "context"
+import (
+	"context"
 
-// Capability represents a permission requirement
-// Defined here to avoid import cycle with internal/wasm
-type Capability struct {
-	Kind    string // fs, network, env, exec
-	Pattern string // e.g., "/etc/**", "80,443", "AWS_*"
-}
+	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
+)
 
 // CapabilityChecker checks if operations are allowed based on granted capabilities
 type CapabilityChecker struct {
 	// Map of plugin name to granted capabilities
-	grantedCapabilities map[string][]Capability
+	grantedCapabilities map[string][]capabilities.Capability
 }
 
 // NewCapabilityChecker creates a new capability checker with the given capabilities
-func NewCapabilityChecker(caps map[string][]Capability) *CapabilityChecker {
+func NewCapabilityChecker(caps map[string][]capabilities.Capability) *CapabilityChecker {
 	return &CapabilityChecker{
 		grantedCapabilities: caps,
 	}

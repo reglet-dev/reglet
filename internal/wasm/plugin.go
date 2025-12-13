@@ -406,7 +406,7 @@ func parsePluginInfo(data []byte) (*PluginInfo, error) {
 	if caps, ok := raw["capabilities"].([]interface{}); ok {
 		for _, capRaw := range caps {
 			if capMap, ok := capRaw.(map[string]interface{}); ok {
-				cap := Capability{}
+				var cap capabilities.Capability
 				if kind, ok := capMap["kind"].(string); ok {
 					cap.Kind = kind
 				}

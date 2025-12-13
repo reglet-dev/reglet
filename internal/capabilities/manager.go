@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/goccy/go-yaml"
+	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
 	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
 	"github.com/whiskeyjimbo/reglet/internal/wasm"
 	"github.com/whiskeyjimbo/reglet/internal/wasm/hostfuncs"
@@ -23,7 +24,7 @@ type Manager struct {
 	configPath  string
 	trustAll    bool
 	interactive bool
-	grants      []hostfuncs.Capability
+	grants      []capabilities.Capability
 }
 
 // NewManager creates a capability manager
@@ -35,7 +36,7 @@ func NewManager(trustAll bool) *Manager {
 		configPath:  configPath,
 		trustAll:    trustAll,
 		interactive: isInteractive(),
-		grants:      []hostfuncs.Capability{},
+		grants:      []capabilities.Capability{},
 	}
 }
 
@@ -51,7 +52,7 @@ func isInteractive() bool {
 }
 
 // CollectRequiredCapabilities loads all plugins in parallel and collects their required capabilities
-func (m *Manager) CollectRequiredCapabilities(ctx context.Context, profile *entities.Profile, runtime *wasm.Runtime, pluginDir string) (map[string][]hostfuncs.Capability, error) {
+func (m *Manager) CollectRequiredCapabilities(ctx context.Context, profile *entities.Profile, runtime *wasm.Runtime, pluginDir string) (map[string][]capabilities.Capability, error) {
 	// Get unique plugin names from profile
 	pluginNames := make(map[string]bool)
 	for _, ctrl := range profile.Controls.Items {
@@ -68,7 +69,7 @@ func (m *Manager) CollectRequiredCapabilities(ctx context.Context, profile *enti
 
 	// Thread-safe map for collecting capabilities
 	var mu sync.Mutex
-	required := make(map[string][]hostfuncs.Capability)
+	required := make(map[string][]capabilities.Capability)
 
 	// Load plugins in parallel
 	g, ctx := errgroup.WithContext(ctx)
@@ -96,9 +97,9 @@ func (m *Manager) CollectRequiredCapabilities(ctx context.Context, profile *enti
 
 			// Collect capabilities (thread-safe)
 			mu.Lock()
-			var caps []hostfuncs.Capability
+			var caps []capabilities.Capability
 			for _, cap := range info.Capabilities {
-				caps = append(caps, hostfuncs.Capability{
+				caps = append(caps, capabilities.Capability{
 					Kind:    cap.Kind,
 					Pattern: cap.Pattern,
 				})
@@ -119,9 +120,9 @@ func (m *Manager) CollectRequiredCapabilities(ctx context.Context, profile *enti
 }
 
 // GrantCapabilities determines which capabilities to grant based on user input
-func (m *Manager) GrantCapabilities(required map[string][]hostfuncs.Capability) (map[string][]hostfuncs.Capability, error) {
+func (m *Manager) GrantCapabilities(required map[string][]capabilities.Capability) (map[string][]capabilities.Capability, error) {
 	// Flatten all required capabilities to a unique set for user prompting
-	flatRequired := make([]hostfuncs.Capability, 0)
+	flatRequired := make([]capabilities.Capability, 0)
 	seen := make(map[string]bool)
 
 	for _, caps := range required {
@@ -145,13 +146,13 @@ func (m *Manager) GrantCapabilities(required map[string][]hostfuncs.Capability) 
 	existingGrants, err := m.loadConfig()
 	if err != nil {
 		// Config file doesn't exist yet - that's okay
-		existingGrants = []hostfuncs.Capability{}
+		existingGrants = []capabilities.Capability{}
 	}
 
 	// Determine which capabilities are not already granted
 	missing := m.findMissingCapabilities(flatRequired, existingGrants)
 
-	var grantedGlobal []hostfuncs.Capability
+	var grantedGlobal []capabilities.Capability
 	if len(missing) == 0 {
 		// All capabilities already granted
 		grantedGlobal = existingGrants
@@ -197,7 +198,7 @@ func (m *Manager) GrantCapabilities(required map[string][]hostfuncs.Capability) 
 
 	// Filter the requested capabilities against the globally granted ones
 	// ensuring each plugin only gets what it requested AND what was granted
-	grantedPerPlugin := make(map[string][]hostfuncs.Capability)
+	grantedPerPlugin := make(map[string][]capabilities.Capability)
 	grantedGlobalMap := make(map[string]bool)
 	for _, cap := range grantedGlobal {
 		key := fmt.Sprintf("%s:%s", cap.Kind, cap.Pattern)
@@ -205,7 +206,7 @@ func (m *Manager) GrantCapabilities(required map[string][]hostfuncs.Capability) 
 	}
 
 	for name, caps := range required {
-		var allowed []hostfuncs.Capability
+		var allowed []capabilities.Capability
 		for _, cap := range caps {
 			key := fmt.Sprintf("%s:%s", cap.Kind, cap.Pattern)
 			if grantedGlobalMap[key] {
@@ -221,14 +222,14 @@ func (m *Manager) GrantCapabilities(required map[string][]hostfuncs.Capability) 
 }
 
 // findMissingCapabilities returns capabilities in required that are not in granted
-func (m *Manager) findMissingCapabilities(required, granted []hostfuncs.Capability) []hostfuncs.Capability {
+func (m *Manager) findMissingCapabilities(required, granted []capabilities.Capability) []capabilities.Capability {
 	grantedMap := make(map[string]bool)
 	for _, cap := range granted {
 		key := fmt.Sprintf("%s:%s", cap.Kind, cap.Pattern)
 		grantedMap[key] = true
 	}
 
-	var missing []hostfuncs.Capability
+	var missing []capabilities.Capability
 	for _, cap := range required {
 		key := fmt.Sprintf("%s:%s", cap.Kind, cap.Pattern)
 		if !grantedMap[key] {
@@ -240,7 +241,7 @@ func (m *Manager) findMissingCapabilities(required, granted []hostfuncs.Capabili
 }
 
 // promptForCapability asks the user whether to grant a capability
-func (m *Manager) promptForCapability(cap hostfuncs.Capability) (granted bool, always bool, err error) {
+func (m *Manager) promptForCapability(cap capabilities.Capability) (granted bool, always bool, err error) {
 	fmt.Fprintf(os.Stderr, "\nPlugin requires permission:\n")
 	fmt.Fprintf(os.Stderr, "  ✓ %s\n", m.describeCapability(cap))
 	fmt.Fprintf(os.Stderr, "\nAllow this permission? [y/N/always]: ")
@@ -270,7 +271,7 @@ func (m *Manager) promptForCapability(cap hostfuncs.Capability) (granted bool, a
 }
 
 // describeCapability returns a human-readable description of a capability
-func (m *Manager) describeCapability(cap hostfuncs.Capability) string {
+func (m *Manager) describeCapability(cap capabilities.Capability) string {
 	switch cap.Kind {
 	case "network":
 		if cap.Pattern == "outbound:*" {
@@ -307,7 +308,7 @@ func (m *Manager) describeCapability(cap hostfuncs.Capability) string {
 }
 
 // formatNonInteractiveError creates a helpful error message for non-interactive mode
-func (m *Manager) formatNonInteractiveError(missing []hostfuncs.Capability) error {
+func (m *Manager) formatNonInteractiveError(missing []capabilities.Capability) error {
 	var msg strings.Builder
 	msg.WriteString("Plugins require additional permissions (running in non-interactive mode)\n\n")
 	msg.WriteString("Required permissions:\n")
@@ -333,10 +334,10 @@ type configFile struct {
 }
 
 // loadConfig loads capability grants from ~/.reglet/config.yaml
-func (m *Manager) loadConfig() ([]hostfuncs.Capability, error) {
+func (m *Manager) loadConfig() ([]capabilities.Capability, error) {
 	// Check if config file exists
 	if _, err := os.Stat(m.configPath); os.IsNotExist(err) {
-		return []hostfuncs.Capability{}, nil
+		return []capabilities.Capability{}, nil
 	}
 
 	// Read config file
@@ -352,9 +353,9 @@ func (m *Manager) loadConfig() ([]hostfuncs.Capability, error) {
 	}
 
 	// Convert to capability slice
-	caps := make([]hostfuncs.Capability, 0, len(cfg.Capabilities))
+	caps := make([]capabilities.Capability, 0, len(cfg.Capabilities))
 	for _, c := range cfg.Capabilities {
-		caps = append(caps, hostfuncs.Capability{
+		caps = append(caps, capabilities.Capability{
 			Kind:    c.Kind,
 			Pattern: c.Pattern,
 		})
@@ -364,7 +365,7 @@ func (m *Manager) loadConfig() ([]hostfuncs.Capability, error) {
 }
 
 // saveConfig saves capability grants to ~/.reglet/config.yaml
-func (m *Manager) saveConfig(grants []hostfuncs.Capability) error {
+func (m *Manager) saveConfig(grants []capabilities.Capability) error {
 	// Create directory if it doesn't exist
 	dir := filepath.Dir(m.configPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {

@@ -2,7 +2,11 @@
 // It manages plugin loading, execution, and capability-based sandboxing using wazero.
 package wasm
 
-import "time"
+import (
+	"time"
+
+	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
+)
 
 // PluginInfo contains metadata about a plugin
 // Maps to the WIT plugin-info record
@@ -10,14 +14,7 @@ type PluginInfo struct {
 	Name         string
 	Version      string
 	Description  string
-	Capabilities []Capability
-}
-
-// Capability represents a permission requirement
-// Maps to the WIT capability record
-type Capability struct {
-	Kind    string // fs, network, env, exec
-	Pattern string // e.g., "/etc/**", "80,443", "AWS_*"
+	Capabilities []capabilities.Capability
 }
 
 // Config represents plugin configuration
