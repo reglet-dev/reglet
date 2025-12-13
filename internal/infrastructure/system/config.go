@@ -74,10 +74,10 @@ func (l *ConfigLoader) Load(path string) (*Config, error) {
 // ToHostFuncsCapabilities converts the config capability format to the internal hostfuncs format.
 func (c *Config) ToHostFuncsCapabilities() []capabilities.Capability {
 	caps := make([]capabilities.Capability, 0, len(c.Capabilities))
-	for _, cap := range c.Capabilities {
+	for _, capability := range c.Capabilities {
 		caps = append(caps, capabilities.Capability{
-			Kind:    cap.Kind,
-			Pattern: cap.Pattern,
+			Kind:    capability.Kind,
+			Pattern: capability.Pattern,
 		})
 	}
 	return caps

@@ -86,10 +86,10 @@ func (o *CapabilityOrchestrator) CollectRequiredCapabilities(ctx context.Context
 			// Collect capabilities (thread-safe)
 			mu.Lock()
 			var caps []capabilities.Capability
-			for _, cap := range info.Capabilities {
+			for _, capability := range info.Capabilities {
 				caps = append(caps, capabilities.Capability{
-					Kind:    cap.Kind,
-					Pattern: cap.Pattern,
+					Kind:    capability.Kind,
+					Pattern: capability.Pattern,
 				})
 			}
 			required[name] = caps
@@ -112,8 +112,8 @@ func (o *CapabilityOrchestrator) GrantCapabilities(required map[string][]capabil
 	// Flatten all required capabilities to a unique set for user prompting
 	flatRequired := capabilities.NewGrant()
 	for _, caps := range required {
-		for _, cap := range caps {
-			flatRequired.Add(cap)
+		for _, capability := range caps {
+			flatRequired.Add(capability)
 		}
 	}
 
@@ -149,19 +149,19 @@ func (o *CapabilityOrchestrator) GrantCapabilities(required map[string][]capabil
 		newGrants := existingGrants
 		shouldSave := false
 
-		for _, cap := range missing {
-			granted, always, err := o.prompter.PromptForCapability(cap)
+		for _, capability := range missing {
+			granted, always, err := o.prompter.PromptForCapability(capability)
 			if err != nil {
 				return nil, err
 			}
 
 			if granted {
-				newGrants.Add(cap)
+				newGrants.Add(capability)
 				if always {
 					shouldSave = true
 				}
 			} else {
-				return nil, fmt.Errorf("capability denied by user: %s", cap.String())
+				return nil, fmt.Errorf("capability denied by user: %s", capability.String())
 			}
 		}
 
@@ -183,9 +183,9 @@ func (o *CapabilityOrchestrator) GrantCapabilities(required map[string][]capabil
 	grantedPerPlugin := make(map[string][]capabilities.Capability)
 	for name, caps := range required {
 		var allowed capabilities.Grant
-		for _, cap := range caps {
-			if grantedGlobal.Contains(cap) {
-				allowed.Add(cap)
+		for _, capability := range caps {
+			if grantedGlobal.Contains(capability) {
+				allowed.Add(capability)
 			}
 		}
 		if len(allowed) > 0 {
@@ -199,9 +199,9 @@ func (o *CapabilityOrchestrator) GrantCapabilities(required map[string][]capabil
 // findMissingCapabilities returns capabilities in required that are not in granted.
 func (o *CapabilityOrchestrator) findMissingCapabilities(required, granted capabilities.Grant) capabilities.Grant {
 	missing := capabilities.NewGrant()
-	for _, cap := range required {
-		if !granted.Contains(cap) {
-			missing.Add(cap)
+	for _, capability := range required {
+		if !granted.Contains(capability) {
+			missing.Add(capability)
 		}
 	}
 	return missing

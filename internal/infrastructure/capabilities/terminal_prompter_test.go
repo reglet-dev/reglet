@@ -19,7 +19,7 @@ func TestTerminalPrompter_PromptForCapability(t *testing.T) {
 	t.Parallel()
 
 	prompter := NewTerminalPrompter()
-	cap := capabilities.Capability{Kind: "fs", Pattern: "read:/etc/passwd"}
+	capability := capabilities.Capability{Kind: "fs", Pattern: "read:/etc/passwd"}
 
 	tests := []struct {
 		name            string
@@ -62,7 +62,7 @@ func TestTerminalPrompter_PromptForCapability(t *testing.T) {
 			assert.NoError(t, err)
 			os.Stderr = w2
 
-			granted, always, err := prompter.PromptForCapability(cap)
+			granted, always, err := prompter.PromptForCapability(capability)
 			w2.Close() // Close writer after prompt
 
 			output, _ := io.ReadAll(r2) // Read all content from the pipe
@@ -85,8 +85,8 @@ func TestTerminalPrompter_describeCapability(t *testing.T) {
 	prompter := NewTerminalPrompter()
 
 	tests := []struct {
-		cap      capabilities.Capability
-		expected string
+		capability capabilities.Capability
+		expected   string
 	}{
 		{capabilities.Capability{Kind: "network", Pattern: "outbound:*"}, "Network access to any port"},
 		{capabilities.Capability{Kind: "network", Pattern: "outbound:private"}, "Network access to private/reserved IPs (localhost, 192.168.x.x, 10.x.x.x, 169.254.169.254, etc.)"},
@@ -99,10 +99,11 @@ func TestTerminalPrompter_describeCapability(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.expected, func(t *testing.T) {
-			assert.Equal(t, tt.expected, prompter.describeCapability(tt.cap))
+			assert.Equal(t, tt.expected, prompter.describeCapability(tt.capability))
 		})
 	}
 }
+
 func TestTerminalPrompter_FormatNonInteractiveError(t *testing.T) {
 	t.Parallel()
 

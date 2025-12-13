@@ -29,9 +29,9 @@ func (p *TerminalPrompter) IsInteractive() bool {
 }
 
 // PromptForCapability asks the user whether to grant a capability.
-func (p *TerminalPrompter) PromptForCapability(cap capabilities.Capability) (granted bool, always bool, err error) {
+func (p *TerminalPrompter) PromptForCapability(capability capabilities.Capability) (granted bool, always bool, err error) {
 	fmt.Fprintf(os.Stderr, "\nPlugin requires permission:\n")
-	fmt.Fprintf(os.Stderr, "  ✓ %s\n", p.describeCapability(cap))
+	fmt.Fprintf(os.Stderr, "  ✓ %s\n", p.describeCapability(capability))
 	fmt.Fprintf(os.Stderr, "\nAllow this permission? [y/N/always]: ")
 
 	// Create a new buffered reader from stdin
@@ -59,39 +59,39 @@ func (p *TerminalPrompter) PromptForCapability(cap capabilities.Capability) (gra
 }
 
 // describeCapability returns a human-readable description of a capability.
-func (p *TerminalPrompter) describeCapability(cap capabilities.Capability) string {
-	switch cap.Kind {
+func (p *TerminalPrompter) describeCapability(capability capabilities.Capability) string {
+	switch capability.Kind {
 	case "network":
-		if cap.Pattern == "outbound:*" {
+		if capability.Pattern == "outbound:*" {
 			return "Network access to any port"
 		}
-		if cap.Pattern == "outbound:private" {
+		if capability.Pattern == "outbound:private" {
 			return "Network access to private/reserved IPs (localhost, 192.168.x.x, 10.x.x.x, 169.254.169.254, etc.)"
 		}
-		if strings.HasPrefix(cap.Pattern, "outbound:") {
-			ports := strings.TrimPrefix(cap.Pattern, "outbound:")
+		if strings.HasPrefix(capability.Pattern, "outbound:") {
+			ports := strings.TrimPrefix(capability.Pattern, "outbound:")
 			return fmt.Sprintf("Network access to port %s", ports)
 		}
-		return fmt.Sprintf("Network: %s", cap.Pattern)
+		return fmt.Sprintf("Network: %s", capability.Pattern)
 	case "fs":
-		if strings.HasPrefix(cap.Pattern, "read:") {
-			path := strings.TrimPrefix(cap.Pattern, "read:")
+		if strings.HasPrefix(capability.Pattern, "read:") {
+			path := strings.TrimPrefix(capability.Pattern, "read:")
 			return fmt.Sprintf("Read files: %s", path)
 		}
-		if strings.HasPrefix(cap.Pattern, "write:") {
-			path := strings.TrimPrefix(cap.Pattern, "write:")
+		if strings.HasPrefix(capability.Pattern, "write:") {
+			path := strings.TrimPrefix(capability.Pattern, "write:")
 			return fmt.Sprintf("Write files: %s", path)
 		}
-		return fmt.Sprintf("Filesystem: %s", cap.Pattern)
+		return fmt.Sprintf("Filesystem: %s", capability.Pattern)
 	case "exec":
-		if cap.Pattern == "/bin/sh" {
+		if capability.Pattern == "/bin/sh" {
 			return "Shell execution (executes shell commands)"
 		}
-		return fmt.Sprintf("Execute commands: %s", cap.Pattern)
+		return fmt.Sprintf("Execute commands: %s", capability.Pattern)
 	case "env":
-		return fmt.Sprintf("Read environment variables: %s", cap.Pattern)
+		return fmt.Sprintf("Read environment variables: %s", capability.Pattern)
 	default:
-		return fmt.Sprintf("%s: %s", cap.Kind, cap.Pattern)
+		return fmt.Sprintf("%s: %s", capability.Kind, capability.Pattern)
 	}
 }
 
@@ -101,14 +101,14 @@ func (p *TerminalPrompter) FormatNonInteractiveError(missing capabilities.Grant)
 	msg.WriteString("Plugins require additional permissions (running in non-interactive mode)\n\n")
 	msg.WriteString("Required permissions:\n")
 
-	for _, cap := range missing {
-		msg.WriteString(fmt.Sprintf("  - %s\n", p.describeCapability(cap)))
+	for _, capability := range missing {
+		msg.WriteString(fmt.Sprintf("  - %s\n", p.describeCapability(capability)))
 	}
 
 	msg.WriteString("\nTo grant these permissions:\n")
 	msg.WriteString("  1. Run interactively and approve when prompted\n")
 	msg.WriteString("  2. Use --trust-plugins flag (grants all permissions)\n")
-	msg.WriteString(fmt.Sprintf("  3. Manually edit: ~/.reglet/config.yaml\n")) // Hardcode for now, will be dynamic later
+	msg.WriteString("  3. Manually edit: ~/.reglet/config.yaml\n") // Hardcode for now, will be dynamic later
 
 	return fmt.Errorf("%s", msg.String())
 }

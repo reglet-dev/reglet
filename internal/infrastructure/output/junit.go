@@ -21,7 +21,7 @@ func NewJUnitFormatter(w io.Writer) *JUnitFormatter {
 	}
 }
 
-// JUnit XML structures
+// JUnitTestSuites JUnit XML structures
 type JUnitTestSuites struct {
 	XMLName    xml.Name         `xml:"testsuites"`
 	Name       string           `xml:"name,attr"`

@@ -16,10 +16,15 @@ type Severity struct {
 type SeverityLevel int
 
 const (
-	SeverityUnknown  SeverityLevel = 0
-	SeverityLow      SeverityLevel = 1
-	SeverityMedium   SeverityLevel = 2
-	SeverityHigh     SeverityLevel = 3
+	// SeverityUnknown = Unknown
+	SeverityUnknown SeverityLevel = 0
+	// SeverityLow = Low
+	SeverityLow SeverityLevel = 1
+	// SeverityMedium = Medium
+	SeverityMedium SeverityLevel = 2
+	// SeverityHigh = High
+	SeverityHigh SeverityLevel = 3
+	// SeverityCritical = Critical
 	SeverityCritical SeverityLevel = 4
 )
 

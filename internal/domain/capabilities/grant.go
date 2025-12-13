@@ -11,19 +11,19 @@ func NewGrant() Grant {
 }
 
 // Add adds a capability to the grant if it's not already present.
-func (g *Grant) Add(cap Capability) {
+func (g *Grant) Add(capability Capability) {
 	for _, existing := range *g {
-		if existing.Equals(cap) {
+		if existing.Equals(capability) {
 			return // Already exists
 		}
 	}
-	*g = append(*g, cap)
+	*g = append(*g, capability)
 }
 
 // Contains checks if the grant contains a specific capability.
-func (g Grant) Contains(cap Capability) bool {
+func (g Grant) Contains(capability Capability) bool {
 	for _, existing := range g {
-		if existing.Equals(cap) {
+		if existing.Equals(capability) {
 			return true
 		}
 	}
@@ -32,8 +32,8 @@ func (g Grant) Contains(cap Capability) bool {
 
 // ContainsAny checks if the grant contains any of the given capabilities.
 func (g Grant) ContainsAny(caps []Capability) bool {
-	for _, cap := range caps {
-		if g.Contains(cap) {
+	for _, capability := range caps {
+		if g.Contains(capability) {
 			return true
 		}
 	}
@@ -41,9 +41,9 @@ func (g Grant) ContainsAny(caps []Capability) bool {
 }
 
 // Remove removes a capability from the grant.
-func (g *Grant) Remove(cap Capability) {
+func (g *Grant) Remove(capability Capability) {
 	for i, existing := range *g {
-		if existing.Equals(cap) {
+		if existing.Equals(capability) {
 			*g = append((*g)[:i], (*g)[i+1:]...)
 			return
 		}

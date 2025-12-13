@@ -1,3 +1,4 @@
+// Package engine is the engine for the app
 package engine
 
 import (

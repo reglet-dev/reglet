@@ -407,14 +407,14 @@ func parsePluginInfo(data []byte) (*PluginInfo, error) {
 	if caps, ok := raw["capabilities"].([]interface{}); ok {
 		for _, capRaw := range caps {
 			if capMap, ok := capRaw.(map[string]interface{}); ok {
-				var cap capabilities.Capability
+				var capability capabilities.Capability
 				if kind, ok := capMap["kind"].(string); ok {
-					cap.Kind = kind
+					capability.Kind = kind
 				}
 				if pattern, ok := capMap["pattern"].(string); ok {
-					cap.Pattern = pattern
+					capability.Pattern = pattern
 				}
-				info.Capabilities = append(info.Capabilities, cap)
+				info.Capabilities = append(info.Capabilities, capability)
 			}
 		}
 	}

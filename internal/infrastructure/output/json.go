@@ -1,3 +1,4 @@
+// Package output holds various output options
 package output
 
 import (

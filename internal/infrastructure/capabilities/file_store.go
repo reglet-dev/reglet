@@ -1,3 +1,4 @@
+// Package capabilities provides capabilities for the wasm plugins
 package capabilities
 
 import (
@@ -70,7 +71,7 @@ func (s *FileStore) Load() (capabilities.Grant, error) {
 func (s *FileStore) Save(grants capabilities.Grant) error {
 	// Create directory if it doesn't exist
 	dir := filepath.Dir(s.configPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
@@ -80,9 +81,9 @@ func (s *FileStore) Save(grants capabilities.Grant) error {
 		Pattern string `yaml:"pattern"`
 	}, len(grants))
 
-	for i, cap := range grants {
-		cfgCaps[i].Kind = cap.Kind
-		cfgCaps[i].Pattern = cap.Pattern
+	for i, capability := range grants {
+		cfgCaps[i].Kind = capability.Kind
+		cfgCaps[i].Pattern = capability.Pattern
 	}
 
 	cfg := configFile{Capabilities: cfgCaps}
@@ -93,5 +94,5 @@ func (s *FileStore) Save(grants capabilities.Grant) error {
 		return fmt.Errorf("failed to marshal config to YAML: %w", err)
 	}
 
-	return os.WriteFile(s.configPath, data, 0600)
+	return os.WriteFile(s.configPath, data, 0o600)
 }

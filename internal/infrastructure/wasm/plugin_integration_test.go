@@ -247,7 +247,7 @@ func TestFilePlugin_Observe_Symlink(t *testing.T) {
 	targetFile.Close()
 	defer os.Remove(targetName)
 
-	err = os.WriteFile(targetName, []byte("content"), 0644)
+	err = os.WriteFile(targetName, []byte("content"), 0o644)
 	require.NoError(t, err)
 
 	// Get absolute paths for WASM filesystem access
@@ -557,7 +557,7 @@ func TestDNSPlugin_Schema(t *testing.T) {
 
 	// Parse the JSON Schema to verify it's valid JSON
 	var schemaData map[string]interface{}
-	err = json.Unmarshal([]byte(schema.RawSchema), &schemaData)
+	err = json.Unmarshal(schema.RawSchema, &schemaData)
 	require.NoError(t, err)
 
 	// Verify schema has expected properties
@@ -847,7 +847,7 @@ func TestHTTPPlugin_Schema(t *testing.T) {
 
 	// Parse schema JSON
 	var schemaData map[string]interface{}
-	err = json.Unmarshal([]byte(schema.RawSchema), &schemaData)
+	err = json.Unmarshal(schema.RawSchema, &schemaData)
 	require.NoError(t, err)
 
 	// Verify schema has expected properties
@@ -977,7 +977,7 @@ func TestTCPPlugin_Schema(t *testing.T) {
 
 	// Parse schema JSON
 	var schemaData map[string]interface{}
-	err = json.Unmarshal([]byte(schema.RawSchema), &schemaData)
+	err = json.Unmarshal(schema.RawSchema, &schemaData)
 	require.NoError(t, err)
 
 	// Verify schema has expected properties

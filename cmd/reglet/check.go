@@ -14,12 +14,12 @@ import (
 	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
 	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
 	"github.com/whiskeyjimbo/reglet/internal/domain/services"
-	"github.com/whiskeyjimbo/reglet/internal/infrastructure/engine"
 	infraconfig "github.com/whiskeyjimbo/reglet/internal/infrastructure/config"
-	"github.com/whiskeyjimbo/reglet/internal/infrastructure/system"
-	"github.com/whiskeyjimbo/reglet/internal/infrastructure/validation"
+	"github.com/whiskeyjimbo/reglet/internal/infrastructure/engine"
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/output"
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/redaction"
+	"github.com/whiskeyjimbo/reglet/internal/infrastructure/system"
+	"github.com/whiskeyjimbo/reglet/internal/infrastructure/validation"
 )
 
 var (
