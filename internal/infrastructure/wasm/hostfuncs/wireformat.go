@@ -15,7 +15,6 @@ import (
 
 //nolint:gosec // G115: uint64->uint32 conversions are safe for WASM32 address space
 
-// Re-export wire format types from shared wireformat package
 type (
 	ContextWireFormat = wireformat.ContextWireFormat
 	DNSRequestWire    = wireformat.DNSRequestWire

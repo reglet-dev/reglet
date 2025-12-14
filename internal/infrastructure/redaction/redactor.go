@@ -1,3 +1,4 @@
+// Package redaction handles secret redaction
 package redaction
 
 import (

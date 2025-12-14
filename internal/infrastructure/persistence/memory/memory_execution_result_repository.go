@@ -14,24 +14,24 @@ import (
 )
 
 // Ensure interface compliance
-var _ repositories.ExecutionResultRepository = (*MemoryExecutionResultRepository)(nil)
+var _ repositories.ExecutionResultRepository = (*ExecutionResultRepository)(nil)
 
-// MemoryExecutionResultRepository is an in-memory implementation of ExecutionResultRepository.
+// ExecutionResultRepository is an in-memory implementation of ExecutionResultRepository.
 // Useful for testing and ephemeral storage.
-type MemoryExecutionResultRepository struct {
+type ExecutionResultRepository struct {
 	results map[uuid.UUID]*execution.ExecutionResult
 	mu      sync.RWMutex
 }
 
 // NewExecutionResultRepository creates a new in-memory repository.
-func NewExecutionResultRepository() *MemoryExecutionResultRepository {
-	return &MemoryExecutionResultRepository{
+func NewExecutionResultRepository() *ExecutionResultRepository {
+	return &ExecutionResultRepository{
 		results: make(map[uuid.UUID]*execution.ExecutionResult),
 	}
 }
 
 // Save persists an execution result.
-func (r *MemoryExecutionResultRepository) Save(ctx context.Context, result *execution.ExecutionResult) error {
+func (r *ExecutionResultRepository) Save(ctx context.Context, result *execution.ExecutionResult) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -43,7 +43,7 @@ func (r *MemoryExecutionResultRepository) Save(ctx context.Context, result *exec
 }
 
 // FindByID retrieves an execution result by its unique ID.
-func (r *MemoryExecutionResultRepository) FindByID(ctx context.Context, id uuid.UUID) (*execution.ExecutionResult, error) {
+func (r *ExecutionResultRepository) FindByID(ctx context.Context, id uuid.UUID) (*execution.ExecutionResult, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -55,7 +55,7 @@ func (r *MemoryExecutionResultRepository) FindByID(ctx context.Context, id uuid.
 }
 
 // FindByProfile retrieves recent execution results for a specific profile.
-func (r *MemoryExecutionResultRepository) FindByProfile(ctx context.Context, profileName string, limit int) ([]*execution.ExecutionResult, error) {
+func (r *ExecutionResultRepository) FindByProfile(ctx context.Context, profileName string, limit int) ([]*execution.ExecutionResult, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -79,7 +79,7 @@ func (r *MemoryExecutionResultRepository) FindByProfile(ctx context.Context, pro
 }
 
 // FindBetween retrieves execution results for a profile within a time range.
-func (r *MemoryExecutionResultRepository) FindBetween(ctx context.Context, profileName string, start, end time.Time) ([]*execution.ExecutionResult, error) {
+func (r *ExecutionResultRepository) FindBetween(ctx context.Context, profileName string, start, end time.Time) ([]*execution.ExecutionResult, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 

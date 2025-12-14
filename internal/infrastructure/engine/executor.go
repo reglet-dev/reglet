@@ -143,13 +143,11 @@ func (e *ObservationExecutor) Execute(ctx context.Context, obs entities.Observat
 			// If we already have an error, append to it, otherwise create new one
 			if result.Evidence.Error != nil {
 				result.Evidence.Error.Message = fmt.Sprintf("%s; %s", result.Evidence.Error.Message, errMsg)
-			} else {
+			} else if status == values.StatusError {
 				// Note: We don't necessarily want to set Evidence.Error for expectation failures
 				// as that changes semantics. Expect failures are StatusFail, not necessarily StatusError.
 				// However, if the service returned StatusError, we should propagate it.
-				if status == values.StatusError {
-					result.Error = &wasm.PluginError{Message: errMsg}
-				}
+				result.Error = &wasm.PluginError{Message: errMsg}
 			}
 		}
 
