@@ -6,13 +6,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/whiskeyjimbo/reglet/internal/infrastructure/build"
 )
 
 func TestNewRuntime(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	runtime, err := NewRuntime(ctx)
+	runtime, err := NewRuntime(ctx, build.Get())
 	require.NoError(t, err)
 	require.NotNil(t, runtime)
 
@@ -30,7 +31,7 @@ func TestRuntime_GetPlugin_NotLoaded(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	runtime, err := NewRuntime(ctx)
+	runtime, err := NewRuntime(ctx, build.Get())
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -45,7 +46,7 @@ func TestLoadPlugin_InvalidWASM(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	runtime, err := NewRuntime(ctx)
+	runtime, err := NewRuntime(ctx, build.Get())
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 

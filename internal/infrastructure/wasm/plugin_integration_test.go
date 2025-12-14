@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
+	"github.com/whiskeyjimbo/reglet/internal/infrastructure/build"
 )
 
 // Global cache for WASM bytes to avoid repeated disk I/O
@@ -66,7 +67,7 @@ func TestLoadFilePlugin(t *testing.T) {
 
 	// Create runtime
 	ctx := context.Background()
-	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
+	runtime, err := NewRuntimeWithCapabilities(ctx, build.Get(), caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -99,7 +100,7 @@ func TestFilePlugin_Describe(t *testing.T) {
 
 	// Create runtime and load plugin
 	ctx := context.Background()
-	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
+	runtime, err := NewRuntimeWithCapabilities(ctx, build.Get(), caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -136,7 +137,7 @@ func TestFilePlugin_Schema(t *testing.T) {
 
 	// Create runtime and load plugin
 	ctx := context.Background()
-	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
+	runtime, err := NewRuntimeWithCapabilities(ctx, build.Get(), caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -194,7 +195,7 @@ func TestFilePlugin_Observe_FileExists(t *testing.T) {
 
 	// Create runtime and load plugin
 	ctx := context.Background()
-	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
+	runtime, err := NewRuntimeWithCapabilities(ctx, build.Get(), caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -272,7 +273,7 @@ func TestFilePlugin_Observe_Symlink(t *testing.T) {
 
 	// Create runtime and load plugin
 	ctx := context.Background()
-	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
+	runtime, err := NewRuntimeWithCapabilities(ctx, build.Get(), caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -320,7 +321,7 @@ func TestFilePlugin_Observe_FileNotFound(t *testing.T) {
 
 	// Create runtime and load plugin
 	ctx := context.Background()
-	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
+	runtime, err := NewRuntimeWithCapabilities(ctx, build.Get(), caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -375,7 +376,7 @@ func TestFilePlugin_Observe_ReadContent(t *testing.T) {
 
 	// Create runtime and load plugin
 	ctx := context.Background()
-	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
+	runtime, err := NewRuntimeWithCapabilities(ctx, build.Get(), caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -451,7 +452,7 @@ func TestFilePlugin_Observe_BinaryContent(t *testing.T) {
 
 	// Create runtime and load plugin
 	ctx := context.Background()
-	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
+	runtime, err := NewRuntimeWithCapabilities(ctx, build.Get(), caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -510,7 +511,7 @@ func TestDNSPlugin_Describe(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
+	runtime, err := NewRuntimeWithCapabilities(ctx, build.Get(), caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -543,7 +544,7 @@ func TestDNSPlugin_Schema(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
+	runtime, err := NewRuntimeWithCapabilities(ctx, build.Get(), caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -585,7 +586,7 @@ func TestDNSPlugin_Observe_A_Record(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
+	runtime, err := NewRuntimeWithCapabilities(ctx, build.Get(), caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -645,7 +646,7 @@ func TestDNSPlugin_Observe_MX_Record(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
+	runtime, err := NewRuntimeWithCapabilities(ctx, build.Get(), caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -709,7 +710,7 @@ func TestDNSPlugin_Observe_InvalidHostname(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
+	runtime, err := NewRuntimeWithCapabilities(ctx, build.Get(), caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -766,7 +767,7 @@ func TestDNSPlugin_Observe_MissingHostname(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
+	runtime, err := NewRuntimeWithCapabilities(ctx, build.Get(), caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -805,7 +806,7 @@ func TestHTTPPlugin_Describe(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
+	runtime, err := NewRuntimeWithCapabilities(ctx, build.Get(), caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -834,7 +835,7 @@ func TestHTTPPlugin_Schema(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
+	runtime, err := NewRuntimeWithCapabilities(ctx, build.Get(), caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -870,7 +871,7 @@ func TestHTTPPlugin_Observe_GET(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
+	runtime, err := NewRuntimeWithCapabilities(ctx, build.Get(), caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -935,7 +936,7 @@ func TestTCPPlugin_Describe(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
+	runtime, err := NewRuntimeWithCapabilities(ctx, build.Get(), caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -964,7 +965,7 @@ func TestTCPPlugin_Schema(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
+	runtime, err := NewRuntimeWithCapabilities(ctx, build.Get(), caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -1000,7 +1001,7 @@ func TestTCPPlugin_Observe_PlainTCP(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
+	runtime, err := NewRuntimeWithCapabilities(ctx, build.Get(), caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -1042,7 +1043,7 @@ func TestTCPPlugin_Observe_TLS(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	runtime, err := NewRuntimeWithCapabilities(ctx, caps)
+	runtime, err := NewRuntimeWithCapabilities(ctx, build.Get(), caps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 

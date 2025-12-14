@@ -1,5 +1,5 @@
-// Package version provides build version information for Reglet.
-package version
+// Package build provides build version information for Reglet.
+package build
 
 import "runtime"
 

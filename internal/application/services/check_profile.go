@@ -12,6 +12,7 @@ import (
 	"github.com/whiskeyjimbo/reglet/internal/application/ports"
 	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
 	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
+	"github.com/whiskeyjimbo/reglet/internal/infrastructure/build"
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/wasm"
 )
 
@@ -178,7 +179,7 @@ func (uc *CheckProfileUseCase) applyFilters(profile *entities.Profile, filters d
 
 // createTemporaryRuntime creates a temporary WASM runtime for capability collection.
 func (uc *CheckProfileUseCase) createTemporaryRuntime(ctx context.Context) (*wasm.Runtime, error) {
-	runtime, err := wasm.NewRuntime(ctx)
+	runtime, err := wasm.NewRuntime(ctx, build.Get())
 	if err != nil {
 		return nil, apperrors.NewConfigurationError("wasm", "failed to create temporary runtime", err)
 	}

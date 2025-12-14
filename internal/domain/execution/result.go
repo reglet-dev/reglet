@@ -12,6 +12,7 @@ import (
 type ExecutionResult struct {
 	ExecutionID    values.ExecutionID `json:"execution_id" yaml:"execution_id"`
 	Version        int                `json:"version" yaml:"version"` // For optimistic locking
+	RegletVersion  string             `json:"reglet_version,omitempty" yaml:"reglet_version,omitempty"`
 	ProfileName    string             `json:"profile_name" yaml:"profile_name"`
 	ProfileVersion string             `json:"profile_version" yaml:"profile_version"`
 	StartTime      time.Time          `json:"start_time" yaml:"start_time"`

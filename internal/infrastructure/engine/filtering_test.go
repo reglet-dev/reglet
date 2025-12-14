@@ -13,6 +13,7 @@ import (
 	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
 	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
 	"github.com/whiskeyjimbo/reglet/internal/domain/values"
+	"github.com/whiskeyjimbo/reglet/internal/infrastructure/build"
 )
 
 // TestFiltering_EndToEnd simulates a full run with 20 controls and filtering.
@@ -97,7 +98,7 @@ func TestFiltering_EndToEnd(t *testing.T) {
 	capMgr := appservices.NewCapabilityOrchestrator(true)
 
 	// Initialize Engine with Capabilities and Config
-	engine, err := NewEngineWithCapabilities(ctx, capMgr, pluginDir, profile, cfg, nil, nil)
+	engine, err := NewEngineWithCapabilities(ctx, build.Get(), capMgr, pluginDir, profile, cfg, nil, nil)
 	require.NoError(t, err)
 	defer engine.Close(ctx)
 

@@ -14,6 +14,7 @@ import (
 	"github.com/whiskeyjimbo/reglet/internal/domain/repositories"
 	"github.com/whiskeyjimbo/reglet/internal/domain/services"
 	"github.com/whiskeyjimbo/reglet/internal/domain/values"
+	"github.com/whiskeyjimbo/reglet/internal/infrastructure/build"
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/redaction"
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/wasm"
 	"golang.org/x/sync/errgroup"
@@ -59,6 +60,7 @@ type Engine struct {
 	executor   *ObservationExecutor
 	config     ExecutionConfig
 	repository repositories.ExecutionResultRepository // Optional repository for persistence
+	version    build.Info
 }
 
 // CapabilityManager defines the interface for capability management
@@ -68,14 +70,15 @@ type CapabilityManager interface {
 }
 
 // NewEngine creates a new execution engine with default configuration.
-func NewEngine(ctx context.Context) (*Engine, error) {
-	return NewEngineWithConfig(ctx, DefaultExecutionConfig())
+func NewEngine(ctx context.Context, version build.Info) (*Engine, error) {
+	return NewEngineWithConfig(ctx, version, DefaultExecutionConfig())
 }
 
 // NewEngineWithCapabilities creates an engine with interactive capability prompts
 // and optional repository support.
 func NewEngineWithCapabilities(
 	ctx context.Context,
+	version build.Info,
 	capMgr CapabilityManager,
 	pluginDir string,
 	profile *entities.Profile,
@@ -84,7 +87,7 @@ func NewEngineWithCapabilities(
 	repo repositories.ExecutionResultRepository, // Optional repository
 ) (*Engine, error) {
 	// Create temporary runtime with no capabilities to load plugins and get requirements
-	tempRuntime, err := wasm.NewRuntime(ctx)
+	tempRuntime, err := wasm.NewRuntime(ctx, version)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temporary runtime: %w", err)
 	}
@@ -106,7 +109,7 @@ func NewEngineWithCapabilities(
 	}
 
 	// Create WASM runtime with granted capabilities
-	runtime, err := wasm.NewRuntimeWithCapabilities(ctx, granted)
+	runtime, err := wasm.NewRuntimeWithCapabilities(ctx, version, granted)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create WASM runtime: %w", err)
 	}
@@ -128,13 +131,14 @@ func NewEngineWithCapabilities(
 		executor:   executor,
 		config:     cfg,
 		repository: repo,
+		version:    version,
 	}, nil
 }
 
 // NewEngineWithConfig creates a new execution engine with custom configuration.
-func NewEngineWithConfig(ctx context.Context, cfg ExecutionConfig) (*Engine, error) {
+func NewEngineWithConfig(ctx context.Context, version build.Info, cfg ExecutionConfig) (*Engine, error) {
 	// Create WASM runtime with no capabilities (legacy path)
-	runtime, err := wasm.NewRuntime(ctx)
+	runtime, err := wasm.NewRuntime(ctx, version)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create WASM runtime: %w", err)
 	}
@@ -146,6 +150,7 @@ func NewEngineWithConfig(ctx context.Context, cfg ExecutionConfig) (*Engine, err
 		runtime:  runtime,
 		executor: executor,
 		config:   cfg,
+		version:  version,
 	}, nil
 }
 
@@ -153,6 +158,7 @@ func NewEngineWithConfig(ctx context.Context, cfg ExecutionConfig) (*Engine, err
 func (e *Engine) Execute(ctx context.Context, profile *entities.Profile) (*execution.ExecutionResult, error) {
 	// Create execution result
 	result := execution.NewExecutionResult(profile.Metadata.Name, profile.Metadata.Version)
+	result.RegletVersion = e.version.String()
 
 	// Calculate required dependencies if enabled
 	var requiredControls map[string]bool

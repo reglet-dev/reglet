@@ -7,6 +7,7 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
+	"github.com/whiskeyjimbo/reglet/internal/infrastructure/build"
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/wasm/hostfuncs"
 )
 
@@ -19,16 +20,17 @@ var globalCache = wazero.NewCompilationCache()
 type Runtime struct {
 	runtime wazero.Runtime
 	plugins map[string]*Plugin // Loaded plugins by name
+	version build.Info
 }
 
 // NewRuntime creates a new WASM runtime with no granted capabilities
 // For production use, use NewRuntimeWithCapabilities instead
-func NewRuntime(ctx context.Context) (*Runtime, error) {
-	return NewRuntimeWithCapabilities(ctx, nil)
+func NewRuntime(ctx context.Context, version build.Info) (*Runtime, error) {
+	return NewRuntimeWithCapabilities(ctx, version, nil)
 }
 
 // NewRuntimeWithCapabilities creates a new WASM runtime with specific capabilities
-func NewRuntimeWithCapabilities(ctx context.Context, caps map[string][]capabilities.Capability) (*Runtime, error) {
+func NewRuntimeWithCapabilities(ctx context.Context, version build.Info, caps map[string][]capabilities.Capability) (*Runtime, error) {
 	// Create wazero runtime with compilation cache
 	// This is a pure Go WASM runtime - no CGO required
 	config := wazero.NewRuntimeConfig().WithCompilationCache(globalCache)
@@ -43,7 +45,7 @@ func NewRuntimeWithCapabilities(ctx context.Context, caps map[string][]capabilit
 
 	// Register custom host functions with capability enforcement
 	// Capabilities define what operations plugins are allowed to perform
-	if err := hostfuncs.RegisterHostFunctions(ctx, r, caps); err != nil {
+	if err := hostfuncs.RegisterHostFunctions(ctx, r, version, caps); err != nil {
 		_ = r.Close(ctx)
 		return nil, fmt.Errorf("failed to register host functions: %w", err)
 	}
@@ -51,6 +53,7 @@ func NewRuntimeWithCapabilities(ctx context.Context, caps map[string][]capabilit
 	return &Runtime{
 		runtime: r,
 		plugins: make(map[string]*Plugin),
+		version: version,
 	}, nil
 }
 

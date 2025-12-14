@@ -9,13 +9,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/whiskeyjimbo/reglet/internal/infrastructure/build"
 )
 
 // TestPlugin_Observe_Concurrent tests that multiple goroutines can call
 // Observe() concurrently without data races or cross-contamination
 func TestPlugin_Observe_Concurrent(t *testing.T) {
 	ctx := context.Background()
-	runtime, err := NewRuntime(ctx)
+	runtime, err := NewRuntime(ctx, build.Get())
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -96,7 +97,7 @@ func TestPlugin_Observe_RaceDetector(t *testing.T) {
 // (Describe, Schema, Observe) can be called concurrently
 func TestPlugin_ConcurrentDifferentMethods(t *testing.T) {
 	ctx := context.Background()
-	runtime, err := NewRuntime(ctx)
+	runtime, err := NewRuntime(ctx, build.Get())
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 

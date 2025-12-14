@@ -6,10 +6,11 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
+	"github.com/whiskeyjimbo/reglet/internal/infrastructure/build"
 )
 
 // RegisterHostFunctions registers all host functions with the wazero runtime
-func RegisterHostFunctions(ctx context.Context, runtime wazero.Runtime, caps map[string][]capabilities.Capability) error {
+func RegisterHostFunctions(ctx context.Context, runtime wazero.Runtime, version build.Info, caps map[string][]capabilities.Capability) error {
 	checker := NewCapabilityChecker(caps)
 
 	// Create host module "reglet_host"
@@ -29,7 +30,7 @@ func RegisterHostFunctions(ctx context.Context, runtime wazero.Runtime, caps map
 	// Returns: http_responsePacked (i64) - packed ptr+len of HTTPResponseWire JSON
 	builder.NewFunctionBuilder().
 		WithGoModuleFunction(api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
-			HTTPRequest(ctx, mod, stack, checker) // Now uncommented
+			HTTPRequest(ctx, mod, stack, checker, version) // Now passes version
 		}), []api.ValueType{api.ValueTypeI64}, []api.ValueType{api.ValueTypeI64}).
 		Export("http_request")
 

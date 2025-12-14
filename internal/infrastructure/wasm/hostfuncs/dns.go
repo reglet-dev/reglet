@@ -11,8 +11,8 @@ import (
 	"github.com/tetratelabs/wazero/api"
 )
 
-// DnsLookupResult is an intermediate struct to hold the DNS lookup results before converting to wire format.
-type DnsLookupResult struct {
+// DNSLookupResult is an intermediate struct to hold the DNS lookup results before converting to wire format.
+type DNSLookupResult struct {
 	Records   []string
 	MXRecords []MXRecordWire
 }
@@ -94,7 +94,7 @@ func DNSLookup(ctx context.Context, mod api.Module, stack []uint64, checker *Cap
 }
 
 // performDNSLookup executes the actual DNS lookup based on record type
-func performDNSLookup(ctx context.Context, hostname string, recordType string, nameserver string) (*DnsLookupResult, error) {
+func performDNSLookup(ctx context.Context, hostname string, recordType string, nameserver string) (*DNSLookupResult, error) {
 	var resolver *net.Resolver
 
 	if nameserver != "" {
@@ -113,7 +113,7 @@ func performDNSLookup(ctx context.Context, hostname string, recordType string, n
 		resolver = net.DefaultResolver
 	}
 
-	result := &DnsLookupResult{}
+	result := &DNSLookupResult{}
 
 	switch recordType {
 	case "A":

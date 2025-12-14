@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/whiskeyjimbo/reglet/internal/infrastructure/build"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
@@ -25,7 +27,7 @@ func TestCommandPlugin_Integration(t *testing.T) {
 		},
 	}
 
-	runtime, err := NewRuntimeWithCapabilities(ctx, grantedCaps)
+	runtime, err := NewRuntimeWithCapabilities(ctx, build.Get(), grantedCaps)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -142,7 +144,7 @@ func TestCommandPlugin_Capabilities(t *testing.T) {
 	ctx := context.Background()
 
 	// Create runtime with NO exec capabilities
-	runtime, err := NewRuntime(ctx)
+	runtime, err := NewRuntime(ctx, build.Get())
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 

@@ -12,12 +12,13 @@ import (
 	"net/url" // Import url for URL parsing
 
 	"github.com/tetratelabs/wazero/api"
+	"github.com/whiskeyjimbo/reglet/internal/infrastructure/build"
 )
 
 // HTTPRequest performs an HTTP request on behalf of the plugin.
 // It receives a packed uint64 (ptr+len) pointing to a JSON-encoded HTTPRequestWire.
 // It returns a packed uint64 (ptr+len) pointing to a JSON-encoded HTTPResponseWire.
-func HTTPRequest(ctx context.Context, mod api.Module, stack []uint64, checker *CapabilityChecker) {
+func HTTPRequest(ctx context.Context, mod api.Module, stack []uint64, checker *CapabilityChecker, version build.Info) {
 	// Stack contains a single uint64 which is packed ptr+len of the request.
 	requestPacked := stack[0]
 	ptr, length := unpackPtrLen(requestPacked)
@@ -119,7 +120,13 @@ func HTTPRequest(ctx context.Context, mod api.Module, stack []uint64, checker *C
 		return
 	}
 
-	// Set headers
+	// Set User-Agent first (Reglet/Version)
+	// Plugins can override this via headers if needed, or we append if we use Add.
+	// We use Set here to establish the default.
+	userAgent := fmt.Sprintf("Reglet/%s (%s)", version.Version, version.Platform)
+	req.Header.Set("User-Agent", userAgent)
+
+	// Set headers from plugin
 	for key, values := range request.Headers {
 		for _, value := range values {
 			req.Header.Add(key, value)

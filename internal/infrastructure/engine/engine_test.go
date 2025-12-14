@@ -13,6 +13,7 @@ import (
 	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
 	"github.com/whiskeyjimbo/reglet/internal/domain/services"
 	"github.com/whiskeyjimbo/reglet/internal/domain/values"
+	"github.com/whiskeyjimbo/reglet/internal/infrastructure/build"
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/wasm"
 )
 
@@ -20,7 +21,7 @@ func TestNewEngine(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
-	engine, err := NewEngine(ctx)
+	engine, err := NewEngine(ctx, build.Get())
 	require.NoError(t, err)
 	require.NotNil(t, engine)
 	require.NotNil(t, engine.runtime)
@@ -117,7 +118,7 @@ func TestGenerateControlMessage_MultipleErrors(t *testing.T) {
 func TestExecuteControl_SingleObservation(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	engine, err := NewEngine(ctx)
+	engine, err := NewEngine(ctx, build.Get())
 	require.NoError(t, err)
 	defer engine.Close(ctx)
 
@@ -156,7 +157,7 @@ func TestExecuteControl_SingleObservation(t *testing.T) {
 func TestExecuteControl_MultipleObservations(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	engine, err := NewEngine(ctx)
+	engine, err := NewEngine(ctx, build.Get())
 	require.NoError(t, err)
 	defer engine.Close(ctx)
 
@@ -193,7 +194,7 @@ func TestExecuteControl_MultipleObservations(t *testing.T) {
 func TestExecute_SingleControl(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	engine, err := NewEngine(ctx)
+	engine, err := NewEngine(ctx, build.Get())
 	require.NoError(t, err)
 	defer engine.Close(ctx)
 
@@ -238,7 +239,7 @@ func TestExecute_SingleControl(t *testing.T) {
 func TestExecute_MultipleControls(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	engine, err := NewEngine(ctx)
+	engine, err := NewEngine(ctx, build.Get())
 	require.NoError(t, err)
 	defer engine.Close(ctx)
 
@@ -292,7 +293,7 @@ func TestExecute_MultipleControls(t *testing.T) {
 func TestExecute_SummaryStatistics(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	engine, err := NewEngine(ctx)
+	engine, err := NewEngine(ctx, build.Get())
 	require.NoError(t, err)
 	defer engine.Close(ctx)
 
@@ -337,7 +338,7 @@ func TestExecute_SummaryStatistics(t *testing.T) {
 func TestExecute_TimingInfo(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	engine, err := NewEngine(ctx)
+	engine, err := NewEngine(ctx, build.Get())
 	require.NoError(t, err)
 	defer engine.Close(ctx)
 
@@ -380,7 +381,7 @@ func TestExecute_TimingInfo(t *testing.T) {
 func TestExecute_InvalidPlugin(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	engine, err := NewEngine(ctx)
+	engine, err := NewEngine(ctx, build.Get())
 	require.NoError(t, err)
 	defer engine.Close(ctx)
 

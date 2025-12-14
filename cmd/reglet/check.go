@@ -14,6 +14,7 @@ import (
 	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
 	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
 	"github.com/whiskeyjimbo/reglet/internal/domain/services"
+	"github.com/whiskeyjimbo/reglet/internal/infrastructure/build"
 	infraconfig "github.com/whiskeyjimbo/reglet/internal/infrastructure/config"
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/engine"
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/output"
@@ -144,7 +145,7 @@ func runCheckAction(ctx context.Context, profilePath string) error {
 
 	// Create execution engine with capability manager and config
 	// Pass nil for repository as persistence is not yet enabled via CLI
-	eng, err := engine.NewEngineWithCapabilities(ctx, capMgr, pluginDir, profile, execConfig, redactor, nil)
+	eng, err := engine.NewEngineWithCapabilities(ctx, build.Get(), capMgr, pluginDir, profile, execConfig, redactor, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create engine: %w", err)
 	}
