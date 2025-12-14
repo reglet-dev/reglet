@@ -11,6 +11,10 @@ import (
 	"github.com/tetratelabs/wazero/api"
 )
 
+type logContextKey string
+
+const requestIDKey logContextKey = "request_id"
+
 // LogMessageWire is the JSON wire format for a log message from Guest to Host.
 type LogMessageWire struct {
 	Context   ContextWireFormat `json:"context"` // Context for correlation etc.
@@ -50,7 +54,7 @@ func LogMessage(ctx context.Context, mod api.Module, stack []uint64) {
 	// Create a log context with correlation ID if available
 	logCtx, _ := createContextFromWire(ctx, logMsg.Context)
 	if logMsg.Context.RequestID != "" {
-		logCtx = context.WithValue(logCtx, "request_id", logMsg.Context.RequestID)
+		logCtx = context.WithValue(logCtx, requestIDKey, logMsg.Context.RequestID)
 	}
 
 	// Determine slog level
