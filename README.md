@@ -1,4 +1,5 @@
-# Reglet
+# ![logov1-small](https://github.com/user-attachments/assets/d62c9bd1-d769-4775-a9d4-1871d4be8f74) Reglet
+
 > **Compliance as Code. Secure by Design.**
 
 Reglet is a modern, modular compliance and infrastructure validation engine. It empowers engineering teams to define policy as code, execute validation logic in securely sandboxed WebAssembly (WASM) environments, and generate standardized audit artifacts.
