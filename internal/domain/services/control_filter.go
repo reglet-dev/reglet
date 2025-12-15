@@ -20,15 +20,15 @@ type ControlEnv struct {
 // ControlFilter encapsulates filtering logic.
 type ControlFilter struct {
 	// Exclusive mode: only include specified controls
-	exclusiveControlIDs []string
+	exclusiveControlIDs map[string]bool
 
 	// Exclusion filters
-	excludeControlIDs []string
-	excludeTags       []string
+	excludeControlIDs map[string]bool
+	excludeTags       map[string]bool
 
 	// Inclusion filters
-	includeTags       []string
-	includeSeverities []string
+	includeTags       map[string]bool
+	includeSeverities map[string]bool
 
 	// Advanced filtering
 	filterProgram *vm.Program
@@ -36,36 +36,42 @@ type ControlFilter struct {
 
 // NewControlFilter creates a filter.
 func NewControlFilter() *ControlFilter {
-	return &ControlFilter{}
+	return &ControlFilter{
+		exclusiveControlIDs: make(map[string]bool),
+		excludeControlIDs:   make(map[string]bool),
+		excludeTags:         make(map[string]bool),
+		includeTags:         make(map[string]bool),
+		includeSeverities:   make(map[string]bool),
+	}
 }
 
 // WithExclusiveControls sets exclusive mode (only these controls run).
 func (f *ControlFilter) WithExclusiveControls(controlIDs []string) *ControlFilter {
-	f.exclusiveControlIDs = controlIDs
+	f.exclusiveControlIDs = toSet(controlIDs)
 	return f
 }
 
 // WithExcludedControls excludes specific control IDs.
 func (f *ControlFilter) WithExcludedControls(controlIDs []string) *ControlFilter {
-	f.excludeControlIDs = controlIDs
+	f.excludeControlIDs = toSet(controlIDs)
 	return f
 }
 
 // WithExcludedTags excludes controls with any of these tags.
 func (f *ControlFilter) WithExcludedTags(tags []string) *ControlFilter {
-	f.excludeTags = tags
+	f.excludeTags = toSet(tags)
 	return f
 }
 
 // WithIncludedTags includes only controls with any of these tags.
 func (f *ControlFilter) WithIncludedTags(tags []string) *ControlFilter {
-	f.includeTags = tags
+	f.includeTags = toSet(tags)
 	return f
 }
 
 // WithIncludedSeverities includes only controls with these severities.
 func (f *ControlFilter) WithIncludedSeverities(severities []string) *ControlFilter {
-	f.includeSeverities = severities
+	f.includeSeverities = toSet(severities)
 	return f
 }
 
@@ -86,27 +92,27 @@ func (f *ControlFilter) WithFilterExpression(program *vm.Program) *ControlFilter
 func (f *ControlFilter) ShouldRun(ctrl entities.Control) (bool, string) {
 	// 0. Exclusive mode: ONLY specified controls run
 	if len(f.exclusiveControlIDs) > 0 {
-		if contains(f.exclusiveControlIDs, ctrl.ID) {
+		if f.exclusiveControlIDs[ctrl.ID] {
 			return true, ""
 		}
 		return false, "excluded by --control filter"
 	}
 
 	// 1. Exclude by control ID
-	if contains(f.excludeControlIDs, ctrl.ID) {
+	if f.excludeControlIDs[ctrl.ID] {
 		return false, "excluded by --exclude-control"
 	}
 
 	// 2. Exclude by tags
 	for _, tag := range ctrl.Tags {
-		if contains(f.excludeTags, tag) {
+		if f.excludeTags[tag] {
 			return false, fmt.Sprintf("excluded by --exclude-tags %s", tag)
 		}
 	}
 
 	// 3. Include by severity (if filter specified)
 	if len(f.includeSeverities) > 0 {
-		if !contains(f.includeSeverities, ctrl.Severity) {
+		if !f.includeSeverities[ctrl.Severity] {
 			return false, "excluded by --severity filter"
 		}
 	}
@@ -115,7 +121,7 @@ func (f *ControlFilter) ShouldRun(ctrl entities.Control) (bool, string) {
 	if len(f.includeTags) > 0 {
 		hasTag := false
 		for _, tag := range ctrl.Tags {
-			if contains(f.includeTags, tag) {
+			if f.includeTags[tag] {
 				hasTag = true
 				break
 			}
@@ -155,12 +161,11 @@ func (f *ControlFilter) ShouldRun(ctrl entities.Control) (bool, string) {
 	return true, ""
 }
 
-// contains checks if a slice contains a string
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
+// toSet converts a slice to a map (set)
+func toSet(slice []string) map[string]bool {
+	s := make(map[string]bool, len(slice))
+	for _, item := range slice {
+		s[item] = true
 	}
-	return false
+	return s
 }
