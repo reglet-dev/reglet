@@ -27,8 +27,8 @@ environments, and generate standardized audit artifacts.`,
 	SilenceUsage: true,
 }
 
-// Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
+// Execute adds child commands and sets flags.
+// Called by main().
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
@@ -43,28 +43,24 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable verbose output")
 }
 
-// initConfig reads in config file and ENV variables if set.
+// initConfig reads config from file or environment.
 func initConfig() {
 	if cfgFile != "" {
-		// Use config file from the flag.
 		viper.SetConfigFile(cfgFile)
 	} else {
-		// Find home directory.
 		home, err := os.UserHomeDir()
 		if err != nil {
 			slog.Error("failed to find home directory", "error", err)
 			os.Exit(1)
 		}
 
-		// Search config in home directory with name ".reglet" (without extension).
 		viper.AddConfigPath(home)
 		viper.SetConfigType("yaml")
 		viper.SetConfigName(".reglet")
 	}
 
-	viper.AutomaticEnv() // read in environment variables that match
+	viper.AutomaticEnv()
 
-	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
 		slog.Debug("using config file", "file", viper.ConfigFileUsed())
 	}

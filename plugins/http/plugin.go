@@ -23,7 +23,7 @@ type httpPlugin struct {
 	client *http.Client
 }
 
-// Describe returns plugin metadata.
+// Describe returns HTTP plugin metadata.
 func (p *httpPlugin) Describe(ctx context.Context) (regletsdk.Metadata, error) {
 	return regletsdk.Metadata{
 		Name:        "http",
@@ -47,12 +47,12 @@ type HTTPConfig struct {
 	BodyPreviewLength    int    `json:"body_preview_length,omitempty" default:"200" description:"Number of characters to include from response body (0 = hash only, -1 = full body)"`
 }
 
-// Schema returns the JSON schema for the plugin's configuration.
+// Schema returns config schema.
 func (p *httpPlugin) Schema(ctx context.Context) ([]byte, error) {
 	return regletsdk.GenerateSchema(HTTPConfig{})
 }
 
-// Check executes the HTTP observation.
+// Check executes HTTP request.
 func (p *httpPlugin) Check(ctx context.Context, config regletsdk.Config) (regletsdk.Evidence, error) {
 	// Set default method
 	if _, ok := config["method"]; !ok {

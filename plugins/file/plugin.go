@@ -17,7 +17,7 @@ import (
 // filePlugin implements the sdk.Plugin interface.
 type filePlugin struct{}
 
-// Describe returns plugin metadata.
+// Describe returns file plugin metadata.
 func (p *filePlugin) Describe(ctx context.Context) (regletsdk.Metadata, error) {
 	return regletsdk.Metadata{
 		Name:        "file",
@@ -26,7 +26,7 @@ func (p *filePlugin) Describe(ctx context.Context) (regletsdk.Metadata, error) {
 		Capabilities: []regletsdk.Capability{
 			{
 				Kind:    "fs",
-				Pattern: "read:**", // Simple pattern, host enforces actual paths
+				Pattern: "read:**",
 			},
 		},
 	}, nil
@@ -38,12 +38,12 @@ type FileConfig struct {
 	Hash        bool   `json:"hash,omitempty" description:"Calculate SHA256 hash of file"`
 }
 
-// Schema returns the JSON schema for the plugin's configuration.
+// Schema returns config schema.
 func (p *filePlugin) Schema(ctx context.Context) ([]byte, error) {
 	return regletsdk.GenerateSchema(FileConfig{})
 }
 
-// Check executes the file observation.
+// Check validates file properties.
 func (p *filePlugin) Check(ctx context.Context, config regletsdk.Config) (regletsdk.Evidence, error) {
 	var cfg FileConfig
 	if err := regletsdk.ValidateConfig(config, &cfg); err != nil {

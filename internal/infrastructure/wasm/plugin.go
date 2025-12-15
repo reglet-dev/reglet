@@ -16,49 +16,44 @@ import (
 
 //nolint:gosec // G115: uint64->uint32 conversions are safe for WASM32 address space
 
-// Plugin represents a loaded WASM plugin
+// Plugin represents a WASM module.
 type Plugin struct {
 	name    string
 	module  wazero.CompiledModule
 	runtime wazero.Runtime
 
-	// Mutex protects concurrent access to cached metadata
+	// Mutex protects cached metadata
 	mu sync.Mutex
 
-	// Cached plugin info from describe() (protected by mu)
+	// Cached plugin info
 	info *PluginInfo
 
-	// Cached schema from schema() (protected by mu)
+	// Cached schema
 	schema *ConfigSchema
 }
 
-// Name returns the plugin name
+// Name returns the plugin name.
 func (p *Plugin) Name() string {
 	return p.name
 }
 
-// createModuleConfig creates a fresh module configuration
-// Includes stdout/stderr for debugging visibility
+// createModuleConfig configures the WASM module.
+// Enables filesystem, time, random, and logging.
 func (p *Plugin) createModuleConfig() wazero.ModuleConfig {
 	return wazero.NewModuleConfig().
-		// Mount root filesystem to allow access to system files like /etc/ssh/sshd_config
-		// Note: This provides full filesystem access to plugins. Capability enforcement
-		// for WASI operations is planned for Phase 2 (see TODO in design.md)
-		// Current capability system only enforces custom host functions (DNS, HTTP, etc.)
+		// Mount root filesystem to allow access to system files (e.g. /etc/ssh/sshd_config).
+		// Note: Phase 2 will introduce finer-grained capability enforcement for WASI.
 		WithFSConfig(wazero.NewFSConfig().WithDirMount("/", "/")).
-		// Enable time-related syscalls (needed for file timestamps)
 		WithSysWalltime().
 		WithSysNanotime().
 		WithSysNanosleep().
-		// Enable random number generation
 		WithRandSource(rand.Reader).
-		// FIX: Enable logging visibility for debugging
 		WithStderr(os.Stderr).
 		WithStdout(os.Stderr)
 }
 
-// createInstance creates a fresh module instance
-// Each call gets isolated WASM memory - thread-safe
+// createInstance instantiates the module.
+// Thread-safe: Each call gets isolated memory.
 func (p *Plugin) createInstance(ctx context.Context) (api.Module, error) {
 	// Create fresh instance every time - no caching
 	instance, err := p.runtime.InstantiateModule(ctx, p.module, p.createModuleConfig())
@@ -84,12 +79,11 @@ func (p *Plugin) createInstance(ctx context.Context) (api.Module, error) {
 	return instance, nil
 }
 
-// Describe calls the plugin's describe() function and returns metadata
+// Describe retrieves plugin metadata.
 func (p *Plugin) Describe(ctx context.Context) (*PluginInfo, error) {
-	// Wrap context with plugin name so host functions can access it
+	// Wrap context with plugin name for host functions
 	ctx = hostfuncs.WithPluginName(ctx, p.name)
 
-	// Check cache with lock
 	p.mu.Lock()
 	if p.info != nil {
 		info := p.info
@@ -98,23 +92,19 @@ func (p *Plugin) Describe(ctx context.Context) (*PluginInfo, error) {
 	}
 	p.mu.Unlock()
 
-	// Create fresh instance for this call
 	instance, err := p.createInstance(ctx)
 	if err != nil {
 		return nil, err
 	}
-	// CRITICAL: Always close instance when done
 	defer func() {
-		_ = instance.Close(ctx) // Best-effort cleanup
+		_ = instance.Close(ctx)
 	}()
 
-	// Get the describe function
 	describeFn := instance.ExportedFunction("describe")
 	if describeFn == nil {
 		return nil, fmt.Errorf("plugin %s does not export describe() function", p.name)
 	}
 
-	// Call describe() - returns packed uint64
 	results, err := describeFn.Call(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to call describe(): %w", err)
@@ -124,28 +114,24 @@ func (p *Plugin) Describe(ctx context.Context) (*PluginInfo, error) {
 		return nil, fmt.Errorf("describe() returned no results")
 	}
 
-	// FIX: Unpack ptr and length from uint64
 	packed := results[0]
-	ptr := uint32(packed >> 32)         // High 32 bits
-	size := uint32(packed & 0xFFFFFFFF) // Low 32 bits
+	ptr := uint32(packed >> 32)
+	size := uint32(packed & 0xFFFFFFFF)
 
 	if ptr == 0 || size == 0 {
 		return nil, fmt.Errorf("describe() returned null pointer or zero length")
 	}
 
-	// Read EXACT size from memory
 	data, err := p.readString(ctx, instance, ptr, size)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read describe() result: %w", err)
 	}
 
-	// Parse JSON into PluginInfo
 	info, err := parsePluginInfo(data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse plugin info: %w", err)
 	}
 
-	// Store in cache with lock
 	p.mu.Lock()
 	p.info = info
 	p.mu.Unlock()
@@ -153,12 +139,10 @@ func (p *Plugin) Describe(ctx context.Context) (*PluginInfo, error) {
 	return info, nil
 }
 
-// Schema calls the plugin's schema() function and returns the config schema
+// Schema retrieves configuration schema.
 func (p *Plugin) Schema(ctx context.Context) (*ConfigSchema, error) {
-	// Wrap context with plugin name so host functions can access it
 	ctx = hostfuncs.WithPluginName(ctx, p.name)
 
-	// Check cache with lock
 	p.mu.Lock()
 	if p.schema != nil {
 		schema := p.schema
@@ -167,23 +151,19 @@ func (p *Plugin) Schema(ctx context.Context) (*ConfigSchema, error) {
 	}
 	p.mu.Unlock()
 
-	// Create fresh instance for this call
 	instance, err := p.createInstance(ctx)
 	if err != nil {
 		return nil, err
 	}
-	// CRITICAL: Always close instance when done
 	defer func() {
-		_ = instance.Close(ctx) // Best-effort cleanup
+		_ = instance.Close(ctx)
 	}()
 
-	// Get the schema function
 	schemaFn := instance.ExportedFunction("schema")
 	if schemaFn == nil {
 		return nil, fmt.Errorf("plugin %s does not export schema() function", p.name)
 	}
 
-	// Call schema() - returns packed uint64
 	results, err := schemaFn.Call(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to call schema(): %w", err)
@@ -193,7 +173,6 @@ func (p *Plugin) Schema(ctx context.Context) (*ConfigSchema, error) {
 		return nil, fmt.Errorf("schema() returned no results")
 	}
 
-	// FIX: Unpack ptr and length from uint64
 	packed := results[0]
 	ptr := uint32(packed >> 32)
 	size := uint32(packed & 0xFFFFFFFF)
@@ -202,22 +181,17 @@ func (p *Plugin) Schema(ctx context.Context) (*ConfigSchema, error) {
 		return nil, fmt.Errorf("schema() returned null pointer or zero length")
 	}
 
-	// Read exact size
 	data, err := p.readString(ctx, instance, ptr, size)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read schema() result: %w", err)
 	}
 
-	// Parse JSON into ConfigSchema
-	// The plugin returns a JSON Schema object, which we'll store as-is for now
-	// In a real implementation, we might want to parse it into a more structured format
+	// Store raw JSON schema for now.
 	schema := &ConfigSchema{
-		Fields: []FieldDef{},
-		// Store raw JSON schema for now
+		Fields:    []FieldDef{},
 		RawSchema: data,
 	}
 
-	// Store in cache with lock
 	p.mu.Lock()
 	p.schema = schema
 	p.mu.Unlock()
@@ -225,7 +199,7 @@ func (p *Plugin) Schema(ctx context.Context) (*ConfigSchema, error) {
 	return schema, nil
 }
 
-// Observe calls the plugin's observe() function with the given config
+// Observe executes the observation logic.
 func (p *Plugin) Observe(ctx context.Context, cfg Config) (*ObservationResult, error) {
 	// Wrap context with plugin name so host functions can access it
 	ctx = hostfuncs.WithPluginName(ctx, p.name)

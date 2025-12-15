@@ -74,11 +74,10 @@ func init() {
 	checkCmd.Flags().BoolVar(&includeDependencies, "include-dependencies", false, "Include dependencies of selected controls")
 }
 
-// runCheckAction implements the core logic for the check command
+// runCheckAction executes the check command logic.
 func runCheckAction(ctx context.Context, profilePath string) error {
 	slog.Info("loading profile", "path", profilePath)
 
-	// Load profile using infrastructure loader
 	loader := infraconfig.NewProfileLoader()
 	profile, err := loader.LoadProfile(profilePath)
 	if err != nil {
@@ -87,13 +86,11 @@ func runCheckAction(ctx context.Context, profilePath string) error {
 
 	slog.Info("profile loaded", "name", profile.Metadata.Name, "version", profile.Metadata.Version)
 
-	// Apply variable substitution
 	substitutor := infraconfig.NewVariableSubstitutor()
 	if err := substitutor.Substitute(profile); err != nil {
 		return fmt.Errorf("failed to substitute variables: %w", err)
 	}
 
-	// Validate profile structure
 	validator := validation.NewProfileValidator()
 	if err := validator.Validate(profile); err != nil {
 		return fmt.Errorf("profile validation failed: %w", err)
@@ -101,15 +98,14 @@ func runCheckAction(ctx context.Context, profilePath string) error {
 
 	slog.Info("profile validated", "controls", len(profile.Controls.Items))
 
-	// Load system config for redaction and capabilities
+	// Load system config for redaction and capabilities.
 	sysConfig, err := loadSystemConfig()
 	if err != nil {
-		// Log warning but continue with defaults
+		// Log warning but continue with defaults.
 		slog.Debug("failed to load system config, using defaults", "error", err)
 		sysConfig = &system.Config{}
 	}
 
-	// Initialize Redactor
 	redactor, err := redaction.New(redaction.Config{
 		Patterns: sysConfig.Redaction.Patterns,
 		Paths:    sysConfig.Redaction.Paths,
@@ -120,7 +116,6 @@ func runCheckAction(ctx context.Context, profilePath string) error {
 		return fmt.Errorf("failed to initialize redactor: %w", err)
 	}
 
-	// Prepare execution config
 	execConfig := engine.DefaultExecutionConfig()
 	execConfig.IncludeTags = includeTags
 	execConfig.IncludeSeverities = includeSeverities
@@ -129,32 +124,28 @@ func runCheckAction(ctx context.Context, profilePath string) error {
 	execConfig.ExcludeControlIDs = excludeControlIDs
 	execConfig.IncludeDependencies = includeDependencies
 
-	// Validate filter config
 	if err := validateFilterConfig(profile, &execConfig); err != nil {
 		return err
 	}
 
-	// Determine plugin directory (relative to current working directory or executable)
 	pluginDir, err := determinePluginDir()
 	if err != nil {
 		return fmt.Errorf("failed to determine plugin directory: %w", err)
 	}
 
-	// Create capability orchestrator
 	capMgr := appservices.NewCapabilityOrchestrator(trustPlugins)
 
-	// Create execution engine with capability manager and config
-	// Pass nil for repository as persistence is not yet enabled via CLI
+	// Create engine with capabilities.
+	// Persistence is not yet enabled via CLI.
 	eng, err := engine.NewEngineWithCapabilities(ctx, build.Get(), capMgr, pluginDir, profile, execConfig, redactor, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create engine: %w", err)
 	}
 	defer func() {
-		_ = eng.Close(ctx) // Best-effort cleanup
+		_ = eng.Close(ctx)
 	}()
 
-	// Pre-flight schema validation
-	// This validates observation configs against plugin schemas BEFORE execution
+	// Validate observation configs against plugin schemas.
 	slog.Info("validating observation configs against plugin schemas")
 	if err := validator.ValidateWithSchemas(ctx, profile, eng.Runtime()); err != nil {
 		return fmt.Errorf("schema validation failed: %w", err)
@@ -163,7 +154,6 @@ func runCheckAction(ctx context.Context, profilePath string) error {
 
 	slog.Info("executing profile")
 
-	// Execute profile
 	result, err := eng.Execute(ctx, profile)
 	if err != nil {
 		return fmt.Errorf("execution failed: %w", err)
@@ -177,7 +167,6 @@ func runCheckAction(ctx context.Context, profilePath string) error {
 		"errors", result.Summary.ErrorControls,
 		"skipped", result.Summary.SkippedControls)
 
-	// Determine output writer
 	writer := os.Stdout
 	if outFile != "" {
 		//nolint:gosec // G304: User-controlled output file path is intentional
@@ -186,18 +175,16 @@ func runCheckAction(ctx context.Context, profilePath string) error {
 			return fmt.Errorf("failed to create output file: %w", err)
 		}
 		defer func() {
-			_ = file.Close() // Best-effort cleanup
+			_ = file.Close()
 		}()
 		writer = file
 		slog.Info("writing output", "file", outFile, "format", format)
 	}
 
-	// Format and output results
 	if err := formatOutput(writer, result, format); err != nil {
 		return fmt.Errorf("failed to format output: %w", err)
 	}
 
-	// Return non-zero exit code if there were failures or errors
 	if result.Summary.FailedControls > 0 || result.Summary.ErrorControls > 0 {
 		return fmt.Errorf("check failed: %d passed, %d failed, %d errors",
 			result.Summary.PassedControls,
@@ -219,9 +206,9 @@ func loadSystemConfig() (*system.Config, error) {
 	return system.NewConfigLoader().Load(configPath)
 }
 
-// validateFilterConfig validates the filter configuration against the profile.
+// validateFilterConfig validates the filter configuration.
 func validateFilterConfig(profile *entities.Profile, cfg *engine.ExecutionConfig) error {
-	// 1. Validate --control references exist
+	// 1. Validate --control references exist.
 	if len(cfg.IncludeControlIDs) > 0 {
 		controlMap := make(map[string]bool)
 		for _, ctrl := range profile.Controls.Items {
@@ -234,13 +221,13 @@ func validateFilterConfig(profile *entities.Profile, cfg *engine.ExecutionConfig
 			}
 		}
 
-		// Warn if other filters are specified
+		// Warn if other filters are specified.
 		if len(cfg.IncludeTags) > 0 || len(cfg.IncludeSeverities) > 0 || filterExpr != "" {
 			fmt.Fprintln(os.Stderr, "⚠️  Warning: --control specified, ignoring other include filters")
 		}
 	}
 
-	// 2. Compile --filter expression ONCE at startup
+	// 2. Compile --filter expression.
 	if filterExpr != "" {
 		program, err := expr.Compile(filterExpr,
 			expr.Env(services.ControlEnv{}),
@@ -267,7 +254,7 @@ func validateFilterConfig(profile *entities.Profile, cfg *engine.ExecutionConfig
 	return nil
 }
 
-// determinePluginDir finds the plugin directory
+// determinePluginDir locates the plugin directory.
 func determinePluginDir() (string, error) {
 	// Try current working directory first
 	cwd, err := os.Getwd()
@@ -295,7 +282,7 @@ func determinePluginDir() (string, error) {
 	return "", fmt.Errorf("plugin directory not found in %s or %s", cwd, exeDir)
 }
 
-// formatOutput formats the result using the specified formatter
+// formatOutput formats execution results.
 func formatOutput(writer *os.File, result *execution.ExecutionResult, format string) error {
 	switch format {
 	case "table":

@@ -16,13 +16,13 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// CapabilityOrchestrator orchestrates capability collection and granting workflow.
-// This is application-layer orchestration combining domain and infrastructure concerns.
+// CapabilityOrchestrator manages capability collection and granting.
+// Coordinates domain and infrastructure.
 type CapabilityOrchestrator struct {
 	fileStore *infraCapabilities.FileStore
 	prompter  *infraCapabilities.TerminalPrompter
 	grants    capabilities.Grant
-	trustAll  bool // Auto-grant all capabilities if true
+	trustAll  bool // Auto-grant all capabilities
 }
 
 // NewCapabilityOrchestrator creates a capability orchestrator.
@@ -39,7 +39,7 @@ func NewCapabilityOrchestrator(trustAll bool) *CapabilityOrchestrator {
 	}
 }
 
-// CollectRequiredCapabilities loads all plugins in parallel and collects their required capabilities.
+// CollectRequiredCapabilities loads plugins and identifies requirements.
 func (o *CapabilityOrchestrator) CollectRequiredCapabilities(ctx context.Context, profile *entities.Profile, runtime *wasm.Runtime, pluginDir string) (map[string][]capabilities.Capability, error) {
 	// Get unique plugin names from profile
 	pluginNames := make(map[string]bool)
@@ -107,7 +107,7 @@ func (o *CapabilityOrchestrator) CollectRequiredCapabilities(ctx context.Context
 	return required, nil
 }
 
-// GrantCapabilities determines which capabilities to grant based on user input.
+// GrantCapabilities resolves permissions via file or prompt.
 func (o *CapabilityOrchestrator) GrantCapabilities(required map[string][]capabilities.Capability) (map[string][]capabilities.Capability, error) {
 	// Flatten all required capabilities to a unique set for user prompting
 	flatRequired := capabilities.NewGrant()

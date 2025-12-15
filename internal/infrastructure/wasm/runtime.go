@@ -11,40 +11,34 @@ import (
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/wasm/hostfuncs"
 )
 
-// globalCache is a shared compilation cache for wazero runtimes.
-// This significantly speeds up compilation when creating multiple runtimes
-// (e.g. during testing or parallel execution).
+// globalCache speeds up compilation across runtimes.
 var globalCache = wazero.NewCompilationCache()
 
-// Runtime manages the WASM runtime environment
+// Runtime manages WASM execution.
 type Runtime struct {
 	runtime wazero.Runtime
 	plugins map[string]*Plugin // Loaded plugins by name
 	version build.Info
 }
 
-// NewRuntime creates a new WASM runtime with no granted capabilities
-// For production use, use NewRuntimeWithCapabilities instead
+// NewRuntime creates a runtime with no capabilities.
 func NewRuntime(ctx context.Context, version build.Info) (*Runtime, error) {
 	return NewRuntimeWithCapabilities(ctx, version, nil)
 }
 
-// NewRuntimeWithCapabilities creates a new WASM runtime with specific capabilities
+// NewRuntimeWithCapabilities initializes runtime with permissions.
 func NewRuntimeWithCapabilities(ctx context.Context, version build.Info, caps map[string][]capabilities.Capability) (*Runtime, error) {
-	// Create wazero runtime with compilation cache
-	// This is a pure Go WASM runtime - no CGO required
+	// Create pure Go WASM runtime with compilation cache.
 	config := wazero.NewRuntimeConfig().WithCompilationCache(globalCache)
 	r := wazero.NewRuntimeWithConfig(ctx, config)
 
-	// Instantiate WASI to support standard system calls
-	// Plugins may need basic WASI functions (clock, random, etc.)
+	// Instantiate WASI for system calls (clock, random, etc.).
 	if _, err := wasi_snapshot_preview1.Instantiate(ctx, r); err != nil {
 		_ = r.Close(ctx)
 		return nil, fmt.Errorf("failed to instantiate WASI: %w", err)
 	}
 
-	// Register custom host functions with capability enforcement
-	// Capabilities define what operations plugins are allowed to perform
+	// Register host functions with capability enforcement.
 	if err := hostfuncs.RegisterHostFunctions(ctx, r, version, caps); err != nil {
 		_ = r.Close(ctx)
 		return nil, fmt.Errorf("failed to register host functions: %w", err)
@@ -57,7 +51,7 @@ func NewRuntimeWithCapabilities(ctx context.Context, version build.Info, caps ma
 	}, nil
 }
 
-// LoadPlugin loads a WASM plugin from bytes
+// LoadPlugin compiles and caches a plugin.
 func (r *Runtime) LoadPlugin(ctx context.Context, name string, wasmBytes []byte) (*Plugin, error) {
 	// Check if plugin is already loaded
 	if p, ok := r.plugins[name]; ok {

@@ -17,7 +17,7 @@ type ControlEnv struct {
 	Tags     []string `expr:"tags"`
 }
 
-// ControlFilter encapsulates all control filtering logic
+// ControlFilter encapsulates filtering logic.
 type ControlFilter struct {
 	// Exclusive mode: only include specified controls
 	exclusiveControlIDs []string
@@ -30,61 +30,59 @@ type ControlFilter struct {
 	includeTags       []string
 	includeSeverities []string
 
-	// Advanced filtering via expression language
+	// Advanced filtering
 	filterProgram *vm.Program
 }
 
-// NewControlFilter creates a new control filter
+// NewControlFilter creates a filter.
 func NewControlFilter() *ControlFilter {
 	return &ControlFilter{}
 }
 
-// WithExclusiveControls sets exclusive mode (only these controls run)
+// WithExclusiveControls sets exclusive mode (only these controls run).
 func (f *ControlFilter) WithExclusiveControls(controlIDs []string) *ControlFilter {
 	f.exclusiveControlIDs = controlIDs
 	return f
 }
 
-// WithExcludedControls excludes specific control IDs
+// WithExcludedControls excludes specific control IDs.
 func (f *ControlFilter) WithExcludedControls(controlIDs []string) *ControlFilter {
 	f.excludeControlIDs = controlIDs
 	return f
 }
 
-// WithExcludedTags excludes controls with any of these tags
+// WithExcludedTags excludes controls with any of these tags.
 func (f *ControlFilter) WithExcludedTags(tags []string) *ControlFilter {
 	f.excludeTags = tags
 	return f
 }
 
-// WithIncludedTags includes only controls with any of these tags
+// WithIncludedTags includes only controls with any of these tags.
 func (f *ControlFilter) WithIncludedTags(tags []string) *ControlFilter {
 	f.includeTags = tags
 	return f
 }
 
-// WithIncludedSeverities includes only controls with these severities
+// WithIncludedSeverities includes only controls with these severities.
 func (f *ControlFilter) WithIncludedSeverities(severities []string) *ControlFilter {
 	f.includeSeverities = severities
 	return f
 }
 
-// WithFilterExpression sets an advanced filter expression
+// WithFilterExpression sets an advanced filter expression.
 func (f *ControlFilter) WithFilterExpression(program *vm.Program) *ControlFilter {
 	f.filterProgram = program
 	return f
 }
 
-// ShouldRun determines if a control should execute based on filter criteria.
-// Returns bool (should run) and string (skip reason if false).
+// ShouldRun determines if a control should execute.
+// Returns true/false and a skip reason.
 //
-// Filter Precedence (0-5):
-// 0. EXCLUSIVE MODE: --control overrides all other filters
-// 1. EXCLUSIONS: ExcludeControlIDs
-// 2. EXCLUSIONS: ExcludeTags
-// 3. INCLUDES: IncludeSeverities
-// 4. INCLUDES: IncludeTags
-// 5. ADVANCED: FilterProgram (expr language)
+// Precedence:
+// 1. Exclusive mode
+// 2. Exclusions (ID, Tags)
+// 3. Inclusions (Severity, Tags)
+// 4. Expression
 func (f *ControlFilter) ShouldRun(ctrl entities.Control) (bool, string) {
 	// 0. Exclusive mode: ONLY specified controls run
 	if len(f.exclusiveControlIDs) > 0 {

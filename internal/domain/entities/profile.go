@@ -7,19 +7,14 @@ import (
 	"time"
 )
 
-// Profile represents a complete Reglet profile configuration.
-// This is an aggregate root in the Configuration bounded context.
+// Profile represents the Reglet profile configuration.
+// Aggregate root in the Configuration context.
 //
-// Aggregate Boundary:
-// - Profile is the root
-// - Controls are entities within the aggregate
-// - Observations are value objects within Controls
-//
-// Invariants Enforced:
-// - Profile must have unique control IDs
-// - All control dependencies must exist within the profile
-// - Profile name and version are required
-// - Controls must have at least one observation
+// Invariants:
+// - Unique control IDs
+// - Dependencies must exist
+// - Name and version required
+// - At least one observation per control
 type Profile struct {
 	Metadata ProfileMetadata        `yaml:"profile"`
 	Plugins  []string               `yaml:"plugins,omitempty"`
@@ -27,21 +22,20 @@ type Profile struct {
 	Controls ControlsSection        `yaml:"controls"`
 }
 
-// ProfileMetadata contains metadata about the profile.
+// ProfileMetadata describes the profile.
 type ProfileMetadata struct {
 	Name        string `yaml:"name"`
 	Version     string `yaml:"version"`
 	Description string `yaml:"description,omitempty"`
 }
 
-// ControlsSection contains control defaults and individual controls.
+// ControlsSection holds controls and defaults.
 type ControlsSection struct {
 	Defaults *ControlDefaults `yaml:"defaults,omitempty"`
 	Items    []Control        `yaml:"items"`
 }
 
-// ControlDefaults defines default values applied to all controls.
-// Individual controls can override these defaults.
+// ControlDefaults defines default values for controls.
 type ControlDefaults struct {
 	Severity string        `yaml:"severity,omitempty"`
 	Owner    string        `yaml:"owner,omitempty"`
@@ -49,10 +43,8 @@ type ControlDefaults struct {
 	Timeout  time.Duration `yaml:"timeout,omitempty"`
 }
 
-// Control represents a single compliance or infrastructure control to validate.
-// Controls are entities within the Profile aggregate.
-//
-// Entity Identity: ID field uniquely identifies each control within a profile.
+// Control is a validation unit.
+// Uniquely identified by ID.
 type Control struct {
 	ID           string        `yaml:"id"`
 	Name         string        `yaml:"name"`
@@ -75,8 +67,7 @@ type Observation struct {
 
 // ===== PROFILE AGGREGATE ROOT METHODS =====
 
-// Validate validates the entire profile configuration.
-// This enforces aggregate invariants.
+// Validate enforces profile invariants.
 func (p *Profile) Validate() error {
 	if p.Metadata.Name == "" {
 		return fmt.Errorf("profile name cannot be empty")
@@ -85,27 +76,22 @@ func (p *Profile) Validate() error {
 		return fmt.Errorf("profile version cannot be empty")
 	}
 
-	// Invariant: Profile must have at least one control
 	if len(p.Controls.Items) == 0 {
 		return fmt.Errorf("at least one control is required")
 	}
 
-	// Validate all controls (entities within aggregate)
 	controlIDs := make(map[string]bool)
 	for i, ctrl := range p.Controls.Items {
-		// Validate each control
 		if err := ctrl.Validate(); err != nil {
 			return fmt.Errorf("control %d (%s): %w", i, ctrl.ID, err)
 		}
 
-		// Check for duplicate IDs (aggregate invariant)
 		if controlIDs[ctrl.ID] {
 			return fmt.Errorf("duplicate control ID: %s", ctrl.ID)
 		}
 		controlIDs[ctrl.ID] = true
 	}
 
-	// Validate dependencies exist (aggregate invariant)
 	for _, ctrl := range p.Controls.Items {
 		for _, dep := range ctrl.DependsOn {
 			if !controlIDs[dep] {
@@ -117,22 +103,18 @@ func (p *Profile) Validate() error {
 	return nil
 }
 
-// AddControl adds a control to the profile with validation.
-// This enforces aggregate invariants.
+// AddControl adds a control, enforcing invariants.
 func (p *Profile) AddControl(ctrl Control) error {
-	// Validate the control
 	if err := ctrl.Validate(); err != nil {
 		return fmt.Errorf("invalid control: %w", err)
 	}
 
-	// Check for duplicate ID
 	for _, existing := range p.Controls.Items {
 		if existing.ID == ctrl.ID {
 			return fmt.Errorf("control with ID %s already exists", ctrl.ID)
 		}
 	}
 
-	// Validate dependencies exist
 	for _, dep := range ctrl.DependsOn {
 		found := false
 		for _, existing := range p.Controls.Items {
