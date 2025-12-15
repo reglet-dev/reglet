@@ -1,11 +1,11 @@
 package capabilities
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"strings"
 
+	"github.com/charmbracelet/huh"
 	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
 )
 
@@ -30,30 +30,38 @@ func (p *TerminalPrompter) IsInteractive() bool {
 
 // PromptForCapability asks the user whether to grant a capability.
 func (p *TerminalPrompter) PromptForCapability(capability capabilities.Capability) (granted bool, always bool, err error) {
-	fmt.Fprintf(os.Stderr, "\nPlugin requires permission:\n")
-	fmt.Fprintf(os.Stderr, "  ✓ %s\n", p.describeCapability(capability))
-	fmt.Fprintf(os.Stderr, "\nAllow this permission? [y/N/always]: ")
+	desc := p.describeCapability(capability)
 
-	// Create a new buffered reader from stdin
-	reader := bufio.NewReader(os.Stdin)
-	response, err := reader.ReadString('\n')
+	// Define choices
+	const (
+		OptionYes    = "Yes, grant for this session"
+		OptionAlways = "Always grant (save to config)"
+		OptionNo     = "No, deny"
+	)
+
+	var selection string
+
+	err = huh.NewSelect[string]().
+		Title("Plugin Requesting Permission").
+		Description(fmt.Sprintf("✓ %s", desc)).
+		Options(
+			huh.NewOption(OptionYes, OptionYes),
+			huh.NewOption(OptionAlways, OptionAlways),
+			huh.NewOption(OptionNo, OptionNo),
+		).
+		Value(&selection).
+		Run()
 	if err != nil {
-		// On error (EOF, etc), treat as "no"
+		// Handle cancellation (Ctrl+C) as denial
 		return false, false, nil
 	}
 
-	response = strings.ToLower(strings.TrimSpace(response))
-
-	switch response {
-	case "y", "yes":
+	switch selection {
+	case OptionYes:
 		return true, false, nil
-	case "a", "always":
+	case OptionAlways:
 		return true, true, nil
-	case "n", "no", "":
-		// Empty response (just Enter) counts as "no"
-		return false, false, nil
 	default:
-		// Unknown response - default to deny
 		return false, false, nil
 	}
 }
