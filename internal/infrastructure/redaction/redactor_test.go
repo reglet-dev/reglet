@@ -33,16 +33,15 @@ func TestRedactor_ScrubString(t *testing.T) {
 			name:     "Hash Mode (No Salt)",
 			input:    "AKIAIOSFODNN7EXAMPLE",
 			hashMode: true,
-			want:     "[sha256:1a5d44a2dca19669]", // Hash of "AKIAIOSFODNN7EXAMPLE" (first 8 bytes)
+			want:     "[hmac:d3608e7190c42874]", // HMAC-SHA256 of "AKIAIOSFODNN7EXAMPLE" with empty salt
 		},
 		{
 			name:     "Hash Mode (With Salt)",
 			input:    "AKIAIOSFODNN7EXAMPLE",
 			hashMode: true,
 			salt:     "my-salt",
-			// Hash of "my-saltAKIAIOSFODNN7EXAMPLE"
-			// echo -n "my-saltAKIAIOSFODNN7EXAMPLE" | sha256sum -> 2cdf1...
-			want: "[sha256:2cdf121b595786fb]", // First 8 bytes (16 hex chars)
+			// HMAC-SHA256 of "AKIAIOSFODNN7EXAMPLE" with key "my-salt"
+			want: "[hmac:b9f2d1a41525d6f5]", // First 8 bytes (16 hex chars)
 		},
 	}
 

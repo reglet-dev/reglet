@@ -2,6 +2,7 @@
 package redaction
 
 import (
+	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -151,18 +152,20 @@ func (r *Redactor) isPathMatch(path string) bool {
 	return false
 }
 
-// hash returns a truncated SHA256 hash of the secret.
-// Format: [sha256:a1b2c3d4e5f6g7h8]
+// hash returns a truncated HMAC-SHA256 hash of the secret.
+// Format: [hmac:a1b2c3d4e5f6g7h8]
 //
 // Security notes:
-// - Hashes are for CORRELATION ONLY (prove same value across runs)
-// - Truncation to 8 bytes (16 hex chars) prevents rainbow table attacks
-// - Low-entropy secrets (short passwords, sequential IDs) may still be vulnerable
-// - For maximum security, use HashMode:false which replaces with [REDACTED]
+// - Uses HMAC-SHA256 with the configured salt as the key.
+// - Truncation to 8 bytes (16 hex chars) prevents rainbow table attacks while allowing correlation.
+// - Requires a high-entropy salt for security against offline brute-forcing.
 func (r *Redactor) hash(secret string) string {
-	h := sha256.Sum256([]byte(r.salt + secret))
-	// Use first 8 bytes (16 hex chars) for correlation - provides 2^64 unique values
-	return fmt.Sprintf("[sha256:%s]", hex.EncodeToString(h[:])[:16])
+	mac := hmac.New(sha256.New, []byte(r.salt))
+	mac.Write([]byte(secret))
+	sum := mac.Sum(nil)
+
+	// Use first 8 bytes (16 hex chars) for correlation
+	return fmt.Sprintf("[hmac:%s]", hex.EncodeToString(sum)[:16])
 }
 
 // defaultPatterns contains regexes for common secrets.
