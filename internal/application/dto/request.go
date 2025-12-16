@@ -69,6 +69,9 @@ type CheckOptions struct {
 
 	// SkipSchemaValidation - skip plugin config schema validation
 	SkipSchemaValidation bool
+
+	// SystemConfigPath - custom system config path (empty = default ~/.reglet/config.yaml)
+	SystemConfigPath string
 }
 
 // RequestMetadata contains metadata for request tracking.

@@ -9,12 +9,30 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	appservices "github.com/whiskeyjimbo/reglet/internal/application/services"
+	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
 	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
 	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
 	"github.com/whiskeyjimbo/reglet/internal/domain/values"
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/build"
+	"github.com/whiskeyjimbo/reglet/internal/infrastructure/wasm"
 )
+
+// testCapabilityManager is a simple mock that auto-approves all capabilities for testing
+type testCapabilityManager struct {
+	trustAll bool
+}
+
+func (m *testCapabilityManager) CollectRequiredCapabilities(ctx context.Context, profile *entities.Profile, runtime *wasm.Runtime, pluginDir string) (map[string][]capabilities.Capability, error) {
+	// For tests, just return empty capabilities
+	return make(map[string][]capabilities.Capability), nil
+}
+
+func (m *testCapabilityManager) GrantCapabilities(required map[string][]capabilities.Capability) (map[string][]capabilities.Capability, error) {
+	if m.trustAll {
+		return required, nil
+	}
+	return make(map[string][]capabilities.Capability), nil
+}
 
 // TestFiltering_EndToEnd simulates a full run with 20 controls and filtering.
 func TestFiltering_EndToEnd(t *testing.T) {
@@ -95,7 +113,7 @@ func TestFiltering_EndToEnd(t *testing.T) {
 	cfg.Parallel = true
 
 	// Create capability manager that trusts all plugins (auto-grant)
-	capMgr := appservices.NewCapabilityOrchestrator(true)
+	capMgr := &testCapabilityManager{trustAll: true}
 
 	// Initialize Engine with Capabilities and Config
 	engine, err := NewEngineWithCapabilities(ctx, build.Get(), capMgr, pluginDir, profile, cfg, nil, nil)

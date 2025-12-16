@@ -11,6 +11,7 @@ import (
 
 	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
 	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
+	"github.com/whiskeyjimbo/reglet/internal/infrastructure/build"
 	infraCapabilities "github.com/whiskeyjimbo/reglet/internal/infrastructure/capabilities"
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/wasm"
 	"golang.org/x/sync/errgroup"
@@ -37,6 +38,24 @@ func NewCapabilityOrchestrator(trustAll bool) *CapabilityOrchestrator {
 		grants:    capabilities.NewGrant(),
 		trustAll:  trustAll,
 	}
+}
+
+// CollectCapabilities creates a temporary runtime and collects required capabilities.
+// Returns the required capabilities and the temporary runtime (caller must close it).
+func (o *CapabilityOrchestrator) CollectCapabilities(ctx context.Context, profile *entities.Profile, pluginDir string) (map[string][]capabilities.Capability, *wasm.Runtime, error) {
+	// Create temporary runtime for capability collection
+	runtime, err := wasm.NewRuntime(ctx, build.Get())
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create temporary runtime: %w", err)
+	}
+
+	caps, err := o.CollectRequiredCapabilities(ctx, profile, runtime, pluginDir)
+	if err != nil {
+		runtime.Close(ctx)
+		return nil, nil, err
+	}
+
+	return caps, runtime, nil
 }
 
 // CollectRequiredCapabilities loads plugins and identifies requirements.
@@ -108,7 +127,7 @@ func (o *CapabilityOrchestrator) CollectRequiredCapabilities(ctx context.Context
 }
 
 // GrantCapabilities resolves permissions via file or prompt.
-func (o *CapabilityOrchestrator) GrantCapabilities(required map[string][]capabilities.Capability) (map[string][]capabilities.Capability, error) {
+func (o *CapabilityOrchestrator) GrantCapabilities(required map[string][]capabilities.Capability, trustAll bool) (map[string][]capabilities.Capability, error) {
 	// Flatten all required capabilities to a unique set for user prompting
 	flatRequired := capabilities.NewGrant()
 	for _, caps := range required {
@@ -117,8 +136,8 @@ func (o *CapabilityOrchestrator) GrantCapabilities(required map[string][]capabil
 		}
 	}
 
-	// If trustAll flag is set, grant everything
-	if o.trustAll {
+	// If trustAll flag is set (from constructor or parameter), grant everything
+	if o.trustAll || trustAll {
 		slog.Warn("Auto-granting all requested capabilities (--trust-plugins enabled)")
 		o.grants = flatRequired
 		return required, nil
