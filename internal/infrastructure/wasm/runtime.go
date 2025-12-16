@@ -3,11 +3,14 @@ package wasm
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/build"
+	"github.com/whiskeyjimbo/reglet/internal/infrastructure/redaction"
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/wasm/hostfuncs"
 )
 
@@ -16,18 +19,24 @@ var globalCache = wazero.NewCompilationCache()
 
 // Runtime manages WASM execution.
 type Runtime struct {
-	runtime wazero.Runtime
-	plugins map[string]*Plugin // Loaded plugins by name
-	version build.Info
+	runtime  wazero.Runtime
+	plugins  map[string]*Plugin // Loaded plugins by name
+	version  build.Info
+	redactor *redaction.Redactor // Optional redactor for plugin output
 }
 
-// NewRuntime creates a runtime with no capabilities.
+// NewRuntime creates a runtime with no capabilities and no redaction.
 func NewRuntime(ctx context.Context, version build.Info) (*Runtime, error) {
-	return NewRuntimeWithCapabilities(ctx, version, nil)
+	return NewRuntimeWithCapabilities(ctx, version, nil, nil)
 }
 
-// NewRuntimeWithCapabilities initializes runtime with permissions.
-func NewRuntimeWithCapabilities(ctx context.Context, version build.Info, caps map[string][]capabilities.Capability) (*Runtime, error) {
+// NewRuntimeWithCapabilities initializes runtime with permissions and optional output redaction.
+func NewRuntimeWithCapabilities(
+	ctx context.Context,
+	version build.Info,
+	caps map[string][]capabilities.Capability,
+	redactor *redaction.Redactor,
+) (*Runtime, error) {
 	// Create pure Go WASM runtime with compilation cache.
 	config := wazero.NewRuntimeConfig().WithCompilationCache(globalCache)
 	r := wazero.NewRuntimeWithConfig(ctx, config)
@@ -45,9 +54,10 @@ func NewRuntimeWithCapabilities(ctx context.Context, version build.Info, caps ma
 	}
 
 	return &Runtime{
-		runtime: r,
-		plugins: make(map[string]*Plugin),
-		version: version,
+		runtime:  r,
+		plugins:  make(map[string]*Plugin),
+		version:  version,
+		redactor: redactor,
 	}, nil
 }
 
@@ -64,11 +74,21 @@ func (r *Runtime) LoadPlugin(ctx context.Context, name string, wasmBytes []byte)
 		return nil, fmt.Errorf("failed to compile plugin %s: %w", name, err)
 	}
 
+	// Create output writers with optional redaction
+	var stdout, stderr io.Writer = os.Stderr, os.Stderr
+	if r.redactor != nil {
+		// Wrap os.Stderr with redaction to prevent secret leakage
+		stdout = redaction.NewWriter(os.Stderr, r.redactor)
+		stderr = redaction.NewWriter(os.Stderr, r.redactor)
+	}
+
 	// Create plugin wrapper
 	plugin := &Plugin{
 		name:    name,
 		module:  compiledModule,
 		runtime: r.runtime,
+		stdout:  stdout,
+		stderr:  stderr,
 	}
 
 	// Cache the plugin

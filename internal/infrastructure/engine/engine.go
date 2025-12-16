@@ -108,8 +108,9 @@ func NewEngineWithCapabilities(
 		return nil, fmt.Errorf("failed to grant capabilities: %w", err)
 	}
 
-	// Create WASM runtime with granted capabilities
-	runtime, err := wasm.NewRuntimeWithCapabilities(ctx, version, granted)
+	// Create WASM runtime with granted capabilities and redactor
+	// SECURITY: Redactor prevents secrets from leaking to plugin stdout/stderr
+	runtime, err := wasm.NewRuntimeWithCapabilities(ctx, version, granted, redactor)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create WASM runtime: %w", err)
 	}

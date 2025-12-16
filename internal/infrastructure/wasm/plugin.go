@@ -5,7 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"os"
+	"io"
 	"sync"
 
 	"github.com/tetratelabs/wazero"
@@ -30,6 +30,10 @@ type Plugin struct {
 
 	// Cached schema
 	schema *ConfigSchema
+
+	// Redacted output streams (wraps os.Stderr with redaction)
+	stdout io.Writer
+	stderr io.Writer
 }
 
 // Name returns the unique identifier of the plugin.
@@ -39,6 +43,7 @@ func (p *Plugin) Name() string {
 
 // createModuleConfig builds the wazero module configuration with necessary host functions.
 // It enables filesystem access, time, random, and logging.
+// stdout/stderr are automatically redacted to prevent secret leakage to logs.
 func (p *Plugin) createModuleConfig() wazero.ModuleConfig {
 	return wazero.NewModuleConfig().
 		// Mount root filesystem to allow access to system files (e.g. /etc/ssh/sshd_config).
@@ -48,8 +53,9 @@ func (p *Plugin) createModuleConfig() wazero.ModuleConfig {
 		WithSysNanotime().
 		WithSysNanosleep().
 		WithRandSource(rand.Reader).
-		WithStderr(os.Stderr).
-		WithStdout(os.Stderr)
+		// SECURITY: Use redacted writers to prevent secrets from leaking to logs
+		WithStderr(p.stderr).
+		WithStdout(p.stdout)
 }
 
 // createInstance instantiates the WASM module with a fresh memory environment.
