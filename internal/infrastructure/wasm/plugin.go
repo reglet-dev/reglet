@@ -16,7 +16,7 @@ import (
 
 //nolint:gosec // G115: uint64->uint32 conversions are safe for WASM32 address space
 
-// Plugin represents a WASM module.
+// Plugin manages the lifecycle and execution of a compiled WASM module.
 type Plugin struct {
 	name    string
 	module  wazero.CompiledModule
@@ -32,13 +32,13 @@ type Plugin struct {
 	schema *ConfigSchema
 }
 
-// Name returns the plugin name.
+// Name returns the unique identifier of the plugin.
 func (p *Plugin) Name() string {
 	return p.name
 }
 
-// createModuleConfig configures the WASM module.
-// Enables filesystem, time, random, and logging.
+// createModuleConfig builds the wazero module configuration with necessary host functions.
+// It enables filesystem access, time, random, and logging.
 func (p *Plugin) createModuleConfig() wazero.ModuleConfig {
 	return wazero.NewModuleConfig().
 		// Mount root filesystem to allow access to system files (e.g. /etc/ssh/sshd_config).
@@ -52,8 +52,8 @@ func (p *Plugin) createModuleConfig() wazero.ModuleConfig {
 		WithStdout(os.Stderr)
 }
 
-// createInstance instantiates the module.
-// Thread-safe: Each call gets isolated memory.
+// createInstance instantiates the WASM module with a fresh memory environment.
+// It ensures thread safety by providing isolated memory for each execution.
 func (p *Plugin) createInstance(ctx context.Context) (api.Module, error) {
 	// Create fresh instance every time - no caching
 	instance, err := p.runtime.InstantiateModule(ctx, p.module, p.createModuleConfig())
@@ -79,7 +79,7 @@ func (p *Plugin) createInstance(ctx context.Context) (api.Module, error) {
 	return instance, nil
 }
 
-// Describe retrieves plugin metadata.
+// Describe executes the plugin's 'describe' function to retrieve metadata.
 func (p *Plugin) Describe(ctx context.Context) (*PluginInfo, error) {
 	// Wrap context with plugin name for host functions
 	ctx = hostfuncs.WithPluginName(ctx, p.name)
@@ -139,7 +139,7 @@ func (p *Plugin) Describe(ctx context.Context) (*PluginInfo, error) {
 	return info, nil
 }
 
-// Schema retrieves configuration schema.
+// Schema executes the plugin's 'schema' function to retrieve configuration definitions.
 func (p *Plugin) Schema(ctx context.Context) (*ConfigSchema, error) {
 	ctx = hostfuncs.WithPluginName(ctx, p.name)
 
@@ -199,7 +199,7 @@ func (p *Plugin) Schema(ctx context.Context) (*ConfigSchema, error) {
 	return schema, nil
 }
 
-// Observe executes the observation logic.
+// Observe executes the main validation logic of the plugin.
 func (p *Plugin) Observe(ctx context.Context, cfg Config) (*ObservationResult, error) {
 	// Wrap context with plugin name so host functions can access it
 	ctx = hostfuncs.WithPluginName(ctx, p.name)
@@ -283,16 +283,15 @@ func (p *Plugin) Observe(ctx context.Context, cfg Config) (*ObservationResult, e
 		nil
 }
 
-// Close closes the plugin and frees resources
-// No-op since instances are created and closed per call
+// Close performs any necessary cleanup.
+// Currently a no-op as instances are ephemeral.
 func (p *Plugin) Close() error {
 	// No cached instance to close anymore
 	// Each method call creates and closes its own instance
 	return nil
 }
 
-// readString reads exactly 'size' bytes from WASM memory at ptr
-// and calls deallocate to free the memory after reading
+// readString safely reads a byte slice from WASM memory and deallocates it.
 func (p *Plugin) readString(ctx context.Context, instance api.Module, ptr uint32, size uint32) ([]byte, error) {
 	// CRITICAL: Ensure memory is always deallocated, even on error
 	defer func() {
@@ -316,8 +315,8 @@ func (p *Plugin) readString(ctx context.Context, instance api.Module, ptr uint32
 	return result, nil
 }
 
-// writeToMemory allocates memory in the WASM module and writes data to it
-// Returns the pointer to the allocated memory
+// writeToMemory allocates WASM memory and copies data into it.
+// It returns the pointer to the allocated block.
 func (p *Plugin) writeToMemory(ctx context.Context, instance api.Module, data []byte) (uint32, error) {
 	// Get the allocate function from the plugin
 	allocateFn := instance.ExportedFunction("allocate")
@@ -355,7 +354,7 @@ func (p *Plugin) writeToMemory(ctx context.Context, instance api.Module, data []
 	return ptr, nil
 }
 
-// parsePluginInfo parses JSON data into a PluginInfo struct
+// parsePluginInfo decodes the JSON metadata returned by the plugin.
 func parsePluginInfo(data []byte) (*PluginInfo, error) {
 	var raw map[string]interface{}
 	if err := json.Unmarshal(data, &raw); err != nil {

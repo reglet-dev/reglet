@@ -10,10 +10,13 @@ import (
 // Profile represents the Reglet profile configuration.
 // Aggregate root in the Configuration context.
 //
-// Invariants:
+// Profile defines the validation configuration and ruleset.
+// It serves as the aggregate root for the configuration context.
+//
+// Invariants enforced:
 // - Unique control IDs
-// - Dependencies must exist
-// - Name and version required
+// - All dependencies must exist
+// - Name and version are mandatory
 // - At least one observation per control
 type Profile struct {
 	Metadata ProfileMetadata        `yaml:"profile"`
@@ -22,20 +25,20 @@ type Profile struct {
 	Controls ControlsSection        `yaml:"controls"`
 }
 
-// ProfileMetadata describes the profile.
+// ProfileMetadata contains descriptive information about the profile.
 type ProfileMetadata struct {
 	Name        string `yaml:"name"`
 	Version     string `yaml:"version"`
 	Description string `yaml:"description,omitempty"`
 }
 
-// ControlsSection holds controls and defaults.
+// ControlsSection groups validation controls and their default settings.
 type ControlsSection struct {
 	Defaults *ControlDefaults `yaml:"defaults,omitempty"`
 	Items    []Control        `yaml:"items"`
 }
 
-// ControlDefaults defines default values for controls.
+// ControlDefaults specifies values inherited by controls when not explicitly set.
 type ControlDefaults struct {
 	Severity string        `yaml:"severity,omitempty"`
 	Owner    string        `yaml:"owner,omitempty"`
@@ -43,8 +46,8 @@ type ControlDefaults struct {
 	Timeout  time.Duration `yaml:"timeout,omitempty"`
 }
 
-// Control is a validation unit.
-// Uniquely identified by ID.
+// Control represents a specific compliance check or validation unit.
+// It is uniquely identified by its ID.
 type Control struct {
 	ID           string        `yaml:"id"`
 	Name         string        `yaml:"name"`
@@ -57,8 +60,8 @@ type Control struct {
 	Observations []Observation `yaml:"observations"`
 }
 
-// Observation defines a single check to execute via a plugin.
-// Observations are value objects (immutable configuration).
+// Observation configuration for a specific plugin execution.
+// It is an immutable value object.
 type Observation struct {
 	Plugin string                 `yaml:"plugin"`
 	Config map[string]interface{} `yaml:"config,omitempty"`
@@ -67,7 +70,7 @@ type Observation struct {
 
 // ===== PROFILE AGGREGATE ROOT METHODS =====
 
-// Validate enforces profile invariants.
+// Validate checks the integrity of the profile configuration.
 func (p *Profile) Validate() error {
 	if p.Metadata.Name == "" {
 		return fmt.Errorf("profile name cannot be empty")
@@ -103,7 +106,8 @@ func (p *Profile) Validate() error {
 	return nil
 }
 
-// AddControl adds a control, enforcing invariants.
+// AddControl safely adds a new control to the profile.
+// It returns an error if the control is invalid or already exists.
 func (p *Profile) AddControl(ctrl Control) error {
 	if err := ctrl.Validate(); err != nil {
 		return fmt.Errorf("invalid control: %w", err)
@@ -132,7 +136,8 @@ func (p *Profile) AddControl(ctrl Control) error {
 	return nil
 }
 
-// GetControl retrieves a control by ID.
+// GetControl retrieves a control by its ID.
+// It returns nil if the control is not found.
 func (p *Profile) GetControl(id string) *Control {
 	for i := range p.Controls.Items {
 		if p.Controls.Items[i].ID == id {
@@ -142,7 +147,7 @@ func (p *Profile) GetControl(id string) *Control {
 	return nil
 }
 
-// HasControl returns true if a control with the given ID exists.
+// HasControl reports whether a control with the given ID exists.
 func (p *Profile) HasControl(id string) bool {
 	return p.GetControl(id) != nil
 }
@@ -152,7 +157,8 @@ func (p *Profile) ControlCount() int {
 	return len(p.Controls.Items)
 }
 
-// SelectControlsByTags returns controls matching any of the specified tags.
+// SelectControlsByTags returns a subset of controls matching any of the specified tags.
+// If tags is empty, all controls are returned.
 func (p *Profile) SelectControlsByTags(tags []string) []Control {
 	if len(tags) == 0 {
 		return p.Controls.Items
@@ -167,7 +173,8 @@ func (p *Profile) SelectControlsByTags(tags []string) []Control {
 	return selected
 }
 
-// SelectControlsBySeverity returns controls matching any of the severities.
+// SelectControlsBySeverity returns a subset of controls matching any of the specified severities.
+// If severities is empty, all controls are returned.
 func (p *Profile) SelectControlsBySeverity(severities []string) []Control {
 	if len(severities) == 0 {
 		return p.Controls.Items
@@ -182,7 +189,7 @@ func (p *Profile) SelectControlsBySeverity(severities []string) []Control {
 	return selected
 }
 
-// ExcludeControlsByID returns controls excluding the specified IDs.
+// ExcludeControlsByID returns a subset of controls excluding the specified IDs.
 func (p *Profile) ExcludeControlsByID(excludeIDs []string) []Control {
 	if len(excludeIDs) == 0 {
 		return p.Controls.Items
@@ -202,7 +209,7 @@ func (p *Profile) ExcludeControlsByID(excludeIDs []string) []Control {
 	return selected
 }
 
-// ApplyDefaults applies default values from ControlDefaults to all controls.
+// ApplyDefaults propagates default values to all controls in the profile.
 func (p *Profile) ApplyDefaults() {
 	if p.Controls.Defaults == nil {
 		return
@@ -249,8 +256,7 @@ func (p *Profile) ApplyDefaults() {
 
 // ===== CONTROL ENTITY METHODS =====
 
-// Validate checks if the control has valid required fields.
-// This encapsulates domain invariants.
+// Validate ensures the control is well-formed.
 func (c *Control) Validate() error {
 	if c.ID == "" {
 		return fmt.Errorf("control ID cannot be empty")

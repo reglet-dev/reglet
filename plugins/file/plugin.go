@@ -14,10 +14,10 @@ import (
 	regletsdk "github.com/whiskeyjimbo/reglet/sdk"
 )
 
-// filePlugin implements the sdk.Plugin interface.
+// filePlugin implements the sdk.Plugin interface for file system operations.
 type filePlugin struct{}
 
-// Describe returns file plugin metadata.
+// Describe provides the file plugin's metadata and capabilities.
 func (p *filePlugin) Describe(ctx context.Context) (regletsdk.Metadata, error) {
 	return regletsdk.Metadata{
 		Name:        "file",
@@ -38,12 +38,12 @@ type FileConfig struct {
 	Hash        bool   `json:"hash,omitempty" description:"Calculate SHA256 hash of file"`
 }
 
-// Schema returns config schema.
+// Schema generates the JSON schema for the plugin's configuration.
 func (p *filePlugin) Schema(ctx context.Context) ([]byte, error) {
 	return regletsdk.GenerateSchema(FileConfig{})
 }
 
-// Check validates file properties.
+// Check executes file system validation based on the provided configuration.
 func (p *filePlugin) Check(ctx context.Context, config regletsdk.Config) (regletsdk.Evidence, error) {
 	var cfg FileConfig
 	if err := regletsdk.ValidateConfig(config, &cfg); err != nil {

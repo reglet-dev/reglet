@@ -27,7 +27,7 @@ var (
 	includeDependencies bool
 )
 
-// checkCmd represents the check command
+// checkCmd implements the check command.
 var checkCmd = &cobra.Command{
 	Use:   "check <profile.yaml>",
 	Short: "Execute compliance checks from a profile",
@@ -65,7 +65,7 @@ func init() {
 	checkCmd.Flags().BoolVar(&includeDependencies, "include-dependencies", false, "Include dependencies of selected controls")
 }
 
-// runCheckAction executes the check command logic using the application layer.
+// runCheckAction encapsulates the logic for the check command.
 func runCheckAction(ctx context.Context, profilePath string) error {
 	// 1. Create dependency injection container
 	c, err := container.New(container.Options{
@@ -101,7 +101,7 @@ func runCheckAction(ctx context.Context, profilePath string) error {
 	return nil
 }
 
-// buildCheckProfileRequest builds the request DTO from CLI flags.
+// buildCheckProfileRequest maps CLI flags to a CheckProfileRequest DTO.
 func buildCheckProfileRequest(profilePath string) dto.CheckProfileRequest {
 	return dto.CheckProfileRequest{
 		ProfilePath: profilePath,
@@ -123,7 +123,7 @@ func buildCheckProfileRequest(profilePath string) dto.CheckProfileRequest {
 	}
 }
 
-// writeOutput formats and writes the execution results.
+// writeOutput directs the execution result to the configured output destination.
 func writeOutput(result *execution.ExecutionResult) error {
 	writer := os.Stdout
 	if outFile != "" {
@@ -142,7 +142,7 @@ func writeOutput(result *execution.ExecutionResult) error {
 	return formatOutput(writer, result, format)
 }
 
-// formatOutput formats execution results in the requested format.
+// formatOutput applies the selected formatter to the execution result.
 func formatOutput(writer *os.File, result *execution.ExecutionResult, format string) error {
 	switch format {
 	case "table":
@@ -162,7 +162,7 @@ func formatOutput(writer *os.File, result *execution.ExecutionResult, format str
 	}
 }
 
-// generateRequestID generates a unique request ID for tracking.
+// generateRequestID creates a unique identifier for request tracing.
 func generateRequestID() string {
 	// For now, return empty. In a real implementation, this would generate a UUID
 	// or use a correlation ID from the environment (e.g., CI build ID).

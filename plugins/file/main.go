@@ -16,5 +16,6 @@ func init() {
 	slog.Info("File plugin init() registered")
 }
 
-// main function for the WASM plugin.
+// main is the entry point for the WASM module.
+// It is required for TinyGo/WASM compilation but uses the SDK for logic.
 func main() {}

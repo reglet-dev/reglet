@@ -8,7 +8,7 @@ import (
 	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
 )
 
-// ControlEnv exposes control metadata for expression evaluation.
+// ControlEnv defines the variables available during filter expression evaluation.
 type ControlEnv struct {
 	ID       string   `expr:"id"`
 	Name     string   `expr:"name"`
@@ -17,7 +17,7 @@ type ControlEnv struct {
 	Tags     []string `expr:"tags"`
 }
 
-// ControlFilter encapsulates filtering logic.
+// ControlFilter implements policy selection logic based on tags, severity, and IDs.
 type ControlFilter struct {
 	// Exclusive mode: only include specified controls
 	exclusiveControlIDs map[string]bool
@@ -34,7 +34,7 @@ type ControlFilter struct {
 	filterProgram *vm.Program
 }
 
-// NewControlFilter creates a filter.
+// NewControlFilter initializes a new empty filter.
 func NewControlFilter() *ControlFilter {
 	return &ControlFilter{
 		exclusiveControlIDs: make(map[string]bool),
@@ -45,7 +45,8 @@ func NewControlFilter() *ControlFilter {
 	}
 }
 
-// WithExclusiveControls sets exclusive mode (only these controls run).
+// WithExclusiveControls restricts execution to ONLY the specified control IDs.
+// If set, all other filters are ignored.
 func (f *ControlFilter) WithExclusiveControls(controlIDs []string) *ControlFilter {
 	f.exclusiveControlIDs = toSet(controlIDs)
 	return f
@@ -75,20 +76,14 @@ func (f *ControlFilter) WithIncludedSeverities(severities []string) *ControlFilt
 	return f
 }
 
-// WithFilterExpression sets an advanced filter expression.
+// WithFilterExpression applies a compiled Expr program for advanced filtering.
 func (f *ControlFilter) WithFilterExpression(program *vm.Program) *ControlFilter {
 	f.filterProgram = program
 	return f
 }
 
-// ShouldRun determines if a control should execute.
-// Returns true/false and a skip reason.
-//
-// Precedence:
-// 1. Exclusive mode
-// 2. Exclusions (ID, Tags)
-// 3. Inclusions (Severity, Tags)
-// 4. Expression
+// ShouldRun evaluates whether a control matches the filter criteria.
+// It returns true if the control should execute, along with a reason if skipped.
 func (f *ControlFilter) ShouldRun(ctrl entities.Control) (bool, string) {
 	// 0. Exclusive mode: ONLY specified controls run
 	if len(f.exclusiveControlIDs) > 0 {

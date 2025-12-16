@@ -7,7 +7,7 @@ import (
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/build"
 )
 
-// versionCmd represents the version command
+// versionCmd implements the version command.
 var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print the version number of reglet",

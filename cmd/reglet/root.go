@@ -13,7 +13,7 @@ var (
 	verbose bool
 )
 
-// rootCmd represents the base command when called without any subcommands
+// rootCmd is the application entry point.
 var rootCmd = &cobra.Command{
 	Use:   "reglet",
 	Short: "Compliance and infrastructure validation platform",
@@ -27,8 +27,7 @@ environments, and generate standardized audit artifacts.`,
 	SilenceUsage: true,
 }
 
-// Execute adds child commands and sets flags.
-// Called by main().
+// Execute runs the root command.
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
@@ -43,7 +42,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable verbose output")
 }
 
-// initConfig reads config from file or environment.
+// initConfig loads configuration from the config file and environment.
 func initConfig() {
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
