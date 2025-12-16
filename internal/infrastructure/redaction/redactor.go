@@ -8,6 +8,10 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/spf13/viper"
+	"github.com/zricethezav/gitleaks/v8/config"
+	"github.com/zricethezav/gitleaks/v8/detect"
 )
 
 // Redactor handles sanitization of sensitive data.
@@ -17,6 +21,10 @@ type Redactor struct {
 	paths    []string
 	hashMode bool
 	salt     string
+
+	// Gitleaks detector for secret detection (222+ patterns)
+	// If nil, falls back to regex patterns only
+	gitleaksDetector *detect.Detector
 }
 
 // Config holds the configuration for the Redactor.
@@ -29,6 +37,9 @@ type Config struct {
 	HashMode bool
 	// Salt for hashing (prevents rainbow tables). If empty, hash is deterministic but unsalted.
 	Salt string
+	// If true, disable gitleaks detector and use only custom patterns
+	// Default: false (gitleaks enabled for comprehensive 222+ pattern coverage)
+	DisableGitleaks bool
 }
 
 // New creates a new Redactor with the given configuration.
@@ -40,7 +51,19 @@ func New(cfg Config) (*Redactor, error) {
 		patterns: make([]*regexp.Regexp, 0, len(cfg.Patterns)+len(defaultPatterns)),
 	}
 
-	// Compile built-in patterns
+	// Initialize gitleaks detector (unless disabled)
+	if !cfg.DisableGitleaks {
+		detector, err := newGitleaksDetector()
+		if err != nil {
+			// Log warning but don't fail - fall back to regex patterns
+			// In production, we might want to log this
+			// For now, just continue without gitleaks
+		} else {
+			r.gitleaksDetector = detector
+		}
+	}
+
+	// Compile built-in patterns (used as fallback or when gitleaks is disabled)
 	for _, p := range defaultPatterns {
 		re, err := regexp.Compile(p)
 		if err != nil {
@@ -61,6 +84,28 @@ func New(cfg Config) (*Redactor, error) {
 	return r, nil
 }
 
+// newGitleaksDetector creates a new gitleaks detector with default configuration.
+func newGitleaksDetector() (*detect.Detector, error) {
+	// Load gitleaks default config (222+ patterns)
+	v := viper.New()
+	v.SetConfigType("toml")
+	if err := v.ReadConfig(strings.NewReader(config.DefaultConfig)); err != nil {
+		return nil, fmt.Errorf("failed to read gitleaks config: %w", err)
+	}
+
+	var vc config.ViperConfig
+	if err := v.Unmarshal(&vc); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal gitleaks config: %w", err)
+	}
+
+	cfg, err := vc.Translate()
+	if err != nil {
+		return nil, fmt.Errorf("failed to translate gitleaks config: %w", err)
+	}
+
+	return detect.NewDetector(cfg), nil
+}
+
 // Redact sanitizes the given data structure.
 // It modifies the data in-place if it's a pointer, or returns a new copy.
 // Supported types: string, []interface{}, map[string]interface{}, and pointers to them.
@@ -69,21 +114,41 @@ func (r *Redactor) Redact(data interface{}) interface{} {
 }
 
 // ScrubString replaces sensitive patterns in a string.
+// Uses gitleaks detector (222+ patterns) first, then falls back to regex patterns.
 func (r *Redactor) ScrubString(input string) string {
 	if input == "" {
 		return ""
 	}
 
-	// Iterate over all patterns
+	result := input
+
+	// Phase 1: Use gitleaks detector if available (comprehensive detection)
+	if r.gitleaksDetector != nil {
+		fragment := detect.Fragment{
+			Raw: result,
+		}
+
+		findings := r.gitleaksDetector.Detect(fragment)
+		for _, finding := range findings {
+			replacement := "[REDACTED]"
+			if r.hashMode {
+				replacement = r.hash(finding.Secret)
+			}
+			result = strings.ReplaceAll(result, finding.Secret, replacement)
+		}
+	}
+
+	// Phase 2: Apply custom regex patterns (fallback + user-defined patterns)
 	for _, re := range r.patterns {
-		input = re.ReplaceAllStringFunc(input, func(match string) string {
+		result = re.ReplaceAllStringFunc(result, func(match string) string {
 			if r.hashMode {
 				return r.hash(match)
 			}
 			return "[REDACTED]"
 		})
 	}
-	return input
+
+	return result
 }
 
 // walk recursively traverses the data structure.

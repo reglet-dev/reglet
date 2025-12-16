@@ -240,6 +240,11 @@ func (p *Plugin) Observe(ctx context.Context, cfg Config) (*ObservationResult, e
 
 	// CRITICAL: Ensure config memory is always deallocated, even on error
 	defer func() {
+		// Prevent cleanup panic from clobbering an existing panic
+		defer func() {
+			_ = recover()
+		}()
+
 		deallocateFn := instance.ExportedFunction("deallocate")
 		if deallocateFn != nil {
 			//nolint:errcheck // Deallocation is best-effort cleanup
@@ -301,6 +306,11 @@ func (p *Plugin) Close() error {
 func (p *Plugin) readString(ctx context.Context, instance api.Module, ptr uint32, size uint32) ([]byte, error) {
 	// CRITICAL: Ensure memory is always deallocated, even on error
 	defer func() {
+		// Prevent cleanup panic from clobbering an existing panic
+		defer func() {
+			_ = recover()
+		}()
+
 		deallocateFn := instance.ExportedFunction("deallocate")
 		if deallocateFn != nil {
 			//nolint:errcheck // Deallocation is best-effort cleanup
