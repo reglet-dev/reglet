@@ -43,6 +43,14 @@ func TestIsPrivateOrReservedIP(t *testing.T) {
 		{"IPv6 unique local", "fc00::1", true},
 		{"IPv6 link-local", "fe80::1", true},
 
+		// IPv4-mapped IPv6 addresses (SSRF bypass vector - should be detected as private)
+		{"IPv4-mapped loopback", "::ffff:127.0.0.1", true},
+		{"IPv4-mapped private 10.x", "::ffff:10.0.0.1", true},
+		{"IPv4-mapped private 192.168.x", "::ffff:192.168.1.1", true},
+		{"IPv4-mapped private 172.16.x", "::ffff:172.16.0.1", true},
+		{"IPv4-mapped AWS metadata", "::ffff:169.254.169.254", true},
+		{"IPv4-mapped public IP", "::ffff:8.8.8.8", false},
+
 		// Multicast
 		{"IPv4 multicast start", "224.0.0.0", true},
 		{"IPv4 multicast end", "239.255.255.255", true},
@@ -130,6 +138,9 @@ func TestValidateDestination_PrivateIPs_Blocked(t *testing.T) {
 		{"private 192.168.x", "192.168.1.1"},
 		{"private 172.16.x", "172.16.0.1"},
 		{"AWS metadata", "169.254.169.254"},
+		{"IPv4-mapped loopback", "::ffff:127.0.0.1"},
+		{"IPv4-mapped private", "::ffff:192.168.1.1"},
+		{"IPv4-mapped AWS metadata", "::ffff:169.254.169.254"},
 	}
 
 	for _, tt := range tests {

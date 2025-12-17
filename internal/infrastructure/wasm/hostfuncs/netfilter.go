@@ -14,6 +14,12 @@ import (
 // - Link-local addresses (169.254.0.0/16, fe80::/10)
 // - Multicast addresses (224.0.0.0/4, ff00::/8)
 func IsPrivateOrReservedIP(ip net.IP) bool {
+	// Normalize IPv4-mapped IPv6 addresses (e.g., ::ffff:127.0.0.1) to IPv4
+	// This prevents SSRF bypasses
+	if ip4 := ip.To4(); ip4 != nil {
+		ip = ip4
+	}
+
 	privateRanges := []string{
 		"127.0.0.0/8",    // IPv4 loopback
 		"10.0.0.0/8",     // RFC1918
