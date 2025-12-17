@@ -87,8 +87,12 @@ func ExecCommand(ctx context.Context, mod api.Module, stack []uint64, checker *C
 	if request.Dir != "" {
 		cmd.Dir = request.Dir
 	}
+
+	// SECURITY: Always set cmd.Env explicitly to prevent host environment leakage
 	if len(request.Env) > 0 {
 		cmd.Env = request.Env
+	} else {
+		cmd.Env = []string{} // Explicitly empty to block environment inheritance
 	}
 
 	var stdout, stderr bytes.Buffer
