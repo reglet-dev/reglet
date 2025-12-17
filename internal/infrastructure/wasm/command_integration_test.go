@@ -27,7 +27,7 @@ func TestCommandPlugin_Integration(t *testing.T) {
 		},
 	}
 
-	runtime, err := NewRuntimeWithCapabilities(ctx, build.Get(), grantedCaps, nil)
+	runtime, err := NewRuntimeWithCapabilities(ctx, build.Get(), grantedCaps, nil, 0)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 

@@ -67,7 +67,7 @@ func New(opts Options) (*Container, error) {
 	}
 
 	// Create engine factory
-	engineFactory := adapters.NewEngineFactoryAdapter(redactor)
+	engineFactory := adapters.NewEngineFactoryAdapter(redactor, systemCfg.WasmMemoryLimitMB)
 
 	// Create capability orchestrator
 	capOrchestrator := services.NewCapabilityOrchestrator(opts.TrustPlugins)

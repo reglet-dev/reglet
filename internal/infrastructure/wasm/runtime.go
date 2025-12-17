@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 
 	"github.com/tetratelabs/wazero"
@@ -27,7 +28,7 @@ type Runtime struct {
 
 // NewRuntime creates a runtime with no capabilities and no redaction.
 func NewRuntime(ctx context.Context, version build.Info) (*Runtime, error) {
-	return NewRuntimeWithCapabilities(ctx, version, nil, nil)
+	return NewRuntimeWithCapabilities(ctx, version, nil, nil, 0)
 }
 
 // NewRuntimeWithCapabilities initializes runtime with permissions and optional output redaction.
@@ -36,9 +37,37 @@ func NewRuntimeWithCapabilities(
 	version build.Info,
 	caps map[string][]capabilities.Capability,
 	redactor *redaction.Redactor,
+	memoryLimitMB int,
 ) (*Runtime, error) {
+	// Determine memory limit
+	// 0 = default (256MB)
+	// -1 = unlimited
+	// >0 = explicit limit in MB
+	if memoryLimitMB == 0 {
+		memoryLimitMB = 256 // Default: 256MB
+		slog.Info("using default WASM memory limit", "mb", memoryLimitMB)
+	} else if memoryLimitMB == -1 {
+		slog.Warn("WASM memory limit disabled (unlimited memory)")
+		// Pass to wazero as is (unlimited)
+	} else if memoryLimitMB > 0 {
+		if memoryLimitMB < 16 {
+			slog.Warn("WASM memory limit very low, plugins may fail", "mb", memoryLimitMB)
+		}
+	} else {
+		return nil, fmt.Errorf("invalid WASM memory limit: %d (must be >= -1)", memoryLimitMB)
+	}
+
 	// Create pure Go WASM runtime with compilation cache.
 	config := wazero.NewRuntimeConfig().WithCompilationCache(globalCache)
+
+	// Apply memory limit if not unlimited
+	if memoryLimitMB > 0 {
+		// Convert MB to pages (1 page = 64KB)
+		// 1 MB = 1024 KB = 16 * 64KB
+		pages := uint32(memoryLimitMB * 16)
+		config = config.WithMemoryLimitPages(pages)
+	}
+
 	r := wazero.NewRuntimeWithConfig(ctx, config)
 
 	// Instantiate WASI for system calls (clock, random, etc.).

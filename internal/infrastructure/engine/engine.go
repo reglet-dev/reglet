@@ -85,6 +85,7 @@ func NewEngineWithCapabilities(
 	cfg ExecutionConfig,
 	redactor *redaction.Redactor,
 	repo repositories.ExecutionResultRepository, // Optional repository
+	memoryLimitMB int,
 ) (*Engine, error) {
 	// Create temporary runtime with no capabilities to load plugins and get requirements
 	tempRuntime, err := wasm.NewRuntime(ctx, version)
@@ -110,7 +111,7 @@ func NewEngineWithCapabilities(
 
 	// Create WASM runtime with granted capabilities and redactor
 	// SECURITY: Redactor prevents secrets from leaking to plugin stdout/stderr
-	runtime, err := wasm.NewRuntimeWithCapabilities(ctx, version, granted, redactor)
+	runtime, err := wasm.NewRuntimeWithCapabilities(ctx, version, granted, redactor, memoryLimitMB)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create WASM runtime: %w", err)
 	}

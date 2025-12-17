@@ -14,11 +14,15 @@ import (
 // Config represents the global configuration file (~/.reglet/config.yaml).
 // This is infrastructure-level configuration separate from profile configuration.
 type Config struct {
-	// Plugin capability grants
+	// User-defined capabilities
 	Capabilities []struct {
 		Kind    string `yaml:"kind"`
 		Pattern string `yaml:"pattern"`
 	} `yaml:"capabilities"`
+
+	// WasmMemoryLimitMB limits WASM memory per plugin in Megabytes (MB).
+	// 0 = default (256MB), -1 = unlimited, >0 = explicit limit in MB.
+	WasmMemoryLimitMB int `yaml:"wasm_memory_limit_mb"`
 
 	// Redaction configuration for secrets
 	Redaction RedactionConfig `yaml:"redaction"`

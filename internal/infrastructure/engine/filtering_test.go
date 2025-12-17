@@ -63,7 +63,7 @@ func TestFiltering_EndToEnd(t *testing.T) {
 	// Create a temporary file that definitely exists and is accessible
 	tempDir := t.TempDir()
 	targetFile := filepath.Join(tempDir, "target.txt")
-	err = os.WriteFile(targetFile, []byte("content"), 0644)
+	err = os.WriteFile(targetFile, []byte("content"), 0o644)
 	require.NoError(t, err)
 
 	// 1. Define a profile with 20 controls
@@ -116,7 +116,7 @@ func TestFiltering_EndToEnd(t *testing.T) {
 	capMgr := &testCapabilityManager{trustAll: true}
 
 	// Initialize Engine with Capabilities and Config
-	engine, err := NewEngineWithCapabilities(ctx, build.Get(), capMgr, pluginDir, profile, cfg, nil, nil)
+	engine, err := NewEngineWithCapabilities(ctx, build.Get(), capMgr, pluginDir, profile, cfg, nil, nil, 0)
 	require.NoError(t, err)
 	defer engine.Close(ctx)
 

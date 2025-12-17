@@ -161,13 +161,15 @@ func (a *EngineAdapter) Close(ctx context.Context) error {
 
 // EngineFactoryAdapter creates execution engines.
 type EngineFactoryAdapter struct {
-	redactor *redaction.Redactor
+	redactor          *redaction.Redactor
+	wasmMemoryLimitMB int
 }
 
 // NewEngineFactoryAdapter creates a new engine factory adapter.
-func NewEngineFactoryAdapter(redactor *redaction.Redactor) *EngineFactoryAdapter {
+func NewEngineFactoryAdapter(redactor *redaction.Redactor, wasmMemoryLimitMB int) *EngineFactoryAdapter {
 	return &EngineFactoryAdapter{
-		redactor: redactor,
+		redactor:          redactor,
+		wasmMemoryLimitMB: wasmMemoryLimitMB,
 	}
 }
 
@@ -195,6 +197,7 @@ func (a *EngineFactoryAdapter) CreateEngine(
 		cfg,
 		a.redactor,
 		nil, // No persistence
+		a.wasmMemoryLimitMB,
 	)
 	if err != nil {
 		return nil, err
