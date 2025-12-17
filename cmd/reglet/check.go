@@ -51,7 +51,7 @@ Filtering:
 func init() {
 	rootCmd.AddCommand(checkCmd)
 
-	checkCmd.Flags().StringVar(&format, "format", "table", "Output format: table, json, yaml, junit")
+	checkCmd.Flags().StringVar(&format, "format", "table", "Output format: table, json, yaml, junit, sarif")
 	checkCmd.Flags().StringVarP(&outFile, "output", "o", "", "Output file path (default: stdout)")
 	checkCmd.Flags().BoolVar(&trustPlugins, "trust-plugins", false, "Auto-grant all plugin capabilities (use with caution)")
 
@@ -86,7 +86,7 @@ func runCheckAction(ctx context.Context, profilePath string) error {
 	}
 
 	// 4. Format and write output
-	if err := writeOutput(response.ExecutionResult); err != nil {
+	if err := writeOutput(response.ExecutionResult, profilePath); err != nil {
 		return fmt.Errorf("failed to write output: %w", err)
 	}
 
@@ -124,7 +124,7 @@ func buildCheckProfileRequest(profilePath string) dto.CheckProfileRequest {
 }
 
 // writeOutput directs the execution result to the configured output destination.
-func writeOutput(result *execution.ExecutionResult) error {
+func writeOutput(result *execution.ExecutionResult, profilePath string) error {
 	writer := os.Stdout
 	if outFile != "" {
 		//nolint:gosec // G304: User-controlled output file path is intentional
@@ -139,11 +139,11 @@ func writeOutput(result *execution.ExecutionResult) error {
 		slog.Info("writing output", "file", outFile, "format", format)
 	}
 
-	return formatOutput(writer, result, format)
+	return formatOutput(writer, result, format, profilePath)
 }
 
 // formatOutput applies the selected formatter to the execution result.
-func formatOutput(writer *os.File, result *execution.ExecutionResult, format string) error {
+func formatOutput(writer *os.File, result *execution.ExecutionResult, format string, profilePath string) error {
 	switch format {
 	case "table":
 		formatter := output.NewTableFormatter(writer)
@@ -157,8 +157,11 @@ func formatOutput(writer *os.File, result *execution.ExecutionResult, format str
 	case "junit":
 		formatter := output.NewJUnitFormatter(writer)
 		return formatter.Format(result)
+	case "sarif":
+		formatter := output.NewSARIFFormatter(writer, profilePath)
+		return formatter.Format(result)
 	default:
-		return fmt.Errorf("unknown format: %s (supported: table, json, yaml, junit)", format)
+		return fmt.Errorf("unknown format: %s (supported: table, json, yaml, junit, sarif)", format)
 	}
 }
 

@@ -10,6 +10,15 @@ Unlike traditional tools that run scripts with full host privileges, Reglet enfo
 [![Go Report Card](https://goreportcard.com/badge/github.com/whiskeyjimbo/reglet)](https://goreportcard.com/report/github.com/whiskeyjimbo/reglet)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
+## Table of Contents
+- [Core Features](#core-features)
+- [Why Reglet?](#why-reglet)
+- [Architecture](#architecture)
+- [Quick Start](#quick-start-30-seconds)
+- [Installation](#installation)
+- [Examples](#examples)
+- [Community](#community)
+
 ## Core Features
 - Secure Sandbox: All validation logic runs inside a CGO-free WebAssembly runtime (wazero). Plugins are memory-safe and isolated from the host OS.
 
@@ -21,18 +30,23 @@ Unlike traditional tools that run scripts with full host privileges, Reglet enfo
 
 - Parallel Execution: Optimized for CI/CD with concurrent execution of independent controls.
 
-- Standardized Output: Generates machine-readable results (JSON, YAML, JUnit) ready for compliance platforms or OSCAL integration(future).
+- Standardized Output: Generates machine-readable results (JSON, YAML, JUnit, SARIF) ready for compliance platforms or OSCAL integration (future).
+
 
 ## Architecture
 Reglet follows an open-core philosophy with a strict focus on security and portability.
 
-- Host: The core engine (Go) manages the lifecycle, capability grants, and reporting.
+- Host: The core engine (Go) manages the lifecycle, capability grants, and reporting. Plugins are securely loaded from the filesystem at runtime.
 
 - SDK: A Go SDK allowing developers to write plugins that compile to WASM/WASI.
 
 - WIT Contracts: The boundary between Host and Plugin is strictly typed using WASM Interface Types (WIT).
 
 ## Quick Start (30 seconds)
+
+### Prerequisites
+- Go 1.25+
+- Make
 
 ```bash
 # Clone and build
@@ -95,17 +109,13 @@ cd reglet
 # Build core binary
 make build
 
-# Build WASM plugins
+# Build WASM plugins (Required: Reglet loads plugins from the ./plugins directory)
 for d in plugins/*/; do (cd "$d" && make build); done
 cd ../..
 
 # Run
 ./bin/reglet check examples/01-quickstart.yaml
 ```
-
-### Prerequisites
-- Go 1.25+
-- Make
 
 ## Examples
 
@@ -127,11 +137,11 @@ Reglet is in active development. Core features work, but expect breaking changes
 - ✅ Core execution engine
 - ✅ File, HTTP, DNS, TCP and command plugins
 - ✅ Capability system
-- ✅ Output formatters
+- ✅ Output formatters (Table, JSON, YAML, JUnit, SARIF)
 
 **v0.3.0-alpha**
 - Profile inheritance
-- OSCAL/SARIF output
+- OSCAL output
 - Binary releases for Linux/macOS/Windows
 
 **v1.0**
@@ -141,6 +151,8 @@ Reglet is in active development. Core features work, but expect breaking changes
 - Plugin SDK documentation
 
 ## Community
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md).
 
 - **Issues:** [GitHub Issues](https://github.com/whiskeyjimbo/reglet/issues)
 - **Discussions:** [GitHub Discussions](https://github.com/whiskeyjimbo/reglet/discussions)
