@@ -30,7 +30,21 @@ func (p *TerminalPrompter) IsInteractive() bool {
 
 // PromptForCapability asks the user whether to grant a capability.
 func (p *TerminalPrompter) PromptForCapability(capability capabilities.Capability) (granted bool, always bool, err error) {
+	return p.PromptForCapabilityWithInfo(capability, false, nil)
+}
+
+// PromptForCapabilityWithInfo asks the user whether to grant a capability with security warnings.
+func (p *TerminalPrompter) PromptForCapabilityWithInfo(
+	capability capabilities.Capability,
+	isBroad bool,
+	profileSpecific *capabilities.Capability,
+) (granted bool, always bool, err error) {
 	desc := p.describeCapability(capability)
+
+	// Show security warning for broad capabilities
+	if isBroad {
+		p.displayBroadCapabilityWarning(capability, profileSpecific)
+	}
 
 	// Define choices
 	const (
@@ -64,6 +78,59 @@ func (p *TerminalPrompter) PromptForCapability(capability capabilities.Capabilit
 	default:
 		return false, false, nil
 	}
+}
+
+// displayBroadCapabilityWarning shows a security warning for overly broad capabilities.
+func (p *TerminalPrompter) displayBroadCapabilityWarning(
+	broad capabilities.Capability,
+	profileSpecific *capabilities.Capability,
+) {
+	fmt.Fprintf(os.Stderr, "\n")
+	fmt.Fprintf(os.Stderr, "⚠️  \033[1;33mSecurity Warning: Broad Permission Requested\033[0m\n\n")
+
+	// Show what's being requested
+	fmt.Fprintf(os.Stderr, "  Requested: %s\n", p.describeCapability(broad))
+
+	// Explain the risk
+	risk := p.describeBroadRisk(broad)
+	if risk != "" {
+		fmt.Fprintf(os.Stderr, "  Risk: %s\n", risk)
+	}
+
+	// Show profile-specific alternative if available
+	if profileSpecific != nil {
+		fmt.Fprintf(os.Stderr, "\n  ✓ Profile only needs: %s\n", p.describeCapability(*profileSpecific))
+		fmt.Fprintf(os.Stderr, "  Recommendation: Consider granting only what the profile needs.\n")
+	} else {
+		fmt.Fprintf(os.Stderr, "  Recommendation: Review if this broad access is necessary.\n")
+	}
+
+	fmt.Fprintf(os.Stderr, "\n")
+}
+
+// describeBroadRisk explains the security implications of a broad capability.
+func (p *TerminalPrompter) describeBroadRisk(cap capabilities.Capability) string {
+	switch cap.Kind {
+	case "fs":
+		if strings.Contains(cap.Pattern, "/**") || strings.Contains(cap.Pattern, "**") {
+			return "Plugin can access ALL files on the system"
+		}
+		if strings.Contains(cap.Pattern, "/etc") {
+			return "Plugin can access sensitive system configuration"
+		}
+		if strings.Contains(cap.Pattern, "/root") || strings.Contains(cap.Pattern, "/home") {
+			return "Plugin can access user home directories and private files"
+		}
+	case "exec":
+		if cap.Pattern == "bash" || cap.Pattern == "sh" || strings.Contains(cap.Pattern, "/bin/") {
+			return "Plugin can execute arbitrary shell commands"
+		}
+	case "network":
+		if cap.Pattern == "*" || cap.Pattern == "outbound:*" {
+			return "Plugin can connect to any host on the internet"
+		}
+	}
+	return "Plugin has broad access beyond what may be necessary"
 }
 
 // describeCapability returns a human-readable description of a capability.

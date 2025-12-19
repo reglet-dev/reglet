@@ -16,9 +16,9 @@ func TestRedactor_GitleaksIntegration(t *testing.T) {
 	require.NotNil(t, redactor.gitleaksDetector, "Gitleaks detector should be initialized by default")
 
 	tests := []struct {
-		name     string
-		input    string
-		expected string
+		name         string
+		input        string
+		expected     string
 		shouldRedact bool
 	}{
 		{

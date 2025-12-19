@@ -18,6 +18,7 @@ var (
 	format              string
 	outFile             string
 	trustPlugins        bool
+	securityLevel       string
 	includeTags         []string
 	includeSeverities   []string
 	includeControlIDs   []string
@@ -54,6 +55,7 @@ func init() {
 	checkCmd.Flags().StringVar(&format, "format", "table", "Output format: table, json, yaml, junit, sarif")
 	checkCmd.Flags().StringVarP(&outFile, "output", "o", "", "Output file path (default: stdout)")
 	checkCmd.Flags().BoolVar(&trustPlugins, "trust-plugins", false, "Auto-grant all plugin capabilities (use with caution)")
+	checkCmd.Flags().StringVar(&securityLevel, "security", "", "Security level: strict, standard, permissive (default: standard or config file)")
 
 	// Filtering flags
 	checkCmd.Flags().StringSliceVar(&includeTags, "tags", nil, "Run controls with these tags (comma-separated)")
@@ -69,8 +71,9 @@ func init() {
 func runCheckAction(ctx context.Context, profilePath string) error {
 	// 1. Create dependency injection container
 	c, err := container.New(container.Options{
-		TrustPlugins: trustPlugins,
-		Logger:       slog.Default(),
+		TrustPlugins:  trustPlugins,
+		SecurityLevel: securityLevel,
+		Logger:        slog.Default(),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to initialize application: %w", err)

@@ -61,7 +61,7 @@ func TestLoadFilePlugin(t *testing.T) {
 	// File plugin needs filesystem capabilities
 	caps := map[string][]capabilities.Capability{
 		"file": {
-			{Kind: "fs", Pattern: "read:**"},
+			{Kind: "fs", Pattern: "read:/**"},
 		},
 	}
 
@@ -94,7 +94,7 @@ func TestFilePlugin_Describe(t *testing.T) {
 	// File plugin needs filesystem capabilities
 	caps := map[string][]capabilities.Capability{
 		"file": {
-			{Kind: "fs", Pattern: "read:**"},
+			{Kind: "fs", Pattern: "read:/**"},
 		},
 	}
 
@@ -131,7 +131,7 @@ func TestFilePlugin_Schema(t *testing.T) {
 	// File plugin needs filesystem capabilities
 	caps := map[string][]capabilities.Capability{
 		"file": {
-			{Kind: "fs", Pattern: "read:**"},
+			{Kind: "fs", Pattern: "read:/**"},
 		},
 	}
 
@@ -189,7 +189,7 @@ func TestFilePlugin_Observe_FileExists(t *testing.T) {
 	// File plugin needs filesystem capabilities
 	caps := map[string][]capabilities.Capability{
 		"file": {
-			{Kind: "fs", Pattern: "read:**"},
+			{Kind: "fs", Pattern: "read:/**"},
 		},
 	}
 
@@ -267,7 +267,7 @@ func TestFilePlugin_Observe_Symlink(t *testing.T) {
 	// File plugin needs filesystem capabilities
 	caps := map[string][]capabilities.Capability{
 		"file": {
-			{Kind: "fs", Pattern: "read:**"},
+			{Kind: "fs", Pattern: "read:/**"},
 		},
 	}
 
@@ -315,7 +315,7 @@ func TestFilePlugin_Observe_FileNotFound(t *testing.T) {
 	// File plugin needs filesystem capabilities
 	caps := map[string][]capabilities.Capability{
 		"file": {
-			{Kind: "fs", Pattern: "read:**"},
+			{Kind: "fs", Pattern: "read:/**"},
 		},
 	}
 
@@ -370,7 +370,7 @@ func TestFilePlugin_Observe_ReadContent(t *testing.T) {
 	// File plugin needs filesystem capabilities
 	caps := map[string][]capabilities.Capability{
 		"file": {
-			{Kind: "fs", Pattern: "read:**"},
+			{Kind: "fs", Pattern: "read:/**"},
 		},
 	}
 
@@ -446,7 +446,7 @@ func TestFilePlugin_Observe_BinaryContent(t *testing.T) {
 	// File plugin needs filesystem capabilities
 	caps := map[string][]capabilities.Capability{
 		"file": {
-			{Kind: "fs", Pattern: "read:**"},
+			{Kind: "fs", Pattern: "read:/**"},
 		},
 	}
 

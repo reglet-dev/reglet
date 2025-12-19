@@ -26,6 +26,9 @@ type Config struct {
 
 	// Redaction configuration for secrets
 	Redaction RedactionConfig `yaml:"redaction"`
+
+	// Security configuration for capability prompting
+	Security SecurityConfig `yaml:"security"`
 }
 
 // RedactionConfig configures how sensitive data is sanitized.
@@ -42,6 +45,48 @@ type RedactionConfig struct {
 type HashModeConfig struct {
 	Enabled bool   `yaml:"enabled"`
 	Salt    string `yaml:"salt"` // Optional salt for stable hashing
+}
+
+// SecurityConfig configures capability security policies.
+type SecurityConfig struct {
+	// Level defines the security policy: "strict", "standard", or "permissive"
+	// - strict: Deny all broad capabilities
+	// - standard: Warn about broad capabilities (default)
+	// - permissive: Allow all capabilities without warnings
+	Level string `yaml:"level"`
+
+	// CustomBroadPatterns allows users to define additional patterns considered "broad"
+	// Format: "kind:pattern" (e.g., "fs:write:/tmp/**")
+	CustomBroadPatterns []string `yaml:"custom_broad_patterns"`
+}
+
+// SecurityLevel represents the security enforcement level.
+type SecurityLevel string
+
+const (
+	// SecurityLevelStrict denies broad capabilities
+	SecurityLevelStrict SecurityLevel = "strict"
+
+	// SecurityLevelStandard warns about broad capabilities (default)
+	SecurityLevelStandard SecurityLevel = "standard"
+
+	// SecurityLevelPermissive allows all capabilities without warnings
+	SecurityLevelPermissive SecurityLevel = "permissive"
+)
+
+// GetSecurityLevel returns the configured security level, defaulting to Standard.
+func (c *SecurityConfig) GetSecurityLevel() SecurityLevel {
+	switch c.Level {
+	case "strict":
+		return SecurityLevelStrict
+	case "standard":
+		return SecurityLevelStandard
+	case "permissive":
+		return SecurityLevelPermissive
+	default:
+		// Default to standard if not specified or invalid
+		return SecurityLevelStandard
+	}
 }
 
 // ConfigLoader loads system configuration from disk.

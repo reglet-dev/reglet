@@ -27,12 +27,12 @@ func TestPluginOutputRedaction_ManualVerification(t *testing.T) {
 	ctx := context.Background()
 
 	// Runtime WITH redactor
-	runtimeWithRedaction, err := wasm.NewRuntimeWithCapabilities(ctx, build.Get(), nil, redactor)
+	runtimeWithRedaction, err := wasm.NewRuntimeWithCapabilities(ctx, build.Get(), nil, redactor, 0)
 	require.NoError(t, err)
 	defer runtimeWithRedaction.Close(ctx)
 
 	// Runtime WITHOUT redactor
-	runtimeWithoutRedaction, err := wasm.NewRuntimeWithCapabilities(ctx, build.Get(), nil, nil)
+	runtimeWithoutRedaction, err := wasm.NewRuntimeWithCapabilities(ctx, build.Get(), nil, nil, 0)
 	require.NoError(t, err)
 	defer runtimeWithoutRedaction.Close(ctx)
 
@@ -63,9 +63,9 @@ func TestPluginOutputRedaction_GitleaksPatterns(t *testing.T) {
 
 	// Test cases: plugin output that should be redacted
 	testCases := []struct {
-		name     string
-		output   string
-		contains string // What should be in the output after redaction
+		name        string
+		output      string
+		contains    string // What should be in the output after redaction
 		notContains string // What should NOT be in the output after redaction
 	}{
 		{

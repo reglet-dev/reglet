@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/build"
 )
 
@@ -16,7 +17,15 @@ import (
 // Observe() concurrently without data races or cross-contamination
 func TestPlugin_Observe_Concurrent(t *testing.T) {
 	ctx := context.Background()
-	runtime, err := NewRuntime(ctx, build.Get())
+
+	// Grant file plugin access to current directory for temp files
+	caps := map[string][]capabilities.Capability{
+		"file": {
+			{Kind: "fs", Pattern: "read:/**"},
+		},
+	}
+
+	runtime, err := NewRuntimeWithCapabilities(ctx, build.Get(), caps, nil, 0)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -97,7 +106,15 @@ func TestPlugin_Observe_RaceDetector(t *testing.T) {
 // (Describe, Schema, Observe) can be called concurrently
 func TestPlugin_ConcurrentDifferentMethods(t *testing.T) {
 	ctx := context.Background()
-	runtime, err := NewRuntime(ctx, build.Get())
+
+	// Grant file plugin access to current directory for temp files
+	caps := map[string][]capabilities.Capability{
+		"file": {
+			{Kind: "fs", Pattern: "read:/**"},
+		},
+	}
+
+	runtime, err := NewRuntimeWithCapabilities(ctx, build.Get(), caps, nil, 0)
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -153,5 +170,159 @@ func TestPlugin_ConcurrentDifferentMethods(t *testing.T) {
 	// Verify all methods succeeded
 	for i, err := range errors {
 		assert.NoError(t, err, "Method %d should not error", i)
+	}
+}
+
+// TestExtractMountPath tests the extractMountPath function with various patterns
+func TestExtractMountPath(t *testing.T) {
+	tests := []struct {
+		name     string
+		pattern  string
+		expected string
+	}{
+		{
+			name:     "specific file",
+			pattern:  "/etc/ssh/sshd_config",
+			expected: "/etc/ssh",
+		},
+		{
+			name:     "directory with wildcard",
+			pattern:  "/var/log/**",
+			expected: "/var/log",
+		},
+		{
+			name:     "root pattern",
+			pattern:  "/**",
+			expected: "/",
+		},
+		{
+			name:     "read operation prefix",
+			pattern:  "read:/etc/hosts",
+			expected: "/etc",
+		},
+		{
+			name:     "write operation prefix",
+			pattern:  "write:/var/log/app.log",
+			expected: "/var/log",
+		},
+		{
+			name:     "single slash",
+			pattern:  "/",
+			expected: "/",
+		},
+		{
+			name:     "directory without trailing slash",
+			pattern:  "/etc",
+			expected: "/",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := extractMountPath(tt.pattern)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestPlugin_ExtractFilesystemMounts tests the extractFilesystemMounts method
+func TestPlugin_ExtractFilesystemMounts(t *testing.T) {
+	tests := []struct {
+		name         string
+		capabilities []capabilities.Capability
+		expected     []fsMount
+	}{
+		{
+			name: "read-only file access",
+			capabilities: []capabilities.Capability{
+				{Kind: "fs", Pattern: "read:/etc/hosts"},
+			},
+			expected: []fsMount{
+				{hostPath: "/etc", guestPath: "/etc", readOnly: true},
+			},
+		},
+		{
+			name: "read-write directory access",
+			capabilities: []capabilities.Capability{
+				{Kind: "fs", Pattern: "write:/var/log/**"},
+			},
+			expected: []fsMount{
+				{hostPath: "/var/log", guestPath: "/var/log", readOnly: false},
+			},
+		},
+		{
+			name: "mixed permissions",
+			capabilities: []capabilities.Capability{
+				{Kind: "fs", Pattern: "read:/etc/hosts"},
+				{Kind: "fs", Pattern: "write:/var/log/app.log"},
+			},
+			expected: []fsMount{
+				{hostPath: "/etc", guestPath: "/etc", readOnly: true},
+				{hostPath: "/var/log", guestPath: "/var/log", readOnly: false},
+			},
+		},
+		{
+			name: "no filesystem capabilities",
+			capabilities: []capabilities.Capability{
+				{Kind: "network", Pattern: "outbound:443"},
+			},
+			expected: []fsMount{},
+		},
+		{
+			name: "root access",
+			capabilities: []capabilities.Capability{
+				{Kind: "fs", Pattern: "read:/**"},
+			},
+			expected: []fsMount{
+				{hostPath: "/", guestPath: "/", readOnly: true},
+			},
+		},
+		{
+			name: "duplicate mounts filtered",
+			capabilities: []capabilities.Capability{
+				{Kind: "fs", Pattern: "read:/etc/hosts"},
+				{Kind: "fs", Pattern: "read:/etc/passwd"},
+			},
+			expected: []fsMount{
+				{hostPath: "/etc", guestPath: "/etc", readOnly: true},
+			},
+		},
+		{
+			name: "overlapping mounts not deduplicated",
+			capabilities: []capabilities.Capability{
+				{Kind: "fs", Pattern: "read:/etc/**"},
+				{Kind: "fs", Pattern: "read:/etc/ssh/**"},
+			},
+			expected: []fsMount{
+				{hostPath: "/etc", guestPath: "/etc", readOnly: true},
+				{hostPath: "/etc/ssh", guestPath: "/etc/ssh", readOnly: true},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			plugin := &Plugin{
+				name:         "test-plugin",
+				capabilities: tt.capabilities,
+			}
+
+			mounts := plugin.extractFilesystemMounts()
+			assert.Equal(t, len(tt.expected), len(mounts), "mount count mismatch")
+
+			// Compare mounts (order may vary)
+			for _, expectedMount := range tt.expected {
+				found := false
+				for _, actualMount := range mounts {
+					if actualMount.hostPath == expectedMount.hostPath &&
+						actualMount.guestPath == expectedMount.guestPath &&
+						actualMount.readOnly == expectedMount.readOnly {
+						found = true
+						break
+					}
+				}
+				assert.True(t, found, "expected mount not found: %+v", expectedMount)
+			}
+		})
 	}
 }

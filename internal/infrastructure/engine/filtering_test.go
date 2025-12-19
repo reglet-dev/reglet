@@ -23,8 +23,12 @@ type testCapabilityManager struct {
 }
 
 func (m *testCapabilityManager) CollectRequiredCapabilities(ctx context.Context, profile *entities.Profile, runtime *wasm.Runtime, pluginDir string) (map[string][]capabilities.Capability, error) {
-	// For tests, just return empty capabilities
-	return make(map[string][]capabilities.Capability), nil
+	// For tests, grant file plugin root filesystem access
+	return map[string][]capabilities.Capability{
+		"file": {
+			{Kind: "fs", Pattern: "read:/**"},
+		},
+	}, nil
 }
 
 func (m *testCapabilityManager) GrantCapabilities(required map[string][]capabilities.Capability) (map[string][]capabilities.Capability, error) {

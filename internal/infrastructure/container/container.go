@@ -32,6 +32,7 @@ type Container struct {
 // Options configure the container.
 type Options struct {
 	TrustPlugins     bool
+	SecurityLevel    string // Security level: strict, standard, permissive (overrides config file)
 	SystemConfigPath string
 	Logger           *slog.Logger
 }
@@ -69,8 +70,15 @@ func New(opts Options) (*Container, error) {
 	// Create engine factory
 	engineFactory := adapters.NewEngineFactoryAdapter(redactor, systemCfg.WasmMemoryLimitMB)
 
+	// Determine security level (command-line flag takes precedence over config file)
+	securityLevel := opts.SecurityLevel
+	if securityLevel == "" {
+		// Use config file setting, or default to "standard"
+		securityLevel = string(systemCfg.Security.GetSecurityLevel())
+	}
+
 	// Create capability orchestrator
-	capOrchestrator := services.NewCapabilityOrchestrator(opts.TrustPlugins)
+	capOrchestrator := services.NewCapabilityOrchestratorWithSecurity(opts.TrustPlugins, securityLevel)
 
 	// Wire up use case
 	checkProfileUseCase := services.NewCheckProfileUseCase(

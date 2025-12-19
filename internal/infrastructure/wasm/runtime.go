@@ -20,10 +20,11 @@ var globalCache = wazero.NewCompilationCache()
 
 // Runtime manages WASM execution.
 type Runtime struct {
-	runtime  wazero.Runtime
-	plugins  map[string]*Plugin // Loaded plugins by name
-	version  build.Info
-	redactor *redaction.Redactor // Optional redactor for plugin output
+	runtime             wazero.Runtime
+	plugins             map[string]*Plugin // Loaded plugins by name
+	version             build.Info
+	redactor            *redaction.Redactor                  // Optional redactor for plugin output
+	grantedCapabilities map[string][]capabilities.Capability // Per-plugin granted capabilities
 }
 
 // NewRuntime creates a runtime with no capabilities and no redaction.
@@ -83,10 +84,11 @@ func NewRuntimeWithCapabilities(
 	}
 
 	return &Runtime{
-		runtime:  r,
-		plugins:  make(map[string]*Plugin),
-		version:  version,
-		redactor: redactor,
+		runtime:             r,
+		plugins:             make(map[string]*Plugin),
+		version:             version,
+		redactor:            redactor,
+		grantedCapabilities: caps,
 	}, nil
 }
 
@@ -113,11 +115,12 @@ func (r *Runtime) LoadPlugin(ctx context.Context, name string, wasmBytes []byte)
 
 	// Create plugin wrapper
 	plugin := &Plugin{
-		name:    name,
-		module:  compiledModule,
-		runtime: r.runtime,
-		stdout:  stdout,
-		stderr:  stderr,
+		name:         name,
+		module:       compiledModule,
+		runtime:      r.runtime,
+		stdout:       stdout,
+		stderr:       stderr,
+		capabilities: r.grantedCapabilities[name], // Extract plugin-specific capabilities
 	}
 
 	// Cache the plugin

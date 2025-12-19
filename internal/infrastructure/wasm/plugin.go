@@ -6,6 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
+	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/tetratelabs/wazero"
@@ -34,6 +37,16 @@ type Plugin struct {
 	// Redacted output streams (wraps os.Stderr with redaction)
 	stdout io.Writer
 	stderr io.Writer
+
+	// Granted capabilities for this plugin (used to build filesystem mounts)
+	capabilities []capabilities.Capability
+}
+
+// fsMount represents a filesystem mount configuration
+type fsMount struct {
+	hostPath  string
+	guestPath string
+	readOnly  bool
 }
 
 // Name returns the unique identifier of the plugin.
@@ -41,14 +54,129 @@ func (p *Plugin) Name() string {
 	return p.name
 }
 
+// extractMountPath returns the directory to mount for a filesystem pattern.
+// For files: returns parent directory (e.g., "/etc/ssh/sshd_config" → "/etc/ssh")
+// For directories: returns the directory itself (e.g., "/var/log/**" → "/var/log")
+func extractMountPath(pattern string) string {
+	// Remove operation prefix (e.g., "read:" or "write:")
+	parts := strings.SplitN(pattern, ":", 2)
+	path := pattern
+	if len(parts) == 2 {
+		path = parts[1]
+	}
+
+	// Handle root wildcard pattern first (before trimming)
+	if path == "/**" || path == "/*" {
+		return "/"
+	}
+
+	// Handle wildcard patterns - these are directory patterns
+	if strings.HasSuffix(path, "/**") {
+		// "/var/log/**" → "/var/log"
+		return strings.TrimSuffix(path, "/**")
+	}
+	if strings.HasSuffix(path, "/*") {
+		// "/var/log/*" → "/var/log"
+		return strings.TrimSuffix(path, "/*")
+	}
+
+	// Handle root pattern
+	if path == "/" {
+		return "/"
+	}
+
+	// For non-wildcard patterns, assume it's a file and return parent directory
+	// This handles cases like "/etc/hosts" → "/etc"
+	dir := filepath.Dir(path)
+
+	// Handle edge cases
+	if dir == "." {
+		// Relative path without parent → mount current directory
+		return "/"
+	}
+
+	return dir
+}
+
+// extractFilesystemMounts builds mount configurations from granted filesystem capabilities.
+func (p *Plugin) extractFilesystemMounts() []fsMount {
+	var mounts []fsMount
+	seenPaths := make(map[string]bool)
+
+	for _, cap := range p.capabilities {
+		if cap.Kind != "fs" {
+			continue
+		}
+
+		// Parse pattern: "read:/etc/hosts" or "write:/var/log/**"
+		parts := strings.SplitN(cap.Pattern, ":", 2)
+		if len(parts) != 2 {
+			slog.Warn("invalid filesystem capability pattern",
+				"plugin", p.name,
+				"pattern", cap.Pattern)
+			continue
+		}
+
+		operation := parts[0] // "read" or "write"
+		pattern := parts[1]   // "/etc/hosts" or "/var/log/**"
+
+		// Extract mount path
+		mountPath := extractMountPath(pattern)
+
+		// Warn about root access
+		if mountPath == "/" || pattern == "/**" {
+			slog.Warn("plugin granted root filesystem access",
+				"plugin", p.name,
+				"capability", cap.Pattern)
+		}
+
+		// Track mount (don't deduplicate per user preference)
+		mountKey := fmt.Sprintf("%s:%s", operation, mountPath)
+		if seenPaths[mountKey] {
+			continue // Same operation + path already added
+		}
+		seenPaths[mountKey] = true
+
+		mounts = append(mounts, fsMount{
+			hostPath:  mountPath,
+			guestPath: mountPath, // Mount at same path in guest
+			readOnly:  operation == "read",
+		})
+	}
+
+	return mounts
+}
+
 // createModuleConfig builds the wazero module configuration with necessary host functions.
 // It enables filesystem access, time, random, and logging.
 // stdout/stderr are automatically redacted to prevent secret leakage to logs.
 func (p *Plugin) createModuleConfig() wazero.ModuleConfig {
+	// Build filesystem mounts from capabilities
+	mounts := p.extractFilesystemMounts()
+	fsConfig := wazero.NewFSConfig()
+
+	for _, mount := range mounts {
+		if mount.readOnly {
+			fsConfig = fsConfig.WithReadOnlyDirMount(mount.hostPath, mount.guestPath)
+			slog.Debug("mounting read-only filesystem",
+				"plugin", p.name,
+				"path", mount.hostPath)
+		} else {
+			fsConfig = fsConfig.WithDirMount(mount.hostPath, mount.guestPath)
+			slog.Debug("mounting read-write filesystem",
+				"plugin", p.name,
+				"path", mount.hostPath)
+		}
+	}
+
+	// Log when plugin has no filesystem access
+	if len(mounts) == 0 {
+		slog.Debug("plugin has no filesystem access",
+			"plugin", p.name)
+	}
+
 	return wazero.NewModuleConfig().
-		// Mount root filesystem to allow access to system files (e.g. /etc/ssh/sshd_config).
-		// Note: Phase 2 will introduce finer-grained capability enforcement for WASI.
-		WithFSConfig(wazero.NewFSConfig().WithDirMount("/", "/")).
+		WithFSConfig(fsConfig). // Now uses capability-driven mounts
 		WithSysWalltime().
 		WithSysNanotime().
 		WithSysNanosleep().
