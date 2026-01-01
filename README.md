@@ -26,6 +26,8 @@ Unlike traditional tools that run scripts with full host privileges, Reglet enfo
 
 - **Capability-Based Security**: "Least Privilege" is enforced at the system call level. A plugin cannot access files, networks, or environment variables unless explicitly allowed. Reglet automatically extracts specific permissions from your profiles (e.g., only `/etc/ssh/sshd_config`) instead of requesting broad access (e.g., all files).
 
+- **Smart Execution Security**: Automatically detects and restricts dangerous command execution patterns. Shells (`/bin/bash`) and interpreters (`python`, `perl`, `node`) are identified as high-risk "broad" capabilities, preventing arbitrary code execution bypasses while allowing safe script execution.
+
 - **Configurable Security Levels**: Choose your security posture with `--security` flag:
   - `strict` - Deny broad capabilities automatically
   - `standard` - Warn and prompt before granting (default)
@@ -96,7 +98,7 @@ Control how Reglet handles capability requests with the `--security` flag:
 ```bash
 reglet check profile.yaml --security=strict
 ```
-- Automatically denies broad capabilities (e.g., `/**`, `**`, `/bin/bash`)
+- Automatically denies broad capabilities (e.g., `/**`, `**`, `/bin/bash`, `python`, `node`)
 - Best for: Production CI/CD pipelines
 - Example: Requesting `fs:read:/` would be denied
 
