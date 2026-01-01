@@ -153,13 +153,14 @@ func (uc *CheckProfileUseCase) Execute(ctx context.Context, req dto.CheckProfile
 
 // validateFilters validates filter configuration and compiles filter expressions.
 func (uc *CheckProfileUseCase) validateFilters(profile *entities.Profile, filters dto.FilterOptions) error {
-	// Validate --control references exist
-	if len(filters.IncludeControlIDs) > 0 {
-		controlMap := make(map[string]bool)
+	// If either include or exclude IDs are provided, build a map once
+	if len(filters.IncludeControlIDs) > 0 || len(filters.ExcludeControlIDs) > 0 {
+		controlMap := make(map[string]bool, len(profile.Controls.Items))
 		for _, ctrl := range profile.Controls.Items {
 			controlMap[ctrl.ID] = true
 		}
 
+		// Validate --control references exist
 		for _, id := range filters.IncludeControlIDs {
 			if !controlMap[id] {
 				return apperrors.NewValidationError(
@@ -168,15 +169,8 @@ func (uc *CheckProfileUseCase) validateFilters(profile *entities.Profile, filter
 				)
 			}
 		}
-	}
 
-	// Validate --exclude-control references exist
-	if len(filters.ExcludeControlIDs) > 0 {
-		controlMap := make(map[string]bool)
-		for _, ctrl := range profile.Controls.Items {
-			controlMap[ctrl.ID] = true
-		}
-
+		// Validate --exclude-control references exist
 		for _, id := range filters.ExcludeControlIDs {
 			if !controlMap[id] {
 				return apperrors.NewValidationError(
