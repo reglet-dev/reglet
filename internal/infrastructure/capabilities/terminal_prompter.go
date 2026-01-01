@@ -66,8 +66,8 @@ func (p *TerminalPrompter) PromptForCapabilityWithInfo(
 		Value(&selection).
 		Run()
 	if err != nil {
-		// Handle cancellation (Ctrl+C) as denial
-		return false, false, nil
+		// Return error if huh selection failed or was cancelled
+		return false, false, err
 	}
 
 	switch selection {
@@ -109,24 +109,24 @@ func (p *TerminalPrompter) displayBroadCapabilityWarning(
 }
 
 // describeBroadRisk explains the security implications of a broad capability.
-func (p *TerminalPrompter) describeBroadRisk(cap capabilities.Capability) string {
-	switch cap.Kind {
+func (p *TerminalPrompter) describeBroadRisk(capability capabilities.Capability) string {
+	switch capability.Kind {
 	case "fs":
-		if strings.Contains(cap.Pattern, "/**") || strings.Contains(cap.Pattern, "**") {
+		if strings.Contains(capability.Pattern, "/**") || strings.Contains(capability.Pattern, "**") {
 			return "Plugin can access ALL files on the system"
 		}
-		if strings.Contains(cap.Pattern, "/etc") {
+		if strings.Contains(capability.Pattern, "/etc") {
 			return "Plugin can access sensitive system configuration"
 		}
-		if strings.Contains(cap.Pattern, "/root") || strings.Contains(cap.Pattern, "/home") {
+		if strings.Contains(capability.Pattern, "/root") || strings.Contains(capability.Pattern, "/home") {
 			return "Plugin can access user home directories and private files"
 		}
 	case "exec":
-		if cap.Pattern == "bash" || cap.Pattern == "sh" || strings.Contains(cap.Pattern, "/bin/") {
+		if capability.Pattern == "bash" || capability.Pattern == "sh" || strings.Contains(capability.Pattern, "/bin/") {
 			return "Plugin can execute arbitrary shell commands"
 		}
 	case "network":
-		if cap.Pattern == "*" || cap.Pattern == "outbound:*" {
+		if capability.Pattern == "*" || capability.Pattern == "outbound:*" {
 			return "Plugin can connect to any host on the internet"
 		}
 	}

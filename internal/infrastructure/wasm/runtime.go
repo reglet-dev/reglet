@@ -46,17 +46,18 @@ func NewRuntimeWithCapabilities(
 	// 0 = default (256MB)
 	// -1 = unlimited
 	// >0 = explicit limit in MB
-	if memoryLimitMB == 0 {
+	switch {
+	case memoryLimitMB == 0:
 		memoryLimitMB = 256 // Default: 256MB
 		slog.Info("using default WASM memory limit", "mb", memoryLimitMB)
-	} else if memoryLimitMB == -1 {
+	case memoryLimitMB == -1:
 		slog.Warn("WASM memory limit disabled (unlimited memory)")
 		// Pass to wazero as is (unlimited)
-	} else if memoryLimitMB > 0 {
+	case memoryLimitMB > 0:
 		if memoryLimitMB < 16 {
 			slog.Warn("WASM memory limit very low, plugins may fail", "mb", memoryLimitMB)
 		}
-	} else {
+	default:
 		return nil, fmt.Errorf("invalid WASM memory limit: %d (must be >= -1)", memoryLimitMB)
 	}
 

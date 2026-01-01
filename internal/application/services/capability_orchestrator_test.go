@@ -177,31 +177,31 @@ func TestExtractProfileCapabilities_CommandPlugin(t *testing.T) {
 
 func TestExtractProfileCapabilities_NetworkPlugins(t *testing.T) {
 	tests := []struct {
-		name           string
-		pluginName     string
-		config         map[string]interface{}
-		expectedKind   string
+		name            string
+		pluginName      string
+		config          map[string]interface{}
+		expectedKind    string
 		expectedPattern string
 	}{
 		{
-			name:           "HTTP with URL",
-			pluginName:     "http",
-			config:         map[string]interface{}{"url": "https://api.example.com"},
-			expectedKind:   "network",
+			name:            "HTTP with URL",
+			pluginName:      "http",
+			config:          map[string]interface{}{"url": "https://api.example.com"},
+			expectedKind:    "network",
 			expectedPattern: "outbound:https://api.example.com",
 		},
 		{
-			name:           "TCP with host",
-			pluginName:     "tcp",
-			config:         map[string]interface{}{"host": "database.example.com:5432"},
-			expectedKind:   "network",
+			name:            "TCP with host",
+			pluginName:      "tcp",
+			config:          map[string]interface{}{"host": "database.example.com:5432"},
+			expectedKind:    "network",
 			expectedPattern: "outbound:database.example.com:5432",
 		},
 		{
-			name:           "DNS with host",
-			pluginName:     "dns",
-			config:         map[string]interface{}{"host": "example.com"},
-			expectedKind:   "network",
+			name:            "DNS with host",
+			pluginName:      "dns",
+			config:          map[string]interface{}{"host": "example.com"},
+			expectedKind:    "network",
 			expectedPattern: "outbound:example.com",
 		},
 	}

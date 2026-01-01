@@ -21,9 +21,9 @@ import (
 // CapabilityInfo contains metadata about a capability request.
 type CapabilityInfo struct {
 	Capability      capabilities.Capability
-	IsProfileBased  bool   // True if extracted from profile config
-	PluginName      string // Which plugin requested this
-	IsBroad         bool   // True if pattern is overly permissive
+	IsProfileBased  bool                     // True if extracted from profile config
+	PluginName      string                   // Which plugin requested this
+	IsBroad         bool                     // True if pattern is overly permissive
 	ProfileSpecific *capabilities.Capability // Profile-specific alternative if available
 }
 
@@ -71,7 +71,9 @@ func (o *CapabilityOrchestrator) CollectCapabilities(ctx context.Context, profil
 
 	caps, err := o.CollectRequiredCapabilities(ctx, profile, runtime, pluginDir)
 	if err != nil {
-		runtime.Close(ctx)
+		if closeErr := runtime.Close(ctx); closeErr != nil {
+			slog.ErrorContext(ctx, "failed to close temporary runtime", "error", closeErr)
+		}
 		return nil, nil, err
 	}
 
@@ -299,9 +301,9 @@ func (o *CapabilityOrchestrator) extractProfileCapabilities(profile *entities.Pr
 }
 
 // isBroadCapability checks if a capability pattern is overly permissive.
-func isBroadCapability(cap capabilities.Capability) bool {
+func isBroadCapability(capability capabilities.Capability) bool {
 	// Filesystem broad patterns
-	if cap.Kind == "fs" {
+	if capability.Kind == "fs" {
 		broadPatterns := []string{
 			"**",           // All files (legacy)
 			"/**",          // Root filesystem
@@ -317,27 +319,51 @@ func isBroadCapability(cap capabilities.Capability) bool {
 			"write:/home/**",
 		}
 		for _, pattern := range broadPatterns {
-			if cap.Pattern == pattern {
+			if capability.Pattern == pattern {
 				return true
 			}
 		}
 	}
 
 	// Execution broad patterns
-	if cap.Kind == "exec" {
+	if capability.Kind == "exec" {
 		// Any shell interpreter is broad
 		shells := []string{"bash", "sh", "zsh", "fish", "/bin/bash", "/bin/sh"}
 		for _, shell := range shells {
-			if cap.Pattern == shell {
+			if capability.Pattern == shell {
+				return true
+			}
+		}
+
+		// Interpreters without specific script paths are broad
+		// They allow arbitrary code execution via flags like -c, -e, -r
+		interpreters := []string{
+			"python", "python2", "python3",
+			"perl",
+			"ruby",
+			"node", "nodejs",
+			"php",
+			"lua",
+			"awk", "gawk", "mawk",
+		}
+
+		for _, interp := range interpreters {
+			// Pattern is just the interpreter name (e.g., "python")
+			if capability.Pattern == interp {
+				return true // Broad - allows python -c "anything"
+			}
+
+			// Pattern explicitly allows all (e.g., "python:*")
+			if strings.HasPrefix(capability.Pattern, interp+":*") {
 				return true
 			}
 		}
 	}
 
 	// Network broad patterns
-	if cap.Kind == "network" {
+	if capability.Kind == "network" {
 		// Wildcard hosts or ports
-		if cap.Pattern == "*" || cap.Pattern == "outbound:*" {
+		if capability.Pattern == "*" || capability.Pattern == "outbound:*" {
 			return true
 		}
 	}
@@ -497,24 +523,24 @@ func (o *CapabilityOrchestrator) findMissingCapabilities(required, granted capab
 }
 
 // describeBroadRisk explains the security implications of a broad capability.
-func (o *CapabilityOrchestrator) describeBroadRisk(cap capabilities.Capability) string {
-	switch cap.Kind {
+func (o *CapabilityOrchestrator) describeBroadRisk(capability capabilities.Capability) string {
+	switch capability.Kind {
 	case "fs":
-		if strings.Contains(cap.Pattern, "/**") || strings.Contains(cap.Pattern, "**") {
+		if strings.Contains(capability.Pattern, "/**") || strings.Contains(capability.Pattern, "**") {
 			return "Plugin can access ALL files on the system"
 		}
-		if strings.Contains(cap.Pattern, "/etc") {
+		if strings.Contains(capability.Pattern, "/etc") {
 			return "Plugin can access sensitive system configuration"
 		}
-		if strings.Contains(cap.Pattern, "/root") || strings.Contains(cap.Pattern, "/home") {
+		if strings.Contains(capability.Pattern, "/root") || strings.Contains(capability.Pattern, "/home") {
 			return "Plugin can access user home directories and private files"
 		}
 	case "exec":
-		if cap.Pattern == "bash" || cap.Pattern == "sh" || strings.Contains(cap.Pattern, "/bin/") {
+		if capability.Pattern == "bash" || capability.Pattern == "sh" || strings.Contains(capability.Pattern, "/bin/") {
 			return "Plugin can execute arbitrary shell commands"
 		}
 	case "network":
-		if cap.Pattern == "*" || cap.Pattern == "outbound:*" {
+		if capability.Pattern == "*" || capability.Pattern == "outbound:*" {
 			return "Plugin can connect to any host on the internet"
 		}
 	}
