@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"runtime"
 	"time"
 
 	"github.com/expr-lang/expr/vm"
@@ -47,9 +48,26 @@ type ExecutionConfig struct {
 
 // DefaultExecutionConfig returns sensible defaults for parallel execution.
 func DefaultExecutionConfig() ExecutionConfig {
+	numCPU := runtime.NumCPU()
+
+	// Default to NumCPU for controls, but at least 4 even on small systems
+	maxControls := numCPU
+	if maxControls < 4 {
+		maxControls = 4
+	}
+
+	// Observations are within a control, so we use a smaller multiple of NumCPU
+	maxObs := numCPU / 2
+	if maxObs < 2 {
+		maxObs = 2
+	}
+	if maxObs > 10 {
+		maxObs = 10 // Cap observations per control to avoid too much nesting
+	}
+
 	return ExecutionConfig{
-		MaxConcurrentControls:     10, // Reasonable default
-		MaxConcurrentObservations: 5,  // Conservative to avoid overwhelming systems
+		MaxConcurrentControls:     maxControls,
+		MaxConcurrentObservations: maxObs,
 		Parallel:                  true,
 	}
 }

@@ -191,7 +191,7 @@ func TestCommandPlugin_Capabilities(t *testing.T) {
 		require.NotNil(t, result.Evidence)
 		assert.False(t, result.Evidence.Status, "Should fail without shell capability")
 		require.NotNil(t, result.Evidence.Error, "Evidence.Error should be set for capability error")
-		assert.Contains(t, result.Evidence.Error.Message, "shell execution requires")
+		assert.Contains(t, result.Evidence.Error.Message, "shell requires")
 	})
 }
 
