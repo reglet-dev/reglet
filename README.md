@@ -15,22 +15,29 @@ Unlike traditional tools that run scripts with full host privileges, Reglet enfo
 - [Why Reglet?](#why-reglet)
 - [Architecture](#architecture)
 - [Quick Start](#quick-start-30-seconds)
+- [Security Model](#security-model)
+- [What Does It Check?](#what-does-it-check)
 - [Installation](#installation)
 - [Examples](#examples)
 - [Community](#community)
 
 ## Core Features
-- Secure Sandbox: All validation logic runs inside a CGO-free WebAssembly runtime (wazero). Plugins are memory-safe and isolated from the host OS.
+- **Secure Sandbox**: All validation logic runs inside a CGO-free WebAssembly runtime (wazero). Plugins are memory-safe and isolated from the host OS.
 
-- Capability-Based Security: "Least Privilege" is enforced at the system call level. A plugin cannot access files, networks, or environment variables unless explicitly allowed.
+- **Capability-Based Security**: "Least Privilege" is enforced at the system call level. A plugin cannot access files, networks, or environment variables unless explicitly allowed. Reglet automatically extracts specific permissions from your profiles (e.g., only `/etc/ssh/sshd_config`) instead of requesting broad access (e.g., all files).
 
-- Declarative Profiles: Define validation rules in simple, versioned YAML.
+- **Configurable Security Levels**: Choose your security posture with `--security` flag:
+  - `strict` - Deny broad capabilities automatically
+  - `standard` - Warn and prompt before granting (default)
+  - `permissive` - Auto-grant for trusted environments
 
-- Automatic Redaction: Sensitive data (secrets, tokens) in plugin output is automatically detected and redacted or hashed before reporting.
+- **Declarative Profiles**: Define validation rules in simple, versioned YAML.
 
-- Parallel Execution: Optimized for CI/CD with concurrent execution of independent controls.
+- **Automatic Redaction**: Sensitive data (secrets, tokens) in plugin output is automatically detected and redacted or hashed before reporting.
 
-- Standardized Output: Generates machine-readable results (JSON, YAML, JUnit, SARIF) ready for compliance platforms or OSCAL integration (future).
+- **Parallel Execution**: Optimized for CI/CD with concurrent execution of independent controls.
+
+- **Standardized Output**: Generates machine-readable results (JSON, YAML, JUnit, SARIF) ready for compliance platforms or OSCAL integration (future).
 
 
 ## Architecture
@@ -64,6 +71,63 @@ make build
 #
 # 3 passed, 0 failed
 ```
+
+## Security Model
+
+Reglet implements a **capability-based security model** with automatic permission discovery:
+
+### Profile-Based Capability Discovery
+When you run a profile, Reglet analyzes your observation configs to extract the **minimum required permissions**:
+
+```yaml
+observations:
+  - plugin: file
+    config:
+      path: /etc/ssh/sshd_config  # Only requests: fs:read:/etc/ssh/sshd_config
+```
+
+Instead of requesting broad access like `read:**` (all files), Reglet requests only what your profile needs.
+
+### Security Levels
+
+Control how Reglet handles capability requests with the `--security` flag:
+
+**Strict Mode** (`--security=strict`)
+```bash
+reglet check profile.yaml --security=strict
+```
+- Automatically denies broad capabilities (e.g., `/**`, `**`, `/bin/bash`)
+- Best for: Production CI/CD pipelines
+- Example: Requesting `fs:read:/` would be denied
+
+**Standard Mode** (default)
+```bash
+reglet check profile.yaml  # or --security=standard
+```
+- Warns about broad capabilities and prompts for approval
+- Shows security risks and profile-specific alternatives
+- Best for: Development and interactive use
+
+**Permissive Mode** (`--security=permissive`)
+```bash
+reglet check profile.yaml --security=permissive
+```
+- Auto-grants all capabilities without prompting
+- Best for: Automated testing, trusted environments
+- Use with `--trust-plugins` for completely non-interactive execution
+
+### Configuration File
+
+Set your preferred security level in `~/.reglet/config.yaml`:
+
+```yaml
+security:
+  level: standard  # strict, standard, or permissive
+  custom_broad_patterns:  # Optional: define additional broad patterns
+    - "fs:write:/tmp/**"
+```
+
+Command-line flags override config file settings.
 
 ## What Does It Check?
 
@@ -136,7 +200,9 @@ Reglet is in active development. Core features work, but expect breaking changes
 **v0.2.0-alpha** (Current)
 - ✅ Core execution engine
 - ✅ File, HTTP, DNS, TCP and command plugins
-- ✅ Capability system
+- ✅ Capability system with profile-based discovery
+- ✅ Configurable security levels (strict/standard/permissive)
+- ✅ Automatic secret redaction
 - ✅ Output formatters (Table, JSON, YAML, JUnit, SARIF)
 
 **v0.3.0-alpha**
