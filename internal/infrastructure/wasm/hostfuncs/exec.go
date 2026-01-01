@@ -134,9 +134,13 @@ func ExecCommand(ctx context.Context, mod api.Module, stack []uint64, checker *C
 		cmd.Env = []string{} // Explicitly empty to block environment inheritance
 	}
 
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+	// 10MB limit for stdout/stderr to prevent OOM DoS
+	const MaxOutputSize = 10 * 1024 * 1024
+
+	stdout := NewBoundedBuffer(MaxOutputSize)
+	stderr := NewBoundedBuffer(MaxOutputSize)
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
 
 	start := time.Now()
 	err := cmd.Run()
@@ -164,6 +168,13 @@ func ExecCommand(ctx context.Context, mod api.Module, stack []uint64, checker *C
 		}
 	}
 
+	if stdout.Truncated || stderr.Truncated {
+		slog.WarnContext(ctx, "command output truncated",
+			"command", request.Command,
+			"stdout_truncated", stdout.Truncated,
+			"stderr_truncated", stderr.Truncated)
+	}
+
 	slog.DebugContext(ctx, "executed command",
 		"command", request.Command,
 		"args", request.Args,
@@ -180,6 +191,45 @@ func ExecCommand(ctx context.Context, mod api.Module, stack []uint64, checker *C
 		IsTimeout:  isTimeout,
 		Error:      errorDetail,
 	})
+}
+
+// BoundedBuffer is a bytes.Buffer wrapper that limits the size of written data.
+type BoundedBuffer struct {
+	buffer    bytes.Buffer
+	limit     int
+	Truncated bool
+}
+
+// NewBoundedBuffer creates a new BoundedBuffer with the specified limit.
+func NewBoundedBuffer(limit int) *BoundedBuffer {
+	return &BoundedBuffer{
+		limit: limit,
+	}
+}
+
+// Write implements io.Writer.
+func (b *BoundedBuffer) Write(p []byte) (n int, err error) {
+	if b.buffer.Len() >= b.limit {
+		b.Truncated = true
+		return len(p), nil // Pretend we wrote it all to satisfy io.Writer contract
+	}
+
+	remaining := b.limit - b.buffer.Len()
+	if len(p) > remaining {
+		b.Truncated = true
+		n, err = b.buffer.Write(p[:remaining])
+		if err != nil {
+			return n, err
+		}
+		return len(p), nil // Return len(p) to avoid short write error
+	}
+
+	return b.buffer.Write(p)
+}
+
+// String returns the buffer contents as a string.
+func (b *BoundedBuffer) String() string {
+	return b.buffer.String()
 }
 
 // isShellExecution detects if a command is a shell invocation.
