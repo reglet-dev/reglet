@@ -76,3 +76,71 @@ func TestConfig_ToHostFuncsCapabilities(t *testing.T) {
 	assert.Equal(t, "network:outbound", caps[1].Kind)
 	assert.Equal(t, "*.example.com:443", caps[1].Pattern)
 }
+
+func TestSecurityConfig_GetSecurityLevel(t *testing.T) {
+	tests := []struct {
+		name     string
+		level    string
+		expected SecurityLevel
+	}{
+		{
+			name:     "strict level",
+			level:    "strict",
+			expected: SecurityLevelStrict,
+		},
+		{
+			name:     "standard level",
+			level:    "standard",
+			expected: SecurityLevelStandard,
+		},
+		{
+			name:     "permissive level",
+			level:    "permissive",
+			expected: SecurityLevelPermissive,
+		},
+		{
+			name:     "empty defaults to standard",
+			level:    "",
+			expected: SecurityLevelStandard,
+		},
+		{
+			name:     "invalid defaults to standard",
+			level:    "invalid",
+			expected: SecurityLevelStandard,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &SecurityConfig{
+				Level: tt.level,
+			}
+			assert.Equal(t, tt.expected, cfg.GetSecurityLevel())
+		})
+	}
+}
+
+func TestConfigLoader_Load_WithSecurityConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	yaml := `
+security:
+  level: strict
+  custom_broad_patterns:
+    - "fs:write:/tmp/**"
+    - "network:outbound:*"
+`
+	err := os.WriteFile(configPath, []byte(yaml), 0600)
+	require.NoError(t, err)
+
+	loader := NewConfigLoader()
+	cfg, err := loader.Load(configPath)
+
+	require.NoError(t, err)
+	assert.Equal(t, "strict", cfg.Security.Level)
+	assert.Equal(t, SecurityLevelStrict, cfg.Security.GetSecurityLevel())
+	assert.Len(t, cfg.Security.CustomBroadPatterns, 2)
+	assert.Contains(t, cfg.Security.CustomBroadPatterns, "fs:write:/tmp/**")
+	assert.Contains(t, cfg.Security.CustomBroadPatterns, "network:outbound:*")
+}
