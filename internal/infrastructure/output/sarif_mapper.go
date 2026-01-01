@@ -271,6 +271,7 @@ func (m *sarifMapper) getInt(data map[string]interface{}, keys ...string) int {
 }
 
 // registerArtifact adds a file to the artifacts map (deduplicated).
+// registerArtifact adds a file to the artifacts map (deduplicated).
 func (m *sarifMapper) registerArtifact(path string, data map[string]interface{}) {
 	uri := m.normalizeURI(path)
 	if _, exists := m.artifacts[uri]; exists {
@@ -279,6 +280,24 @@ func (m *sarifMapper) registerArtifact(path string, data map[string]interface{})
 
 	artifact := sarif.NewArtifact().
 		WithLocation(sarif.NewArtifactLocation().WithURI(uri))
+
+	// Attempt to read file content to embed in SARIF
+	// This allows viewers to show the code context
+	absPath, err := filepath.Abs(path)
+	if err == nil {
+		// Limit content size to prevents massive SARIF files
+		const maxContentSize = 512 * 1024 // 512KB limit
+
+		// Use os.Stat to check size first
+		if info, err := os.Stat(absPath); err == nil && !info.IsDir() {
+			if info.Size() < maxContentSize {
+				content, err := os.ReadFile(absPath)
+				if err == nil {
+					artifact.WithContents(sarif.NewArtifactContent().WithText(string(content)))
+				}
+			}
+		}
+	}
 
 	// Add properties from evidence
 	props := sarif.NewPropertyBag()
