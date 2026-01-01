@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"sync"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
@@ -21,6 +22,7 @@ var globalCache = wazero.NewCompilationCache()
 // Runtime manages WASM execution.
 type Runtime struct {
 	runtime             wazero.Runtime
+	mu                  sync.RWMutex       // Protects plugins map from concurrent access
 	plugins             map[string]*Plugin // Loaded plugins by name
 	version             build.Info
 	redactor            *redaction.Redactor                  // Optional redactor for plugin output
@@ -94,7 +96,19 @@ func NewRuntimeWithCapabilities(
 
 // LoadPlugin compiles and caches a plugin.
 func (r *Runtime) LoadPlugin(ctx context.Context, name string, wasmBytes []byte) (*Plugin, error) {
-	// Check if plugin is already loaded
+	// Fast path: Check if plugin is already loaded
+	r.mu.RLock()
+	if p, ok := r.plugins[name]; ok {
+		r.mu.RUnlock()
+		return p, nil
+	}
+	r.mu.RUnlock()
+
+	// Slow path: Need to compile and load the plugin (write lock)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// Double-check: Another goroutine may have loaded it while we waited for the lock
 	if p, ok := r.plugins[name]; ok {
 		return p, nil
 	}
@@ -129,8 +143,10 @@ func (r *Runtime) LoadPlugin(ctx context.Context, name string, wasmBytes []byte)
 	return plugin, nil
 }
 
-// GetPlugin retrieves a loaded plugin by name
+// GetPlugin retrieves a loaded plugin by name.
 func (r *Runtime) GetPlugin(name string) (*Plugin, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	p, ok := r.plugins[name]
 	return p, ok
 }
@@ -139,7 +155,10 @@ func (r *Runtime) GetPlugin(name string) (*Plugin, bool) {
 // It loads the plugin (if not already loaded) and retrieves its JSON Schema.
 func (r *Runtime) GetPluginSchema(ctx context.Context, pluginName string) ([]byte, error) {
 	// Check if plugin is already loaded
+	r.mu.RLock()
 	plugin, ok := r.plugins[pluginName]
+	r.mu.RUnlock()
+
 	if !ok {
 		// Plugin not loaded - need to load it first
 		// This requires finding the plugin WASM file
