@@ -14,7 +14,8 @@ import (
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/output"
 )
 
-var (
+// CheckOptions holds the configuration for the check command.
+type CheckOptions struct {
 	format              string
 	outFile             string
 	trustPlugins        bool
@@ -26,13 +27,19 @@ var (
 	excludeControlIDs   []string
 	filterExpr          string
 	includeDependencies bool
-)
+}
 
-// checkCmd implements the check command.
-var checkCmd = &cobra.Command{
-	Use:   "check <profile.yaml>",
-	Short: "Execute compliance checks from a profile",
-	Long: `Load a profile configuration and execute the defined validation controls.
+func init() {
+	rootCmd.AddCommand(newCheckCmd())
+}
+
+func newCheckCmd() *cobra.Command {
+	opts := &CheckOptions{}
+
+	cmd := &cobra.Command{
+		Use:   "check <profile.yaml>",
+		Short: "Execute compliance checks from a profile",
+		Long: `Load a profile configuration and execute the defined validation controls.
 The profile must be a valid YAML file defining the checks to run.
 
 Filtering:
@@ -43,36 +50,35 @@ Filtering:
   --exclude-tags slow           Exclude controls with 'slow' tag
   --filter "severity == 'high'" Advanced filtering expression
   --include-dependencies        Include dependencies of selected controls`,
-	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return runCheckAction(cmd.Context(), args[0])
-	},
-}
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runCheckAction(cmd.Context(), args[0], opts)
+		},
+	}
 
-func init() {
-	rootCmd.AddCommand(checkCmd)
-
-	checkCmd.Flags().StringVar(&format, "format", "table", "Output format: table, json, yaml, junit, sarif")
-	checkCmd.Flags().StringVarP(&outFile, "output", "o", "", "Output file path (default: stdout)")
-	checkCmd.Flags().BoolVar(&trustPlugins, "trust-plugins", false, "Auto-grant all plugin capabilities (use with caution)")
-	checkCmd.Flags().StringVar(&securityLevel, "security", "", "Security level: strict, standard, permissive (default: standard or config file)")
+	cmd.Flags().StringVar(&opts.format, "format", "table", "Output format: table, json, yaml, junit, sarif")
+	cmd.Flags().StringVarP(&opts.outFile, "output", "o", "", "Output file path (default: stdout)")
+	cmd.Flags().BoolVar(&opts.trustPlugins, "trust-plugins", false, "Auto-grant all plugin capabilities (use with caution)")
+	cmd.Flags().StringVar(&opts.securityLevel, "security", "", "Security level: strict, standard, permissive (default: standard or config file)")
 
 	// Filtering flags
-	checkCmd.Flags().StringSliceVar(&includeTags, "tags", nil, "Run controls with these tags (comma-separated)")
-	checkCmd.Flags().StringSliceVar(&includeSeverities, "severity", nil, "Run controls with these severities (comma-separated)")
-	checkCmd.Flags().StringSliceVar(&includeControlIDs, "control", nil, "Run specific controls by ID (exclusive, comma-separated)")
-	checkCmd.Flags().StringSliceVar(&excludeTags, "exclude-tags", nil, "Exclude controls with these tags (comma-separated)")
-	checkCmd.Flags().StringSliceVar(&excludeControlIDs, "exclude-control", nil, "Exclude specific controls by ID (comma-separated)")
-	checkCmd.Flags().StringVar(&filterExpr, "filter", "", "Advanced filter expression (e.g. \"severity == 'critical'\")")
-	checkCmd.Flags().BoolVar(&includeDependencies, "include-dependencies", false, "Include dependencies of selected controls")
+	cmd.Flags().StringSliceVar(&opts.includeTags, "tags", nil, "Run controls with these tags (comma-separated)")
+	cmd.Flags().StringSliceVar(&opts.includeSeverities, "severity", nil, "Run controls with these severities (comma-separated)")
+	cmd.Flags().StringSliceVar(&opts.includeControlIDs, "control", nil, "Run specific controls by ID (exclusive, comma-separated)")
+	cmd.Flags().StringSliceVar(&opts.excludeTags, "exclude-tags", nil, "Exclude controls with these tags (comma-separated)")
+	cmd.Flags().StringSliceVar(&opts.excludeControlIDs, "exclude-control", nil, "Exclude specific controls by ID (comma-separated)")
+	cmd.Flags().StringVar(&opts.filterExpr, "filter", "", "Advanced filter expression (e.g. \"severity == 'critical'\")")
+	cmd.Flags().BoolVar(&opts.includeDependencies, "include-dependencies", false, "Include dependencies of selected controls")
+
+	return cmd
 }
 
 // runCheckAction encapsulates the logic for the check command.
-func runCheckAction(ctx context.Context, profilePath string) error {
+func runCheckAction(ctx context.Context, profilePath string, opts *CheckOptions) error {
 	// 1. Create dependency injection container
 	c, err := container.New(container.Options{
-		TrustPlugins:  trustPlugins,
-		SecurityLevel: securityLevel,
+		TrustPlugins:  opts.trustPlugins,
+		SecurityLevel: opts.securityLevel,
 		Logger:        slog.Default(),
 	})
 	if err != nil {
@@ -80,7 +86,7 @@ func runCheckAction(ctx context.Context, profilePath string) error {
 	}
 
 	// 2. Build request from CLI flags
-	request := buildCheckProfileRequest(profilePath)
+	request := buildCheckProfileRequest(profilePath, opts)
 
 	// 3. Execute use case
 	response, err := c.CheckProfileUseCase().Execute(ctx, request)
@@ -89,7 +95,7 @@ func runCheckAction(ctx context.Context, profilePath string) error {
 	}
 
 	// 4. Format and write output
-	if err := writeOutput(response.ExecutionResult, profilePath); err != nil {
+	if err := writeOutput(response.ExecutionResult, profilePath, opts); err != nil {
 		return fmt.Errorf("failed to write output: %w", err)
 	}
 
@@ -105,20 +111,20 @@ func runCheckAction(ctx context.Context, profilePath string) error {
 }
 
 // buildCheckProfileRequest maps CLI flags to a CheckProfileRequest DTO.
-func buildCheckProfileRequest(profilePath string) dto.CheckProfileRequest {
+func buildCheckProfileRequest(profilePath string, opts *CheckOptions) dto.CheckProfileRequest {
 	return dto.CheckProfileRequest{
 		ProfilePath: profilePath,
 		Filters: dto.FilterOptions{
-			IncludeTags:         includeTags,
-			IncludeSeverities:   includeSeverities,
-			IncludeControlIDs:   includeControlIDs,
-			ExcludeTags:         excludeTags,
-			ExcludeControlIDs:   excludeControlIDs,
-			FilterExpression:    filterExpr,
-			IncludeDependencies: includeDependencies,
+			IncludeTags:         opts.includeTags,
+			IncludeSeverities:   opts.includeSeverities,
+			IncludeControlIDs:   opts.includeControlIDs,
+			ExcludeTags:         opts.excludeTags,
+			ExcludeControlIDs:   opts.excludeControlIDs,
+			FilterExpression:    opts.filterExpr,
+			IncludeDependencies: opts.includeDependencies,
 		},
 		Options: dto.CheckOptions{
-			TrustPlugins: trustPlugins,
+			TrustPlugins: opts.trustPlugins,
 		},
 		Metadata: dto.RequestMetadata{
 			RequestID: generateRequestID(),
@@ -127,11 +133,11 @@ func buildCheckProfileRequest(profilePath string) dto.CheckProfileRequest {
 }
 
 // writeOutput directs the execution result to the configured output destination.
-func writeOutput(result *execution.ExecutionResult, profilePath string) error {
+func writeOutput(result *execution.ExecutionResult, profilePath string, opts *CheckOptions) error {
 	writer := os.Stdout
-	if outFile != "" {
+	if opts.outFile != "" {
 		//nolint:gosec // G304: User-controlled output file path is intentional
-		file, err := os.Create(outFile)
+		file, err := os.Create(opts.outFile)
 		if err != nil {
 			return fmt.Errorf("failed to create output file: %w", err)
 		}
@@ -139,10 +145,10 @@ func writeOutput(result *execution.ExecutionResult, profilePath string) error {
 			_ = file.Close()
 		}()
 		writer = file
-		slog.Info("writing output", "file", outFile, "format", format)
+		slog.Info("writing output", "file", opts.outFile, "format", opts.format)
 	}
 
-	return formatOutput(writer, result, format, profilePath)
+	return formatOutput(writer, result, opts.format, profilePath)
 }
 
 // formatOutput applies the selected formatter to the execution result.
