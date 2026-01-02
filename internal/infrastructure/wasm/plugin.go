@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -89,10 +90,23 @@ func extractMountPath(pattern string) string {
 	// This handles cases like "/etc/hosts" → "/etc"
 	dir := filepath.Dir(path)
 
-	// Handle edge cases
+	// SECURITY FIX: Handle relative paths safely
+	// CRITICAL: Never mount host root (/) for relative paths!
 	if dir == "." {
-		// Relative path without parent → mount current directory
-		return "/"
+		// Relative path detected - mount current working directory, NOT root
+		cwd, err := os.Getwd()
+		if err != nil {
+			// If we can't determine CWD, log error and return empty string
+			// Empty string will be caught and skipped by extractFilesystemMounts
+			slog.Error("cannot determine current working directory for relative path capability",
+				"pattern", pattern,
+				"error", err)
+			return "" // Signal to skip this mount
+		}
+		slog.Warn("relative path in capability - mounting current working directory",
+			"pattern", pattern,
+			"mount_path", cwd)
+		return cwd
 	}
 
 	return dir
@@ -122,6 +136,14 @@ func (p *Plugin) extractFilesystemMounts() []fsMount {
 
 		// Extract mount path
 		mountPath := extractMountPath(pattern)
+
+		// Skip empty mount paths (indicates error in path extraction)
+		if mountPath == "" {
+			slog.Warn("skipping invalid capability pattern - could not determine safe mount path",
+				"plugin", p.name,
+				"pattern", cap.Pattern)
+			continue
+		}
 
 		// Warn about root access
 		if mountPath == "/" || pattern == "/**" {

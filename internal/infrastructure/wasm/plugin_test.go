@@ -225,6 +225,45 @@ func TestExtractMountPath(t *testing.T) {
 	}
 }
 
+// TestExtractMountPath_RelativePaths tests the security fix for relative paths
+// SECURITY: Relative paths should NEVER mount root (/) - they should mount CWD
+func TestExtractMountPath_RelativePaths(t *testing.T) {
+	// Get current working directory for comparison
+	cwd, err := os.Getwd()
+	require.NoError(t, err, "test setup: failed to get current directory")
+
+	tests := []struct {
+		name     string
+		pattern  string
+		expected string
+	}{
+		{
+			name:     "relative file without path",
+			pattern:  "foo.txt",
+			expected: cwd, // Should mount CWD, NOT root!
+		},
+		{
+			name:     "relative file with read prefix",
+			pattern:  "read:config.yaml",
+			expected: cwd, // Should mount CWD, NOT root!
+		},
+		{
+			name:     "relative file with write prefix",
+			pattern:  "write:output.log",
+			expected: cwd, // Should mount CWD, NOT root!
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := extractMountPath(tt.pattern)
+			assert.Equal(t, tt.expected, result,
+				"SECURITY: relative path '%s' must mount CWD (%s), NOT root (/)",
+				tt.pattern, cwd)
+		})
+	}
+}
+
 // TestPlugin_ExtractFilesystemMounts tests the extractFilesystemMounts method
 func TestPlugin_ExtractFilesystemMounts(t *testing.T) {
 	tests := []struct {
