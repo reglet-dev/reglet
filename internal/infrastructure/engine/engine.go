@@ -193,7 +193,7 @@ func (e *Engine) Execute(ctx context.Context, profile *entities.Profile) (*execu
 	// Execute controls
 	if e.config.Parallel && len(profile.Controls.Items) > 1 {
 		// Parallel execution of controls
-		if err := e.executeControlsParallel(ctx, profile.Controls.Items, result, requiredControls); err != nil {
+		if err := e.executeControlsWithWorkerPool(ctx, profile.Controls.Items, result, requiredControls); err != nil {
 			return nil, err
 		}
 	} else {
@@ -243,40 +243,274 @@ func (e *Engine) resolveDependencies(profile *entities.Profile) (map[string]bool
 	return required, nil
 }
 
-// executeControlsParallel executes controls in parallel, respecting dependencies.
-// Controls are organized into levels by BuildControlDAG, and each level is executed
-// sequentially while controls within a level run in parallel.
-func (e *Engine) executeControlsParallel(ctx context.Context, controls []entities.Control, result *execution.ExecutionResult, requiredDeps map[string]bool) error {
-	// Build dependency graph and get control levels
-	resolver := services.NewDependencyResolver()
-	levels, err := resolver.BuildControlDAG(controls)
-	if err != nil {
-		return fmt.Errorf("failed to build control dependency graph: %w", err)
+// workerPoolState manages the state of dependency-aware parallel execution.
+// Instead of organizing controls into levels with barriers, this approach
+// maintains a dynamic ready queue and executes controls as soon as their
+// dependencies are satisfied.
+type workerPoolState struct {
+	// Immutable after initialization (safe for concurrent reads)
+	controlByID map[string]entities.Control // Control lookup by ID
+	reverseDeps map[string][]string         // Control ID → list of dependent control IDs
+
+	// Mutable state (owned by coordinator goroutine)
+	inDegree      map[string]int  // Control ID → count of unmet dependencies
+	readyQueue    []string        // Control IDs ready to execute (dependencies satisfied)
+	completed     map[string]bool // Control IDs that have completed execution
+	totalControls int             // Total number of controls to execute
+
+	// Channels for work distribution and completion signaling
+	workChan chan string // Buffered channel for control IDs ready to execute
+	doneChan chan string // Unbuffered channel for completion signals
+
+	// Context and error handling
+	ctx      context.Context
+	cancel   context.CancelFunc
+	errGroup *errgroup.Group
+
+	// Execution dependencies
+	engine       *Engine
+	execResult   *execution.ExecutionResult
+	requiredDeps map[string]bool
+}
+
+// initializeWorkerPoolState builds the dependency graph and prepares initial state.
+// It validates dependencies, detects cycles, and creates the initial ready queue.
+func (e *Engine) initializeWorkerPoolState(
+	ctx context.Context,
+	controls []entities.Control,
+	result *execution.ExecutionResult,
+	requiredDeps map[string]bool,
+) (*workerPoolState, error) {
+	// Build dependency graph structures
+	controlByID := make(map[string]entities.Control)
+	inDegree := make(map[string]int)
+	reverseDeps := make(map[string][]string)
+
+	for _, ctrl := range controls {
+		controlByID[ctrl.ID] = ctrl
+		inDegree[ctrl.ID] = len(ctrl.DependsOn)
+
+		// Build reverse dependency map (control → dependents)
+		for _, depID := range ctrl.DependsOn {
+			reverseDeps[depID] = append(reverseDeps[depID], ctrl.ID)
+		}
 	}
 
-	// Execute each level sequentially, controls within level in parallel
-	for _, level := range levels {
-		// Create errgroup for this level
-		g, levelCtx := errgroup.WithContext(ctx)
+	// Validate all dependencies exist
+	for _, ctrl := range controls {
+		for _, depID := range ctrl.DependsOn {
+			if _, exists := controlByID[depID]; !exists {
+				return nil, fmt.Errorf("control %s depends on non-existent control %s", ctrl.ID, depID)
+			}
+		}
+	}
 
-		// Apply concurrency limit if specified
-		if e.config.MaxConcurrentControls > 0 {
-			g.SetLimit(e.config.MaxConcurrentControls)
+	// Detect cycles using existing DependencyResolver
+	resolver := services.NewDependencyResolver()
+	if _, err := resolver.BuildControlDAG(controls); err != nil {
+		return nil, err // Returns cycle error if detected
+	}
+
+	// Build initial ready queue (controls with no dependencies)
+	readyQueue := []string{}
+	for _, ctrl := range controls {
+		if inDegree[ctrl.ID] == 0 {
+			readyQueue = append(readyQueue, ctrl.ID)
+		}
+	}
+
+	// Create channels
+	// workChan is buffered to reduce blocking when workers finish
+	// doneChan is unbuffered to ensure completion handling completes before worker continues
+	maxConcurrent := e.config.MaxConcurrentControls
+	if maxConcurrent <= 0 {
+		maxConcurrent = 1 // Ensure at least 1 for buffer size
+	}
+	workChan := make(chan string, maxConcurrent)
+	doneChan := make(chan string)
+
+	// Create context and errgroup
+	groupCtx, cancel := context.WithCancel(ctx)
+	g, gCtx := errgroup.WithContext(groupCtx)
+	// Do not set g.SetLimit here. The number of goroutines is controlled by 
+	// numWorkers + 1 (coordinator) in executeControlsWithWorkerPool.
+	// Setting it to MaxConcurrentControls would cause deadlock if numWorkers == MaxConcurrentControls.
+
+	return &workerPoolState{
+		controlByID:   controlByID,
+		reverseDeps:   reverseDeps,
+		inDegree:      inDegree,
+		readyQueue:    readyQueue,
+		completed:     make(map[string]bool),
+		totalControls: len(controls),
+		workChan:      workChan,
+		doneChan:      doneChan,
+		ctx:           gCtx,
+		cancel:        cancel,
+		errGroup:      g,
+		engine:        e,
+		execResult:    result,
+		requiredDeps:  requiredDeps,
+	}, nil
+}
+
+// enqueueReadyControls sends ready controls from the queue to the work channel.
+// This is called by the coordinator after dependency updates.
+// It sends as many controls as the channel can accept without blocking.
+func (state *workerPoolState) enqueueReadyControls() {
+	for len(state.readyQueue) > 0 {
+		select {
+		case state.workChan <- state.readyQueue[0]:
+			// Successfully sent to worker, remove from queue
+			state.readyQueue = state.readyQueue[1:]
+		default:
+			// Channel full (all workers busy), stop trying
+			return
+		}
+	}
+}
+
+// handleControlCompletion processes a completed control by updating dependents.
+// When a control completes, it decrements the in-degree of all dependent controls.
+// Any dependent that reaches in-degree 0 becomes ready to execute.
+func (state *workerPoolState) handleControlCompletion(controlID string) {
+	// Mark as completed
+	state.completed[controlID] = true
+
+	// Update each dependent control
+	for _, dependentID := range state.reverseDeps[controlID] {
+		// Decrement in-degree (one less unmet dependency)
+		state.inDegree[dependentID]--
+
+		// If all dependencies are now satisfied, add to ready queue
+		if state.inDegree[dependentID] == 0 {
+			state.readyQueue = append(state.readyQueue, dependentID)
+		}
+	}
+}
+
+// coordinateExecution is the central coordinator that manages control execution.
+// It runs in a single goroutine, owning all mutable state (inDegree, readyQueue).
+// This design eliminates the need for fine-grained locking.
+//
+// Flow:
+// 1. Enqueue initial batch of ready controls (in-degree 0)
+// 2. Wait for completion signals on doneChan
+// 3. Update dependencies and enqueue newly-ready controls
+// 4. Repeat until all controls complete
+func (state *workerPoolState) coordinateExecution() error {
+	// Enqueue initial batch of ready controls
+	state.enqueueReadyControls()
+
+	completedCount := 0
+
+	for completedCount < state.totalControls {
+		select {
+		case controlID := <-state.doneChan:
+			// Control completed, update state
+			completedCount++
+
+			// Update dependents and find newly-ready controls
+			state.handleControlCompletion(controlID)
+
+			// Enqueue newly-ready controls to work channel
+			state.enqueueReadyControls()
+
+		case <-state.ctx.Done():
+			// Context cancelled (user interrupt or timeout)
+			return state.ctx.Err()
+		}
+	}
+
+	// All controls completed, signal workers to exit
+	close(state.workChan)
+	return nil
+}
+
+// executeWorker runs in a goroutine, pulling controls from workChan and executing them.
+// Workers are stateless - all state is in workerPoolState.
+// Workers exit when workChan is closed by the coordinator.
+func (state *workerPoolState) executeWorker() {
+	for controlID := range state.workChan {
+		// Lookup control (immutable map, safe for concurrent reads)
+		ctrl, exists := state.controlByID[controlID]
+		if !exists {
+			// Should never happen (validated during initialization)
+			continue
 		}
 
-		// Execute all controls in this level in parallel
-		for _, ctrl := range level.Controls {
-			g.Go(func() error {
-				controlResult := e.executeControl(levelCtx, ctrl, result, requiredDeps)
-				result.AddControlResult(controlResult)
-				return nil // Don't fail fast on individual control errors
-			})
-		}
+		// Execute control using existing executeControl method
+		// This handles dependency checking, observation execution, and status aggregation
+		controlResult := state.engine.executeControl(
+			state.ctx,
+			ctrl,
+			state.execResult,
+			state.requiredDeps,
+		)
 
-		// Wait for all controls in this level to complete before moving to next level
-		if err := g.Wait(); err != nil {
-			return fmt.Errorf("level %d execution failed: %w", level.Level, err)
+		// Store result (thread-safe via ExecutionResult.AddControlResult mutex)
+		state.execResult.AddControlResult(controlResult)
+
+		// Signal completion to coordinator
+		select {
+		case state.doneChan <- controlID:
+			// Completion signaled successfully
+		case <-state.ctx.Done():
+			// Context cancelled, exit worker
+			return
 		}
+	}
+}
+
+// executeControlsWithWorkerPool executes controls in parallel using a dependency-aware worker pool.
+// This replaces the level-based barrier approach with a more efficient strategy that executes
+// controls as soon as their dependencies are satisfied.
+//
+// Algorithm:
+// 1. Initialize state: build dependency graph, validate, create ready queue
+// 2. Launch worker goroutines: pull from workChan, execute, signal completion
+// 3. Launch coordinator goroutine: handle completions, update dependencies, enqueue ready controls
+// 4. Wait for all goroutines to complete
+//
+// Performance: Controls execute immediately when dependencies satisfied (no level barriers).
+func (e *Engine) executeControlsWithWorkerPool(
+	ctx context.Context,
+	controls []entities.Control,
+	result *execution.ExecutionResult,
+	requiredDeps map[string]bool,
+) error {
+	// Initialize worker pool state (build dependency graph, validate)
+	state, err := e.initializeWorkerPoolState(ctx, controls, result, requiredDeps)
+	if err != nil {
+		return fmt.Errorf("failed to initialize worker pool: %w", err)
+	}
+	defer state.cancel() // Ensure cleanup on exit
+
+	// Determine number of workers
+	numWorkers := e.config.MaxConcurrentControls
+	if numWorkers <= 0 {
+		numWorkers = runtime.NumCPU()
+		if numWorkers < 4 {
+			numWorkers = 4
+		}
+	}
+
+	// Launch worker goroutines
+	for i := 0; i < numWorkers; i++ {
+		state.errGroup.Go(func() error {
+			state.executeWorker()
+			return nil // Workers don't fail-fast, they record errors in results
+		})
+	}
+
+	// Launch coordinator goroutine
+	state.errGroup.Go(func() error {
+		return state.coordinateExecution()
+	})
+
+	// Wait for all workers and coordinator to complete
+	if err := state.errGroup.Wait(); err != nil {
+		return fmt.Errorf("worker pool execution failed: %w", err)
 	}
 
 	return nil

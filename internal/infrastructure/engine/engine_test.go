@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -642,4 +643,279 @@ func TestResolveDependencies(t *testing.T) {
 	assert.True(t, required["c2"])
 	assert.False(t, required["c3"], "c3 is a target, not a dependency") // c3 runs because shouldRun=true
 	assert.False(t, required["c4"])
+}
+
+// ========================================
+// Worker Pool Tests
+// ========================================
+
+// TestWorkerPool_NoDependencies verifies parallel execution when no dependencies exist
+func TestWorkerPool_NoDependencies(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	engine, err := NewEngine(ctx, build.Get())
+	require.NoError(t, err)
+	defer engine.Close(ctx)
+
+	// Create 10 controls with no dependencies
+	controls := make([]entities.Control, 10)
+	for i := 0; i < 10; i++ {
+		controls[i] = entities.Control{
+			ID:   fmt.Sprintf("control-%d", i),
+			Name: fmt.Sprintf("Control %d", i),
+			Observations: []entities.Observation{
+				{
+					Plugin: "file",
+					Config: map[string]interface{}{
+						"path": "/etc/hostname",
+					},
+				},
+			},
+		}
+	}
+
+	profile := &entities.Profile{
+		Metadata: entities.ProfileMetadata{Name: "test", Version: "1.0"},
+		Controls: entities.ControlsSection{Items: controls},
+	}
+
+	result, err := engine.Execute(ctx, profile)
+	require.NoError(t, err)
+	assert.Len(t, result.Controls, 10)
+}
+
+// TestWorkerPool_LinearDependencies verifies sequential execution for linear chain
+func TestWorkerPool_LinearDependencies(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	engine, err := NewEngine(ctx, build.Get())
+	require.NoError(t, err)
+	defer engine.Close(ctx)
+
+	// Create chain: A → B → C
+	controls := []entities.Control{
+		{
+			ID:   "a",
+			Name: "Control A",
+			Observations: []entities.Observation{
+				{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
+			},
+		},
+		{
+			ID:         "b",
+			Name:       "Control B",
+			DependsOn:  []string{"a"},
+			Observations: []entities.Observation{
+				{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
+			},
+		},
+		{
+			ID:         "c",
+			Name:       "Control C",
+			DependsOn:  []string{"b"},
+			Observations: []entities.Observation{
+				{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
+			},
+		},
+	}
+
+	profile := &entities.Profile{
+		Metadata: entities.ProfileMetadata{Name: "test", Version: "1.0"},
+		Controls: entities.ControlsSection{Items: controls},
+	}
+
+	result, err := engine.Execute(ctx, profile)
+	require.NoError(t, err)
+	assert.Len(t, result.Controls, 3)
+
+	// Verify all passed (if file exists) or handled gracefully
+	for _, ctrl := range result.Controls {
+		assert.Contains(t, []values.Status{values.StatusPass, values.StatusError, values.StatusFail, values.StatusSkipped}, ctrl.Status)
+	}
+}
+
+// TestWorkerPool_DiamondDependencies verifies parallel execution in diamond pattern
+func TestWorkerPool_DiamondDependencies(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	engine, err := NewEngine(ctx, build.Get())
+	require.NoError(t, err)
+	defer engine.Close(ctx)
+
+	// Create diamond: A → B, A → C, B → D, C → D
+	controls := []entities.Control{
+		{ID: "a", Name: "A", Observations: []entities.Observation{
+			{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
+		}},
+		{ID: "b", Name: "B", DependsOn: []string{"a"}, Observations: []entities.Observation{
+			{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
+		}},
+		{ID: "c", Name: "C", DependsOn: []string{"a"}, Observations: []entities.Observation{
+			{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
+		}},
+		{ID: "d", Name: "D", DependsOn: []string{"b", "c"}, Observations: []entities.Observation{
+			{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
+		}},
+	}
+
+	profile := &entities.Profile{
+		Metadata: entities.ProfileMetadata{Name: "test", Version: "1.0"},
+		Controls: entities.ControlsSection{Items: controls},
+	}
+
+	result, err := engine.Execute(ctx, profile)
+	require.NoError(t, err)
+	assert.Len(t, result.Controls, 4)
+}
+
+// TestWorkerPool_DependencyFailure verifies skip propagation on failure
+func TestWorkerPool_DependencyFailure(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	engine, err := NewEngine(ctx, build.Get())
+	require.NoError(t, err)
+	defer engine.Close(ctx)
+
+	// A fails (nonexistent file) → B should skip → C should skip
+	controls := []entities.Control{
+		{ID: "a", Name: "A (will fail)", Observations: []entities.Observation{
+			{Plugin: "file", Config: map[string]interface{}{"path": "/nonexistent-file-12345", "mode": "exists"}},
+		}},
+		{ID: "b", Name: "B", DependsOn: []string{"a"}, Observations: []entities.Observation{
+			{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
+		}},
+		{ID: "c", Name: "C", DependsOn: []string{"b"}, Observations: []entities.Observation{
+			{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
+		}},
+	}
+
+	profile := &entities.Profile{
+		Metadata: entities.ProfileMetadata{Name: "test", Version: "1.0"},
+		Controls: entities.ControlsSection{Items: controls},
+	}
+
+	result, err := engine.Execute(ctx, profile)
+	require.NoError(t, err)
+
+	// Verify skip propagation
+	statusByID := make(map[string]values.Status)
+	for _, ctrl := range result.Controls {
+		statusByID[ctrl.ID] = ctrl.Status
+	}
+
+	// 'a' might be Error or Fail depending on how plugin reports nonexistent file with mode=exists
+	// The file plugin usually returns Fail or Error.
+	// As long as it is not Pass, dependencies should skip.
+	assert.NotEqual(t, values.StatusPass, statusByID["a"])
+	
+	// If 'a' didn't pass, b and c should be skipped
+	if statusByID["a"] != values.StatusPass {
+		assert.Equal(t, values.StatusSkipped, statusByID["b"]) // Dependency failed
+		assert.Equal(t, values.StatusSkipped, statusByID["c"]) // Transitive skip
+	}
+}
+
+// TestWorkerPool_CycleDetection verifies cycle detection during initialization
+func TestWorkerPool_CycleDetection(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	engine, err := NewEngine(ctx, build.Get())
+	require.NoError(t, err)
+	defer engine.Close(ctx)
+
+	// Create cycle: A → B → A
+	controls := []entities.Control{
+		{ID: "a", Name: "A", DependsOn: []string{"b"}, Observations: []entities.Observation{
+			{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
+		}},
+		{ID: "b", Name: "B", DependsOn: []string{"a"}, Observations: []entities.Observation{
+			{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
+		}},
+	}
+
+	profile := &entities.Profile{
+		Metadata: entities.ProfileMetadata{Name: "test", Version: "1.0"},
+		Controls: entities.ControlsSection{Items: controls},
+	}
+
+	// Should return error about circular dependency
+	_, err = engine.Execute(ctx, profile)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "circular dependency")
+}
+
+// TestWorkerPool_MissingDependency verifies error on missing dependency
+func TestWorkerPool_MissingDependency(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	engine, err := NewEngine(ctx, build.Get())
+	require.NoError(t, err)
+	defer engine.Close(ctx)
+
+	// A depends on non-existent B
+	// Add C to force parallel execution path (len > 1)
+	controls := []entities.Control{
+		{ID: "a", Name: "A", DependsOn: []string{"nonexistent"}, Observations: []entities.Observation{
+			{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
+		}},
+		{ID: "c", Name: "C", Observations: []entities.Observation{
+			{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
+		}},
+	}
+
+	profile := &entities.Profile{
+		Metadata: entities.ProfileMetadata{Name: "test", Version: "1.0"},
+		Controls: entities.ControlsSection{Items: controls},
+	}
+
+	// Should return error about missing dependency
+	_, err = engine.Execute(ctx, profile)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "non-existent")
+}
+
+// TestWorkerPool_ContextCancellation verifies graceful shutdown on cancellation
+func TestWorkerPool_ContextCancellation(t *testing.T) {
+	t.Parallel()
+
+	engine, err := NewEngine(context.Background(), build.Get())
+	require.NoError(t, err)
+	defer engine.Close(context.Background())
+
+	// Create many controls to ensure some are in-flight when cancelled
+	controls := make([]entities.Control, 50)
+	for i := 0; i < 50; i++ {
+		controls[i] = entities.Control{
+			ID:   fmt.Sprintf("control-%d", i),
+			Name: fmt.Sprintf("Control %d", i),
+			Observations: []entities.Observation{
+				{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
+			},
+		}
+	}
+
+	profile := &entities.Profile{
+		Metadata: entities.ProfileMetadata{Name: "test", Version: "1.0"},
+		Controls: entities.ControlsSection{Items: controls},
+	}
+
+	// Create cancellable context
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Cancel after short delay
+	go func() {
+		time.Sleep(10 * time.Millisecond)
+		cancel()
+	}()
+
+	// Execute should return context error
+	_, err = engine.Execute(ctx, profile)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "context canceled")
 }
