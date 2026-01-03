@@ -244,7 +244,7 @@ func (p *Plugin) injectEnvironmentVariables(config wazero.ModuleConfig) wazero.M
 
 		// Check if this key is allowed by any granted capability
 		for _, cap := range envCapabilities {
-			if matchEnvPattern(key, cap.Pattern) {
+			if capabilities.MatchEnvironmentPattern(key, cap.Pattern) {
 				allowedEnv = append(allowedEnv, envVar)
 				slog.Debug("injecting environment variable",
 					"plugin", p.name,
@@ -264,24 +264,6 @@ func (p *Plugin) injectEnvironmentVariables(config wazero.ModuleConfig) wazero.M
 	}
 
 	return config
-}
-
-// matchEnvPattern checks if an environment variable key matches a capability pattern
-// Examples:
-//   - "AWS_*" matches "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"
-//   - "AWS_ACCESS_KEY_ID" matches exactly
-//   - "*" matches all (dangerous - should warn)
-func matchEnvPattern(key, pattern string) bool {
-	if pattern == "*" {
-		return true
-	}
-
-	if strings.HasSuffix(pattern, "*") {
-		prefix := strings.TrimSuffix(pattern, "*")
-		return strings.HasPrefix(key, prefix)
-	}
-
-	return key == pattern
 }
 
 // createInstance instantiates the WASM module with a fresh memory environment.

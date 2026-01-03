@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
 )
 
 func TestMatchEnvPattern(t *testing.T) {
@@ -65,7 +66,7 @@ func TestMatchEnvPattern(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := matchEnvPattern(tt.key, tt.pattern)
+			result := capabilities.MatchEnvironmentPattern(tt.key, tt.pattern)
 			assert.Equal(t, tt.expected, result)
 		})
 	}

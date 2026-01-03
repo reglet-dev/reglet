@@ -33,7 +33,7 @@ func (p *Policy) IsGranted(request Capability, granted []Capability) bool {
 		case "fs":
 			matches = matchFilesystemPattern(request.Pattern, grant.Pattern)
 		case "env":
-			matches = matchEnvironmentPattern(request.Pattern, grant.Pattern)
+			matches = MatchEnvironmentPattern(request.Pattern, grant.Pattern)
 		case "exec":
 			matches = matchExecPattern(request.Pattern, grant.Pattern)
 		default:
@@ -170,11 +170,28 @@ func matchFilesystemPattern(requested, granted string) bool {
 	return matched
 }
 
-func matchEnvironmentPattern(requested, granted string) bool {
+// MatchEnvironmentPattern checks if an environment variable key matches a capability pattern.
+// Supports exact match ("AWS_REGION"), prefix match ("AWS_*"), and wildcard ("*").
+// This is the canonical implementation used by both capability enforcement and plugin injection.
+//
+// Examples:
+//   - MatchEnvironmentPattern("AWS_REGION", "AWS_REGION") -> true (exact)
+//   - MatchEnvironmentPattern("AWS_ACCESS_KEY_ID", "AWS_*") -> true (prefix)
+//   - MatchEnvironmentPattern("PATH", "*") -> true (wildcard)
+//   - MatchEnvironmentPattern("GCP_PROJECT", "AWS_*") -> false (no match)
+func MatchEnvironmentPattern(requested, granted string) bool {
+	// Wildcard matches everything (dangerous - should trigger warnings)
+	if granted == "*" {
+		return true
+	}
+
+	// Prefix match (e.g., "AWS_*" matches "AWS_ACCESS_KEY_ID", "AWS_REGION")
 	if strings.HasSuffix(granted, "*") {
 		prefix := strings.TrimSuffix(granted, "*")
 		return strings.HasPrefix(requested, prefix)
 	}
+
+	// Exact match
 	return requested == granted
 }
 
