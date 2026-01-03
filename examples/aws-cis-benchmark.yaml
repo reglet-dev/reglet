@@ -1,0 +1,53 @@
+profile:
+  name: aws-cis-benchmark
+  version: 1.0.0
+  description: CIS AWS Foundations Benchmark controls
+
+plugins:
+  - aws
+
+controls:
+  defaults:
+    severity: warning
+    owner: security-team
+    tags: [aws, cis]
+
+  items:
+    - id: cis-1.4-root-access-keys
+      name: Ensure no root account access key exists
+      severity: critical
+      observations:
+        - plugin: aws
+          config:
+            service: iam
+            operation: get_account_summary
+        expect:
+          - "data.account_summary.account_access_keys_present == 0"
+
+    - id: cis-2.1.1-s3-encryption
+      name: Ensure S3 bucket encryption is enabled
+      severity: high
+      observations:
+        # This would usually use a loop in a real profile
+        - plugin: aws
+          config:
+            service: s3
+            operation: list_buckets
+        expect:
+          - "all(data.buckets, {.encryption_enabled == true})"
+
+    - id: cis-5.2-sg-no-open-ssh
+      name: Ensure no security group allows ingress from 0.0.0.0/0 to port 22
+      severity: critical
+      observations:
+        - plugin: aws
+          config:
+            service: ec2
+            operation: describe_security_groups
+            filters:
+              - name: "ip-permission.protocol"
+                values: ["tcp"]
+              - name: "ip-permission.from-port"
+                values: ["22"]
+        expect:
+          - "len(data.security_groups) == 0"

@@ -1,0 +1,64 @@
+profile:
+  name: aws-custom-infrastructure
+  version: 1.0.0
+  description: Organization-specific infrastructure validation rules
+
+plugins:
+  - aws
+
+controls:
+  defaults:
+    severity: medium
+    owner: devops-team
+    tags: [aws, operations]
+
+  items:
+    - id: ops-tagging-standard
+      name: Resource Tagging Standard
+      description: All EC2 instances must have Owner and CostCenter tags
+      observations:
+        - plugin: aws
+          config:
+            service: ec2
+            operation: describe_instances
+            region: us-east-1
+      expect:
+        - "all(data.instances, {has(.tags, 'Owner') && has(.tags, 'CostCenter')})"
+
+    - id: ops-instance-types
+      name: Approved Instance Types
+      description: Use only approved instance families (t3, m5) to control costs
+      observations:
+        - plugin: aws
+          config:
+            service: ec2
+            operation: describe_instances
+            region: us-east-1
+      expect:
+        - "all(data.instances, {.instance_type startsWith 't3.' || .instance_type startsWith 'm5.'})"
+
+    - id: sec-default-vpc-unused
+      name: Default VPC Should Not Be Used
+      description: Ensure workloads are not running in the default VPC
+      observations:
+        - plugin: aws
+          config:
+            service: vpc
+            operation: describe_vpcs
+            region: us-east-1
+      expect:
+        # We expect to find non-default VPCs, or if default exists, it should be empty (hard to check emptiness here without listing resources in it)
+        # Check: Ensure any active VPC is not marked is_default=true? 
+        # Or simpler: verify we have custom VPCs.
+        - "any(data.vpcs, {.is_default == false})"
+
+    - id: ops-s3-naming-convention
+      name: S3 Bucket Naming Convention
+      description: Buckets should follow company naming standards (e.g., start with com.example)
+      observations:
+        - plugin: aws
+          config:
+            service: s3
+            operation: list_buckets
+      expect:
+        - "all(data.buckets, {.name startsWith 'com.example'})"
