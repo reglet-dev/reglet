@@ -368,6 +368,22 @@ func isBroadCapability(capability capabilities.Capability) bool {
 		}
 	}
 
+	// Environment broad patterns
+	if capability.Kind == "env" {
+		dangerousPatterns := []string{
+			"*",       // All environment variables
+			"AWS_*",   // All AWS variables
+			"AZURE_*", // All Azure variables
+			"GCP_*",   // All GCP variables
+		}
+
+		for _, pattern := range dangerousPatterns {
+			if capability.Pattern == pattern {
+				return true
+			}
+		}
+	}
+
 	return false
 }
 
@@ -542,6 +558,27 @@ func (o *CapabilityOrchestrator) describeBroadRisk(capability capabilities.Capab
 	case "network":
 		if capability.Pattern == "*" || capability.Pattern == "outbound:*" {
 			return "Plugin can connect to any host on the internet"
+		}
+	case "env":
+		switch capability.Pattern {
+		case "*":
+			return `Grants access to ALL environment variables including:
+    • Secrets and API keys from other tools
+    • Shell configuration (PATH, HOME, etc.)
+    • Potential credential leakage
+
+Recommendation: Grant only specific variables:
+    env:AWS_ACCESS_KEY_ID
+    env:AWS_SECRET_ACCESS_KEY
+    env:AWS_REGION`
+
+		case "AWS_*":
+			return `Grants access to ALL AWS environment variables including:
+    • AWS_ACCESS_KEY_ID (needed)
+    • AWS_SECRET_ACCESS_KEY (needed)
+    • AWS_SESSION_TOKEN (temporary credentials - high risk if leaked)
+
+Recommendation: Grant only required variables individually`
 		}
 	}
 	return "Plugin has broad access beyond what may be necessary"

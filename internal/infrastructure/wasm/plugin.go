@@ -172,7 +172,7 @@ func (p *Plugin) extractFilesystemMounts() []fsMount {
 // createModuleConfig builds the wazero module configuration with necessary host functions.
 // It enables filesystem access, time, random, and logging.
 // stdout/stderr are automatically redacted to prevent secret leakage to logs.
-func (p *Plugin) createModuleConfig() wazero.ModuleConfig {
+func (p *Plugin) createModuleConfig(ctx context.Context) wazero.ModuleConfig {
 	// Build filesystem mounts from capabilities
 	mounts := p.extractFilesystemMounts()
 	fsConfig := wazero.NewFSConfig()
@@ -197,7 +197,7 @@ func (p *Plugin) createModuleConfig() wazero.ModuleConfig {
 			"plugin", p.name)
 	}
 
-	return wazero.NewModuleConfig().
+	config := wazero.NewModuleConfig().
 		WithFSConfig(fsConfig). // Now uses capability-driven mounts
 		WithSysWalltime().
 		WithSysNanotime().
@@ -206,13 +206,89 @@ func (p *Plugin) createModuleConfig() wazero.ModuleConfig {
 		// SECURITY: Use redacted writers to prevent secrets from leaking to logs
 		WithStderr(p.stderr).
 		WithStdout(p.stdout)
+
+	// Inject environment variables based on granted capabilities
+	if len(p.capabilities) > 0 {
+		config = p.injectEnvironmentVariables(config)
+	}
+
+	return config
+}
+
+// injectEnvironmentVariables filters host environment variables based on granted capabilities
+func (p *Plugin) injectEnvironmentVariables(config wazero.ModuleConfig) wazero.ModuleConfig {
+	// Get all granted env capabilities for this plugin
+	envCapabilities := []capabilities.Capability{}
+	for _, cap := range p.capabilities {
+		if cap.Kind == "env" {
+			envCapabilities = append(envCapabilities, cap)
+		}
+	}
+
+	if len(envCapabilities) == 0 {
+		return config // No env capabilities granted
+	}
+
+	// Get host environment variables
+	hostEnv := os.Environ()
+
+	// Filter environment variables that match granted patterns
+	allowedEnv := []string{}
+	for _, envVar := range hostEnv {
+		// Parse "KEY=VALUE"
+		parts := strings.SplitN(envVar, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		key := parts[0]
+
+		// Check if this key is allowed by any granted capability
+		for _, cap := range envCapabilities {
+			if matchEnvPattern(key, cap.Pattern) {
+				allowedEnv = append(allowedEnv, envVar)
+				slog.Debug("injecting environment variable",
+					"plugin", p.name,
+					"key", key,
+					"capability", cap.String())
+				break
+			}
+		}
+	}
+
+	// Inject allowed variables
+	for _, envVar := range allowedEnv {
+		parts := strings.SplitN(envVar, "=", 2)
+		if len(parts) == 2 {
+			config = config.WithEnv(parts[0], parts[1])
+		}
+	}
+
+	return config
+}
+
+// matchEnvPattern checks if an environment variable key matches a capability pattern
+// Examples:
+//   - "AWS_*" matches "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"
+//   - "AWS_ACCESS_KEY_ID" matches exactly
+//   - "*" matches all (dangerous - should warn)
+func matchEnvPattern(key, pattern string) bool {
+	if pattern == "*" {
+		return true
+	}
+
+	if strings.HasSuffix(pattern, "*") {
+		prefix := strings.TrimSuffix(pattern, "*")
+		return strings.HasPrefix(key, prefix)
+	}
+
+	return key == pattern
 }
 
 // createInstance instantiates the WASM module with a fresh memory environment.
 // It ensures thread safety by providing isolated memory for each execution.
 func (p *Plugin) createInstance(ctx context.Context) (api.Module, error) {
 	// Create fresh instance every time - no caching
-	instance, err := p.runtime.InstantiateModule(ctx, p.module, p.createModuleConfig())
+	instance, err := p.runtime.InstantiateModule(ctx, p.module, p.createModuleConfig(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate plugin %s: %w", p.name, err)
 	}
