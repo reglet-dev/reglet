@@ -625,6 +625,8 @@ func (e *Engine) executeObservationsParallel(ctx context.Context, observations [
 
 	// Execute each observation in parallel
 	for i, obs := range observations {
+		i := i     // Create loop-local copy to avoid closure capture bug
+		obs := obs // Create loop-local copy to avoid closure capture bug
 		g.Go(func() error {
 			obsResult := e.executor.Execute(ctx, obs)
 			// Safe without mutex: each goroutine writes to unique index in pre-allocated slice
