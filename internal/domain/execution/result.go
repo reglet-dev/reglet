@@ -29,10 +29,10 @@ type ControlResult struct {
 	Name         string              `json:"name" yaml:"name"`
 	Description  string              `json:"description,omitempty" yaml:"description,omitempty"`
 	Severity     string              `json:"severity,omitempty" yaml:"severity,omitempty"`
-	Tags         []string            `json:"tags,omitempty" yaml:"tags,omitempty"`
-	Status       values.Status       `json:"status" yaml:"status"`
-	Observations []ObservationResult `json:"observations" yaml:"observations"`
-	Message      string              `json:"message,omitempty" yaml:"message,omitempty"`
+	Tags               []string            `json:"tags,omitempty" yaml:"tags,omitempty"`
+	Status             values.Status       `json:"status" yaml:"status"`
+	ObservationResults []ObservationResult `json:"observations" yaml:"observations"`
+	Message            string              `json:"message,omitempty" yaml:"message,omitempty"`
 	SkipReason   string              `json:"skip_reason,omitempty" yaml:"skip_reason,omitempty"`
 	Duration     time.Duration       `json:"duration_ms" yaml:"duration_ms"`
 }
@@ -168,8 +168,8 @@ func (r *ExecutionResult) calculateSummary() {
 		}
 
 		// Count observation statuses
-		r.Summary.TotalObservations += len(ctrl.Observations)
-		for _, obs := range ctrl.Observations {
+		r.Summary.TotalObservations += len(ctrl.ObservationResults)
+		for _, obs := range ctrl.ObservationResults {
 			switch obs.Status {
 			case values.StatusPass:
 				r.Summary.PassedObservations++

@@ -55,10 +55,10 @@ type Control struct {
 	Severity     string        `yaml:"severity,omitempty"`
 	Owner        string        `yaml:"owner,omitempty"`
 	Tags         []string      `yaml:"tags,omitempty"`
-	DependsOn    []string      `yaml:"depends_on,omitempty"`
-	Timeout      time.Duration           `yaml:"timeout,omitempty"`
-	Observations []ObservationDefinition `yaml:"observations"`
-}
+		DependsOn              []string                `yaml:"depends_on,omitempty"`
+		Timeout                time.Duration           `yaml:"timeout,omitempty"`
+		ObservationDefinitions []ObservationDefinition `yaml:"observations"`
+	}
 
 // ObservationDefinition configuration for a specific plugin execution.
 // It is an immutable value object.
@@ -265,7 +265,7 @@ func (c *Control) Validate() error {
 	if c.Name == "" {
 		return fmt.Errorf("control %s: name cannot be empty", c.ID)
 	}
-	if len(c.Observations) == 0 {
+	if len(c.ObservationDefinitions) == 0 {
 		return fmt.Errorf("control %s: must have at least one observation", c.ID)
 	}
 
@@ -342,7 +342,7 @@ func (c *Control) GetEffectiveTimeout(defaultTimeout time.Duration) time.Duratio
 
 // ObservationCount returns the number of observations in this control.
 func (c *Control) ObservationCount() int {
-	return len(c.Observations)
+	return len(c.ObservationDefinitions)
 }
 
 // IsEmpty returns true if this is the zero value.

@@ -134,7 +134,7 @@ func TestSARIFMapper_ExtractLocation_Path(t *testing.T) {
 	t.Parallel()
 	result := execution.NewExecutionResult("test", "1.0.0")
 	ctrl := execution.ControlResult{ID: "loc-1", Status: values.StatusPass}
-	ctrl.Observations = []execution.ObservationResult{
+	ctrl.ObservationResults = []execution.ObservationResult{
 		{
 			Evidence: &wasm.Evidence{
 				Data: map[string]interface{}{
@@ -161,7 +161,7 @@ func TestSARIFMapper_ExtractLocation_CommandPath(t *testing.T) {
 	t.Parallel()
 	result := execution.NewExecutionResult("test", "1.0.0")
 	ctrl := execution.ControlResult{ID: "loc-2", Status: values.StatusPass}
-	ctrl.Observations = []execution.ObservationResult{
+	ctrl.ObservationResults = []execution.ObservationResult{
 		{
 			Evidence: &wasm.Evidence{
 				Data: map[string]interface{}{
@@ -183,7 +183,7 @@ func TestSARIFMapper_ExtractLocation_ShellCommand_Valid(t *testing.T) {
 	t.Parallel()
 	result := execution.NewExecutionResult("test", "1.0.0")
 	ctrl := execution.ControlResult{ID: "loc-3", Status: values.StatusPass}
-	ctrl.Observations = []execution.ObservationResult{
+	ctrl.ObservationResults = []execution.ObservationResult{
 		{
 			Evidence: &wasm.Evidence{
 				Data: map[string]interface{}{
@@ -205,7 +205,7 @@ func TestSARIFMapper_ExtractLocation_ShellCommand_Invalid(t *testing.T) {
 	t.Parallel()
 	result := execution.NewExecutionResult("test", "1.0.0")
 	ctrl := execution.ControlResult{ID: "loc-4", Status: values.StatusPass}
-	ctrl.Observations = []execution.ObservationResult{
+	ctrl.ObservationResults = []execution.ObservationResult{
 		{
 			Evidence: &wasm.Evidence{
 				Data: map[string]interface{}{
@@ -227,11 +227,11 @@ func TestSARIFMapper_ArtifactRegistration_Deduplication(t *testing.T) {
 	result := execution.NewExecutionResult("test", "1.0.0")
 	// Two controls pointing to same file
 	ctrl1 := execution.ControlResult{ID: "dup-1", Status: values.StatusPass}
-	ctrl1.Observations = []execution.ObservationResult{
+	ctrl1.ObservationResults = []execution.ObservationResult{
 		{Evidence: &wasm.Evidence{Data: map[string]interface{}{"path": "/same/file"}}},
 	}
 	ctrl2 := execution.ControlResult{ID: "dup-2", Status: values.StatusPass}
-	ctrl2.Observations = []execution.ObservationResult{
+	ctrl2.ObservationResults = []execution.ObservationResult{
 		{Evidence: &wasm.Evidence{Data: map[string]interface{}{"path": "/same/file"}}},
 	}
 	result.AddControlResult(ctrl1)
@@ -248,7 +248,7 @@ func TestSARIFMapper_ArtifactProperties(t *testing.T) {
 	t.Parallel()
 	result := execution.NewExecutionResult("test", "1.0.0")
 	ctrl := execution.ControlResult{ID: "props-1", Status: values.StatusPass}
-	ctrl.Observations = []execution.ObservationResult{
+	ctrl.ObservationResults = []execution.ObservationResult{
 		{
 			Evidence: &wasm.Evidence{
 				Data: map[string]interface{}{
@@ -284,7 +284,7 @@ func TestSARIFMapper_LocationNormalization_Relative(t *testing.T) {
 
 	result := execution.NewExecutionResult("test", "1.0.0")
 	ctrl := execution.ControlResult{ID: "norm-1", Status: values.StatusPass}
-	ctrl.Observations = []execution.ObservationResult{
+	ctrl.ObservationResults = []execution.ObservationResult{
 		{Evidence: &wasm.Evidence{Data: map[string]interface{}{"path": targetFile}}},
 	}
 	result.AddControlResult(ctrl)

@@ -138,7 +138,7 @@ func (v *ProfileValidator) ValidateWithSchemas(ctx context.Context, profile *ent
 	// Then validate each observation's config against its plugin's schema
 	var errors []string
 	for _, ctrl := range profile.Controls.Items {
-		for j, obs := range ctrl.Observations {
+		for j, obs := range ctrl.ObservationDefinitions {
 			if err := validateObservationSchemaCompiled(ctx, obs, compiler); err != nil {
 				errors = append(errors, fmt.Sprintf("control %s, observation %d (%s): %s", ctrl.ID, j, obs.Plugin, err.Error()))
 			}
@@ -223,12 +223,12 @@ func validateControl(ctrl entities.Control) error {
 	}
 
 	// At least one observation is required
-	if len(ctrl.Observations) == 0 {
+	if len(ctrl.ObservationDefinitions) == 0 {
 		errors = append(errors, "at least one observation is required")
 	}
 
 	// Validate each observation
-	for j, obs := range ctrl.Observations {
+	for j, obs := range ctrl.ObservationDefinitions {
 		if err := validateObservation(obs); err != nil {
 			errors = append(errors, fmt.Sprintf("observation %d: %s", j, err.Error()))
 		}

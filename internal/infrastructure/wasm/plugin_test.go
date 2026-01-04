@@ -57,7 +57,7 @@ func TestPlugin_Observe_Concurrent(t *testing.T) {
 
 	// Run concurrent observations
 	var wg sync.WaitGroup
-	results := make([]*ObservationResult, numFiles)
+	results := make([]*PluginObservationResult, numFiles)
 
 	for i := 0; i < numFiles; i++ {
 		wg.Add(1)

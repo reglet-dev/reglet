@@ -108,7 +108,7 @@ func (m *sarifMapper) mapControlResult(ctrl execution.ControlResult) *sarif.Resu
 
 	// Add properties (observations, duration, metadata)
 	props := sarif.NewPropertyBag()
-	props.Add("observations", ctrl.Observations)
+	props.Add("observations", ctrl.ObservationResults)
 	props.Add("duration_ms", ctrl.Duration.Milliseconds())
 
 	if len(ctrl.Tags) > 0 {
@@ -177,7 +177,7 @@ func (m *sarifMapper) mapSeverityToLevel(severity string) string {
 
 // extractLocation attempts to extract file location from observations.
 func (m *sarifMapper) extractLocation(ctrl execution.ControlResult) *sarif.Location {
-	for _, obs := range ctrl.Observations {
+	for _, obs := range ctrl.ObservationResults {
 		if obs.Evidence == nil || obs.Evidence.Data == nil {
 			continue
 		}

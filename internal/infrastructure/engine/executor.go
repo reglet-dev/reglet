@@ -198,7 +198,7 @@ func (e *ObservationExecutor) LoadPlugin(ctx context.Context, pluginName string)
 }
 
 // determineStatusWithExpect determines the observation status by evaluating expect expressions.
-func (e *ObservationExecutor) determineStatusWithExpect(ctx context.Context, wasmResult *wasm.ObservationResult, expects []string) (values.Status, string) {
+func (e *ObservationExecutor) determineStatusWithExpect(ctx context.Context, wasmResult *wasm.PluginObservationResult, expects []string) (values.Status, string) {
 	aggregator := services.NewStatusAggregator()
 	return aggregator.DetermineObservationStatus(ctx, wasmResult.Evidence, expects)
 }

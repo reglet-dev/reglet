@@ -89,7 +89,7 @@ func (o *CapabilityOrchestrator) CollectRequiredCapabilities(ctx context.Context
 	// Get unique plugin names from profile
 	pluginNames := make(map[string]bool)
 	for _, ctrl := range profile.Controls.Items {
-		for _, obs := range ctrl.Observations {
+		for _, obs := range ctrl.ObservationDefinitions {
 			pluginNames[obs.Plugin] = true
 		}
 	}
@@ -223,7 +223,7 @@ func (o *CapabilityOrchestrator) extractProfileCapabilities(profile *entities.Pr
 
 	// Analyze each control's observations
 	for _, ctrl := range profile.Controls.Items {
-		for _, obs := range ctrl.Observations {
+		for _, obs := range ctrl.ObservationDefinitions {
 			pluginName := obs.Plugin
 
 			// Initialize plugin entry if needed

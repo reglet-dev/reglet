@@ -132,7 +132,7 @@ func (f *JUnitFormatter) Format(result *execution.ExecutionResult) error {
 
 func formatObservations(ctrl execution.ControlResult) string {
 	var out string
-	for _, obs := range ctrl.Observations {
+	for _, obs := range ctrl.ObservationResults {
 		if obs.Status != values.StatusPass {
 			out += fmt.Sprintf("Observation (%s): %s\n", obs.Plugin, obs.Status)
 			if obs.Error != nil {

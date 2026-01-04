@@ -139,7 +139,7 @@ func NewEngineWithCapabilities(
 
 	// Preload plugins for schema validation
 	for _, ctrl := range profile.Controls.Items {
-		for _, obs := range ctrl.Observations {
+		for _, obs := range ctrl.ObservationDefinitions {
 			if _, err := executor.LoadPlugin(ctx, obs.Plugin); err != nil {
 				return nil, fmt.Errorf("failed to preload plugin %s: %w", obs.Plugin, err)
 			}
@@ -525,8 +525,8 @@ func (e *Engine) executeControl(ctx context.Context, ctrl entities.Control, exec
 		Name:         ctrl.Name,
 		Description:  ctrl.Description,
 		Severity:     ctrl.Severity,
-		Tags:         ctrl.Tags,
-		Observations: make([]execution.ObservationResult, 0, len(ctrl.Observations)),
+		Tags:               ctrl.Tags,
+		ObservationResults: make([]execution.ObservationResult, 0, len(ctrl.ObservationDefinitions)),
 	}
 
 	// Check if control should run (filtering)
@@ -567,21 +567,21 @@ func (e *Engine) executeControl(ctx context.Context, ctrl entities.Control, exec
 	}
 
 	// Execute observations
-	if e.config.Parallel && len(ctrl.Observations) > 1 {
+	if e.config.Parallel && len(ctrl.ObservationDefinitions) > 1 {
 		// Parallel execution of observations
-		result.Observations = e.executeObservationsParallel(ctx, ctrl.Observations)
+		result.ObservationResults = e.executeObservationsParallel(ctx, ctrl.ObservationDefinitions)
 	} else {
 		// Sequential execution of observations
-		for _, obs := range ctrl.Observations {
+		for _, obs := range ctrl.ObservationDefinitions {
 			obsResult := e.executor.Execute(ctx, obs)
-			result.Observations = append(result.Observations, obsResult)
+			result.ObservationResults = append(result.ObservationResults, obsResult)
 		}
 	}
 
 	// Aggregate observation results to determine control status
 	// Extract statuses from observations
-	observationStatuses := make([]values.Status, len(result.Observations))
-	for i, obs := range result.Observations {
+	observationStatuses := make([]values.Status, len(result.ObservationResults))
+	for i, obs := range result.ObservationResults {
 		observationStatuses[i] = obs.Status
 	}
 
@@ -589,7 +589,7 @@ func (e *Engine) executeControl(ctx context.Context, ctrl entities.Control, exec
 	result.Status = aggregator.AggregateControlStatus(observationStatuses)
 
 	// Generate message based on status
-	result.Message = generateControlMessage(result.Status, result.Observations)
+	result.Message = generateControlMessage(result.Status, result.ObservationResults)
 
 	// Set duration
 	result.Duration = time.Since(startTime)

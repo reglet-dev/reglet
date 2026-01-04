@@ -120,9 +120,9 @@ func (f *TableFormatter) formatControl(ctrl execution.ControlResult) {
 	fmt.Fprintf(f.writer, "  Duration: %s\n", ctrl.Duration.Round(time.Millisecond))
 
 	// Observations
-	if len(ctrl.Observations) > 0 {
+	if len(ctrl.ObservationResults) > 0 {
 		fmt.Fprintln(f.writer, "  Observations:")
-		for i, obs := range ctrl.Observations {
+		for i, obs := range ctrl.ObservationResults {
 			f.formatObservation(obs, i+1)
 		}
 	}

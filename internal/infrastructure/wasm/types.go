@@ -46,8 +46,9 @@ type FieldDef struct {
 	Description string
 }
 
-// ObservationResult is the result of running an observation
-type ObservationResult struct {
+// PluginObservationResult is the result of running an observation through a WASM plugin.
+// This is a low-level boundary type.
+type PluginObservationResult struct {
 	Evidence *execution.Evidence
 	Error    *execution.PluginError
 }

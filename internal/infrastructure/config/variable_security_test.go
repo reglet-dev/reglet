@@ -154,7 +154,7 @@ controls:
 			require.NoError(t, err, "Substitution should succeed")
 
 			// Get the substituted value (try both "path" and "command" keys)
-			config := profile.Controls.Items[0].Observations[0].Config
+			config := profile.Controls.Items[0].ObservationDefinitions[0].Config
 			actualPath, ok := config["path"]
 			if !ok {
 				actualPath = config["command"]
@@ -209,7 +209,7 @@ controls:
 	err = substitutor.Substitute(profile)
 	require.NoError(t, err)
 
-	actualPath := profile.Controls.Items[0].Observations[0].Config["path"]
+	actualPath := profile.Controls.Items[0].ObservationDefinitions[0].Config["path"]
 
 	// Path traversal sequences should be preserved (plugin/capability system must validate)
 	assert.Equal(t, "/safe/dir/../../../etc/passwd", actualPath,
@@ -278,7 +278,7 @@ controls:
 			err = substitutor.Substitute(profile)
 			require.NoError(t, err)
 
-			actual := profile.Controls.Items[0].Observations[0].Config["value"]
+			actual := profile.Controls.Items[0].ObservationDefinitions[0].Config["value"]
 			assert.Equal(t, tt.expected, actual, "Special characters should be preserved")
 		})
 	}

@@ -29,7 +29,7 @@ func createTestResult() *execution.ExecutionResult {
 		Status:      values.StatusPass,
 		Message:     "All 2 checks passed",
 		Duration:    100 * time.Millisecond,
-		Observations: []execution.ObservationResult{
+		ObservationResults: []execution.ObservationResult{
 			{
 				Plugin: "file",
 				Config: map[string]interface{}{
@@ -76,7 +76,7 @@ func createTestResult() *execution.ExecutionResult {
 		Status:      values.StatusFail,
 		Message:     "1 check failed",
 		Duration:    50 * time.Millisecond,
-		Observations: []execution.ObservationResult{
+		ObservationResults: []execution.ObservationResult{
 			{
 				Plugin: "file",
 				Config: map[string]interface{}{
@@ -105,7 +105,7 @@ func createTestResult() *execution.ExecutionResult {
 		Status:   values.StatusError,
 		Message:  "Plugin load failed",
 		Duration: 10 * time.Millisecond,
-		Observations: []execution.ObservationResult{
+		ObservationResults: []execution.ObservationResult{
 			{
 				Plugin: "nonexistent",
 				Config: map[string]interface{}{
@@ -338,7 +338,7 @@ func TestJSONFormatter_PreservesTypes(t *testing.T) {
 	// Verify durations are preserved
 	assert.Greater(t, decoded.Duration, time.Duration(0))
 	assert.Greater(t, decoded.Controls[0].Duration, time.Duration(0))
-	assert.Greater(t, decoded.Controls[0].Observations[0].Duration, time.Duration(0))
+	assert.Greater(t, decoded.Controls[0].ObservationResults[0].Duration, time.Duration(0))
 
 	// Verify status types
 	assert.Equal(t, values.StatusPass, decoded.Controls[0].Status)

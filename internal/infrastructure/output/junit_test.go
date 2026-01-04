@@ -22,7 +22,7 @@ func TestJUnitFormatter_Format(t *testing.T) {
 		Name:     "Passing Control",
 		Status:   values.StatusPass,
 		Duration: 100 * time.Millisecond,
-		Observations: []execution.ObservationResult{
+		ObservationResults: []execution.ObservationResult{
 			{Plugin: "test", Status: values.StatusPass},
 		},
 	}
@@ -34,7 +34,7 @@ func TestJUnitFormatter_Format(t *testing.T) {
 		Status:   values.StatusFail,
 		Message:  "Control failed",
 		Duration: 50 * time.Millisecond,
-		Observations: []execution.ObservationResult{
+		ObservationResults: []execution.ObservationResult{
 			{
 				Plugin: "test",
 				Status: values.StatusFail,
@@ -52,7 +52,7 @@ func TestJUnitFormatter_Format(t *testing.T) {
 		Status:   values.StatusError,
 		Message:  "Control error",
 		Duration: 10 * time.Millisecond,
-		Observations: []execution.ObservationResult{
+		ObservationResults: []execution.ObservationResult{
 			{
 				Plugin: "test",
 				Status: values.StatusError,

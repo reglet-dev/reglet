@@ -418,7 +418,7 @@ func (p *Plugin) Schema(ctx context.Context) (*ConfigSchema, error) {
 }
 
 // Observe executes the main validation logic of the plugin.
-func (p *Plugin) Observe(ctx context.Context, cfg Config) (*ObservationResult, error) {
+func (p *Plugin) Observe(ctx context.Context, cfg Config) (*PluginObservationResult, error) {
 	// Wrap context with plugin name so host functions can access it
 	ctx = hostfuncs.WithPluginName(ctx, p.name)
 
@@ -495,11 +495,11 @@ func (p *Plugin) Observe(ctx context.Context, cfg Config) (*ObservationResult, e
 		return nil, fmt.Errorf("failed to parse observe() result into internal/wasm/types.Evidence: %w", err)
 	}
 
-	// Construct and return ObservationResult
+	// Construct and return PluginObservationResult
 	// Note: Evidence.Error represents application-level errors (validation, lookup failures, etc.)
-	// ObservationResult.Error represents WASM execution errors (panics, plugin failures)
-	// Don't propagate Evidence.Error to ObservationResult.Error - they serve different purposes
-	return &ObservationResult{
+	// PluginObservationResult.Error represents WASM execution errors (panics, plugin failures)
+	// Don't propagate Evidence.Error to PluginObservationResult.Error - they serve different purposes
+	return &PluginObservationResult{
 			Evidence: &hostEvidence,
 			Error:    nil, // Plugin executed successfully, errors are in Evidence
 		},

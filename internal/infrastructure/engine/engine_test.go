@@ -129,7 +129,7 @@ func TestExecuteControl_SingleObservation(t *testing.T) {
 		Description: "A test control",
 		Severity:    "medium",
 		Tags:        []string{"test"},
-		Observations: []entities.ObservationDefinition{
+		ObservationDefinitions: []entities.ObservationDefinition{
 			{
 				Plugin: "file",
 				Config: map[string]interface{}{
@@ -150,7 +150,7 @@ func TestExecuteControl_SingleObservation(t *testing.T) {
 	assert.Equal(t, "A test control", result.Description)
 	assert.Equal(t, "medium", result.Severity)
 	assert.Equal(t, []string{"test"}, result.Tags)
-	assert.Len(t, result.Observations, 1)
+	assert.Len(t, result.ObservationResults, 1)
 	assert.Greater(t, result.Duration, time.Duration(0))
 	assert.NotEmpty(t, result.Message)
 }
@@ -165,7 +165,7 @@ func TestExecuteControl_MultipleObservations(t *testing.T) {
 	ctrl := entities.Control{
 		ID:   "multi-test",
 		Name: "Multi Observation Test",
-		Observations: []entities.ObservationDefinition{
+		ObservationDefinitions: []entities.ObservationDefinition{
 			{
 				Plugin: "file",
 				Config: map[string]interface{}{
@@ -188,7 +188,7 @@ func TestExecuteControl_MultipleObservations(t *testing.T) {
 	result := engine.executeControl(ctx, ctrl, execResult, nil)
 
 	assert.Equal(t, "multi-test", result.ID)
-	assert.Len(t, result.Observations, 2)
+	assert.Len(t, result.ObservationResults, 2)
 	assert.Greater(t, result.Duration, time.Duration(0))
 }
 
@@ -209,7 +209,7 @@ func TestExecute_SingleControl(t *testing.T) {
 				{
 					ID:   "control-1",
 					Name: "Control 1",
-					Observations: []entities.ObservationDefinition{
+					ObservationDefinitions: []entities.ObservationDefinition{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{
@@ -254,7 +254,7 @@ func TestExecute_MultipleControls(t *testing.T) {
 				{
 					ID:   "control-1",
 					Name: "Control 1",
-					Observations: []entities.ObservationDefinition{
+					ObservationDefinitions: []entities.ObservationDefinition{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{
@@ -267,7 +267,7 @@ func TestExecute_MultipleControls(t *testing.T) {
 				{
 					ID:   "control-2",
 					Name: "Control 2",
-					Observations: []entities.ObservationDefinition{
+					ObservationDefinitions: []entities.ObservationDefinition{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{
@@ -308,7 +308,7 @@ func TestExecute_SummaryStatistics(t *testing.T) {
 				{
 					ID:   "control-1",
 					Name: "Control 1",
-					Observations: []entities.ObservationDefinition{
+					ObservationDefinitions: []entities.ObservationDefinition{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{
@@ -353,7 +353,7 @@ func TestExecute_TimingInfo(t *testing.T) {
 				{
 					ID:   "control-1",
 					Name: "Control 1",
-					Observations: []entities.ObservationDefinition{
+					ObservationDefinitions: []entities.ObservationDefinition{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{
@@ -376,7 +376,7 @@ func TestExecute_TimingInfo(t *testing.T) {
 	assert.Greater(t, result.Duration, time.Duration(0))
 	assert.True(t, result.EndTime.After(result.StartTime))
 	assert.Greater(t, result.Controls[0].Duration, time.Duration(0))
-	assert.Greater(t, result.Controls[0].Observations[0].Duration, time.Duration(0))
+	assert.Greater(t, result.Controls[0].ObservationResults[0].Duration, time.Duration(0))
 }
 
 func TestExecute_InvalidPlugin(t *testing.T) {
@@ -396,7 +396,7 @@ func TestExecute_InvalidPlugin(t *testing.T) {
 				{
 					ID:   "control-1",
 					Name: "Control 1",
-					Observations: []entities.ObservationDefinition{
+					ObservationDefinitions: []entities.ObservationDefinition{
 						{
 							Plugin: "nonexistent-plugin",
 							Config: map[string]interface{}{
@@ -414,10 +414,10 @@ func TestExecute_InvalidPlugin(t *testing.T) {
 
 	assert.Len(t, result.Controls, 1)
 	assert.Equal(t, values.StatusError, result.Controls[0].Status)
-	assert.Len(t, result.Controls[0].Observations, 1)
-	assert.Equal(t, values.StatusError, result.Controls[0].Observations[0].Status)
-	assert.NotNil(t, result.Controls[0].Observations[0].Error)
-	assert.Contains(t, result.Controls[0].Observations[0].Error.Message, "failed to read plugin")
+	assert.Len(t, result.Controls[0].ObservationResults, 1)
+	assert.Equal(t, values.StatusError, result.Controls[0].ObservationResults[0].Status)
+	assert.NotNil(t, result.Controls[0].ObservationResults[0].Error)
+	assert.Contains(t, result.Controls[0].ObservationResults[0].Error.Message, "failed to read plugin")
 }
 
 // --- Filtering Tests ---
@@ -664,7 +664,7 @@ func TestWorkerPool_NoDependencies(t *testing.T) {
 		controls[i] = entities.Control{
 			ID:   fmt.Sprintf("control-%d", i),
 			Name: fmt.Sprintf("Control %d", i),
-			Observations: []entities.ObservationDefinition{
+			ObservationDefinitions: []entities.ObservationDefinition{
 				{
 					Plugin: "file",
 					Config: map[string]interface{}{
@@ -699,7 +699,7 @@ func TestWorkerPool_LinearDependencies(t *testing.T) {
 		{
 			ID:   "a",
 			Name: "Control A",
-			Observations: []entities.ObservationDefinition{
+			ObservationDefinitions: []entities.ObservationDefinition{
 				{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
 			},
 		},
@@ -707,7 +707,7 @@ func TestWorkerPool_LinearDependencies(t *testing.T) {
 			ID:         "b",
 			Name:       "Control B",
 			DependsOn:  []string{"a"},
-			Observations: []entities.ObservationDefinition{
+			ObservationDefinitions: []entities.ObservationDefinition{
 				{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
 			},
 		},
@@ -715,7 +715,7 @@ func TestWorkerPool_LinearDependencies(t *testing.T) {
 			ID:         "c",
 			Name:       "Control C",
 			DependsOn:  []string{"b"},
-			Observations: []entities.ObservationDefinition{
+			ObservationDefinitions: []entities.ObservationDefinition{
 				{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
 			},
 		},
@@ -747,16 +747,16 @@ func TestWorkerPool_DiamondDependencies(t *testing.T) {
 
 	// Create diamond: A → B, A → C, B → D, C → D
 	controls := []entities.Control{
-		{ID: "a", Name: "A", Observations: []entities.ObservationDefinition{
+		{ID: "a", Name: "A", ObservationDefinitions: []entities.ObservationDefinition{
 			{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
 		}},
-		{ID: "b", Name: "B", DependsOn: []string{"a"}, Observations: []entities.ObservationDefinition{
+		{ID: "b", Name: "B", DependsOn: []string{"a"}, ObservationDefinitions: []entities.ObservationDefinition{
 			{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
 		}},
-		{ID: "c", Name: "C", DependsOn: []string{"a"}, Observations: []entities.ObservationDefinition{
+		{ID: "c", Name: "C", DependsOn: []string{"a"}, ObservationDefinitions: []entities.ObservationDefinition{
 			{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
 		}},
-		{ID: "d", Name: "D", DependsOn: []string{"b", "c"}, Observations: []entities.ObservationDefinition{
+		{ID: "d", Name: "D", DependsOn: []string{"b", "c"}, ObservationDefinitions: []entities.ObservationDefinition{
 			{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
 		}},
 	}
@@ -782,13 +782,13 @@ func TestWorkerPool_DependencyFailure(t *testing.T) {
 
 	// A fails (nonexistent file) → B should skip → C should skip
 	controls := []entities.Control{
-		{ID: "a", Name: "A (will fail)", Observations: []entities.ObservationDefinition{
+		{ID: "a", Name: "A (will fail)", ObservationDefinitions: []entities.ObservationDefinition{
 			{Plugin: "file", Config: map[string]interface{}{"path": "/nonexistent-file-12345", "mode": "exists"}},
 		}},
-		{ID: "b", Name: "B", DependsOn: []string{"a"}, Observations: []entities.ObservationDefinition{
+		{ID: "b", Name: "B", DependsOn: []string{"a"}, ObservationDefinitions: []entities.ObservationDefinition{
 			{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
 		}},
-		{ID: "c", Name: "C", DependsOn: []string{"b"}, Observations: []entities.ObservationDefinition{
+		{ID: "c", Name: "C", DependsOn: []string{"b"}, ObservationDefinitions: []entities.ObservationDefinition{
 			{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
 		}},
 	}
@@ -830,10 +830,10 @@ func TestWorkerPool_CycleDetection(t *testing.T) {
 
 	// Create cycle: A → B → A
 	controls := []entities.Control{
-		{ID: "a", Name: "A", DependsOn: []string{"b"}, Observations: []entities.ObservationDefinition{
+		{ID: "a", Name: "A", DependsOn: []string{"b"}, ObservationDefinitions: []entities.ObservationDefinition{
 			{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
 		}},
-		{ID: "b", Name: "B", DependsOn: []string{"a"}, Observations: []entities.ObservationDefinition{
+		{ID: "b", Name: "B", DependsOn: []string{"a"}, ObservationDefinitions: []entities.ObservationDefinition{
 			{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
 		}},
 	}
@@ -861,10 +861,10 @@ func TestWorkerPool_MissingDependency(t *testing.T) {
 	// A depends on non-existent B
 	// Add C to force parallel execution path (len > 1)
 	controls := []entities.Control{
-		{ID: "a", Name: "A", DependsOn: []string{"nonexistent"}, Observations: []entities.ObservationDefinition{
+		{ID: "a", Name: "A", DependsOn: []string{"nonexistent"}, ObservationDefinitions: []entities.ObservationDefinition{
 			{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
 		}},
-		{ID: "c", Name: "C", Observations: []entities.ObservationDefinition{
+		{ID: "c", Name: "C", ObservationDefinitions: []entities.ObservationDefinition{
 			{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
 		}},
 	}
@@ -894,7 +894,7 @@ func TestWorkerPool_ContextCancellation(t *testing.T) {
 		controls[i] = entities.Control{
 			ID:   fmt.Sprintf("control-%d", i),
 			Name: fmt.Sprintf("Control %d", i),
-			Observations: []entities.ObservationDefinition{
+			ObservationDefinitions: []entities.ObservationDefinition{
 				{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
 			},
 		}

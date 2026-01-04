@@ -42,7 +42,7 @@ controls:
 	assert.Equal(t, "Checking file in production", profile.Controls.Items[0].Description)
 
 	// Verify substitution in observation config
-	assert.Equal(t, "/tmp/test.txt", profile.Controls.Items[0].Observations[0].Config["path"])
+	assert.Equal(t, "/tmp/test.txt", profile.Controls.Items[0].ObservationDefinitions[0].Config["path"])
 }
 
 func TestSubstituteVariables_Nested(t *testing.T) {
@@ -75,7 +75,7 @@ controls:
 	require.NoError(t, err)
 
 	// Verify nested variable substitution
-	assert.Equal(t, "/etc/app/config.yaml", profile.Controls.Items[0].Observations[0].Config["path"])
+	assert.Equal(t, "/etc/app/config.yaml", profile.Controls.Items[0].ObservationDefinitions[0].Config["path"])
 }
 
 func TestSubstituteVariables_Missing(t *testing.T) {

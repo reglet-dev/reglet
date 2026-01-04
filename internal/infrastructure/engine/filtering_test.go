@@ -87,7 +87,7 @@ func TestFiltering_EndToEnd(t *testing.T) {
 			Name:     fmt.Sprintf("Control %d", i),
 			Severity: severity,
 			Tags:     []string{tag},
-			Observations: []entities.ObservationDefinition{
+			ObservationDefinitions: []entities.ObservationDefinition{
 				{
 					Plugin: "file",
 					Config: map[string]interface{}{
@@ -157,7 +157,7 @@ func TestFiltering_EndToEnd(t *testing.T) {
 			if !assert.Equal(t, values.StatusPass, ctrl.Status, "Control %s should pass", id) {
 				// Dump details if failed
 				t.Logf("Control %s failed. Message: %s", id, ctrl.Message)
-				for _, obs := range ctrl.Observations {
+				for _, obs := range ctrl.ObservationResults {
 					t.Logf("  Observation status: %s", obs.Status)
 					if obs.Error != nil {
 						t.Logf("  Error: %v", obs.Error)
@@ -168,12 +168,12 @@ func TestFiltering_EndToEnd(t *testing.T) {
 				}
 			}
 			assert.Empty(t, ctrl.SkipReason)
-			assert.NotEmpty(t, ctrl.Observations)
+			assert.NotEmpty(t, ctrl.ObservationResults)
 		} else {
 			// Should be skipped
 			assert.Equal(t, values.StatusSkipped, ctrl.Status, "Control %s should be skipped", id)
 			assert.Contains(t, ctrl.SkipReason, "excluded by --tags filter", "Control %s skip reason incorrect", id)
-			assert.Empty(t, ctrl.Observations) // No observations should run
+			assert.Empty(t, ctrl.ObservationResults) // No observations should run
 		}
 	}
 }

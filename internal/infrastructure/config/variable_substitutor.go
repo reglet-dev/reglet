@@ -42,9 +42,13 @@ func (s *VariableSubstitutor) Substitute(profile *entities.Profile) error {
 			return fmt.Errorf("control %s: %w", ctrl.ID, err)
 		}
 
-		// Substitute in each observation config
-		for j := range ctrl.Observations {
-			obs := &ctrl.Observations[j]
+			// Substitute in each observation config
+
+			for j := range ctrl.ObservationDefinitions {
+
+				obs := &ctrl.ObservationDefinitions[j]
+
+		
 			if err := substituteInMap(obs.Config, profile.Vars); err != nil {
 				return fmt.Errorf("control %s, observation %d: %w", ctrl.ID, j, err)
 			}
