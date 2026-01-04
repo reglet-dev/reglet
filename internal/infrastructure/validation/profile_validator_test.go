@@ -207,8 +207,8 @@ func TestValidate_NoObservations(t *testing.T) {
 		Controls: entities.ControlsSection{
 			Items: []entities.Control{
 				{
-					ID:           "test-control",
-					Name:         "Test Control",
+					ID:                     "test-control",
+					Name:                   "Test Control",
 					ObservationDefinitions: []entities.ObservationDefinition{},
 				},
 			},

@@ -332,7 +332,7 @@ func (e *Engine) initializeWorkerPoolState(
 	// Create context and errgroup
 	groupCtx, cancel := context.WithCancel(ctx)
 	g, gCtx := errgroup.WithContext(groupCtx)
-	// Do not set g.SetLimit here. The number of goroutines is controlled by 
+	// Do not set g.SetLimit here. The number of goroutines is controlled by
 	// numWorkers + 1 (coordinator) in executeControlsWithWorkerPool.
 	// Setting it to MaxConcurrentControls would cause deadlock if numWorkers == MaxConcurrentControls.
 
@@ -521,10 +521,10 @@ func (e *Engine) executeControl(ctx context.Context, ctrl entities.Control, exec
 	startTime := time.Now()
 
 	result := execution.ControlResult{
-		ID:           ctrl.ID,
-		Name:         ctrl.Name,
-		Description:  ctrl.Description,
-		Severity:     ctrl.Severity,
+		ID:                 ctrl.ID,
+		Name:               ctrl.Name,
+		Description:        ctrl.Description,
+		Severity:           ctrl.Severity,
 		Tags:               ctrl.Tags,
 		ObservationResults: make([]execution.ObservationResult, 0, len(ctrl.ObservationDefinitions)),
 	}

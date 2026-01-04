@@ -118,7 +118,7 @@ func (s *StatusAggregator) DetermineObservationStatus(
 
 	// Security: Complexity limits to prevent DoS attacks
 	const maxExpressionLength = 1000 // Character limit for readability
-	const maxASTNodes = 100           // AST node limit prevents deeply nested expressions
+	const maxASTNodes = 100          // AST node limit prevents deeply nested expressions
 
 	options := []expr.Option{
 		expr.Env(env),

@@ -65,8 +65,8 @@ controls:
           config:
             path: "{{ .vars.evil }}"
 `,
-			expectedPath:   "{{ env \"AWS_SECRET_ACCESS_KEY\" }}",
-			description:    "env function calls in variable values should not be executed",
+			expectedPath: "{{ env \"AWS_SECRET_ACCESS_KEY\" }}",
+			description:  "env function calls in variable values should not be executed",
 		},
 		{
 			name: "nested template injection",

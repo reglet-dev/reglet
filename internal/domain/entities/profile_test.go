@@ -65,8 +65,8 @@ func Test_Control_Validate(t *testing.T) {
 		{
 			name: "no_observations",
 			control: Control{
-				ID:           "ctrl-001",
-				Name:         "Test",
+				ID:                     "ctrl-001",
+				Name:                   "Test",
 				ObservationDefinitions: []ObservationDefinition{},
 			},
 			wantErr: true,

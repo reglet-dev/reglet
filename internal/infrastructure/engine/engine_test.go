@@ -704,17 +704,17 @@ func TestWorkerPool_LinearDependencies(t *testing.T) {
 			},
 		},
 		{
-			ID:         "b",
-			Name:       "Control B",
-			DependsOn:  []string{"a"},
+			ID:        "b",
+			Name:      "Control B",
+			DependsOn: []string{"a"},
 			ObservationDefinitions: []entities.ObservationDefinition{
 				{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
 			},
 		},
 		{
-			ID:         "c",
-			Name:       "Control C",
-			DependsOn:  []string{"b"},
+			ID:        "c",
+			Name:      "Control C",
+			DependsOn: []string{"b"},
 			ObservationDefinitions: []entities.ObservationDefinition{
 				{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
 			},
@@ -811,7 +811,7 @@ func TestWorkerPool_DependencyFailure(t *testing.T) {
 	// The file plugin usually returns Fail or Error.
 	// As long as it is not Pass, dependencies should skip.
 	assert.NotEqual(t, values.StatusPass, statusByID["a"])
-	
+
 	// If 'a' didn't pass, b and c should be skipped
 	if statusByID["a"] != values.StatusPass {
 		assert.Equal(t, values.StatusSkipped, statusByID["b"]) // Dependency failed

@@ -49,16 +49,16 @@ type ControlDefaults struct {
 // Control represents a specific compliance check or validation unit.
 // It is uniquely identified by its ID.
 type Control struct {
-	ID           string        `yaml:"id"`
-	Name         string        `yaml:"name"`
-	Description  string        `yaml:"description,omitempty"`
-	Severity     string        `yaml:"severity,omitempty"`
-	Owner        string        `yaml:"owner,omitempty"`
-	Tags         []string      `yaml:"tags,omitempty"`
-		DependsOn              []string                `yaml:"depends_on,omitempty"`
-		Timeout                time.Duration           `yaml:"timeout,omitempty"`
-		ObservationDefinitions []ObservationDefinition `yaml:"observations"`
-	}
+	ID                     string                  `yaml:"id"`
+	Name                   string                  `yaml:"name"`
+	Description            string                  `yaml:"description,omitempty"`
+	Severity               string                  `yaml:"severity,omitempty"`
+	Owner                  string                  `yaml:"owner,omitempty"`
+	Tags                   []string                `yaml:"tags,omitempty"`
+	DependsOn              []string                `yaml:"depends_on,omitempty"`
+	Timeout                time.Duration           `yaml:"timeout,omitempty"`
+	ObservationDefinitions []ObservationDefinition `yaml:"observations"`
+}
 
 // ObservationDefinition configuration for a specific plugin execution.
 // It is an immutable value object.

@@ -136,11 +136,11 @@ func TestDetermineObservationStatus_NoCodeExecution(t *testing.T) {
 
 	maliciousExpressions := []string{
 		// These are syntactically valid but will fail due to undefined functions/variables
-		"exec('ls')",                // No exec function
-		"import('os')",              // No import support
-		"File.Read('/etc/passwd')",  // No File object
-		"HTTP.Get('evil.com')",      // No HTTP object
-		"os.Getenv('AWS_KEY')",      // No os package
+		"exec('ls')",               // No exec function
+		"import('os')",             // No import support
+		"File.Read('/etc/passwd')", // No File object
+		"HTTP.Get('evil.com')",     // No HTTP object
+		"os.Getenv('AWS_KEY')",     // No os package
 		"goroutine { data.value }", // No goroutine syntax
 	}
 
