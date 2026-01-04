@@ -34,7 +34,7 @@ func (t *dnsPinningTransport) RoundTrip(req *http.Request) (*http.Response, erro
 	// Resolve and validate hostname to IP (prevents DNS rebinding)
 	validatedIP, err := resolveAndValidate(t.ctx, hostname, t.pluginName, t.checker)
 	if err != nil {
-		return nil, fmt.Errorf("SSRF protection: %v", err)
+		return nil, fmt.Errorf("SSRF protection: %w", err)
 	}
 
 	// Determine port

@@ -49,7 +49,7 @@ func TestIsBroadCapability_ExecWildcards(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isBroadCapability(tt.capability)
+			result := tt.capability.IsBroad() // Use domain method
 			assert.Equal(t, tt.isBroad, result,
 				"Capability %s should %s be detected as broad",
 				tt.capability.String(),
@@ -104,7 +104,7 @@ func TestIsBroadCapability_FilesystemWildcards(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isBroadCapability(tt.capability)
+			result := tt.capability.IsBroad() // Use domain method
 			assert.Equal(t, tt.isBroad, result,
 				"Capability %s should %s be detected as broad",
 				tt.capability.String(),
@@ -154,7 +154,7 @@ func TestIsBroadCapability_EnvironmentWildcards(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isBroadCapability(tt.capability)
+			result := tt.capability.IsBroad() // Use domain method
 			assert.Equal(t, tt.isBroad, result,
 				"Capability %s should %s be detected as broad",
 				tt.capability.String(),
@@ -194,7 +194,7 @@ func TestIsBroadCapability_NetworkWildcards(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isBroadCapability(tt.capability)
+			result := tt.capability.IsBroad() // Use domain method
 			assert.Equal(t, tt.isBroad, result,
 				"Capability %s should %s be detected as broad",
 				tt.capability.String(),
@@ -407,7 +407,7 @@ func TestIsBroadCapability_VersionedInterpreters(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isBroadCapability(tt.capability)
+			result := tt.capability.IsBroad() // Use domain method
 			assert.Equal(t, tt.isBroad, result,
 				"Capability %s should %s be detected as broad",
 				tt.capability.String(),

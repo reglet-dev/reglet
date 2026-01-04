@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 
 	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
@@ -170,14 +169,14 @@ func (o *CapabilityOrchestrator) CollectRequiredCapabilities(ctx context.Context
 				"capabilities", profileSpecific)
 
 			// Store metadata for each profile-specific capability
-			for _, cap := range profileSpecific {
-				key := cap.Kind + ":" + cap.Pattern
+			for _, capability := range profileSpecific {
+				key := capability.Kind + ":" + capability.Pattern
 				o.capabilityInfo[key] = CapabilityInfo{
-					Capability:      cap,
+					Capability:      capability,
 					IsProfileBased:  true,
 					PluginName:      name,
-					IsBroad:         isBroadCapability(cap),
-					ProfileSpecific: nil, // Already profile-specific
+					IsBroad:         capability.IsBroad(),
+					ProfileSpecific: nil,
 				}
 			}
 
@@ -190,13 +189,13 @@ func (o *CapabilityOrchestrator) CollectRequiredCapabilities(ctx context.Context
 				"capabilities", metaCaps)
 
 			// Store metadata for plugin-declared capabilities
-			for _, cap := range metaCaps {
-				key := cap.Kind + ":" + cap.Pattern
+			for _, capability := range metaCaps {
+				key := capability.Kind + ":" + capability.Pattern
 				info := CapabilityInfo{
-					Capability:     cap,
+					Capability:     capability,
 					IsProfileBased: false,
 					PluginName:     name,
-					IsBroad:        isBroadCapability(cap),
+					IsBroad:        capability.IsBroad(),
 				}
 
 				// Check if there's a profile-specific alternative we could have used
@@ -278,9 +277,9 @@ func (o *CapabilityOrchestrator) extractProfileCapabilities(profile *entities.Pr
 			}
 
 			// Deduplicate by using capability string as key
-			for _, cap := range extractedCaps {
-				key := cap.Kind + ":" + cap.Pattern
-				profileCaps[pluginName][key] = cap
+			for _, capability := range extractedCaps {
+				key := capability.Kind + ":" + capability.Pattern
+				profileCaps[pluginName][key] = capability
 			}
 		}
 	}
@@ -298,146 +297,6 @@ func (o *CapabilityOrchestrator) extractProfileCapabilities(profile *entities.Pr
 	}
 
 	return result
-}
-
-// isInterpreterVariant checks if a pattern matches an interpreter base name or its versioned variants.
-//
-// Matches:
-//   - Exact: "python"
-//   - Versioned: "python3", "python3.11", "python2.7"
-//   - Subpath: "python:*", "python:/path/to/script.py"
-//
-// Does NOT match:
-//   - Unrelated: "pythonista", "python-config"
-//   - Full paths: "/usr/bin/python" (handled elsewhere)
-func isInterpreterVariant(pattern string, baseInterpreter string) bool {
-	// Exact match
-	if pattern == baseInterpreter {
-		return true
-	}
-
-	// Check for version or subpath variant
-	if strings.HasPrefix(pattern, baseInterpreter) {
-		suffix := pattern[len(baseInterpreter):]
-		if len(suffix) > 0 {
-			first := suffix[0]
-			// Version number: python3, python3.11
-			// Subpath separator: python:*, python:/script.py
-			if (first >= '0' && first <= '9') || first == '.' || first == ':' {
-				return true
-			}
-		}
-	}
-
-	return false
-}
-
-// isBroadCapability checks if a capability pattern is overly permissive.
-func isBroadCapability(capability capabilities.Capability) bool {
-	// Filesystem broad patterns
-	if capability.Kind == "fs" {
-		broadPatterns := []string{
-			"**",           // All files (legacy)
-			"/**",          // Root filesystem
-			"read:**",      // All files read
-			"write:**",     // All files write
-			"read:/",       // Root read
-			"write:/",      // Root write
-			"read:/etc/**", // Sensitive system config
-			"write:/etc/**",
-			"read:/root/**", // Root home directory
-			"write:/root/**",
-			"read:/home/**", // All user home directories
-			"write:/home/**",
-		}
-		for _, pattern := range broadPatterns {
-			if capability.Pattern == pattern {
-				return true
-			}
-		}
-	}
-
-	// Execution broad patterns
-	if capability.Kind == "exec" {
-		// Wildcard patterns allow arbitrary command execution
-		if capability.Pattern == "**" || capability.Pattern == "*" {
-			return true
-		}
-
-		// Any shell interpreter is broad
-		shells := []string{"bash", "sh", "zsh", "fish", "/bin/bash", "/bin/sh"}
-		for _, shell := range shells {
-			if capability.Pattern == shell {
-				return true
-			}
-		}
-
-		// Interpreters without specific script paths are broad
-		// They allow arbitrary code execution via flags like -c, -e, -r
-		// Use prefix matching to catch versioned interpreters (python3.11, node18, etc.)
-		interpreters := []string{
-			"python", // Covers python, python2, python3, python3.11, python2.7, etc.
-			"perl",   // Covers perl, perl5, etc.
-			"ruby",   // Covers ruby, ruby3.2, etc.
-			"node",   // Covers node, node18, node20, etc.
-			"php",    // Covers php, php7, php8, etc.
-			"lua",    // Covers lua, lua5.1, lua5.2, lua5.3, lua5.4, etc.
-			"awk",    // Covers awk (base)
-			"tclsh",  // Tcl shell interpreter
-			"wish",   // Tcl/Tk windowing shell
-			"expect", // Tcl-based automation tool
-		}
-
-		for _, base := range interpreters {
-			if isInterpreterVariant(capability.Pattern, base) {
-				return true // Matches base, versioned, or subpath variants
-			}
-		}
-
-		// AWK variants (gawk, mawk, nawk) - check explicitly since they don't share base "awk"
-		awkVariants := []string{"gawk", "mawk", "nawk"}
-		for _, variant := range awkVariants {
-			if isInterpreterVariant(capability.Pattern, variant) {
-				return true
-			}
-		}
-
-		// nodejs is an alias for node
-		if isInterpreterVariant(capability.Pattern, "nodejs") {
-			return true
-		}
-
-		// irb (interactive ruby) is also dangerous
-		if isInterpreterVariant(capability.Pattern, "irb") {
-			return true
-		}
-	}
-
-	// Network broad patterns
-	if capability.Kind == "network" {
-		// Wildcard hosts or ports
-		if capability.Pattern == "*" || capability.Pattern == "outbound:*" {
-			return true
-		}
-	}
-
-	// Environment broad patterns
-	if capability.Kind == "env" {
-		dangerousPatterns := []string{
-			"*",       // All environment variables
-			"AWS_*",   // All AWS variables
-			"AZURE_*", // All Azure variables
-			"GCP_*",   // All GCP variables
-		}
-
-		for _, pattern := range dangerousPatterns {
-			if capability.Pattern == pattern {
-				return true
-			}
-		}
-	}
-
-	return false
 }
 
 // GrantCapabilities resolves permissions via file or prompt.
@@ -499,7 +358,7 @@ func (o *CapabilityOrchestrator) GrantCapabilities(required map[string][]capabil
 					slog.Error("broad capability denied by security policy",
 						"level", "strict",
 						"capability", capability.String(),
-						"risk", o.describeBroadRisk(capability))
+						"risk", capability.RiskDescription()) // Use domain method
 					return nil, fmt.Errorf("broad capability denied by strict security policy: %s", capability.String())
 
 				case "permissive":
@@ -589,50 +448,4 @@ func (o *CapabilityOrchestrator) findMissingCapabilities(required, granted capab
 		}
 	}
 	return missing
-}
-
-// describeBroadRisk explains the security implications of a broad capability.
-func (o *CapabilityOrchestrator) describeBroadRisk(capability capabilities.Capability) string {
-	switch capability.Kind {
-	case "fs":
-		if strings.Contains(capability.Pattern, "/**") || strings.Contains(capability.Pattern, "**") {
-			return "Plugin can access ALL files on the system"
-		}
-		if strings.Contains(capability.Pattern, "/etc") {
-			return "Plugin can access sensitive system configuration"
-		}
-		if strings.Contains(capability.Pattern, "/root") || strings.Contains(capability.Pattern, "/home") {
-			return "Plugin can access user home directories and private files"
-		}
-	case "exec":
-		if capability.Pattern == "bash" || capability.Pattern == "sh" || strings.Contains(capability.Pattern, "/bin/") {
-			return "Plugin can execute arbitrary shell commands"
-		}
-	case "network":
-		if capability.Pattern == "*" || capability.Pattern == "outbound:*" {
-			return "Plugin can connect to any host on the internet"
-		}
-	case "env":
-		switch capability.Pattern {
-		case "*":
-			return `Grants access to ALL environment variables including:
-    • Secrets and API keys from other tools
-    • Shell configuration (PATH, HOME, etc.)
-    • Potential credential leakage
-
-Recommendation: Grant only specific variables:
-    env:AWS_ACCESS_KEY_ID
-    env:AWS_SECRET_ACCESS_KEY
-    env:AWS_REGION`
-
-		case "AWS_*":
-			return `Grants access to ALL AWS environment variables including:
-    • AWS_ACCESS_KEY_ID (needed)
-    • AWS_SECRET_ACCESS_KEY (needed)
-    • AWS_SESSION_TOKEN (temporary credentials - high risk if leaked)
-
-Recommendation: Grant only required variables individually`
-		}
-	}
-	return "Plugin has broad access beyond what may be necessary"
 }
