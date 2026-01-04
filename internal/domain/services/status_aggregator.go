@@ -91,20 +91,20 @@ func (s *StatusAggregator) AggregateControlStatus(observationStatuses []values.S
 // - Only explicitly provided variables accessible (no probing)
 // - expr-lang prevents code execution, filesystem, network access
 //
-// Returns: Status and optional error message
+// Returns: Status and list of expectation results
 func (s *StatusAggregator) DetermineObservationStatus(
 	ctx context.Context,
 	evidence *execution.Evidence,
 	expects []string,
-) (values.Status, string) {
+) (values.Status, []execution.ExpectationResult) {
 	// No expectations → use evidence status directly
 	if len(expects) == 0 {
-		return s.StatusFromEvidenceStatus(evidence.Status), ""
+		return s.StatusFromEvidenceStatus(evidence.Status), nil
 	}
 
 	// Evidence failed with error → don't evaluate expects
 	if evidence.Error != nil {
-		return values.StatusError, evidence.Error.Message
+		return values.StatusError, nil
 	}
 
 	// Create environment for expression evaluation
@@ -151,37 +151,109 @@ func (s *StatusAggregator) DetermineObservationStatus(
 		}),
 	}
 
+	// Track all expectation results
+	results := make([]execution.ExpectationResult, 0, len(expects))
+	finalStatus := values.StatusPass
+
 	// Evaluate each expect expression
 	for _, expectExpr := range expects {
 		// Security: Reject overly long expressions for readability and DoS prevention
 		// MaxNodes provides the primary DoS protection via AST complexity limiting
 		if len(expectExpr) > maxExpressionLength {
-			return values.StatusError, fmt.Sprintf("expect expression too long (max %d chars): %d chars", maxExpressionLength, len(expectExpr))
+			results = append(results, execution.ExpectationResult{
+				Expression: expectExpr,
+				Passed:     false,
+				Message:    fmt.Sprintf("Expression too long (max %d chars): %d chars", maxExpressionLength, len(expectExpr)),
+			})
+			finalStatus = values.StatusError
+			continue
 		}
 
 		program, err := expr.Compile(expectExpr, options...)
 		if err != nil {
-			return values.StatusError, fmt.Sprintf("expect compilation failed: %v", err)
+			results = append(results, execution.ExpectationResult{
+				Expression: expectExpr,
+				Passed:     false,
+				Message:    fmt.Sprintf("Compilation failed: %v", err),
+			})
+			finalStatus = values.StatusError
+			continue
 		}
 
 		output, err := expr.Run(program, env)
 		if err != nil {
-			return values.StatusError, fmt.Sprintf("expect evaluation failed: %v", err)
+			results = append(results, execution.ExpectationResult{
+				Expression: expectExpr,
+				Passed:     false,
+				Message:    fmt.Sprintf("Evaluation failed: %v", err),
+			})
+			finalStatus = values.StatusError
+			continue
 		}
 
 		result, ok := output.(bool)
 		if !ok {
-			return values.StatusError, fmt.Sprintf("expect expression did not return boolean: %v", output)
+			results = append(results, execution.ExpectationResult{
+				Expression: expectExpr,
+				Passed:     false,
+				Message:    fmt.Sprintf("Expression did not return boolean: %v", output),
+			})
+			finalStatus = values.StatusError
+			continue
 		}
 
-		// ANY false expression fails the observation
-		if !result {
-			return values.StatusFail, fmt.Sprintf("expectation failed: %s", expectExpr)
+		// Track result
+		if result {
+			// Expectation passed - no message needed
+			results = append(results, execution.ExpectationResult{
+				Expression: expectExpr,
+				Passed:     true,
+			})
+		} else {
+			// Expectation failed - construct helpful message
+			message := s.constructFailureMessage(expectExpr, evidence.Data)
+			results = append(results, execution.ExpectationResult{
+				Expression: expectExpr,
+				Passed:     false,
+				Message:    message,
+			})
+			// Update final status to fail if not already error
+			if finalStatus != values.StatusError {
+				finalStatus = values.StatusFail
+			}
 		}
 	}
 
-	// All expectations passed
-	return values.StatusPass, ""
+	return finalStatus, results
+}
+
+// constructFailureMessage attempts to construct a helpful failure message
+// by extracting actual values from evidence data when possible.
+func (s *StatusAggregator) constructFailureMessage(expression string, evidenceData map[string]interface{}) string {
+	// Try to parse simple comparison expressions like "data.size == 2785"
+	// Common patterns: ==, !=, >, <, >=, <=
+	patterns := []string{"==", "!=", ">=", "<=", ">", "<"}
+
+	for _, op := range patterns {
+		if strings.Contains(expression, op) {
+			parts := strings.SplitN(expression, op, 2)
+			if len(parts) == 2 {
+				left := strings.TrimSpace(parts[0])
+				right := strings.TrimSpace(parts[1])
+
+				// Try to extract actual value if left side is a data reference
+				if strings.HasPrefix(left, "data.") {
+					fieldPath := strings.TrimPrefix(left, "data.")
+					if actualValue, ok := evidenceData[fieldPath]; ok {
+						return fmt.Sprintf("Expected %s %s %s, got %v", left, op, right, actualValue)
+					}
+				}
+			}
+		}
+	}
+
+	// Fallback: just state the expression failed
+	return fmt.Sprintf("Expression evaluated to false: %s", expression)
 }
 
 // StatusFromEvidenceStatus converts evidence boolean status to observation status

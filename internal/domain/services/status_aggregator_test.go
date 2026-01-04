@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -77,11 +78,12 @@ func Test_StatusAggregator_AggregateControlStatus(t *testing.T) {
 
 func Test_StatusAggregator_DetermineObservationStatus(t *testing.T) {
 	tests := []struct {
-		name           string
-		evidence       *execution.Evidence
-		expects        []string
-		expectedStatus values.Status
-		expectedError  string
+		name                      string
+		evidence                  *execution.Evidence
+		expects                   []string
+		expectedStatus            values.Status
+		expectedFailedExpectCount int    // How many expectations should have failed
+		expectedMessageContains   string // Message should contain this (for any failed expectation)
 	}{
 		{
 			name: "no expects uses evidence status true",
@@ -120,9 +122,10 @@ func Test_StatusAggregator_DetermineObservationStatus(t *testing.T) {
 					"status_code": 500,
 				},
 			},
-			expects:        []string{"data.status_code == 200"},
-			expectedStatus: values.StatusFail,
-			expectedError:  "expectation failed: data.status_code == 200",
+			expects:                   []string{"data.status_code == 200"},
+			expectedStatus:            values.StatusFail,
+			expectedFailedExpectCount: 1,
+			expectedMessageContains:   "data.status_code",
 		},
 		{
 			name: "multiple expects all pass",
@@ -145,9 +148,10 @@ func Test_StatusAggregator_DetermineObservationStatus(t *testing.T) {
 					"connected":   false,
 				},
 			},
-			expects:        []string{"data.status_code == 200", "data.connected == true"},
-			expectedStatus: values.StatusFail,
-			expectedError:  "expectation failed: data.connected == true",
+			expects:                   []string{"data.status_code == 200", "data.connected == true"},
+			expectedStatus:            values.StatusFail,
+			expectedFailedExpectCount: 1,
+			expectedMessageContains:   "data.connected",
 		},
 		{
 			name: "invalid expect expression returns error",
@@ -155,8 +159,9 @@ func Test_StatusAggregator_DetermineObservationStatus(t *testing.T) {
 				Status: true,
 				Data:   map[string]interface{}{},
 			},
-			expects:        []string{"invalid syntax ==="},
-			expectedStatus: values.StatusError,
+			expects:                   []string{"invalid syntax ==="},
+			expectedStatus:            values.StatusError,
+			expectedFailedExpectCount: 1,
 		},
 		{
 			name: "evidence error skips expect evaluation",
@@ -167,18 +172,35 @@ func Test_StatusAggregator_DetermineObservationStatus(t *testing.T) {
 			},
 			expects:        []string{"some_field == true"},
 			expectedStatus: values.StatusError,
-			expectedError:  "connection failed",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			aggregator := NewStatusAggregator()
-			status, errMsg := aggregator.DetermineObservationStatus(context.Background(), tt.evidence, tt.expects)
+			status, results := aggregator.DetermineObservationStatus(context.Background(), tt.evidence, tt.expects)
 
 			assert.Equal(t, tt.expectedStatus, status)
-			if tt.expectedError != "" {
-				assert.Contains(t, errMsg, tt.expectedError)
+
+			// Check failed expectation count
+			failedCount := 0
+			for _, result := range results {
+				if !result.Passed {
+					failedCount++
+				}
+			}
+			assert.Equal(t, tt.expectedFailedExpectCount, failedCount)
+
+			// Check message contains expected text (if specified)
+			if tt.expectedMessageContains != "" {
+				foundMessage := false
+				for _, result := range results {
+					if strings.Contains(result.Message, tt.expectedMessageContains) {
+						foundMessage = true
+						break
+					}
+				}
+				assert.True(t, foundMessage, "Expected to find message containing %q", tt.expectedMessageContains)
 			}
 		})
 	}

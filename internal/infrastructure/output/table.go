@@ -148,6 +148,26 @@ func (f *TableFormatter) formatObservation(obs execution.ObservationResult, inde
 		fmt.Fprintf(f.writer, "       %s: %s\n", f.colorize("Error", colorRed), errMsg)
 	}
 
+	// Show failed expectations (only show failures for clarity)
+	if len(obs.Expectations) > 0 {
+		failedExpectations := []execution.ExpectationResult{}
+		for _, exp := range obs.Expectations {
+			if !exp.Passed {
+				failedExpectations = append(failedExpectations, exp)
+			}
+		}
+
+		if len(failedExpectations) > 0 {
+			fmt.Fprintf(f.writer, "       %s:\n", f.colorize("Failed Expectations", colorRed))
+			for _, exp := range failedExpectations {
+				fmt.Fprintf(f.writer, "         - %s\n", exp.Expression)
+				if exp.Message != "" {
+					fmt.Fprintf(f.writer, "           %s\n", f.colorize(exp.Message, colorYellow))
+				}
+			}
+		}
+	}
+
 	// Show evidence summary if present
 	if obs.Evidence != nil {
 		// Collect valid keys to print (excluding internal/redundant ones)

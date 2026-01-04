@@ -39,12 +39,22 @@ type ControlResult struct {
 
 // ObservationResult represents the result of executing a single observation.
 type ObservationResult struct {
-	Plugin   string                 `json:"plugin" yaml:"plugin"`
-	Config   map[string]interface{} `json:"config" yaml:"config"`
-	Status   values.Status          `json:"status" yaml:"status"`
-	Evidence *Evidence              `json:"evidence,omitempty" yaml:"evidence,omitempty"`
-	Error    *PluginError           `json:"error,omitempty" yaml:"error,omitempty"`
-	Duration time.Duration          `json:"duration_ms" yaml:"duration_ms"`
+	Plugin       string                 `json:"plugin" yaml:"plugin"`
+	Config       map[string]interface{} `json:"config" yaml:"config"`
+	Status       values.Status          `json:"status" yaml:"status"`
+	Evidence     *Evidence              `json:"evidence,omitempty" yaml:"evidence,omitempty"`
+	Error        *PluginError           `json:"error,omitempty" yaml:"error,omitempty"`
+	Expectations []ExpectationResult    `json:"expectations,omitempty" yaml:"expectations,omitempty"`
+	Duration     time.Duration          `json:"duration_ms" yaml:"duration_ms"`
+}
+
+// ExpectationResult represents the result of evaluating a single expectation expression.
+// The Message field provides human-readable context about failures, constructed by the
+// StatusAggregator which has full access to the evidence and expression evaluation context.
+type ExpectationResult struct {
+	Expression string `json:"expression" yaml:"expression"`           // The expect expression (e.g., "data.size == 2785")
+	Passed     bool   `json:"passed" yaml:"passed"`                   // Whether the expectation passed
+	Message    string `json:"message,omitempty" yaml:"message,omitempty"` // Human-readable description (only set on failure/error)
 }
 
 // ResultSummary provides aggregate statistics about the execution.

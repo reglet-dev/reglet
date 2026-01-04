@@ -132,21 +132,9 @@ func (e *ObservationExecutor) Execute(ctx context.Context, obs entities.Observat
 		result.Evidence = wasmResult.Evidence // Set the full Evidence from wasmResult
 
 		// Determine status based on top-level Evidence.Status and expect expressions
-		status, errMsg := e.determineStatusWithExpect(ctx, wasmResult, obs.Expect)
+		status, expectations := e.determineStatusWithExpect(ctx, wasmResult, obs.Expect)
 		result.Status = status
-
-		// If validation failed with error message
-		if errMsg != "" {
-			// If we already have an error, append to it, otherwise create new one
-			if result.Evidence.Error != nil {
-				result.Evidence.Error.Message = fmt.Sprintf("%s; %s", result.Evidence.Error.Message, errMsg)
-			} else if status == values.StatusError {
-				// Note: We don't necessarily want to set Evidence.Error for expectation failures
-				// as that changes semantics. Expect failures are StatusFail, not necessarily StatusError.
-				// However, if the service returned StatusError, we should propagate it.
-				result.Error = &wasm.PluginError{Message: errMsg}
-			}
-		}
+		result.Expectations = expectations
 
 		// Redact sensitive data from evidence before returning/storing it
 		if e.redactor != nil && wasmResult.Evidence.Data != nil {
@@ -198,7 +186,7 @@ func (e *ObservationExecutor) LoadPlugin(ctx context.Context, pluginName string)
 }
 
 // determineStatusWithExpect determines the observation status by evaluating expect expressions.
-func (e *ObservationExecutor) determineStatusWithExpect(ctx context.Context, wasmResult *wasm.PluginObservationResult, expects []string) (values.Status, string) {
+func (e *ObservationExecutor) determineStatusWithExpect(ctx context.Context, wasmResult *wasm.PluginObservationResult, expects []string) (values.Status, []execution.ExpectationResult) {
 	aggregator := services.NewStatusAggregator()
 	return aggregator.DetermineObservationStatus(ctx, wasmResult.Evidence, expects)
 }

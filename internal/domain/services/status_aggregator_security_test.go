@@ -90,23 +90,42 @@ func TestDetermineObservationStatus_SecurityHardening(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			status, errMsg := aggregator.DetermineObservationStatus(ctx, evidence, tt.expects)
+			status, results := aggregator.DetermineObservationStatus(ctx, evidence, tt.expects)
 			assert.Equal(t, tt.wantStatus, status)
 
 			if tt.wantErrType != "" {
-				require.NotEmpty(t, errMsg, "expected error message")
-				switch tt.wantErrType {
-				case "compilation":
-					assert.Contains(t, errMsg, "compilation failed", "error should indicate compilation failure")
-				case "evaluation":
-					assert.Contains(t, errMsg, "evaluation failed", "error should indicate evaluation failure")
-				case "length":
-					assert.Contains(t, errMsg, "too long", "error should indicate length limit")
-				case "expectation":
-					assert.Contains(t, errMsg, "expectation failed", "error should indicate expectation failure")
+				// Should have at least one failed expectation
+				require.NotEmpty(t, results, "expected expectation results")
+
+				// Find a failed expectation with the right error type
+				foundError := false
+				for _, result := range results {
+					if !result.Passed && result.Message != "" {
+						switch tt.wantErrType {
+						case "compilation":
+							if strings.Contains(result.Message, "Compilation failed") {
+								foundError = true
+							}
+						case "evaluation":
+							if strings.Contains(result.Message, "Evaluation failed") {
+								foundError = true
+							}
+						case "length":
+							if strings.Contains(result.Message, "too long") {
+								foundError = true
+							}
+						case "expectation":
+							// Any failed expectation with a message counts
+							foundError = true
+						}
+					}
 				}
+				assert.True(t, foundError, "expected error type %q not found in results", tt.wantErrType)
 			} else {
-				assert.Empty(t, errMsg, "unexpected error: %s", errMsg)
+				// All expectations should pass
+				for _, result := range results {
+					assert.True(t, result.Passed, "expected all expectations to pass")
+				}
 			}
 		})
 	}
@@ -146,10 +165,11 @@ func TestDetermineObservationStatus_NoCodeExecution(t *testing.T) {
 
 	for _, expr := range maliciousExpressions {
 		t.Run(expr, func(t *testing.T) {
-			status, errMsg := aggregator.DetermineObservationStatus(ctx, evidence, []string{expr})
+			status, results := aggregator.DetermineObservationStatus(ctx, evidence, []string{expr})
 			assert.Equal(t, values.StatusError, status, "malicious expression should fail")
-			assert.NotEmpty(t, errMsg, "should have error message")
-			assert.Contains(t, errMsg, "compilation failed", "should fail at compilation")
+			require.NotEmpty(t, results, "should have expectation results")
+			require.False(t, results[0].Passed, "expectation should fail")
+			assert.Contains(t, results[0].Message, "Compilation failed", "should fail at compilation")
 		})
 	}
 }
