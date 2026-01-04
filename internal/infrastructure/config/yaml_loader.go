@@ -10,7 +10,6 @@ import (
 
 	"github.com/goccy/go-yaml"
 	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
-	"github.com/whiskeyjimbo/reglet/internal/infrastructure/validation"
 )
 
 // ProfileLoader handles loading profiles from YAML files.
@@ -56,14 +55,7 @@ func (l *ProfileLoader) LoadProfileFromReader(r io.Reader) (*entities.Profile, e
 		return nil, fmt.Errorf("failed to decode profile YAML: %w", err)
 	}
 
-	// Apply defaults to controls
-	profile.ApplyDefaults()
-
-	// Validate profile structure
-	validator := validation.NewProfileValidator()
-	if err := validator.Validate(&profile); err != nil {
-		return nil, fmt.Errorf("profile validation failed: %w", err)
-	}
+	// NOTE: ProfileLoader just loads the raw profile from YAML.
 
 	return &profile, nil
 }

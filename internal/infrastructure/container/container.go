@@ -6,6 +6,7 @@ import (
 
 	"github.com/whiskeyjimbo/reglet/internal/application/ports"
 	"github.com/whiskeyjimbo/reglet/internal/application/services"
+	domainservices "github.com/whiskeyjimbo/reglet/internal/domain/services"
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/adapters"
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/redaction"
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/system"
@@ -80,9 +81,13 @@ func New(opts Options) (*Container, error) {
 	// Create capability orchestrator
 	capOrchestrator := services.NewCapabilityOrchestratorWithSecurity(opts.TrustPlugins, securityLevel)
 
+	// Create domain services
+	profileCompiler := domainservices.NewProfileCompiler()
+
 	// Wire up use case
 	checkProfileUseCase := services.NewCheckProfileUseCase(
 		profileLoader,
+		profileCompiler,
 		profileValidator,
 		systemConfigAdapter,
 		pluginResolver,

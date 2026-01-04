@@ -21,6 +21,7 @@ import (
 // This is a pure application layer component that depends only on ports.
 type CheckProfileUseCase struct {
 	profileLoader    ports.ProfileLoader
+	profileCompiler  *services.ProfileCompiler
 	profileValidator ports.ProfileValidator
 	systemConfig     ports.SystemConfigProvider
 	pluginResolver   ports.PluginDirectoryResolver
@@ -32,6 +33,7 @@ type CheckProfileUseCase struct {
 // NewCheckProfileUseCase creates a new check profile use case.
 func NewCheckProfileUseCase(
 	profileLoader ports.ProfileLoader,
+	profileCompiler *services.ProfileCompiler,
 	profileValidator ports.ProfileValidator,
 	systemConfig ports.SystemConfigProvider,
 	pluginResolver ports.PluginDirectoryResolver,
@@ -45,6 +47,7 @@ func NewCheckProfileUseCase(
 
 	return &CheckProfileUseCase{
 		profileLoader:    profileLoader,
+		profileCompiler:  profileCompiler,
 		profileValidator: profileValidator,
 		systemConfig:     systemConfig,
 		pluginResolver:   pluginResolver,
@@ -60,20 +63,21 @@ func (uc *CheckProfileUseCase) Execute(ctx context.Context, req dto.CheckProfile
 
 	uc.logger.Info("loading profile", "path", req.ProfilePath)
 
-	// 1. Load profile (with variable substitution)
-	profile, err := uc.profileLoader.LoadProfile(req.ProfilePath)
+	// 1. Load raw profile from YAML
+	rawProfile, err := uc.profileLoader.LoadProfile(req.ProfilePath)
 	if err != nil {
 		return nil, apperrors.NewValidationError("profile", "failed to load profile", err.Error())
 	}
 
-	uc.logger.Info("profile loaded", "name", profile.Metadata.Name, "version", profile.Metadata.Version)
+	uc.logger.Info("profile loaded", "name", rawProfile.Metadata.Name, "version", rawProfile.Metadata.Version)
 
-	// 2. Validate profile structure
-	if err := uc.profileValidator.Validate(profile); err != nil {
-		return nil, apperrors.NewValidationError("profile", "validation failed", err.Error())
+	// 2. Compile profile (apply defaults + validate)
+	profile, err := uc.profileCompiler.Compile(rawProfile)
+	if err != nil {
+		return nil, apperrors.NewValidationError("profile", "compilation failed", err.Error())
 	}
 
-	uc.logger.Info("profile validated", "controls", len(profile.Controls.Items))
+	uc.logger.Info("profile compiled and validated", "controls", profile.ControlCount())
 
 	// 3. Apply filters to profile (validate filter references)
 	if err := uc.validateFilters(profile, req.Filters); err != nil {
@@ -92,7 +96,8 @@ func (uc *CheckProfileUseCase) Execute(ctx context.Context, req dto.CheckProfile
 	}
 
 	// 5. Collect required capabilities using capability orchestrator
-	requiredCaps, tempRuntime, err := uc.capOrchestrator.CollectCapabilities(ctx, profile, pluginDir)
+	// Note: ValidatedProfile embeds *Profile, so we can access it directly
+	requiredCaps, tempRuntime, err := uc.capOrchestrator.CollectCapabilities(ctx, profile.Profile, pluginDir)
 	if err != nil {
 		return nil, apperrors.NewConfigurationError("capabilities", "failed to collect capabilities", err)
 	}
@@ -109,7 +114,7 @@ func (uc *CheckProfileUseCase) Execute(ctx context.Context, req dto.CheckProfile
 	}
 
 	// 7. Create execution engine with granted capabilities
-	eng, err := uc.engineFactory.CreateEngine(ctx, profile, grantedCaps, pluginDir, req.Options.SkipSchemaValidation)
+	eng, err := uc.engineFactory.CreateEngine(ctx, profile.Profile, grantedCaps, pluginDir, req.Options.SkipSchemaValidation)
 	if err != nil {
 		return nil, apperrors.NewConfigurationError("engine", "failed to create engine", err)
 	}
@@ -119,7 +124,7 @@ func (uc *CheckProfileUseCase) Execute(ctx context.Context, req dto.CheckProfile
 
 	// 8. Execute profile
 	uc.logger.Info("executing profile")
-	result, err := eng.Execute(ctx, profile)
+	result, err := eng.Execute(ctx, profile.Profile)
 	if err != nil {
 		return nil, apperrors.NewExecutionError("", "execution failed", err)
 	}
@@ -152,11 +157,12 @@ func (uc *CheckProfileUseCase) Execute(ctx context.Context, req dto.CheckProfile
 }
 
 // validateFilters validates filter configuration and compiles filter expressions.
-func (uc *CheckProfileUseCase) validateFilters(profile *entities.Profile, filters dto.FilterOptions) error {
+func (uc *CheckProfileUseCase) validateFilters(profile entities.ProfileReader, filters dto.FilterOptions) error {
 	// If either include or exclude IDs are provided, build a map once
 	if len(filters.IncludeControlIDs) > 0 || len(filters.ExcludeControlIDs) > 0 {
-		controlMap := make(map[string]bool, len(profile.Controls.Items))
-		for _, ctrl := range profile.Controls.Items {
+		controls := profile.GetAllControls()
+		controlMap := make(map[string]bool, len(controls))
+		for _, ctrl := range controls {
 			controlMap[ctrl.ID] = true
 		}
 

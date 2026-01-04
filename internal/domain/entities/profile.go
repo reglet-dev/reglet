@@ -71,6 +71,26 @@ type ObservationDefinition struct {
 
 // ===== PROFILE AGGREGATE ROOT METHODS =====
 
+// GetMetadata returns the profile metadata.
+func (p *Profile) GetMetadata() ProfileMetadata {
+	return p.Metadata
+}
+
+// GetPlugins returns the list of plugins required by this profile.
+func (p *Profile) GetPlugins() []string {
+	return p.Plugins
+}
+
+// GetVars returns the profile variables.
+func (p *Profile) GetVars() map[string]interface{} {
+	return p.Vars
+}
+
+// GetAllControls returns all controls in the profile.
+func (p *Profile) GetAllControls() []Control {
+	return p.Controls.Items
+}
+
 // Validate checks the integrity of the profile configuration.
 func (p *Profile) Validate() error {
 	if p.Metadata.Name == "" {

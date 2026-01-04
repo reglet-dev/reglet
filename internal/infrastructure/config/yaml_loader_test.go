@@ -42,7 +42,9 @@ func TestLoadProfileFromReader_InvalidYAML(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to decode")
 }
 
-func TestLoadProfileFromReader_ValidationFails(t *testing.T) {
+func TestLoadProfileFromReader_LoadsRawProfile(t *testing.T) {
+	// ProfileLoader now just loads the raw profile without validation
+	// The application layer is responsible for compiling (validating + applying defaults)
 	yaml := `
 profile:
   name: ""
@@ -51,13 +53,18 @@ controls:
   items: []
 `
 	loader := NewProfileLoader()
-	_, err := loader.LoadProfileFromReader(strings.NewReader(yaml))
+	profile, err := loader.LoadProfileFromReader(strings.NewReader(yaml))
 
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "validation failed")
+	// Should successfully load even with invalid data
+	// Validation happens in ProfileCompiler, not ProfileLoader
+	require.NoError(t, err)
+	assert.NotNil(t, profile)
+	assert.Empty(t, profile.Metadata.Name) // Empty name is loaded as-is
 }
 
-func TestLoadProfileFromReader_AppliesDefaults(t *testing.T) {
+func TestLoadProfileFromReader_LoadsDefaultsWithoutApplying(t *testing.T) {
+	// ProfileLoader now just loads the raw profile
+	// Defaults are NOT applied by the loader - that's done by ProfileCompiler
 	yaml := `
 profile:
   name: Test
@@ -78,6 +85,12 @@ controls:
 	profile, err := loader.LoadProfileFromReader(strings.NewReader(yaml))
 
 	require.NoError(t, err)
-	assert.Equal(t, "high", profile.Controls.Items[0].Severity)
-	assert.Equal(t, "platform", profile.Controls.Items[0].Owner)
+	// Defaults are loaded but NOT applied to controls
+	assert.NotNil(t, profile.Controls.Defaults)
+	assert.Equal(t, "high", profile.Controls.Defaults.Severity)
+	assert.Equal(t, "platform", profile.Controls.Defaults.Owner)
+
+	// Control should NOT have defaults applied yet
+	assert.Empty(t, profile.Controls.Items[0].Severity)
+	assert.Empty(t, profile.Controls.Items[0].Owner)
 }
