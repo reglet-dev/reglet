@@ -300,6 +300,38 @@ func (o *CapabilityOrchestrator) extractProfileCapabilities(profile *entities.Pr
 	return result
 }
 
+// isInterpreterVariant checks if a pattern matches an interpreter base name or its versioned variants.
+//
+// Matches:
+//   - Exact: "python"
+//   - Versioned: "python3", "python3.11", "python2.7"
+//   - Subpath: "python:*", "python:/path/to/script.py"
+//
+// Does NOT match:
+//   - Unrelated: "pythonista", "python-config"
+//   - Full paths: "/usr/bin/python" (handled elsewhere)
+func isInterpreterVariant(pattern string, baseInterpreter string) bool {
+	// Exact match
+	if pattern == baseInterpreter {
+		return true
+	}
+
+	// Check for version or subpath variant
+	if strings.HasPrefix(pattern, baseInterpreter) {
+		suffix := pattern[len(baseInterpreter):]
+		if len(suffix) > 0 {
+			first := suffix[0]
+			// Version number: python3, python3.11
+			// Subpath separator: python:*, python:/script.py
+			if (first >= '0' && first <= '9') || first == '.' || first == ':' {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 // isBroadCapability checks if a capability pattern is overly permissive.
 func isBroadCapability(capability capabilities.Capability) bool {
 	// Filesystem broad patterns
@@ -327,6 +359,11 @@ func isBroadCapability(capability capabilities.Capability) bool {
 
 	// Execution broad patterns
 	if capability.Kind == "exec" {
+		// Wildcard patterns allow arbitrary command execution
+		if capability.Pattern == "**" || capability.Pattern == "*" {
+			return true
+		}
+
 		// Any shell interpreter is broad
 		shells := []string{"bash", "sh", "zsh", "fish", "/bin/bash", "/bin/sh"}
 		for _, shell := range shells {
@@ -337,26 +374,42 @@ func isBroadCapability(capability capabilities.Capability) bool {
 
 		// Interpreters without specific script paths are broad
 		// They allow arbitrary code execution via flags like -c, -e, -r
+		// Use prefix matching to catch versioned interpreters (python3.11, node18, etc.)
 		interpreters := []string{
-			"python", "python2", "python3",
-			"perl",
-			"ruby",
-			"node", "nodejs",
-			"php",
-			"lua",
-			"awk", "gawk", "mawk",
+			"python", // Covers python, python2, python3, python3.11, python2.7, etc.
+			"perl",   // Covers perl, perl5, etc.
+			"ruby",   // Covers ruby, ruby3.2, etc.
+			"node",   // Covers node, node18, node20, etc.
+			"php",    // Covers php, php7, php8, etc.
+			"lua",    // Covers lua, lua5.1, lua5.2, lua5.3, lua5.4, etc.
+			"awk",    // Covers awk (base)
+			"tclsh",  // Tcl shell interpreter
+			"wish",   // Tcl/Tk windowing shell
+			"expect", // Tcl-based automation tool
 		}
 
-		for _, interp := range interpreters {
-			// Pattern is just the interpreter name (e.g., "python")
-			if capability.Pattern == interp {
-				return true // Broad - allows python -c "anything"
+		for _, base := range interpreters {
+			if isInterpreterVariant(capability.Pattern, base) {
+				return true // Matches base, versioned, or subpath variants
 			}
+		}
 
-			// Pattern explicitly allows all (e.g., "python:*")
-			if strings.HasPrefix(capability.Pattern, interp+":*") {
+		// AWK variants (gawk, mawk, nawk) - check explicitly since they don't share base "awk"
+		awkVariants := []string{"gawk", "mawk", "nawk"}
+		for _, variant := range awkVariants {
+			if isInterpreterVariant(capability.Pattern, variant) {
 				return true
 			}
+		}
+
+		// nodejs is an alias for node
+		if isInterpreterVariant(capability.Pattern, "nodejs") {
+			return true
+		}
+
+		// irb (interactive ruby) is also dangerous
+		if isInterpreterVariant(capability.Pattern, "irb") {
+			return true
 		}
 	}
 

@@ -3,13 +3,10 @@ package engine
 import (
 	"context"
 	"fmt"
-	"net"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
-	"github.com/expr-lang/expr"
 	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
 	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
 	"github.com/whiskeyjimbo/reglet/internal/domain/services"
@@ -204,42 +201,4 @@ func (e *ObservationExecutor) LoadPlugin(ctx context.Context, pluginName string)
 func (e *ObservationExecutor) determineStatusWithExpect(ctx context.Context, wasmResult *wasm.ObservationResult, expects []string) (values.Status, string) {
 	aggregator := services.NewStatusAggregator()
 	return aggregator.DetermineObservationStatus(ctx, wasmResult.Evidence, expects)
-}
-
-func determineStatusFromEvidenceStatus(evidenceStatus bool) values.Status {
-	aggregator := services.NewStatusAggregator()
-	return aggregator.StatusFromEvidenceStatus(evidenceStatus)
-}
-
-// getExprOptions returns a list of expr options including custom helper functions.
-func getExprOptions(env map[string]interface{}) []expr.Option {
-	return []expr.Option{
-		expr.Env(env),
-		expr.AsBool(),
-		expr.Function("strContains", func(params ...interface{}) (interface{}, error) {
-			if len(params) != 2 {
-				return nil, fmt.Errorf("strContains expects 2 arguments")
-			}
-			s, ok := params[0].(string)
-			if !ok {
-				return nil, fmt.Errorf("strContains: first argument must be a string")
-			}
-			substr, ok := params[1].(string)
-			if !ok {
-				return nil, fmt.Errorf("strContains: second argument must be a string")
-			}
-			return strings.Contains(s, substr), nil
-		}),
-		expr.Function("isIPv4", func(params ...interface{}) (interface{}, error) {
-			if len(params) != 1 {
-				return nil, fmt.Errorf("isIPv4 expects 1 argument")
-			}
-			ipStr, ok := params[0].(string)
-			if !ok {
-				return nil, fmt.Errorf("isIPv4: argument must be a string")
-			}
-			ip := net.ParseIP(ipStr)
-			return ip != nil && ip.To4() != nil, nil
-		}),
-	}
 }

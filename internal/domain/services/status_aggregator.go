@@ -86,6 +86,11 @@ func (s *StatusAggregator) AggregateControlStatus(observationStatuses []values.S
 // - ANY false expression → observation FAILS
 // - Non-boolean result or compilation error → observation ERRORS
 //
+// Security:
+// - Expression length limited to 1000 chars (DoS prevention)
+// - Only explicitly provided variables accessible (no probing)
+// - expr-lang prevents code execution, filesystem, network access
+//
 // Returns: Status and optional error message
 func (s *StatusAggregator) DetermineObservationStatus(
 	ctx context.Context,
@@ -111,9 +116,14 @@ func (s *StatusAggregator) DetermineObservationStatus(
 		"error":     evidence.Error,     // Top-level error
 	}
 
+	// Security: Complexity limits to prevent DoS attacks
+	const maxExpressionLength = 1000 // Character limit for readability
+	const maxASTNodes = 100           // AST node limit prevents deeply nested expressions
+
 	options := []expr.Option{
 		expr.Env(env),
 		expr.AsBool(),
+		expr.MaxNodes(maxASTNodes), // Security: Limit expression complexity (prevents DoS via nested operations)
 		expr.Function("strContains", func(params ...interface{}) (interface{}, error) {
 			if len(params) != 2 {
 				return nil, fmt.Errorf("strContains expects 2 arguments")
@@ -143,6 +153,12 @@ func (s *StatusAggregator) DetermineObservationStatus(
 
 	// Evaluate each expect expression
 	for _, expectExpr := range expects {
+		// Security: Reject overly long expressions for readability and DoS prevention
+		// MaxNodes provides the primary DoS protection via AST complexity limiting
+		if len(expectExpr) > maxExpressionLength {
+			return values.StatusError, fmt.Sprintf("expect expression too long (max %d chars): %d chars", maxExpressionLength, len(expectExpr))
+		}
+
 		program, err := expr.Compile(expectExpr, options...)
 		if err != nil {
 			return values.StatusError, fmt.Sprintf("expect compilation failed: %v", err)
