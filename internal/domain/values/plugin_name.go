@@ -1,7 +1,6 @@
 package values
 
 import (
-	"database/sql/driver"
 	"fmt"
 	"strings"
 )
@@ -64,36 +63,4 @@ func (p *PluginName) UnmarshalJSON(data []byte) error {
 	}
 	*p = name
 	return nil
-}
-
-// Value implements driver.Valuer
-func (p PluginName) Value() (driver.Value, error) {
-	return p.value, nil
-}
-
-// Scan implements sql.Scanner
-func (p *PluginName) Scan(value interface{}) error {
-	if value == nil {
-		*p = PluginName{}
-		return nil
-	}
-
-	switch v := value.(type) {
-	case string:
-		name, err := NewPluginName(v)
-		if err != nil {
-			return err
-		}
-		*p = name
-		return nil
-	case []byte:
-		name, err := NewPluginName(string(v))
-		if err != nil {
-			return err
-		}
-		*p = name
-		return nil
-	default:
-		return fmt.Errorf("cannot scan %T into PluginName", value)
-	}
 }

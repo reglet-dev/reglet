@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func Test_Status_Precedence(t *testing.T) {
@@ -63,34 +62,4 @@ func Test_Status_Validate(t *testing.T) {
 
 	invalid := Status("invalid")
 	assert.Error(t, invalid.Validate())
-}
-
-func Test_Status_Scan(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    interface{}
-		expected Status
-		wantErr  bool
-	}{
-		{"string pass", "pass", StatusPass, false},
-		{"string fail", "fail", StatusFail, false},
-		{"bytes", []byte("error"), StatusError, false},
-		{"nil", nil, Status(""), false},
-		{"invalid type", 123, Status(""), true},
-		{"invalid value", "invalid", Status(""), true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var s Status
-			err := s.Scan(tt.input)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				assert.Equal(t, tt.expected, s)
-			}
-		})
-	}
 }

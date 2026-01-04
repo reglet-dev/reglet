@@ -3,7 +3,6 @@
 package values
 
 import (
-	"database/sql/driver"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -83,36 +82,4 @@ func (e *ExecutionID) UnmarshalJSON(data []byte) error {
 	}
 	*e = id
 	return nil
-}
-
-// Value implements driver.Valuer for database/sql
-func (e ExecutionID) Value() (driver.Value, error) {
-	return e.value.String(), nil
-}
-
-// Scan implements sql.Scanner for database/sql
-func (e *ExecutionID) Scan(value interface{}) error {
-	if value == nil {
-		*e = ExecutionID{}
-		return nil
-	}
-
-	switch v := value.(type) {
-	case string:
-		id, err := ParseExecutionID(v)
-		if err != nil {
-			return err
-		}
-		*e = id
-		return nil
-	case []byte:
-		id, err := ParseExecutionID(string(v))
-		if err != nil {
-			return err
-		}
-		*e = id
-		return nil
-	default:
-		return fmt.Errorf("cannot scan %T into ExecutionID", value)
-	}
 }

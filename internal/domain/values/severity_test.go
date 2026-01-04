@@ -97,33 +97,3 @@ func Test_Severity_JSON(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, original.Equals(decoded))
 }
-
-func Test_Severity_Scan(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    interface{}
-		expected Severity
-		wantErr  bool
-	}{
-		{"string low", "low", SevLow, false},
-		{"string critical", "critical", SevCritical, false},
-		{"bytes", []byte("medium"), SevMedium, false},
-		{"nil", nil, SevUnknown, false},
-		{"invalid type", 123, Severity{}, true},
-		{"invalid value", "invalid", Severity{}, true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var sev Severity
-			err := sev.Scan(tt.input)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				assert.True(t, sev.Equals(tt.expected))
-			}
-		})
-	}
-}

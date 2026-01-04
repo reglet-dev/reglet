@@ -1,7 +1,6 @@
 package values
 
 import (
-	"database/sql/driver"
 	"fmt"
 )
 
@@ -61,37 +60,5 @@ func (s Status) Validate() error {
 		return nil
 	default:
 		return fmt.Errorf("invalid status: %s", s)
-	}
-}
-
-// Value implements driver.Valuer for database/sql
-func (s Status) Value() (driver.Value, error) {
-	return string(s), nil
-}
-
-// Scan implements sql.Scanner for database/sql
-func (s *Status) Scan(value interface{}) error {
-	if value == nil {
-		*s = ""
-		return nil
-	}
-
-	switch v := value.(type) {
-	case string:
-		status := Status(v)
-		if err := status.Validate(); err != nil {
-			return err
-		}
-		*s = status
-		return nil
-	case []byte:
-		status := Status(v)
-		if err := status.Validate(); err != nil {
-			return err
-		}
-		*s = status
-		return nil
-	default:
-		return fmt.Errorf("cannot scan %T into Status", value)
 	}
 }

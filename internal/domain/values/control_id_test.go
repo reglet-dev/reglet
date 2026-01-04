@@ -75,34 +75,3 @@ func Test_ControlID_JSON(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, original.Equals(decoded))
 }
-
-func Test_ControlID_Scan(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    interface{}
-		expected string
-		wantErr  bool
-	}{
-		{"string", "ctrl-001", "ctrl-001", false},
-		{"bytes", []byte("ctrl-001"), "ctrl-001", false},
-		{"nil", nil, "", false},
-		{"invalid type", 123, "", true},
-		{"empty string", "", "", true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var id ControlID
-			err := id.Scan(tt.input)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				if tt.input != nil {
-					assert.Equal(t, tt.expected, id.String())
-				}
-			}
-		})
-	}
-}

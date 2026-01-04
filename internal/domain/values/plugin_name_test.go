@@ -76,34 +76,3 @@ func Test_PluginName_JSON(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, original.Equals(decoded))
 }
-
-func Test_PluginName_Scan(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    interface{}
-		expected string
-		wantErr  bool
-	}{
-		{"string", "http", "http", false},
-		{"bytes", []byte("tcp"), "tcp", false},
-		{"nil", nil, "", false},
-		{"invalid type", 123, "", true},
-		{"empty", "", "", true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var pn PluginName
-			err := pn.Scan(tt.input)
-
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				if tt.input != nil {
-					assert.Equal(t, tt.expected, pn.String())
-				}
-			}
-		})
-	}
-}

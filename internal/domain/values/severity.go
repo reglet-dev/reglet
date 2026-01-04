@@ -1,7 +1,6 @@
 package values
 
 import (
-	"database/sql/driver"
 	"fmt"
 	"strings"
 )
@@ -121,36 +120,4 @@ func (s *Severity) UnmarshalJSON(data []byte) error {
 	}
 	*s = sev
 	return nil
-}
-
-// Value implements driver.Valuer
-func (s Severity) Value() (driver.Value, error) {
-	return s.String(), nil
-}
-
-// Scan implements sql.Scanner
-func (s *Severity) Scan(value interface{}) error {
-	if value == nil {
-		*s = SevUnknown
-		return nil
-	}
-
-	switch v := value.(type) {
-	case string:
-		sev, err := NewSeverity(v)
-		if err != nil {
-			return err
-		}
-		*s = sev
-		return nil
-	case []byte:
-		sev, err := NewSeverity(string(v))
-		if err != nil {
-			return err
-		}
-		*s = sev
-		return nil
-	default:
-		return fmt.Errorf("cannot scan %T into Severity", value)
-	}
 }

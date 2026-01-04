@@ -1,7 +1,6 @@
 package values
 
 import (
-	"database/sql/driver"
 	"fmt"
 	"strings"
 )
@@ -66,36 +65,4 @@ func (c *ControlID) UnmarshalJSON(data []byte) error {
 	}
 	*c = id
 	return nil
-}
-
-// Value implements driver.Valuer for database/sql
-func (c ControlID) Value() (driver.Value, error) {
-	return c.value, nil
-}
-
-// Scan implements sql.Scanner for database/sql
-func (c *ControlID) Scan(value interface{}) error {
-	if value == nil {
-		*c = ControlID{}
-		return nil
-	}
-
-	switch v := value.(type) {
-	case string:
-		id, err := NewControlID(v)
-		if err != nil {
-			return err
-		}
-		*c = id
-		return nil
-	case []byte:
-		id, err := NewControlID(string(v))
-		if err != nil {
-			return err
-		}
-		*c = id
-		return nil
-	default:
-		return fmt.Errorf("cannot scan %T into ControlID", value)
-	}
 }
