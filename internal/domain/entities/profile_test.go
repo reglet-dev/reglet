@@ -323,6 +323,37 @@ func Test_Profile_Validate(t *testing.T) {
 			wantErr: true,
 			errMsg:  "non-existent control",
 		},
+		{
+			name: "circular_dependency",
+			profile: Profile{
+				Metadata: ProfileMetadata{
+					Name:    "Test",
+					Version: "1.0.0",
+				},
+				Controls: ControlsSection{
+					Items: []Control{
+						{
+							ID:        "a",
+							Name:      "A",
+							DependsOn: []string{"b"},
+							ObservationDefinitions: []ObservationDefinition{
+								{Plugin: "http"},
+							},
+						},
+						{
+							ID:        "b",
+							Name:      "B",
+							DependsOn: []string{"a"},
+							ObservationDefinitions: []ObservationDefinition{
+								{Plugin: "http"},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+			errMsg:  "circular dependency detected",
+		},
 	}
 
 	for _, tt := range tests {
@@ -367,6 +398,43 @@ func Test_Profile_AddControl(t *testing.T) {
 	err = profile.AddControl(ctrl1)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "already exists")
+
+	// Create a cycle via AddControl
+	// Setup profile with A -> B
+	profileWithCycle := Profile{
+		Metadata: ProfileMetadata{Name: "CycleTest", Version: "1.0"},
+		Controls: ControlsSection{
+			Items: []Control{
+				{
+					ID:        "a",
+					Name:      "A",
+					DependsOn: []string{"b"},
+					ObservationDefinitions: []ObservationDefinition{
+						{Plugin: "http"},
+					},
+				},
+			},
+		},
+	}
+
+	// Try to add B -> A
+	ctrlB := Control{
+		ID:        "b",
+		Name:      "B",
+		DependsOn: []string{"a"},
+		ObservationDefinitions: []ObservationDefinition{
+			{Plugin: "http"},
+		},
+	}
+
+	// Should fail due to cycle
+	err = profileWithCycle.AddControl(ctrlB)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "circular dependency")
+
+	// Ensure rollback happened (B should not be in Items)
+	assert.Len(t, profileWithCycle.Controls.Items, 1)
+	assert.Equal(t, "a", profileWithCycle.Controls.Items[0].ID)
 }
 
 func Test_Profile_GetControl(t *testing.T) {

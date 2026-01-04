@@ -104,6 +104,10 @@ func (p *Profile) Validate() error {
 		}
 	}
 
+	if err := p.CheckForCycles(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -133,7 +137,57 @@ func (p *Profile) AddControl(ctrl Control) error {
 		}
 	}
 
+	// Tentatively add the control
 	p.Controls.Items = append(p.Controls.Items, ctrl)
+
+	// Check for cycles
+	if err := p.CheckForCycles(); err != nil {
+		// Rollback
+		p.Controls.Items = p.Controls.Items[:len(p.Controls.Items)-1]
+		return fmt.Errorf("adding control creates circular dependency: %w", err)
+	}
+
+	return nil
+}
+
+// CheckForCycles checks if the control dependency graph contains any cycles.
+func (p *Profile) CheckForCycles() error {
+	visited := make(map[string]bool)
+	recStack := make(map[string]bool)
+
+	// Build a map for O(1) lookups of dependencies
+	controlDeps := make(map[string][]string)
+	for _, ctrl := range p.Controls.Items {
+		controlDeps[ctrl.ID] = ctrl.DependsOn
+	}
+
+	var dfs func(string) error
+	dfs = func(id string) error {
+		visited[id] = true
+		recStack[id] = true
+
+		for _, dep := range controlDeps[id] {
+			if !visited[dep] {
+				if err := dfs(dep); err != nil {
+					return err
+				}
+			} else if recStack[dep] {
+				return fmt.Errorf("%s -> %s", id, dep)
+			}
+		}
+
+		recStack[id] = false
+		return nil
+	}
+
+	for _, ctrl := range p.Controls.Items {
+		if !visited[ctrl.ID] {
+			if err := dfs(ctrl.ID); err != nil {
+				return fmt.Errorf("circular dependency detected: %w", err)
+			}
+		}
+	}
+
 	return nil
 }
 
