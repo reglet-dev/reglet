@@ -1,9 +1,6 @@
 package services
 
 import (
-	"fmt"
-
-	"github.com/expr-lang/expr"
 	"github.com/expr-lang/expr/vm"
 	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
 )
@@ -87,73 +84,41 @@ func (f *ControlFilter) WithFilterExpression(program *vm.Program) *ControlFilter
 func (f *ControlFilter) ShouldRun(ctrl entities.Control) (bool, string) {
 	// 0. Exclusive mode: ONLY specified controls run
 	if len(f.exclusiveControlIDs) > 0 {
-		if f.exclusiveControlIDs[ctrl.ID] {
-			return true, ""
-		}
-		return false, "excluded by --control filter"
+		spec := NewExclusiveControlsSpecification(f.exclusiveControlIDs)
+		return spec.IsSatisfiedBy(ctrl)
 	}
 
+	// Build specification chain for inclusion/exclusion logic
+	var specs []ControlSpecification
+
 	// 1. Exclude by control ID
-	if f.excludeControlIDs[ctrl.ID] {
-		return false, "excluded by --exclude-control"
+	if len(f.excludeControlIDs) > 0 {
+		specs = append(specs, NewExcludedControlsSpecification(f.excludeControlIDs))
 	}
 
 	// 2. Exclude by tags
-	for _, tag := range ctrl.Tags {
-		if f.excludeTags[tag] {
-			return false, fmt.Sprintf("excluded by --exclude-tags %s", tag)
-		}
+	if len(f.excludeTags) > 0 {
+		specs = append(specs, NewExcludedTagsSpecification(f.excludeTags))
 	}
 
 	// 3. Include by severity (if filter specified)
 	if len(f.includeSeverities) > 0 {
-		if !f.includeSeverities[ctrl.Severity] {
-			return false, "excluded by --severity filter"
-		}
+		specs = append(specs, NewIncludedSeveritiesSpecification(f.includeSeverities))
 	}
 
 	// 4. Include by tags (if filter specified)
 	if len(f.includeTags) > 0 {
-		hasTag := false
-		for _, tag := range ctrl.Tags {
-			if f.includeTags[tag] {
-				hasTag = true
-				break
-			}
-		}
-		if !hasTag {
-			return false, "excluded by --tags filter"
-		}
+		specs = append(specs, NewIncludedTagsSpecification(f.includeTags))
 	}
 
 	// 5. Advanced filter expression
 	if f.filterProgram != nil {
-		// Create evaluation environment
-		env := ControlEnv{
-			ID:       ctrl.ID,
-			Name:     ctrl.Name,
-			Severity: ctrl.Severity,
-			Owner:    ctrl.Owner,
-			Tags:     ctrl.Tags,
-		}
-
-		output, err := expr.Run(f.filterProgram, env)
-		if err != nil {
-			return false, fmt.Sprintf("filter expression error: %v", err)
-		}
-
-		result, ok := output.(bool)
-		if !ok {
-			return false, fmt.Sprintf("filter expression did not return boolean: %v", output)
-		}
-
-		if !result {
-			return false, "excluded by --filter expression"
-		}
+		specs = append(specs, NewExpressionSpecification(f.filterProgram))
 	}
 
-	// No filters matched - include by default
-	return true, ""
+	// Combine all criteria with AND
+	spec := NewAndSpecification(specs...)
+	return spec.IsSatisfiedBy(ctrl)
 }
 
 // toSet converts a slice to a map (set)
