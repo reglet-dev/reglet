@@ -27,6 +27,7 @@ type Runtime struct {
 	version             build.Info
 	redactor            *redaction.Redactor                  // Optional redactor for plugin output
 	grantedCapabilities map[string][]capabilities.Capability // Per-plugin granted capabilities
+	frozenEnv           []string                             // Snapshot of environment at startup (frozen for security)
 }
 
 // NewRuntime creates a runtime with no capabilities and no redaction.
@@ -92,6 +93,7 @@ func NewRuntimeWithCapabilities(
 		version:             version,
 		redactor:            redactor,
 		grantedCapabilities: caps,
+		frozenEnv:           os.Environ(), // Freeze environment at startup for security
 	}, nil
 }
 
@@ -136,6 +138,7 @@ func (r *Runtime) LoadPlugin(ctx context.Context, name string, wasmBytes []byte)
 		stdout:       stdout,
 		stderr:       stderr,
 		capabilities: r.grantedCapabilities[name], // Extract plugin-specific capabilities
+		frozenEnv:    r.frozenEnv,                 // Pass frozen environment snapshot (prevents runtime env leakage)
 	}
 
 	// Cache the plugin

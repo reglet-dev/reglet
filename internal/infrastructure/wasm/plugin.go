@@ -41,6 +41,9 @@ type Plugin struct {
 
 	// Granted capabilities for this plugin (used to build filesystem mounts)
 	capabilities []capabilities.Capability
+
+	// Frozen environment snapshot from runtime initialization (prevents runtime env leakage)
+	frozenEnv []string
 }
 
 // fsMount represents a filesystem mount configuration
@@ -229,8 +232,9 @@ func (p *Plugin) injectEnvironmentVariables(config wazero.ModuleConfig) wazero.M
 		return config // No env capabilities granted
 	}
 
-	// Get host environment variables
-	hostEnv := os.Environ()
+	// Use frozen environment snapshot from runtime initialization
+	// This prevents runtime environment changes from leaking to plugins
+	hostEnv := p.frozenEnv
 
 	// Filter environment variables that match granted patterns
 	allowedEnv := []string{}

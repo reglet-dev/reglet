@@ -33,7 +33,7 @@ func TestRedactor_ScrubString(t *testing.T) {
 			name:     "Hash Mode (No Salt)",
 			input:    "AKIAIOSFODNN7EXAMPLE",
 			hashMode: true,
-			want:     "[hmac:d3608e7190c42874]", // HMAC-SHA256 of "AKIAIOSFODNN7EXAMPLE" with empty salt
+			want:     "[hmac:d3608e7190c42874c51ef490bdc7570d]", // HMAC-SHA256 of "AKIAIOSFODNN7EXAMPLE" with empty salt (first 16 bytes)
 		},
 		{
 			name:     "Hash Mode (With Salt)",
@@ -41,7 +41,7 @@ func TestRedactor_ScrubString(t *testing.T) {
 			hashMode: true,
 			salt:     "my-salt",
 			// HMAC-SHA256 of "AKIAIOSFODNN7EXAMPLE" with key "my-salt"
-			want: "[hmac:b9f2d1a41525d6f5]", // First 8 bytes (16 hex chars)
+			want: "[hmac:b9f2d1a41525d6f5899a386f50dc2295]", // First 16 bytes (32 hex chars)
 		},
 	}
 

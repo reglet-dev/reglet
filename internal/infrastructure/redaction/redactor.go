@@ -218,19 +218,20 @@ func (r *Redactor) isPathMatch(path string) bool {
 }
 
 // hash returns a truncated HMAC-SHA256 hash of the secret.
-// Format: [hmac:a1b2c3d4e5f6g7h8]
+// Format: [hmac:a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6]
 //
 // Security notes:
 // - Uses HMAC-SHA256 with the configured salt as the key.
-// - Truncation to 8 bytes (16 hex chars) prevents rainbow table attacks while allowing correlation.
+// - Truncation to 16 bytes (32 hex chars) provides 128-bit security for collision resistance.
+// - Prevents rainbow table attacks while allowing correlation of identical secrets.
 // - Requires a high-entropy salt for security against offline brute-forcing.
 func (r *Redactor) hash(secret string) string {
 	mac := hmac.New(sha256.New, []byte(r.salt))
 	mac.Write([]byte(secret))
 	sum := mac.Sum(nil)
 
-	// Use first 8 bytes (16 hex chars) for correlation
-	return fmt.Sprintf("[hmac:%s]", hex.EncodeToString(sum)[:16])
+	// Use first 16 bytes (32 hex chars) for correlation - provides 128-bit security
+	return fmt.Sprintf("[hmac:%s]", hex.EncodeToString(sum)[:32])
 }
 
 // defaultPatterns contains regexes for common secrets.

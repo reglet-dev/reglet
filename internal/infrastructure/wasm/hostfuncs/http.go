@@ -3,17 +3,74 @@ package hostfuncs
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/url" // Import url for URL parsing
+	"time"
 
 	"github.com/tetratelabs/wazero/api"
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/build"
 )
+
+// dnsPinningTransport is a custom http.RoundTripper that prevents DNS rebinding attacks
+// by resolving DNS once, validating the IP, and connecting to that specific IP.
+type dnsPinningTransport struct {
+	base       *http.Transport
+	ctx        context.Context
+	pluginName string
+	checker    *CapabilityChecker
+}
+
+// RoundTrip implements http.RoundTripper with DNS pinning and SSRF protection.
+func (t *dnsPinningTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	hostname := req.URL.Hostname()
+
+	// Resolve and validate hostname to IP (prevents DNS rebinding)
+	validatedIP, err := resolveAndValidate(t.ctx, hostname, t.pluginName, t.checker)
+	if err != nil {
+		return nil, fmt.Errorf("SSRF protection: %v", err)
+	}
+
+	// Determine port
+	port := req.URL.Port()
+	if port == "" {
+		if req.URL.Scheme == "https" {
+			port = "443"
+		} else {
+			port = "80"
+		}
+	}
+
+	// Create a new transport with DNS pinned to validated IP
+	// Clone base transport settings to preserve configuration
+	pinnedTransport := t.base.Clone()
+	pinnedTransport.DialContext = func(dialCtx context.Context, network, addr string) (net.Conn, error) {
+		// Ignore addr parameter and use validated IP
+		// This ensures connection goes to IP we validated, not a potentially rebinded DNS result
+		targetAddr := net.JoinHostPort(validatedIP, port)
+		dialer := &net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}
+		return dialer.DialContext(dialCtx, network, targetAddr)
+	}
+
+	// For HTTPS, preserve hostname for SNI and certificate validation
+	if req.URL.Scheme == "https" {
+		if pinnedTransport.TLSClientConfig == nil {
+			pinnedTransport.TLSClientConfig = &tls.Config{}
+		}
+		pinnedTransport.TLSClientConfig.ServerName = hostname
+	}
+
+	return pinnedTransport.RoundTrip(req)
+}
 
 // HTTPRequest performs an HTTP request on behalf of the plugin.
 // It receives a packed uint64 (ptr+len) pointing to a JSON-encoded HTTPRequestWire.
@@ -83,15 +140,8 @@ func HTTPRequest(ctx context.Context, mod api.Module, stack []uint64, checker *C
 		return
 	}
 
-	// SSRF protection: validate destination is not a private/reserved IP
-	if err := ValidateDestination(ctx, parsedURL.Hostname(), pluginName, checker); err != nil {
-		errMsg := fmt.Sprintf("SSRF protection: %v", err)
-		slog.WarnContext(ctx, errMsg, "url", request.URL, "host", parsedURL.Hostname())
-		stack[0] = hostWriteResponse(ctx, mod, HTTPResponseWire{
-			Error: &ErrorDetail{Message: errMsg, Type: "ssrf_protection"},
-		})
-		return
-	}
+	// NOTE: SSRF protection with DNS pinning happens in dnsPinningTransport.RoundTrip()
+	// This validates and pins DNS for both initial request and redirects
 
 	// 2. Prepare HTTP request body
 	var reqBody io.Reader
@@ -133,16 +183,30 @@ func HTTPRequest(ctx context.Context, mod api.Module, stack []uint64, checker *C
 		}
 	}
 
-	// 4. Perform HTTP request with SSRF-safe client
-	// SECURITY: Block redirects to prevent SSRF bypass via redirect chains
-	// Redirects could bypass ValidateDestination by redirecting to private IPs
+	// 4. Perform HTTP request with SSRF-safe client using DNS pinning
+	// SECURITY: Create custom RoundTripper that validates and pins DNS for each request
+	// This prevents DNS rebinding attacks on both initial request and redirects
+	baseTransport := &http.Transport{
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          10,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+
+	// Custom RoundTripper that validates and pins DNS before each request
+	dnsPinnedTransport := &dnsPinningTransport{
+		base:       baseTransport,
+		ctx:        ctx,
+		pluginName: pluginName,
+		checker:    checker,
+	}
+
 	client := &http.Client{
+		Transport: dnsPinnedTransport,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			// Validate redirect target against SSRF protection
-			if err := ValidateDestination(ctx, req.URL.Hostname(), pluginName, checker); err != nil {
-				return fmt.Errorf("redirect blocked by SSRF protection: %w", err)
-			}
 			// Allow up to 10 redirects (http.DefaultClient default)
+			// DNS validation happens in RoundTrip for each request
 			if len(via) >= 10 {
 				return fmt.Errorf("stopped after 10 redirects")
 			}
