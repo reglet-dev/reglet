@@ -22,7 +22,7 @@ func Test_Control_Validate(t *testing.T) {
 			control: Control{
 				ID:   "ctrl-001",
 				Name: "Test",
-				Observations: []Observation{
+				Observations: []ObservationDefinition{
 					{Plugin: "http"},
 				},
 			},
@@ -32,7 +32,7 @@ func Test_Control_Validate(t *testing.T) {
 			name: "missing_id",
 			control: Control{
 				Name: "Test",
-				Observations: []Observation{
+				Observations: []ObservationDefinition{
 					{Plugin: "http"},
 				},
 			},
@@ -44,7 +44,7 @@ func Test_Control_Validate(t *testing.T) {
 			control: Control{
 				ID:   "",
 				Name: "Test",
-				Observations: []Observation{
+				Observations: []ObservationDefinition{
 					{Plugin: "http"},
 				},
 			},
@@ -55,7 +55,7 @@ func Test_Control_Validate(t *testing.T) {
 			name: "missing_name",
 			control: Control{
 				ID: "ctrl-001",
-				Observations: []Observation{
+				Observations: []ObservationDefinition{
 					{Plugin: "http"},
 				},
 			},
@@ -67,7 +67,7 @@ func Test_Control_Validate(t *testing.T) {
 			control: Control{
 				ID:           "ctrl-001",
 				Name:         "Test",
-				Observations: []Observation{},
+				Observations: []ObservationDefinition{},
 			},
 			wantErr: true,
 			errMsg:  "must have at least one observation",
@@ -78,7 +78,7 @@ func Test_Control_Validate(t *testing.T) {
 				ID:       "ctrl-001",
 				Name:     "Test",
 				Severity: "invalid",
-				Observations: []Observation{
+				Observations: []ObservationDefinition{
 					{Plugin: "http"},
 				},
 			},
@@ -198,7 +198,7 @@ func Test_Control_ObservationCount(t *testing.T) {
 		{
 			name: "three observations",
 			control: Control{
-				Observations: []Observation{
+				Observations: []ObservationDefinition{
 					{Plugin: "http"},
 					{Plugin: "tcp"},
 					{Plugin: "dns"},
@@ -242,7 +242,7 @@ func Test_Profile_Validate(t *testing.T) {
 						{
 							ID:   "ctrl-001",
 							Name: "Test Control",
-							Observations: []Observation{
+							Observations: []ObservationDefinition{
 								{Plugin: "http"},
 							},
 						},
@@ -283,14 +283,14 @@ func Test_Profile_Validate(t *testing.T) {
 						{
 							ID:   "ctrl-001",
 							Name: "First",
-							Observations: []Observation{
+							Observations: []ObservationDefinition{
 								{Plugin: "http"},
 							},
 						},
 						{
 							ID:   "ctrl-001",
 							Name: "Duplicate",
-							Observations: []Observation{
+							Observations: []ObservationDefinition{
 								{Plugin: "tcp"},
 							},
 						},
@@ -313,7 +313,7 @@ func Test_Profile_Validate(t *testing.T) {
 							ID:        "ctrl-001",
 							Name:      "Test",
 							DependsOn: []string{"ctrl-nonexistent"},
-							Observations: []Observation{
+							Observations: []ObservationDefinition{
 								{Plugin: "http"},
 							},
 						},
@@ -355,7 +355,7 @@ func Test_Profile_AddControl(t *testing.T) {
 	ctrl1 := Control{
 		ID:   "ctrl-001",
 		Name: "Test",
-		Observations: []Observation{
+		Observations: []ObservationDefinition{
 			{Plugin: "http"},
 		},
 	}

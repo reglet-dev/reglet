@@ -144,13 +144,13 @@ func Test_validatePluginName_EdgeCases(t *testing.T) {
 func Test_validateObservation_WithInvalidPluginName(t *testing.T) {
 	tests := []struct {
 		name        string
-		obs         entities.Observation
+		obs         entities.ObservationDefinition
 		expectError bool
 		errorMsg    string
 	}{
 		{
 			name: "valid plugin name",
-			obs: entities.Observation{
+			obs: entities.ObservationDefinition{
 				Plugin: "file",
 				Config: map[string]interface{}{},
 			},
@@ -158,7 +158,7 @@ func Test_validateObservation_WithInvalidPluginName(t *testing.T) {
 		},
 		{
 			name: "path traversal in plugin name",
-			obs: entities.Observation{
+			obs: entities.ObservationDefinition{
 				Plugin: "../etc/passwd",
 				Config: map[string]interface{}{},
 			},
@@ -167,7 +167,7 @@ func Test_validateObservation_WithInvalidPluginName(t *testing.T) {
 		},
 		{
 			name: "empty plugin name",
-			obs: entities.Observation{
+			obs: entities.ObservationDefinition{
 				Plugin: "",
 				Config: map[string]interface{}{},
 			},
@@ -176,7 +176,7 @@ func Test_validateObservation_WithInvalidPluginName(t *testing.T) {
 		},
 		{
 			name: "plugin name with slash",
-			obs: entities.Observation{
+			obs: entities.ObservationDefinition{
 				Plugin: "plugins/file",
 				Config: map[string]interface{}{},
 			},

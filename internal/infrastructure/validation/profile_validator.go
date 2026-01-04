@@ -271,7 +271,7 @@ func ValidatePluginName(name string) error {
 }
 
 // validateObservation validates a single observation.
-func validateObservation(obs entities.Observation) error {
+func validateObservation(obs entities.ObservationDefinition) error {
 	var errors []string
 
 	// Plugin is required
@@ -298,7 +298,7 @@ func validateObservation(obs entities.Observation) error {
 
 // validateObservationSchemaCompiled validates an observation's config using a schema compiler.
 // This uses cached compiled schemas to avoid repeated compilation overhead.
-func validateObservationSchemaCompiled(ctx context.Context, obs entities.Observation, compiler *SchemaCompiler) error {
+func validateObservationSchemaCompiled(ctx context.Context, obs entities.ObservationDefinition, compiler *SchemaCompiler) error {
 	// Get compiled schema from cache or compile if needed
 	schema, err := compiler.GetCompiledSchema(ctx, obs.Plugin)
 	if err != nil {

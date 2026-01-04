@@ -18,7 +18,7 @@ func TestValidate_Valid(t *testing.T) {
 				{
 					ID:   "test-control",
 					Name: "Test Control",
-					Observations: []entities.Observation{
+					Observations: []entities.ObservationDefinition{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{
@@ -46,7 +46,7 @@ func TestValidate_MissingName(t *testing.T) {
 				{
 					ID:   "test-control",
 					Name: "Test Control",
-					Observations: []entities.Observation{
+					Observations: []entities.ObservationDefinition{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{
@@ -76,7 +76,7 @@ func TestValidate_InvalidVersion(t *testing.T) {
 				{
 					ID:   "test-control",
 					Name: "Test Control",
-					Observations: []entities.Observation{
+					Observations: []entities.ObservationDefinition{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{
@@ -106,7 +106,7 @@ func TestValidate_MissingControlID(t *testing.T) {
 			Items: []entities.Control{
 				{
 					Name: "Test Control",
-					Observations: []entities.Observation{
+					Observations: []entities.ObservationDefinition{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{
@@ -136,7 +136,7 @@ func TestValidate_InvalidControlID(t *testing.T) {
 				{
 					ID:   "invalid id with spaces",
 					Name: "Test Control",
-					Observations: []entities.Observation{
+					Observations: []entities.ObservationDefinition{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{
@@ -167,7 +167,7 @@ func TestValidate_DuplicateControlIDs(t *testing.T) {
 				{
 					ID:   "test-control",
 					Name: "Test Control 1",
-					Observations: []entities.Observation{
+					Observations: []entities.ObservationDefinition{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{
@@ -179,7 +179,7 @@ func TestValidate_DuplicateControlIDs(t *testing.T) {
 				{
 					ID:   "test-control",
 					Name: "Test Control 2",
-					Observations: []entities.Observation{
+					Observations: []entities.ObservationDefinition{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{
@@ -209,7 +209,7 @@ func TestValidate_NoObservations(t *testing.T) {
 				{
 					ID:           "test-control",
 					Name:         "Test Control",
-					Observations: []entities.Observation{},
+					Observations: []entities.ObservationDefinition{},
 				},
 			},
 		},
@@ -232,7 +232,7 @@ func TestValidate_MissingPlugin(t *testing.T) {
 				{
 					ID:   "test-control",
 					Name: "Test Control",
-					Observations: []entities.Observation{
+					Observations: []entities.ObservationDefinition{
 						{
 							Config: map[string]interface{}{
 								"path": "/etc/test",
@@ -262,7 +262,7 @@ func TestValidate_ManualStruct(t *testing.T) {
 				{
 					ID:   "manual-1",
 					Name: "Manual Control",
-					Observations: []entities.Observation{
+					Observations: []entities.ObservationDefinition{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{"path": "/"},

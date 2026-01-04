@@ -129,7 +129,7 @@ func TestExecuteControl_SingleObservation(t *testing.T) {
 		Description: "A test control",
 		Severity:    "medium",
 		Tags:        []string{"test"},
-		Observations: []entities.Observation{
+		Observations: []entities.ObservationDefinition{
 			{
 				Plugin: "file",
 				Config: map[string]interface{}{
@@ -165,7 +165,7 @@ func TestExecuteControl_MultipleObservations(t *testing.T) {
 	ctrl := entities.Control{
 		ID:   "multi-test",
 		Name: "Multi Observation Test",
-		Observations: []entities.Observation{
+		Observations: []entities.ObservationDefinition{
 			{
 				Plugin: "file",
 				Config: map[string]interface{}{
@@ -209,7 +209,7 @@ func TestExecute_SingleControl(t *testing.T) {
 				{
 					ID:   "control-1",
 					Name: "Control 1",
-					Observations: []entities.Observation{
+					Observations: []entities.ObservationDefinition{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{
@@ -254,7 +254,7 @@ func TestExecute_MultipleControls(t *testing.T) {
 				{
 					ID:   "control-1",
 					Name: "Control 1",
-					Observations: []entities.Observation{
+					Observations: []entities.ObservationDefinition{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{
@@ -267,7 +267,7 @@ func TestExecute_MultipleControls(t *testing.T) {
 				{
 					ID:   "control-2",
 					Name: "Control 2",
-					Observations: []entities.Observation{
+					Observations: []entities.ObservationDefinition{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{
@@ -308,7 +308,7 @@ func TestExecute_SummaryStatistics(t *testing.T) {
 				{
 					ID:   "control-1",
 					Name: "Control 1",
-					Observations: []entities.Observation{
+					Observations: []entities.ObservationDefinition{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{
@@ -353,7 +353,7 @@ func TestExecute_TimingInfo(t *testing.T) {
 				{
 					ID:   "control-1",
 					Name: "Control 1",
-					Observations: []entities.Observation{
+					Observations: []entities.ObservationDefinition{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{
@@ -396,7 +396,7 @@ func TestExecute_InvalidPlugin(t *testing.T) {
 				{
 					ID:   "control-1",
 					Name: "Control 1",
-					Observations: []entities.Observation{
+					Observations: []entities.ObservationDefinition{
 						{
 							Plugin: "nonexistent-plugin",
 							Config: map[string]interface{}{
@@ -664,7 +664,7 @@ func TestWorkerPool_NoDependencies(t *testing.T) {
 		controls[i] = entities.Control{
 			ID:   fmt.Sprintf("control-%d", i),
 			Name: fmt.Sprintf("Control %d", i),
-			Observations: []entities.Observation{
+			Observations: []entities.ObservationDefinition{
 				{
 					Plugin: "file",
 					Config: map[string]interface{}{
@@ -699,7 +699,7 @@ func TestWorkerPool_LinearDependencies(t *testing.T) {
 		{
 			ID:   "a",
 			Name: "Control A",
-			Observations: []entities.Observation{
+			Observations: []entities.ObservationDefinition{
 				{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
 			},
 		},
@@ -707,7 +707,7 @@ func TestWorkerPool_LinearDependencies(t *testing.T) {
 			ID:         "b",
 			Name:       "Control B",
 			DependsOn:  []string{"a"},
-			Observations: []entities.Observation{
+			Observations: []entities.ObservationDefinition{
 				{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
 			},
 		},
@@ -715,7 +715,7 @@ func TestWorkerPool_LinearDependencies(t *testing.T) {
 			ID:         "c",
 			Name:       "Control C",
 			DependsOn:  []string{"b"},
-			Observations: []entities.Observation{
+			Observations: []entities.ObservationDefinition{
 				{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
 			},
 		},
@@ -747,16 +747,16 @@ func TestWorkerPool_DiamondDependencies(t *testing.T) {
 
 	// Create diamond: A → B, A → C, B → D, C → D
 	controls := []entities.Control{
-		{ID: "a", Name: "A", Observations: []entities.Observation{
+		{ID: "a", Name: "A", Observations: []entities.ObservationDefinition{
 			{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
 		}},
-		{ID: "b", Name: "B", DependsOn: []string{"a"}, Observations: []entities.Observation{
+		{ID: "b", Name: "B", DependsOn: []string{"a"}, Observations: []entities.ObservationDefinition{
 			{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
 		}},
-		{ID: "c", Name: "C", DependsOn: []string{"a"}, Observations: []entities.Observation{
+		{ID: "c", Name: "C", DependsOn: []string{"a"}, Observations: []entities.ObservationDefinition{
 			{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
 		}},
-		{ID: "d", Name: "D", DependsOn: []string{"b", "c"}, Observations: []entities.Observation{
+		{ID: "d", Name: "D", DependsOn: []string{"b", "c"}, Observations: []entities.ObservationDefinition{
 			{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
 		}},
 	}
@@ -782,13 +782,13 @@ func TestWorkerPool_DependencyFailure(t *testing.T) {
 
 	// A fails (nonexistent file) → B should skip → C should skip
 	controls := []entities.Control{
-		{ID: "a", Name: "A (will fail)", Observations: []entities.Observation{
+		{ID: "a", Name: "A (will fail)", Observations: []entities.ObservationDefinition{
 			{Plugin: "file", Config: map[string]interface{}{"path": "/nonexistent-file-12345", "mode": "exists"}},
 		}},
-		{ID: "b", Name: "B", DependsOn: []string{"a"}, Observations: []entities.Observation{
+		{ID: "b", Name: "B", DependsOn: []string{"a"}, Observations: []entities.ObservationDefinition{
 			{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
 		}},
-		{ID: "c", Name: "C", DependsOn: []string{"b"}, Observations: []entities.Observation{
+		{ID: "c", Name: "C", DependsOn: []string{"b"}, Observations: []entities.ObservationDefinition{
 			{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
 		}},
 	}
@@ -830,10 +830,10 @@ func TestWorkerPool_CycleDetection(t *testing.T) {
 
 	// Create cycle: A → B → A
 	controls := []entities.Control{
-		{ID: "a", Name: "A", DependsOn: []string{"b"}, Observations: []entities.Observation{
+		{ID: "a", Name: "A", DependsOn: []string{"b"}, Observations: []entities.ObservationDefinition{
 			{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
 		}},
-		{ID: "b", Name: "B", DependsOn: []string{"a"}, Observations: []entities.Observation{
+		{ID: "b", Name: "B", DependsOn: []string{"a"}, Observations: []entities.ObservationDefinition{
 			{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
 		}},
 	}
@@ -861,10 +861,10 @@ func TestWorkerPool_MissingDependency(t *testing.T) {
 	// A depends on non-existent B
 	// Add C to force parallel execution path (len > 1)
 	controls := []entities.Control{
-		{ID: "a", Name: "A", DependsOn: []string{"nonexistent"}, Observations: []entities.Observation{
+		{ID: "a", Name: "A", DependsOn: []string{"nonexistent"}, Observations: []entities.ObservationDefinition{
 			{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
 		}},
-		{ID: "c", Name: "C", Observations: []entities.Observation{
+		{ID: "c", Name: "C", Observations: []entities.ObservationDefinition{
 			{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
 		}},
 	}
@@ -894,7 +894,7 @@ func TestWorkerPool_ContextCancellation(t *testing.T) {
 		controls[i] = entities.Control{
 			ID:   fmt.Sprintf("control-%d", i),
 			Name: fmt.Sprintf("Control %d", i),
-			Observations: []entities.Observation{
+			Observations: []entities.ObservationDefinition{
 				{Plugin: "file", Config: map[string]interface{}{"path": "/etc/hostname"}},
 			},
 		}

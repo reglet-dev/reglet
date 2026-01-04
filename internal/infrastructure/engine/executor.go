@@ -77,7 +77,7 @@ func findProjectRoot() string {
 }
 
 // Execute runs a single observation and returns the result.
-func (e *ObservationExecutor) Execute(ctx context.Context, obs entities.Observation) execution.ObservationResult {
+func (e *ObservationExecutor) Execute(ctx context.Context, obs entities.ObservationDefinition) execution.ObservationResult {
 	startTime := time.Now()
 
 	result := execution.ObservationResult{

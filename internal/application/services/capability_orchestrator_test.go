@@ -17,7 +17,7 @@ func TestExtractProfileCapabilities_FilePlugin(t *testing.T) {
 				{
 					ID:   "test-1",
 					Name: "Test Control",
-					Observations: []entities.Observation{
+					Observations: []entities.ObservationDefinition{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{
@@ -48,7 +48,7 @@ func TestExtractProfileCapabilities_Deduplication(t *testing.T) {
 				{
 					ID:   "test-1",
 					Name: "Test Control 1",
-					Observations: []entities.Observation{
+					Observations: []entities.ObservationDefinition{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{
@@ -60,7 +60,7 @@ func TestExtractProfileCapabilities_Deduplication(t *testing.T) {
 				{
 					ID:   "test-2",
 					Name: "Test Control 2",
-					Observations: []entities.Observation{
+					Observations: []entities.ObservationDefinition{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{
@@ -72,7 +72,7 @@ func TestExtractProfileCapabilities_Deduplication(t *testing.T) {
 				{
 					ID:   "test-3",
 					Name: "Test Control 3",
-					Observations: []entities.Observation{
+					Observations: []entities.ObservationDefinition{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{
@@ -103,7 +103,7 @@ func TestExtractProfileCapabilities_MultipleFiles(t *testing.T) {
 				{
 					ID:   "test-1",
 					Name: "Test Control",
-					Observations: []entities.Observation{
+					Observations: []entities.ObservationDefinition{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{
@@ -154,7 +154,7 @@ func TestExtractProfileCapabilities_CommandPlugin(t *testing.T) {
 				{
 					ID:   "test-1",
 					Name: "Test Control",
-					Observations: []entities.Observation{
+					Observations: []entities.ObservationDefinition{
 						{
 							Plugin: "command",
 							Config: map[string]interface{}{
@@ -216,7 +216,7 @@ func TestExtractProfileCapabilities_NetworkPlugins(t *testing.T) {
 						{
 							ID:   "test-1",
 							Name: "Test Control",
-							Observations: []entities.Observation{
+							Observations: []entities.ObservationDefinition{
 								{
 									Plugin: tt.pluginName,
 									Config: tt.config,
@@ -247,7 +247,7 @@ func TestExtractProfileCapabilities_EmptyConfig(t *testing.T) {
 				{
 					ID:   "test-1",
 					Name: "Test Control",
-					Observations: []entities.Observation{
+					Observations: []entities.ObservationDefinition{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{
@@ -276,7 +276,7 @@ func TestExtractProfileCapabilities_MultiplePlugins(t *testing.T) {
 				{
 					ID:   "test-1",
 					Name: "Test Control",
-					Observations: []entities.Observation{
+					Observations: []entities.ObservationDefinition{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{

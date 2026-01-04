@@ -87,7 +87,7 @@ func TestFiltering_EndToEnd(t *testing.T) {
 			Name:     fmt.Sprintf("Control %d", i),
 			Severity: severity,
 			Tags:     []string{tag},
-			Observations: []entities.Observation{
+			Observations: []entities.ObservationDefinition{
 				{
 					Plugin: "file",
 					Config: map[string]interface{}{

@@ -68,7 +68,7 @@ func Test_ValidateWithSchemas_Success(t *testing.T) {
 				{
 					ID:   "test-1",
 					Name: "Test Control",
-					Observations: []entities.Observation{
+					Observations: []entities.ObservationDefinition{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{
@@ -113,7 +113,7 @@ func Test_ValidateWithSchemas_TypeMismatch(t *testing.T) {
 				{
 					ID:   "test-1",
 					Name: "Test Control",
-					Observations: []entities.Observation{
+					Observations: []entities.ObservationDefinition{
 						{
 							Plugin: "http",
 							Config: map[string]interface{}{
@@ -158,7 +158,7 @@ func Test_ValidateWithSchemas_MissingRequiredField(t *testing.T) {
 				{
 					ID:   "test-1",
 					Name: "Test Control",
-					Observations: []entities.Observation{
+					Observations: []entities.ObservationDefinition{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{
@@ -193,7 +193,7 @@ func Test_ValidateWithSchemas_NoSchema(t *testing.T) {
 				{
 					ID:   "test-1",
 					Name: "Test Control",
-					Observations: []entities.Observation{
+					Observations: []entities.ObservationDefinition{
 						{
 							Plugin: "unknown",
 							Config: map[string]interface{}{
@@ -235,7 +235,7 @@ func Test_ValidateWithSchemas_StructuralValidationFirst(t *testing.T) {
 				{
 					ID:   "test-1",
 					Name: "Test Control",
-					Observations: []entities.Observation{
+					Observations: []entities.ObservationDefinition{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{
@@ -290,7 +290,7 @@ func Test_ValidateWithSchemas_MultipleErrors(t *testing.T) {
 				{
 					ID:   "test-1",
 					Name: "Test Control 1",
-					Observations: []entities.Observation{
+					Observations: []entities.ObservationDefinition{
 						{
 							Plugin: "file",
 							Config: map[string]interface{}{
@@ -303,7 +303,7 @@ func Test_ValidateWithSchemas_MultipleErrors(t *testing.T) {
 				{
 					ID:   "test-2",
 					Name: "Test Control 2",
-					Observations: []entities.Observation{
+					Observations: []entities.ObservationDefinition{
 						{
 							Plugin: "http",
 							Config: map[string]interface{}{
@@ -439,7 +439,7 @@ func Test_ValidateWithSchemas_UsesCachedSchemas(t *testing.T) {
 		controls[i] = entities.Control{
 			ID:   fmt.Sprintf("test-%d", i),
 			Name: "Test Control",
-			Observations: []entities.Observation{
+			Observations: []entities.ObservationDefinition{
 				{
 					Plugin: "file",
 					Config: map[string]interface{}{

@@ -611,7 +611,7 @@ func (e *Engine) shouldRun(ctrl entities.Control) (bool, string) {
 }
 
 // executeObservationsParallel executes observations in parallel with concurrency limits.
-func (e *Engine) executeObservationsParallel(ctx context.Context, observations []entities.Observation) []execution.ObservationResult {
+func (e *Engine) executeObservationsParallel(ctx context.Context, observations []entities.ObservationDefinition) []execution.ObservationResult {
 	g, ctx := errgroup.WithContext(ctx)
 
 	// Apply concurrency limit if specified

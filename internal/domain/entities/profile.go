@@ -56,13 +56,14 @@ type Control struct {
 	Owner        string        `yaml:"owner,omitempty"`
 	Tags         []string      `yaml:"tags,omitempty"`
 	DependsOn    []string      `yaml:"depends_on,omitempty"`
-	Timeout      time.Duration `yaml:"timeout,omitempty"`
-	Observations []Observation `yaml:"observations"`
+	Timeout      time.Duration           `yaml:"timeout,omitempty"`
+	Observations []ObservationDefinition `yaml:"observations"`
 }
 
-// Observation configuration for a specific plugin execution.
+// ObservationDefinition configuration for a specific plugin execution.
 // It is an immutable value object.
-type Observation struct {
+// Renamed from Observation to ObservationDefinition to avoid confusion with ObservationResult.
+type ObservationDefinition struct {
 	Plugin string                 `yaml:"plugin"`
 	Config map[string]interface{} `yaml:"config,omitempty"`
 	Expect []string               `yaml:"expect,omitempty"`
