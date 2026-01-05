@@ -77,3 +77,35 @@ func Test_PluginName_JSON(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, original.Equals(decoded))
 }
+
+// Test_PluginName_MarshalJSON_EscapesSpecialChars verifies that MarshalJSON
+// produces valid JSON even if a PluginName with special characters were
+// somehow created (bypassing validation).
+func Test_PluginName_MarshalJSON_EscapesSpecialChars(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+	}{
+		{"quote", `test"quote`},
+		{"backslash", `test\path`},
+		{"newline", "test\nline"},
+		{"tab", "test\ttab"},
+		{"unicode", "test\u0000null"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Directly construct to bypass validation (simulating potential bypass)
+			pn := PluginName{value: tt.value}
+
+			data, err := pn.MarshalJSON()
+			require.NoError(t, err, "MarshalJSON should not error")
+
+			// Must be valid JSON - json.Unmarshal should work
+			var decoded string
+			err = json.Unmarshal(data, &decoded)
+			require.NoError(t, err, "MarshalJSON must produce valid JSON")
+			assert.Equal(t, tt.value, decoded, "round-trip should preserve value")
+		})
+	}
+}

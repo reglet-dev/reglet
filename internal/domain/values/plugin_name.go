@@ -1,6 +1,7 @@
 package values
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -80,9 +81,10 @@ func (p PluginName) Equals(other PluginName) bool {
 	return p.value == other.value
 }
 
-// MarshalJSON implements json.Marshaler
+// MarshalJSON implements json.Marshaler.
+// Uses json.Marshal for proper character escaping.
 func (p PluginName) MarshalJSON() ([]byte, error) {
-	return []byte(`"` + p.value + `"`), nil
+	return json.Marshal(p.value)
 }
 
 // UnmarshalJSON implements json.Unmarshaler
