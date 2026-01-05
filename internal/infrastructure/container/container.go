@@ -2,12 +2,15 @@
 package container
 
 import (
+	"context"
 	"log/slog"
 
 	"github.com/whiskeyjimbo/reglet/internal/application/ports"
 	"github.com/whiskeyjimbo/reglet/internal/application/services"
+	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
 	domainservices "github.com/whiskeyjimbo/reglet/internal/domain/services"
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/adapters"
+	"github.com/whiskeyjimbo/reglet/internal/infrastructure/plugins"
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/redaction"
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/system"
 )
@@ -51,7 +54,7 @@ func New(opts Options) (*Container, error) {
 	pluginResolver := adapters.NewPluginDirectoryAdapter()
 
 	// Load system config
-	systemCfg, err := systemConfigAdapter.LoadConfig(nil, opts.SystemConfigPath)
+	systemCfg, err := systemConfigAdapter.LoadConfig(context.TODO(), opts.SystemConfigPath)
 	if err != nil {
 		opts.Logger.Debug("failed to load system config, using defaults", "error", err)
 		systemCfg = &system.Config{} // Use defaults
@@ -78,8 +81,12 @@ func New(opts Options) (*Container, error) {
 		securityLevel = string(systemCfg.Security.GetSecurityLevel())
 	}
 
+	// Create capability registry and register default extractors (OCP)
+	capRegistry := capabilities.NewRegistry()
+	plugins.RegisterDefaultExtractors(capRegistry)
+
 	// Create capability orchestrator
-	capOrchestrator := services.NewCapabilityOrchestratorWithSecurity(opts.TrustPlugins, securityLevel)
+	capOrchestrator := services.NewCapabilityOrchestratorWithSecurity(opts.TrustPlugins, securityLevel, capRegistry)
 
 	// Create domain services
 	profileCompiler := domainservices.NewProfileCompiler()
