@@ -18,36 +18,14 @@ func TestCapabilityOrchestrator_UsesAnalyzer(t *testing.T) {
 	assert.IsType(t, &domainServices.CapabilityAnalyzer{}, orchestrator.analyzer)
 }
 
-// TestCapabilityOrchestrator_SecurityLevels verifies security level configuration.
-func TestCapabilityOrchestrator_SecurityLevels(t *testing.T) {
-	tests := []struct {
-		name     string
-		level    string
-		expected string
-	}{
-		{
-			name:     "Default security level",
-			level:    "standard",
-			expected: "standard",
-		},
-		{
-			name:     "Strict security level",
-			level:    "strict",
-			expected: "strict",
-		},
-		{
-			name:     "Permissive security level",
-			level:    "permissive",
-			expected: "permissive",
-		},
-	}
+// TestCapabilityOrchestrator_UsesGatekeeper verifies that the orchestrator
+// delegates granting to the gatekeeper.
+func TestCapabilityOrchestrator_UsesGatekeeper(t *testing.T) {
+	orchestrator := NewCapabilityOrchestrator(false)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			orchestrator := NewCapabilityOrchestratorWithSecurity(false, tt.level)
-			assert.Equal(t, tt.expected, orchestrator.securityLevel)
-		})
-	}
+	// Verify gatekeeper is injected
+	require.NotNil(t, orchestrator.gatekeeper)
+	assert.IsType(t, &CapabilityGatekeeper{}, orchestrator.gatekeeper)
 }
 
 // Note: Comprehensive extraction logic tests are now in

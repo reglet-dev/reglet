@@ -13,7 +13,6 @@ import (
 	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
 	domainServices "github.com/whiskeyjimbo/reglet/internal/domain/services"
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/build"
-	infraCapabilities "github.com/whiskeyjimbo/reglet/internal/infrastructure/capabilities"
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/wasm"
 	"golang.org/x/sync/errgroup"
 )
@@ -27,16 +26,15 @@ type CapabilityInfo struct {
 	ProfileSpecific *capabilities.Capability // Profile-specific alternative if available
 }
 
-// CapabilityOrchestrator manages capability collection and granting.
-// Coordinates domain and infrastructure.
+// CapabilityOrchestrator coordinates capability collection and granting.
+// It delegates to specialized services:
+// - CapabilityAnalyzer for extraction (domain logic)
+// - CapabilityGatekeeper for granting (security boundary)
 type CapabilityOrchestrator struct {
 	analyzer       *domainServices.CapabilityAnalyzer // Domain service for extraction
-	fileStore      *infraCapabilities.FileStore
-	prompter       *infraCapabilities.TerminalPrompter
-	grants         capabilities.Grant
-	trustAll       bool                      // Auto-grant all capabilities
-	capabilityInfo map[string]CapabilityInfo // Metadata about requested capabilities
-	securityLevel  string                    // Security level: strict, standard, permissive
+	gatekeeper     *CapabilityGatekeeper               // Application service for granting
+	trustAll       bool                                // Auto-grant all capabilities
+	capabilityInfo map[string]CapabilityInfo           // Metadata about requested capabilities
 }
 
 // NewCapabilityOrchestrator creates a capability orchestrator with default security level (standard).
@@ -50,15 +48,11 @@ func NewCapabilityOrchestratorWithSecurity(trustAll bool, securityLevel string) 
 	homeDir, _ := os.UserHomeDir()
 	configPath := filepath.Join(homeDir, ".reglet", "config.yaml")
 
-	prompter := infraCapabilities.NewTerminalPrompter()
 	return &CapabilityOrchestrator{
 		analyzer:       domainServices.NewCapabilityAnalyzer(),
-		fileStore:      infraCapabilities.NewFileStore(configPath),
-		prompter:       prompter,
-		grants:         capabilities.NewGrant(),
+		gatekeeper:     NewCapabilityGatekeeper(configPath, securityLevel),
 		trustAll:       trustAll,
 		capabilityInfo: make(map[string]CapabilityInfo),
-		securityLevel:  securityLevel,
 	}
 }
 
@@ -109,7 +103,6 @@ func (o *CapabilityOrchestrator) CollectRequiredCapabilities(ctx context.Context
 	// Load plugins in parallel to get their declared capabilities
 	g, gctx := errgroup.WithContext(ctx)
 	for _, name := range names {
-		name := name // Capture loop variable
 		g.Go(func() error {
 			// Plugin name is validated in config.validatePluginName() to prevent path traversal
 			pluginPath := filepath.Join(pluginDir, name, name+".wasm")
@@ -216,9 +209,10 @@ func (o *CapabilityOrchestrator) CollectRequiredCapabilities(ctx context.Context
 	return required, nil
 }
 
-// GrantCapabilities resolves permissions via file or prompt.
+// GrantCapabilities resolves permissions via the gatekeeper.
+// Delegates the complete granting workflow to CapabilityGatekeeper.
 func (o *CapabilityOrchestrator) GrantCapabilities(required map[string][]capabilities.Capability, trustAll bool) (map[string][]capabilities.Capability, error) {
-	// Flatten all required capabilities to a unique set for user prompting
+	// Flatten all required capabilities to a unique set
 	flatRequired := capabilities.NewGrant()
 	for _, caps := range required {
 		for _, capability := range caps {
@@ -226,117 +220,11 @@ func (o *CapabilityOrchestrator) GrantCapabilities(required map[string][]capabil
 		}
 	}
 
-	// If trustAll flag is set (from constructor or parameter), grant everything
-	if o.trustAll || trustAll {
-		slog.Warn("Auto-granting all requested capabilities (--trust-plugins enabled)")
-		o.grants = flatRequired
-		return required, nil
-	}
-
-	// Load existing grants from config file
-	existingGrants, err := o.fileStore.Load()
+	// Delegate granting decision to the gatekeeper
+	grantedGlobal, err := o.gatekeeper.GrantCapabilities(flatRequired, o.capabilityInfo, o.trustAll || trustAll)
 	if err != nil {
-		// Config file doesn't exist yet - that's okay
-		existingGrants = capabilities.NewGrant()
+		return nil, err
 	}
-
-	// Determine which capabilities are not already granted
-	missing := o.findMissingCapabilities(flatRequired, existingGrants)
-
-	var grantedGlobal capabilities.Grant
-	if len(missing) == 0 {
-		// All capabilities already granted
-		grantedGlobal = existingGrants
-	} else {
-		// Prompt for missing capabilities
-		if !o.prompter.IsInteractive() {
-			// Non-interactive mode - fail with clear instructions
-			return nil, o.prompter.FormatNonInteractiveError(missing)
-		}
-
-		// Interactive prompts
-		newGrants := existingGrants
-		shouldSave := false
-
-		for _, capability := range missing {
-			// Look up metadata for this capability
-			key := capability.Kind + ":" + capability.Pattern
-			info, hasInfo := o.capabilityInfo[key]
-
-			var granted bool
-			var always bool
-			var err error
-
-			// Apply security level policy
-			if hasInfo && info.IsBroad {
-				switch o.securityLevel {
-				case "strict":
-					// Strict mode: auto-deny broad capabilities
-					slog.Error("broad capability denied by security policy",
-						"level", "strict",
-						"capability", capability.String(),
-						"risk", capability.RiskDescription()) // Use domain method
-					return nil, fmt.Errorf("broad capability denied by strict security policy: %s", capability.String())
-
-				case "permissive":
-					// Permissive mode: auto-allow without prompting
-					slog.Warn("auto-granting broad capability (permissive mode)",
-						"capability", capability.String())
-					granted = true
-					always = false
-
-				default: // "standard"
-					// Standard mode: warn and prompt
-					granted, always, err = o.prompter.PromptForCapabilityWithInfo(
-						capability,
-						info.IsBroad,
-						info.ProfileSpecific,
-					)
-				}
-			} else if o.securityLevel == "permissive" {
-				// Permissive mode: auto-allow all capabilities without prompting
-				granted = true
-				always = false
-			} else {
-				// Standard/strict mode: prompt for non-broad capabilities
-				if hasInfo {
-					granted, always, err = o.prompter.PromptForCapabilityWithInfo(
-						capability,
-						info.IsBroad,
-						info.ProfileSpecific,
-					)
-				} else {
-					// Fallback to basic prompt (shouldn't happen in normal flow)
-					granted, always, err = o.prompter.PromptForCapability(capability)
-				}
-			}
-
-			if err != nil {
-				return nil, err
-			}
-
-			if granted {
-				newGrants.Add(capability)
-				if always {
-					shouldSave = true
-				}
-			} else {
-				return nil, fmt.Errorf("capability denied by user: %s", capability.String())
-			}
-		}
-
-		// Save to config if user chose "always" for any capability
-		if shouldSave {
-			if err := o.fileStore.Save(newGrants); err != nil {
-				fmt.Fprintf(os.Stderr, "⚠️  Warning: failed to save config: %v\n", err)
-			} else {
-				fmt.Fprintf(os.Stderr, "✓ Permissions saved to %s\n", o.fileStore.ConfigPath())
-			}
-		}
-		grantedGlobal = newGrants
-	}
-
-	o.grants = grantedGlobal
 
 	// Filter the requested capabilities against the globally granted ones
 	// ensuring each plugin only gets what it requested AND what was granted
@@ -354,15 +242,4 @@ func (o *CapabilityOrchestrator) GrantCapabilities(required map[string][]capabil
 	}
 
 	return grantedPerPlugin, nil
-}
-
-// findMissingCapabilities returns capabilities in required that are not in granted.
-func (o *CapabilityOrchestrator) findMissingCapabilities(required, granted capabilities.Grant) capabilities.Grant {
-	missing := capabilities.NewGrant()
-	for _, capability := range required {
-		if !granted.Contains(capability) {
-			missing.Add(capability)
-		}
-	}
-	return missing
 }
