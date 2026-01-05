@@ -5,9 +5,12 @@ package adapters
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
+	"github.com/expr-lang/expr"
+	"github.com/whiskeyjimbo/reglet/internal/application/dto"
 	"github.com/whiskeyjimbo/reglet/internal/application/ports"
 	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
 	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
@@ -179,13 +182,15 @@ func (a *EngineFactoryAdapter) CreateEngine(
 	profile entities.ProfileReader,
 	grantedCaps map[string][]capabilities.Capability,
 	pluginDir string,
+	filters dto.FilterOptions,
+	execution dto.ExecutionOptions,
 	skipSchemaValidation bool,
 ) (ports.ExecutionEngine, error) {
 	// Create capability manager that uses the granted capabilities
 	capMgr := &staticCapabilityManager{granted: grantedCaps}
 
-	// Build execution config
-	cfg := engine.DefaultExecutionConfig()
+	// Build execution config from filters and execution options
+	cfg := a.buildExecutionConfig(filters, execution)
 
 	// Create engine
 	eng, err := engine.NewEngineWithCapabilities(
@@ -204,6 +209,41 @@ func (a *EngineFactoryAdapter) CreateEngine(
 	}
 
 	return &EngineAdapter{engine: eng}, nil
+}
+
+// buildExecutionConfig constructs an ExecutionConfig from filter and execution options.
+func (a *EngineFactoryAdapter) buildExecutionConfig(filters dto.FilterOptions, exec dto.ExecutionOptions) engine.ExecutionConfig {
+	cfg := engine.DefaultExecutionConfig()
+
+	// Apply execution options
+	cfg.Parallel = exec.Parallel
+	if exec.MaxConcurrentControls > 0 {
+		cfg.MaxConcurrentControls = exec.MaxConcurrentControls
+	}
+	if exec.MaxConcurrentObservations > 0 {
+		cfg.MaxConcurrentObservations = exec.MaxConcurrentObservations
+	}
+
+	// Apply filters
+	cfg.IncludeTags = filters.IncludeTags
+	cfg.IncludeSeverities = filters.IncludeSeverities
+	cfg.IncludeControlIDs = filters.IncludeControlIDs
+	cfg.ExcludeTags = filters.ExcludeTags
+	cfg.ExcludeControlIDs = filters.ExcludeControlIDs
+	cfg.IncludeDependencies = filters.IncludeDependencies
+
+	// Compile filter expression if provided
+	if filters.FilterExpression != "" {
+		program, err := expr.Compile(filters.FilterExpression)
+		if err != nil {
+			// Log warning but don't fail - validation should have caught this earlier
+			slog.Warn("failed to compile filter expression", "expression", filters.FilterExpression, "error", err)
+		} else {
+			cfg.FilterProgram = program
+		}
+	}
+
+	return cfg
 }
 
 // staticCapabilityManager provides pre-granted capabilities.

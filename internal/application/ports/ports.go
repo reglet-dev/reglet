@@ -6,6 +6,7 @@ package ports
 import (
 	"context"
 
+	"github.com/whiskeyjimbo/reglet/internal/application/dto"
 	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
 	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
 	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
@@ -52,7 +53,7 @@ type ExecutionEngine interface {
 
 // EngineFactory creates execution engines with capabilities.
 type EngineFactory interface {
-	CreateEngine(ctx context.Context, profile entities.ProfileReader, grantedCaps map[string][]capabilities.Capability, pluginDir string, skipSchemaValidation bool) (ExecutionEngine, error)
+	CreateEngine(ctx context.Context, profile entities.ProfileReader, grantedCaps map[string][]capabilities.Capability, pluginDir string, filters dto.FilterOptions, execution dto.ExecutionOptions, skipSchemaValidation bool) (ExecutionEngine, error)
 }
 
 // OutputFormatter formats execution results.

@@ -112,8 +112,8 @@ func (uc *CheckProfileUseCase) Execute(ctx context.Context, req dto.CheckProfile
 		return nil, apperrors.NewCapabilityError("capability grant failed", flattenCapabilities(requiredCaps))
 	}
 
-	// 7. Create execution engine with granted capabilities
-	eng, err := uc.engineFactory.CreateEngine(ctx, profile, grantedCaps, pluginDir, req.Options.SkipSchemaValidation)
+	// 7. Create execution engine with granted capabilities and filters
+	eng, err := uc.engineFactory.CreateEngine(ctx, profile, grantedCaps, pluginDir, req.Filters, req.Execution, req.Options.SkipSchemaValidation)
 	if err != nil {
 		return nil, apperrors.NewConfigurationError("engine", "failed to create engine", err)
 	}
