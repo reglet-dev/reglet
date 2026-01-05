@@ -27,6 +27,16 @@ func NewPluginName(name string) (PluginName, error) {
 		return PluginName{}, fmt.Errorf("plugin name too long (max 64 chars)")
 	}
 
+	// Security check: Path separators
+	if strings.ContainsAny(name, `/\`) {
+		return PluginName{}, fmt.Errorf("plugin name cannot contain path separators")
+	}
+
+	// Security check: Directory traversal
+	if strings.Contains(name, "..") {
+		return PluginName{}, fmt.Errorf("plugin name cannot contain parent directory references")
+	}
+
 	// Validate characters: simple alphanumeric + underscore + hyphen
 	// No slashes, dots, or other special characters allowed
 	for _, ch := range name {
