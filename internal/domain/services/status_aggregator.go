@@ -8,18 +8,26 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"sync"
 
 	"github.com/expr-lang/expr"
+	"github.com/expr-lang/expr/vm"
 	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
 	"github.com/whiskeyjimbo/reglet/internal/domain/values"
 )
 
-// StatusAggregator determines status at different levels of the execution hierarchy
-type StatusAggregator struct{}
+// StatusAggregator determines status at different levels of the execution hierarchy.
+// It caches compiled expressions to avoid redundant compilation overhead.
+type StatusAggregator struct {
+	programCache map[string]*vm.Program // Cache of compiled expressions (thread-safe with mutex)
+	cacheMu      sync.RWMutex           // Protects programCache
+}
 
-// NewStatusAggregator creates a new status aggregator service
+// NewStatusAggregator creates a new status aggregator service with initialized cache.
 func NewStatusAggregator() *StatusAggregator {
-	return &StatusAggregator{}
+	return &StatusAggregator{
+		programCache: make(map[string]*vm.Program),
+	}
 }
 
 // AggregateControlStatus determines control status from observation statuses.
@@ -79,6 +87,37 @@ func (s *StatusAggregator) AggregateControlStatus(observationStatuses []values.S
 	return values.StatusPass
 }
 
+// getOrCompileExpression retrieves a cached program or compiles and caches a new one.
+// Thread-safe via RWMutex: multiple readers or single writer.
+func (s *StatusAggregator) getOrCompileExpression(expression string, options []expr.Option) (*vm.Program, error) {
+	// Try read lock first (optimistic path - expression likely cached)
+	s.cacheMu.RLock()
+	program, found := s.programCache[expression]
+	s.cacheMu.RUnlock()
+
+	if found {
+		return program, nil
+	}
+
+	// Not in cache - compile with write lock
+	s.cacheMu.Lock()
+	defer s.cacheMu.Unlock()
+
+	// Double-check after acquiring write lock (another goroutine may have compiled it)
+	if program, found := s.programCache[expression]; found {
+		return program, nil
+	}
+
+	// Compile and cache
+	program, err := expr.Compile(expression, options...)
+	if err != nil {
+		return nil, err
+	}
+
+	s.programCache[expression] = program
+	return program, nil
+}
+
 // DetermineObservationStatus evaluates expect expressions against evidence data.
 //
 // Evaluation Rules:
@@ -90,6 +129,10 @@ func (s *StatusAggregator) AggregateControlStatus(observationStatuses []values.S
 // - Expression length limited to 1000 chars (DoS prevention)
 // - Only explicitly provided variables accessible (no probing)
 // - expr-lang prevents code execution, filesystem, network access
+//
+// Performance:
+// - Compiled expressions are cached to avoid redundant compilation
+// - Thread-safe caching with read/write locks for concurrent execution
 //
 // Returns: Status and list of expectation results
 func (s *StatusAggregator) DetermineObservationStatus(
@@ -169,7 +212,8 @@ func (s *StatusAggregator) DetermineObservationStatus(
 			continue
 		}
 
-		program, err := expr.Compile(expectExpr, options...)
+		// Get or compile expression (uses cache for performance)
+		program, err := s.getOrCompileExpression(expectExpr, options)
 		if err != nil {
 			results = append(results, execution.ExpectationResult{
 				Expression: expectExpr,
