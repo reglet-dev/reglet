@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
@@ -104,9 +105,22 @@ func (o *CapabilityOrchestrator) CollectRequiredCapabilities(ctx context.Context
 	g, gctx := errgroup.WithContext(ctx)
 	for _, name := range names {
 		g.Go(func() error {
-			// Plugin name is validated in config.validatePluginName() to prevent path traversal
-			pluginPath := filepath.Join(pluginDir, name, name+".wasm")
-			wasmBytes, err := os.ReadFile(pluginPath)
+			// Security: Validate plugin name to prevent path traversal
+			if strings.ContainsAny(name, `/\`) || strings.Contains(name, "..") {
+				return fmt.Errorf("invalid plugin name %q: contains path separator or traversal", name)
+			}
+
+			// SECURITY: Use os.OpenRoot to prevent symlink-based path traversal.
+			// This ensures plugins cannot escape the plugin directory via symlinks.
+			rootDir, err := os.OpenRoot(pluginDir)
+			if err != nil {
+				return fmt.Errorf("failed to open plugin directory %s: %w", pluginDir, err)
+			}
+			defer rootDir.Close()
+
+			// Read plugin file using sandboxed Root.ReadFile (Go 1.25+)
+			pluginSubpath := filepath.Join(name, name+".wasm")
+			wasmBytes, err := rootDir.ReadFile(pluginSubpath)
 			if err != nil {
 				return fmt.Errorf("failed to read plugin %s: %w", name, err)
 			}
