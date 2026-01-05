@@ -5,13 +5,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
 	domainServices "github.com/whiskeyjimbo/reglet/internal/domain/services"
 )
 
 // TestCapabilityOrchestrator_UsesAnalyzer verifies that the orchestrator
 // delegates capability extraction to the domain service.
 func TestCapabilityOrchestrator_UsesAnalyzer(t *testing.T) {
-	orchestrator := NewCapabilityOrchestrator(false)
+	orchestrator := NewCapabilityOrchestrator(false, capabilities.NewRegistry())
 
 	// Verify analyzer is injected
 	require.NotNil(t, orchestrator.analyzer)
@@ -21,7 +22,7 @@ func TestCapabilityOrchestrator_UsesAnalyzer(t *testing.T) {
 // TestCapabilityOrchestrator_UsesGatekeeper verifies that the orchestrator
 // delegates granting to the gatekeeper.
 func TestCapabilityOrchestrator_UsesGatekeeper(t *testing.T) {
-	orchestrator := NewCapabilityOrchestrator(false)
+	orchestrator := NewCapabilityOrchestrator(false, capabilities.NewRegistry())
 
 	// Verify gatekeeper is injected
 	require.NotNil(t, orchestrator.gatekeeper)

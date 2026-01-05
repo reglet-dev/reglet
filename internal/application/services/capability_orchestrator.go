@@ -38,18 +38,18 @@ type CapabilityOrchestrator struct {
 }
 
 // NewCapabilityOrchestrator creates a capability orchestrator with default security level (standard).
-func NewCapabilityOrchestrator(trustAll bool) *CapabilityOrchestrator {
-	return NewCapabilityOrchestratorWithSecurity(trustAll, "standard")
+func NewCapabilityOrchestrator(trustAll bool, registry *capabilities.Registry) *CapabilityOrchestrator {
+	return NewCapabilityOrchestratorWithSecurity(trustAll, "standard", registry)
 }
 
 // NewCapabilityOrchestratorWithSecurity creates a capability orchestrator with specified security level.
 // securityLevel can be: "strict", "standard", or "permissive"
-func NewCapabilityOrchestratorWithSecurity(trustAll bool, securityLevel string) *CapabilityOrchestrator {
+func NewCapabilityOrchestratorWithSecurity(trustAll bool, securityLevel string, registry *capabilities.Registry) *CapabilityOrchestrator {
 	homeDir, _ := os.UserHomeDir()
 	configPath := filepath.Join(homeDir, ".reglet", "config.yaml")
 
 	return &CapabilityOrchestrator{
-		analyzer:       domainServices.NewCapabilityAnalyzer(),
+		analyzer:       domainServices.NewCapabilityAnalyzer(registry),
 		gatekeeper:     NewCapabilityGatekeeper(configPath, securityLevel),
 		trustAll:       trustAll,
 		capabilityInfo: make(map[string]CapabilityInfo),

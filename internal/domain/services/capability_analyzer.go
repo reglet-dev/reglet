@@ -7,11 +7,15 @@ import (
 
 // CapabilityAnalyzer extracts specific capability requirements from profiles.
 // This is a pure domain service with no infrastructure dependencies.
-type CapabilityAnalyzer struct{}
+type CapabilityAnalyzer struct {
+	registry *capabilities.Registry
+}
 
 // NewCapabilityAnalyzer creates a new capability analyzer.
-func NewCapabilityAnalyzer() *CapabilityAnalyzer {
-	return &CapabilityAnalyzer{}
+func NewCapabilityAnalyzer(registry *capabilities.Registry) *CapabilityAnalyzer {
+	return &CapabilityAnalyzer{
+		registry: registry,
+	}
 }
 
 // ExtractCapabilities analyzes profile observations to extract specific capability requirements.
@@ -33,8 +37,18 @@ func (a *CapabilityAnalyzer) ExtractCapabilities(profile entities.ProfileReader)
 				profileCaps[pluginName] = make(map[string]capabilities.Capability)
 			}
 
+			// Look up extractor for this plugin
+			extractor, ok := a.registry.Get(pluginName)
+			if !ok {
+				// No specific extractor found, skip or maybe log warning?
+				// For now, if no extractor, we assume no *specific* additional capabilities needed
+				// beyond what the plugin declares in its manifest (which are static).
+				// But here we are extracting DYNAMIC capabilities.
+				continue
+			}
+
 			// Extract plugin-specific capabilities based on config
-			extractedCaps := a.extractFromObservation(pluginName, obs.Config)
+			extractedCaps := extractor.Extract(obs.Config)
 
 			// Deduplicate by using capability string as key
 			for _, capability := range extractedCaps {
@@ -57,55 +71,4 @@ func (a *CapabilityAnalyzer) ExtractCapabilities(profile entities.ProfileReader)
 	}
 
 	return result
-}
-
-// extractFromObservation extracts capabilities from a single observation config.
-// This is plugin-specific logic that understands each plugin's config schema.
-func (a *CapabilityAnalyzer) extractFromObservation(pluginName string, config map[string]interface{}) []capabilities.Capability {
-	var extractedCaps []capabilities.Capability
-
-	switch pluginName {
-	case "file":
-		// Extract file path from config
-		if pathVal, ok := config["path"]; ok {
-			if path, ok := pathVal.(string); ok && path != "" {
-				// Create specific read capability for this file
-				extractedCaps = append(extractedCaps, capabilities.Capability{
-					Kind:    "fs",
-					Pattern: "read:" + path,
-				})
-			}
-		}
-
-	case "command":
-		// Extract command from config
-		if cmdVal, ok := config["command"]; ok {
-			if cmd, ok := cmdVal.(string); ok && cmd != "" {
-				extractedCaps = append(extractedCaps, capabilities.Capability{
-					Kind:    "exec",
-					Pattern: cmd,
-				})
-			}
-		}
-
-	case "http", "tcp", "dns":
-		// Network plugins - extract specific endpoints if available
-		if urlVal, ok := config["url"]; ok {
-			if url, ok := urlVal.(string); ok && url != "" {
-				extractedCaps = append(extractedCaps, capabilities.Capability{
-					Kind:    "network",
-					Pattern: "outbound:" + url,
-				})
-			}
-		} else if hostVal, ok := config["host"]; ok {
-			if host, ok := hostVal.(string); ok && host != "" {
-				extractedCaps = append(extractedCaps, capabilities.Capability{
-					Kind:    "network",
-					Pattern: "outbound:" + host,
-				})
-			}
-		}
-	}
-
-	return extractedCaps
 }

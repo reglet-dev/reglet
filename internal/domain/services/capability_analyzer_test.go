@@ -8,8 +8,61 @@ import (
 	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
 )
 
+// Mock extractors for testing (replicates logic that moved to infrastructure)
+type testFileExtractor struct{}
+
+func (e *testFileExtractor) Extract(config map[string]interface{}) []capabilities.Capability {
+	var caps []capabilities.Capability
+	if pathVal, ok := config["path"]; ok {
+		if path, ok := pathVal.(string); ok && path != "" {
+			caps = append(caps, capabilities.Capability{Kind: "fs", Pattern: "read:" + path})
+		}
+	}
+	return caps
+}
+
+type testCommandExtractor struct{}
+
+func (e *testCommandExtractor) Extract(config map[string]interface{}) []capabilities.Capability {
+	var caps []capabilities.Capability
+	if cmdVal, ok := config["command"]; ok {
+		if cmd, ok := cmdVal.(string); ok && cmd != "" {
+			caps = append(caps, capabilities.Capability{Kind: "exec", Pattern: cmd})
+		}
+	}
+	return caps
+}
+
+type testNetworkExtractor struct{}
+
+func (e *testNetworkExtractor) Extract(config map[string]interface{}) []capabilities.Capability {
+	var caps []capabilities.Capability
+	if urlVal, ok := config["url"]; ok {
+		if url, ok := urlVal.(string); ok && url != "" {
+			caps = append(caps, capabilities.Capability{Kind: "network", Pattern: "outbound:" + url})
+		}
+	}
+	if hostVal, ok := config["host"]; ok {
+		if host, ok := hostVal.(string); ok && host != "" {
+			caps = append(caps, capabilities.Capability{Kind: "network", Pattern: "outbound:" + host})
+		}
+	}
+	return caps
+}
+
+func setupTestRegistry() *capabilities.Registry {
+	r := capabilities.NewRegistry()
+	r.Register("file", &testFileExtractor{})
+	r.Register("command", &testCommandExtractor{})
+	net := &testNetworkExtractor{}
+	r.Register("http", net)
+	r.Register("tcp", net)
+	r.Register("dns", net)
+	return r
+}
+
 func TestCapabilityAnalyzer_ExtractCapabilities_FilePlugin(t *testing.T) {
-	analyzer := NewCapabilityAnalyzer()
+	analyzer := NewCapabilityAnalyzer(setupTestRegistry())
 
 	profile := &entities.Profile{
 		Metadata: entities.ProfileMetadata{Name: "test", Version: "1.0.0"},
@@ -39,7 +92,7 @@ func TestCapabilityAnalyzer_ExtractCapabilities_FilePlugin(t *testing.T) {
 }
 
 func TestCapabilityAnalyzer_ExtractCapabilities_CommandPlugin(t *testing.T) {
-	analyzer := NewCapabilityAnalyzer()
+	analyzer := NewCapabilityAnalyzer(setupTestRegistry())
 
 	profile := &entities.Profile{
 		Metadata: entities.ProfileMetadata{Name: "test", Version: "1.0.0"},
@@ -112,7 +165,7 @@ func TestCapabilityAnalyzer_ExtractCapabilities_NetworkPlugins(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			analyzer := NewCapabilityAnalyzer()
+			analyzer := NewCapabilityAnalyzer(setupTestRegistry())
 
 			profile := &entities.Profile{
 				Metadata: entities.ProfileMetadata{Name: "test", Version: "1.0.0"},
@@ -141,7 +194,7 @@ func TestCapabilityAnalyzer_ExtractCapabilities_NetworkPlugins(t *testing.T) {
 }
 
 func TestCapabilityAnalyzer_ExtractCapabilities_Deduplication(t *testing.T) {
-	analyzer := NewCapabilityAnalyzer()
+	analyzer := NewCapabilityAnalyzer(setupTestRegistry())
 
 	profile := &entities.Profile{
 		Metadata: entities.ProfileMetadata{Name: "test", Version: "1.0.0"},
@@ -193,7 +246,7 @@ func TestCapabilityAnalyzer_ExtractCapabilities_Deduplication(t *testing.T) {
 }
 
 func TestCapabilityAnalyzer_ExtractCapabilities_MultiplePlugins(t *testing.T) {
-	analyzer := NewCapabilityAnalyzer()
+	analyzer := NewCapabilityAnalyzer(setupTestRegistry())
 
 	profile := &entities.Profile{
 		Metadata: entities.ProfileMetadata{Name: "test", Version: "1.0.0"},
@@ -230,7 +283,7 @@ func TestCapabilityAnalyzer_ExtractCapabilities_MultiplePlugins(t *testing.T) {
 }
 
 func TestCapabilityAnalyzer_ExtractCapabilities_NoExtractableCapabilities(t *testing.T) {
-	analyzer := NewCapabilityAnalyzer()
+	analyzer := NewCapabilityAnalyzer(setupTestRegistry())
 
 	profile := &entities.Profile{
 		Metadata: entities.ProfileMetadata{Name: "test", Version: "1.0.0"},
@@ -285,7 +338,7 @@ func TestCapabilityAnalyzer_ExtractCapabilities_InvalidConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			analyzer := NewCapabilityAnalyzer()
+			analyzer := NewCapabilityAnalyzer(setupTestRegistry())
 
 			profile := &entities.Profile{
 				Metadata: entities.ProfileMetadata{Name: "test", Version: "1.0.0"},
