@@ -150,7 +150,7 @@ type EngineAdapter struct {
 }
 
 // Execute executes the profile using the wrapped engine.
-func (a *EngineAdapter) Execute(ctx context.Context, profile *entities.Profile) (*execution.ExecutionResult, error) {
+func (a *EngineAdapter) Execute(ctx context.Context, profile entities.ProfileReader) (*execution.ExecutionResult, error) {
 	return a.engine.Execute(ctx, profile)
 }
 
@@ -176,7 +176,7 @@ func NewEngineFactoryAdapter(redactor *redaction.Redactor, wasmMemoryLimitMB int
 // CreateEngine creates an execution engine with capabilities.
 func (a *EngineFactoryAdapter) CreateEngine(
 	ctx context.Context,
-	profile *entities.Profile,
+	profile entities.ProfileReader,
 	grantedCaps map[string][]capabilities.Capability,
 	pluginDir string,
 	skipSchemaValidation bool,
@@ -213,7 +213,7 @@ type staticCapabilityManager struct {
 
 func (m *staticCapabilityManager) CollectRequiredCapabilities(
 	ctx context.Context,
-	profile *entities.Profile,
+	profile entities.ProfileReader,
 	runtime *wasm.Runtime,
 	pluginDir string,
 ) (map[string][]capabilities.Capability, error) {

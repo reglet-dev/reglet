@@ -36,7 +36,7 @@ type PluginDirectoryResolver interface {
 
 // CapabilityCollector collects required capabilities from plugins.
 type CapabilityCollector interface {
-	CollectRequiredCapabilities(ctx context.Context, profile *entities.Profile, runtime *wasm.Runtime, pluginDir string) (map[string][]capabilities.Capability, error)
+	CollectRequiredCapabilities(ctx context.Context, profile entities.ProfileReader, runtime *wasm.Runtime, pluginDir string) (map[string][]capabilities.Capability, error)
 }
 
 // CapabilityGranter grants capabilities (interactively or automatically).
@@ -46,13 +46,13 @@ type CapabilityGranter interface {
 
 // ExecutionEngine executes profiles and returns results.
 type ExecutionEngine interface {
-	Execute(ctx context.Context, profile *entities.Profile) (*execution.ExecutionResult, error)
+	Execute(ctx context.Context, profile entities.ProfileReader) (*execution.ExecutionResult, error)
 	Close(ctx context.Context) error
 }
 
 // EngineFactory creates execution engines with capabilities.
 type EngineFactory interface {
-	CreateEngine(ctx context.Context, profile *entities.Profile, grantedCaps map[string][]capabilities.Capability, pluginDir string, skipSchemaValidation bool) (ExecutionEngine, error)
+	CreateEngine(ctx context.Context, profile entities.ProfileReader, grantedCaps map[string][]capabilities.Capability, pluginDir string, skipSchemaValidation bool) (ExecutionEngine, error)
 }
 
 // OutputFormatter formats execution results.

@@ -61,7 +61,7 @@ func NewCapabilityOrchestratorWithSecurity(trustAll bool, securityLevel string) 
 
 // CollectCapabilities creates a temporary runtime and collects required capabilities.
 // Returns the required capabilities and the temporary runtime (caller must close it).
-func (o *CapabilityOrchestrator) CollectCapabilities(ctx context.Context, profile *entities.Profile, pluginDir string) (map[string][]capabilities.Capability, *wasm.Runtime, error) {
+func (o *CapabilityOrchestrator) CollectCapabilities(ctx context.Context, profile entities.ProfileReader, pluginDir string) (map[string][]capabilities.Capability, *wasm.Runtime, error) {
 	// Create temporary runtime for capability collection
 	runtime, err := wasm.NewRuntime(ctx, build.Get())
 	if err != nil {
@@ -81,13 +81,13 @@ func (o *CapabilityOrchestrator) CollectCapabilities(ctx context.Context, profil
 
 // CollectRequiredCapabilities loads plugins and identifies requirements.
 // It prioritizes specific capabilities extracted from profile configs over plugin metadata.
-func (o *CapabilityOrchestrator) CollectRequiredCapabilities(ctx context.Context, profile *entities.Profile, runtime *wasm.Runtime, pluginDir string) (map[string][]capabilities.Capability, error) {
+func (o *CapabilityOrchestrator) CollectRequiredCapabilities(ctx context.Context, profile entities.ProfileReader, runtime *wasm.Runtime, pluginDir string) (map[string][]capabilities.Capability, error) {
 	// First, extract specific capabilities from profile observation configs
 	profileCaps := o.extractProfileCapabilities(profile)
 
 	// Get unique plugin names from profile
 	pluginNames := make(map[string]bool)
-	for _, ctrl := range profile.Controls.Items {
+	for _, ctrl := range profile.GetAllControls() {
 		for _, obs := range ctrl.ObservationDefinitions {
 			pluginNames[obs.Plugin] = true
 		}
@@ -216,12 +216,12 @@ func (o *CapabilityOrchestrator) CollectRequiredCapabilities(ctx context.Context
 // extractProfileCapabilities analyzes profile observations to extract specific capability requirements.
 // This enables principle of least privilege by requesting only the resources actually used,
 // rather than the plugin's full declared capabilities.
-func (o *CapabilityOrchestrator) extractProfileCapabilities(profile *entities.Profile) map[string][]capabilities.Capability {
+func (o *CapabilityOrchestrator) extractProfileCapabilities(profile entities.ProfileReader) map[string][]capabilities.Capability {
 	// Use map to deduplicate capabilities per plugin
 	profileCaps := make(map[string]map[string]capabilities.Capability)
 
 	// Analyze each control's observations
-	for _, ctrl := range profile.Controls.Items {
+	for _, ctrl := range profile.GetAllControls() {
 		for _, obs := range ctrl.ObservationDefinitions {
 			pluginName := obs.Plugin
 

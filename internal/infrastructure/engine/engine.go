@@ -83,7 +83,7 @@ type Engine struct {
 
 // CapabilityManager defines the interface for capability management
 type CapabilityManager interface {
-	CollectRequiredCapabilities(ctx context.Context, profile *entities.Profile, runtime *wasm.Runtime, pluginDir string) (map[string][]capabilities.Capability, error)
+	CollectRequiredCapabilities(ctx context.Context, profile entities.ProfileReader, runtime *wasm.Runtime, pluginDir string) (map[string][]capabilities.Capability, error)
 	GrantCapabilities(required map[string][]capabilities.Capability) (map[string][]capabilities.Capability, error)
 }
 
@@ -99,7 +99,7 @@ func NewEngineWithCapabilities(
 	version build.Info,
 	capMgr CapabilityManager,
 	pluginDir string,
-	profile *entities.Profile,
+	profile entities.ProfileReader,
 	cfg ExecutionConfig,
 	redactor *redaction.Redactor,
 	repo repositories.ExecutionResultRepository, // Optional repository
@@ -138,7 +138,7 @@ func NewEngineWithCapabilities(
 	executor := NewExecutor(runtime, pluginDir, redactor)
 
 	// Preload plugins for schema validation
-	for _, ctrl := range profile.Controls.Items {
+	for _, ctrl := range profile.GetAllControls() {
 		for _, obs := range ctrl.ObservationDefinitions {
 			if _, err := executor.LoadPlugin(ctx, obs.Plugin); err != nil {
 				return nil, fmt.Errorf("failed to preload plugin %s: %w", obs.Plugin, err)
@@ -175,9 +175,10 @@ func NewEngineWithConfig(ctx context.Context, version build.Info, cfg ExecutionC
 }
 
 // Execute runs a complete profile and returns the result.
-func (e *Engine) Execute(ctx context.Context, profile *entities.Profile) (*execution.ExecutionResult, error) {
+func (e *Engine) Execute(ctx context.Context, profile entities.ProfileReader) (*execution.ExecutionResult, error) {
 	// Create execution result
-	result := execution.NewExecutionResult(profile.Metadata.Name, profile.Metadata.Version)
+	metadata := profile.GetMetadata()
+	result := execution.NewExecutionResult(metadata.Name, metadata.Version)
 	result.RegletVersion = e.version.String()
 
 	// Calculate required dependencies if enabled
@@ -191,14 +192,15 @@ func (e *Engine) Execute(ctx context.Context, profile *entities.Profile) (*execu
 	}
 
 	// Execute controls
-	if e.config.Parallel && len(profile.Controls.Items) > 1 {
+	allControls := profile.GetAllControls()
+	if e.config.Parallel && len(allControls) > 1 {
 		// Parallel execution of controls
-		if err := e.executeControlsWithWorkerPool(ctx, profile.Controls.Items, result, requiredControls); err != nil {
+		if err := e.executeControlsWithWorkerPool(ctx, allControls, result, requiredControls); err != nil {
 			return nil, err
 		}
 	} else {
 		// Sequential execution of controls
-		for _, ctrl := range profile.Controls.Items {
+		for _, ctrl := range allControls {
 			controlResult := e.executeControl(ctx, ctrl, result, requiredControls)
 			result.AddControlResult(controlResult)
 		}
@@ -219,9 +221,10 @@ func (e *Engine) Execute(ctx context.Context, profile *entities.Profile) (*execu
 }
 
 // resolveDependencies calculates the transitive closure of dependencies for matched controls.
-func (e *Engine) resolveDependencies(profile *entities.Profile) (map[string]bool, error) {
+func (e *Engine) resolveDependencies(profile entities.ProfileReader) (map[string]bool, error) {
 	resolver := services.NewDependencyResolver()
-	allDependencies, err := resolver.ResolveDependencies(profile.Controls.Items)
+	allControls := profile.GetAllControls()
+	allDependencies, err := resolver.ResolveDependencies(allControls)
 	if err != nil {
 		return nil, err
 	}
@@ -229,7 +232,7 @@ func (e *Engine) resolveDependencies(profile *entities.Profile) (map[string]bool
 	required := make(map[string]bool)
 
 	// Identify initial targets (controls that match filters)
-	for _, ctrl := range profile.Controls.Items {
+	for _, ctrl := range allControls {
 		if should, _ := e.shouldRun(ctrl); should {
 			// Add all transitive dependencies for this control to required set
 			if deps, ok := allDependencies[ctrl.ID]; ok {

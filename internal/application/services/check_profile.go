@@ -96,8 +96,7 @@ func (uc *CheckProfileUseCase) Execute(ctx context.Context, req dto.CheckProfile
 	}
 
 	// 5. Collect required capabilities using capability orchestrator
-	// Note: ValidatedProfile embeds *Profile, so we can access it directly
-	requiredCaps, tempRuntime, err := uc.capOrchestrator.CollectCapabilities(ctx, profile.Profile, pluginDir)
+	requiredCaps, tempRuntime, err := uc.capOrchestrator.CollectCapabilities(ctx, profile, pluginDir)
 	if err != nil {
 		return nil, apperrors.NewConfigurationError("capabilities", "failed to collect capabilities", err)
 	}
@@ -114,7 +113,7 @@ func (uc *CheckProfileUseCase) Execute(ctx context.Context, req dto.CheckProfile
 	}
 
 	// 7. Create execution engine with granted capabilities
-	eng, err := uc.engineFactory.CreateEngine(ctx, profile.Profile, grantedCaps, pluginDir, req.Options.SkipSchemaValidation)
+	eng, err := uc.engineFactory.CreateEngine(ctx, profile, grantedCaps, pluginDir, req.Options.SkipSchemaValidation)
 	if err != nil {
 		return nil, apperrors.NewConfigurationError("engine", "failed to create engine", err)
 	}
@@ -124,7 +123,7 @@ func (uc *CheckProfileUseCase) Execute(ctx context.Context, req dto.CheckProfile
 
 	// 8. Execute profile
 	uc.logger.Info("executing profile")
-	result, err := eng.Execute(ctx, profile.Profile)
+	result, err := eng.Execute(ctx, profile)
 	if err != nil {
 		return nil, apperrors.NewExecutionError("", "execution failed", err)
 	}

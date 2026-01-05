@@ -22,7 +22,7 @@ type testCapabilityManager struct {
 	trustAll bool
 }
 
-func (m *testCapabilityManager) CollectRequiredCapabilities(ctx context.Context, profile *entities.Profile, runtime *wasm.Runtime, pluginDir string) (map[string][]capabilities.Capability, error) {
+func (m *testCapabilityManager) CollectRequiredCapabilities(ctx context.Context, profile entities.ProfileReader, runtime *wasm.Runtime, pluginDir string) (map[string][]capabilities.Capability, error) {
 	// For tests, grant file plugin root filesystem access
 	return map[string][]capabilities.Capability{
 		"file": {
