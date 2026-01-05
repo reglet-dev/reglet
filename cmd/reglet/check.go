@@ -3,9 +3,12 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/whiskeyjimbo/reglet/internal/application/dto"
@@ -179,8 +182,12 @@ func formatOutput(writer *os.File, result *execution.ExecutionResult, format str
 }
 
 // generateRequestID creates a unique identifier for request tracing.
+// Uses cryptographically secure random bytes to ensure uniqueness.
 func generateRequestID() string {
-	// For now, return empty. In a real implementation, this would generate a UUID
-	// or use a correlation ID from the environment (e.g., CI build ID).
-	return ""
+	b := make([]byte, 16) // 128 bits of entropy
+	if _, err := rand.Read(b); err != nil {
+		// Fallback to timestamp-based ID if crypto/rand fails (extremely rare)
+		return fmt.Sprintf("req-%d", time.Now().UnixNano())
+	}
+	return hex.EncodeToString(b)
 }
