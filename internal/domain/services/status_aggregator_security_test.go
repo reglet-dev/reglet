@@ -80,9 +80,9 @@ func TestDetermineObservationStatus_SecurityHardening(t *testing.T) {
 			wantErrType: "expectation", // Failing expectation returns error message
 		},
 		{
-			name: "safe helper function usage",
+			name: "safe native operator usage",
 			expects: []string{
-				"strContains(data.name, 'test')",
+				"data.name contains 'test'",
 			},
 			wantStatus: values.StatusPass,
 		},
@@ -240,16 +240,6 @@ func TestDetermineObservationStatus_HelperFunctions(t *testing.T) {
 		wantStatus values.Status
 	}{
 		{
-			name:       "strContains valid",
-			expr:       "strContains(data.hostname, 'example')",
-			wantStatus: values.StatusPass,
-		},
-		{
-			name:       "strContains invalid",
-			expr:       "strContains(data.hostname, 'evil')",
-			wantStatus: values.StatusFail,
-		},
-		{
 			name:       "isIPv4 valid",
 			expr:       "isIPv4(data.ip)",
 			wantStatus: values.StatusPass,
@@ -258,16 +248,6 @@ func TestDetermineObservationStatus_HelperFunctions(t *testing.T) {
 			name:       "isIPv4 invalid",
 			expr:       "isIPv4(data.hostname)",
 			wantStatus: values.StatusFail,
-		},
-		{
-			name:       "strContains wrong argument count",
-			expr:       "strContains(data.hostname)",
-			wantStatus: values.StatusError,
-		},
-		{
-			name:       "strContains wrong type",
-			expr:       "strContains(123, 'test')",
-			wantStatus: values.StatusError,
 		},
 	}
 

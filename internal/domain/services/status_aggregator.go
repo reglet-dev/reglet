@@ -167,20 +167,7 @@ func (s *StatusAggregator) DetermineObservationStatus(
 		expr.Env(env),
 		expr.AsBool(),
 		expr.MaxNodes(maxASTNodes), // Security: Limit expression complexity (prevents DoS via nested operations)
-		expr.Function("strContains", func(params ...interface{}) (interface{}, error) {
-			if len(params) != 2 {
-				return nil, fmt.Errorf("strContains expects 2 arguments")
-			}
-			s, ok := params[0].(string)
-			if !ok {
-				return nil, fmt.Errorf("strContains: first argument must be a string")
-			}
-			substr, ok := params[1].(string)
-			if !ok {
-				return nil, fmt.Errorf("strContains: second argument must be a string")
-			}
-			return strings.Contains(s, substr), nil
-		}),
+
 		expr.Function("isIPv4", func(params ...interface{}) (interface{}, error) {
 			if len(params) != 1 {
 				return nil, fmt.Errorf("isIPv4 expects 1 argument")

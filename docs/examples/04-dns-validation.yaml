@@ -52,7 +52,7 @@ controls:
             hostname: www.github.com
             record_type: CNAME
           expect:
-            - data.record_count > 0 && strContains(data.records[0], "github.com")
+            - data.record_count > 0 && data.records[0] contains "github.com"
 
     - id: dns-google-mx
       name: Google MX records exist
