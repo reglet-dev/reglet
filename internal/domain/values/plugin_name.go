@@ -11,13 +11,39 @@ type PluginName struct {
 	value string
 }
 
-// NewPluginName creates a PluginName with validation
+// NewPluginName creates a PluginName with strict validation.
+// A valid plugin name must:
+// - Be non-empty
+// - contain only alphanumeric characters, underscores, and hyphens
+// - NOT contain paths, dots, or special characters
+// - Be at most 64 characters long
 func NewPluginName(name string) (PluginName, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return PluginName{}, fmt.Errorf("plugin name cannot be empty")
 	}
+
+	if len(name) > 64 {
+		return PluginName{}, fmt.Errorf("plugin name too long (max 64 chars)")
+	}
+
+	// Validate characters: simple alphanumeric + underscore + hyphen
+	// No slashes, dots, or other special characters allowed
+	for _, ch := range name {
+		if !isValidPluginChar(ch) {
+			return PluginName{}, fmt.Errorf("invalid plugin name %q: must contain only alphanumeric characters, underscores, and hyphens", name)
+		}
+	}
+
 	return PluginName{value: name}, nil
+}
+
+func isValidPluginChar(r rune) bool {
+	return (r >= 'a' && r <= 'z') ||
+		(r >= 'A' && r <= 'Z') ||
+		(r >= '0' && r <= '9') ||
+		r == '_' ||
+		r == '-'
 }
 
 // MustNewPluginName creates a PluginName or panics

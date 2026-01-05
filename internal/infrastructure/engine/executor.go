@@ -171,9 +171,17 @@ func (e *ObservationExecutor) LoadPlugin(ctx context.Context, pluginName string)
 		return plugin, nil
 	}
 
+	// Validate plugin name to prevent path traversal
+	// NewPluginName enforces strict character set (alphanumeric, _, -) and no paths
+	validName, err := values.NewPluginName(pluginName)
+	if err != nil {
+		return nil, fmt.Errorf("invalid plugin name %q: %w", pluginName, err)
+	}
+
 	// Construct plugin path using the pre-calculated pluginDir
-	// Plugin name is validated in config.validatePluginName() to prevent path traversal
-	pluginPath := filepath.Join(e.pluginDir, pluginName, pluginName+".wasm")
+	// Use validated value to ensure safety
+	safeName := validName.String()
+	pluginPath := filepath.Join(e.pluginDir, safeName, safeName+".wasm")
 
 	// Read the WASM file
 	wasmBytes, err := os.ReadFile(pluginPath)

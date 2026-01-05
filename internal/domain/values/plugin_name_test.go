@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Test_NewPluginName tests that valid plugin names are accepted
 func Test_NewPluginName(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -16,7 +17,7 @@ func Test_NewPluginName(t *testing.T) {
 		wantErr bool
 	}{
 		{"valid", "http", "http", false},
-		{"with version", "http@1.0.0", "http@1.0.0", false},
+		{"invalid char @", "http@1.0.0", "", true},
 		{"trims whitespace", "  http  ", "http", false},
 		{"empty", "", "", true},
 		{"whitespace only", "   ", "", true},

@@ -13,13 +13,11 @@ import (
 
 	"github.com/santhosh-tekuri/jsonschema/v5"
 	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
+	"github.com/whiskeyjimbo/reglet/internal/domain/values"
 )
 
 // Control ID must be alphanumeric with dashes and underscores
 var controlIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_.-]+$`)
-
-// Plugin name must be alphanumeric with underscores and hyphens (no path separators)
-var pluginNamePattern = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
 // PluginSchemaProvider is an interface for loading plugins and retrieving their schemas.
 // This allows validation code to be decoupled from the WASM runtime implementation.
@@ -244,30 +242,13 @@ func validateControl(ctrl entities.Control) error {
 // ValidatePluginName validates that a plugin name is safe to use in filesystem paths.
 // This prevents path traversal attacks when loading plugins.
 // EXPORTED for use by other packages that need to validate plugin names.
+// ValidatePluginName validates that a plugin name is safe to use in filesystem paths.
+// This prevents path traversal attacks when loading plugins.
+// EXPORTED for use by other packages that need to validate plugin names.
 func ValidatePluginName(name string) error {
-	if name == "" {
-		return fmt.Errorf("plugin name cannot be empty")
-	}
-
-	if len(name) > 64 {
-		return fmt.Errorf("plugin name too long (max 64 characters)")
-	}
-
-	// Check for path traversal attempts first (more specific error messages)
-	if strings.Contains(name, "/") || strings.Contains(name, "\\") {
-		return fmt.Errorf("plugin name cannot contain path separators")
-	}
-
-	if strings.Contains(name, "..") {
-		return fmt.Errorf("plugin name cannot contain parent directory references")
-	}
-
-	// Finally check against allowed character set
-	if !pluginNamePattern.MatchString(name) {
-		return fmt.Errorf("plugin name must contain only alphanumeric characters, underscores, and hyphens")
-	}
-
-	return nil
+	// Delegate to domain value object for single source of truth
+	_, err := values.NewPluginName(name)
+	return err
 }
 
 // validateObservation validates a single observation.
