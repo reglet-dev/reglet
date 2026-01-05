@@ -263,7 +263,7 @@ type workerPoolState struct {
 
 	// Channels for work distribution and completion signaling
 	workChan chan string // Buffered channel for control IDs ready to execute
-	doneChan chan string // Unbuffered channel for completion signals
+	doneChan chan string // Buffered channel for completion signals (prevents worker blocking)
 
 	// Context and error handling
 	ctx      context.Context
@@ -323,14 +323,17 @@ func (e *Engine) initializeWorkerPoolState(
 	}
 
 	// Create channels
-	// workChan is buffered to reduce blocking when workers finish
-	// doneChan is unbuffered to ensure completion handling completes before worker continues
+	// workChan is buffered to reduce blocking when coordinator sends work
+	// doneChan is buffered to prevent workers from blocking when signaling completion
+	// Buffer sizes:
+	// - workChan: maxConcurrent (limits concurrent execution)
+	// - doneChan: len(controls) (allows all completions without blocking)
 	maxConcurrent := e.config.MaxConcurrentControls
 	if maxConcurrent <= 0 {
 		maxConcurrent = 1 // Ensure at least 1 for buffer size
 	}
 	workChan := make(chan string, maxConcurrent)
-	doneChan := make(chan string)
+	doneChan := make(chan string, len(controls))
 
 	// Create context and errgroup
 	groupCtx, cancel := context.WithCancel(ctx)
