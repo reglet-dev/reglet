@@ -11,6 +11,7 @@ import (
 
 	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
 	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
+	domainServices "github.com/whiskeyjimbo/reglet/internal/domain/services"
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/build"
 	infraCapabilities "github.com/whiskeyjimbo/reglet/internal/infrastructure/capabilities"
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/wasm"
@@ -29,6 +30,7 @@ type CapabilityInfo struct {
 // CapabilityOrchestrator manages capability collection and granting.
 // Coordinates domain and infrastructure.
 type CapabilityOrchestrator struct {
+	analyzer       *domainServices.CapabilityAnalyzer // Domain service for extraction
 	fileStore      *infraCapabilities.FileStore
 	prompter       *infraCapabilities.TerminalPrompter
 	grants         capabilities.Grant
@@ -50,6 +52,7 @@ func NewCapabilityOrchestratorWithSecurity(trustAll bool, securityLevel string) 
 
 	prompter := infraCapabilities.NewTerminalPrompter()
 	return &CapabilityOrchestrator{
+		analyzer:       domainServices.NewCapabilityAnalyzer(),
 		fileStore:      infraCapabilities.NewFileStore(configPath),
 		prompter:       prompter,
 		grants:         capabilities.NewGrant(),
@@ -82,8 +85,8 @@ func (o *CapabilityOrchestrator) CollectCapabilities(ctx context.Context, profil
 // CollectRequiredCapabilities loads plugins and identifies requirements.
 // It prioritizes specific capabilities extracted from profile configs over plugin metadata.
 func (o *CapabilityOrchestrator) CollectRequiredCapabilities(ctx context.Context, profile entities.ProfileReader, runtime *wasm.Runtime, pluginDir string) (map[string][]capabilities.Capability, error) {
-	// First, extract specific capabilities from profile observation configs
-	profileCaps := o.extractProfileCapabilities(profile)
+	// First, extract specific capabilities from profile observation configs using domain service
+	profileCaps := o.analyzer.ExtractCapabilities(profile)
 
 	// Get unique plugin names from profile
 	pluginNames := make(map[string]bool)
@@ -211,92 +214,6 @@ func (o *CapabilityOrchestrator) CollectRequiredCapabilities(ctx context.Context
 	}
 
 	return required, nil
-}
-
-// extractProfileCapabilities analyzes profile observations to extract specific capability requirements.
-// This enables principle of least privilege by requesting only the resources actually used,
-// rather than the plugin's full declared capabilities.
-func (o *CapabilityOrchestrator) extractProfileCapabilities(profile entities.ProfileReader) map[string][]capabilities.Capability {
-	// Use map to deduplicate capabilities per plugin
-	profileCaps := make(map[string]map[string]capabilities.Capability)
-
-	// Analyze each control's observations
-	for _, ctrl := range profile.GetAllControls() {
-		for _, obs := range ctrl.ObservationDefinitions {
-			pluginName := obs.Plugin
-
-			// Initialize plugin entry if needed
-			if _, ok := profileCaps[pluginName]; !ok {
-				profileCaps[pluginName] = make(map[string]capabilities.Capability)
-			}
-
-			// Extract plugin-specific capabilities based on config
-			var extractedCaps []capabilities.Capability
-
-			switch pluginName {
-			case "file":
-				// Extract file path from config
-				if pathVal, ok := obs.Config["path"]; ok {
-					if path, ok := pathVal.(string); ok && path != "" {
-						// Create specific read capability for this file
-						extractedCaps = append(extractedCaps, capabilities.Capability{
-							Kind:    "fs",
-							Pattern: "read:" + path,
-						})
-					}
-				}
-
-			case "command":
-				// Extract command from config
-				if cmdVal, ok := obs.Config["command"]; ok {
-					if cmd, ok := cmdVal.(string); ok && cmd != "" {
-						extractedCaps = append(extractedCaps, capabilities.Capability{
-							Kind:    "exec",
-							Pattern: cmd,
-						})
-					}
-				}
-
-			case "http", "tcp", "dns":
-				// Network plugins - extract specific endpoints if available
-				if urlVal, ok := obs.Config["url"]; ok {
-					if url, ok := urlVal.(string); ok && url != "" {
-						extractedCaps = append(extractedCaps, capabilities.Capability{
-							Kind:    "network",
-							Pattern: "outbound:" + url,
-						})
-					}
-				} else if hostVal, ok := obs.Config["host"]; ok {
-					if host, ok := hostVal.(string); ok && host != "" {
-						extractedCaps = append(extractedCaps, capabilities.Capability{
-							Kind:    "network",
-							Pattern: "outbound:" + host,
-						})
-					}
-				}
-			}
-
-			// Deduplicate by using capability string as key
-			for _, capability := range extractedCaps {
-				key := capability.Kind + ":" + capability.Pattern
-				profileCaps[pluginName][key] = capability
-			}
-		}
-	}
-
-	// Convert map to slice
-	result := make(map[string][]capabilities.Capability)
-	for pluginName, capMap := range profileCaps {
-		caps := make([]capabilities.Capability, 0, len(capMap))
-		for _, cap := range capMap {
-			caps = append(caps, cap)
-		}
-		if len(caps) > 0 {
-			result[pluginName] = caps
-		}
-	}
-
-	return result
 }
 
 // GrantCapabilities resolves permissions via file or prompt.
