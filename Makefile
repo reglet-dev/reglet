@@ -5,9 +5,9 @@ BINARY_NAME=reglet
 VERSION?=dev
 COMMIT=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE=$(shell date -u '+%Y-%m-%d_%H:%M:%S')
-LDFLAGS=-ldflags "-X github.com/whiskeyjimbo/reglet/internal/version.Version=$(VERSION) \
-                   -X github.com/whiskeyjimbo/reglet/internal/version.Commit=$(COMMIT) \
-                   -X github.com/whiskeyjimbo/reglet/internal/version.BuildDate=$(BUILD_DATE)"
+LDFLAGS=-ldflags "-X github.com/whiskeyjimbo/reglet/internal/infrastructure/build.Version=$(VERSION) \
+                   -X github.com/whiskeyjimbo/reglet/internal/infrastructure/build.Commit=$(COMMIT) \
+                   -X github.com/whiskeyjimbo/reglet/internal/infrastructure/build.BuildDate=$(BUILD_DATE)"
 
 # Go commands
 GOCMD=go
@@ -86,6 +86,62 @@ profile-mem: ## Run memory profiling
 	@echo "Running memory profiling..."
 	$(GOTEST) -memprofile=mem.prof -bench=. ./...
 	$(GOCMD) tool pprof -http=:8080 mem.prof
+
+fuzz: ## Run all fuzz tests (short duration for CI)
+	@echo "Running fuzz tests..."
+	@# Capabilities
+	@go test -fuzz=^FuzzNetworkPatternMatching$$ -fuzztime=5s ./internal/domain/capabilities/
+	@go test -fuzz=^FuzzFilesystemPatternMatching$$ -fuzztime=5s ./internal/domain/capabilities/
+	@go test -fuzz=^FuzzExecPatternMatching$$ -fuzztime=5s ./internal/domain/capabilities/
+	@go test -fuzz=^FuzzEnvironmentPatternMatching$$ -fuzztime=5s ./internal/domain/capabilities/
+	@# Config
+	@go test -fuzz=^FuzzYAMLLoading$$ -fuzztime=5s ./internal/infrastructure/config/
+	@go test -fuzz=^FuzzVariableSubstitution$$ -fuzztime=5s ./internal/infrastructure/config/
+	@# Hostfuncs
+	@go test -fuzz=^FuzzHTTPRequestParsing$$ -fuzztime=5s ./internal/infrastructure/wasm/hostfuncs/
+	@go test -fuzz=^FuzzDNSRequestParsing$$ -fuzztime=5s ./internal/infrastructure/wasm/hostfuncs/
+	@go test -fuzz=^FuzzTCPRequestParsing$$ -fuzztime=5s ./internal/infrastructure/wasm/hostfuncs/
+	@go test -fuzz=^FuzzSMTPRequestParsing$$ -fuzztime=5s ./internal/infrastructure/wasm/hostfuncs/
+	@go test -fuzz=^FuzzPackedPtrLen$$ -fuzztime=5s ./internal/infrastructure/wasm/hostfuncs/
+	@go test -fuzz=^FuzzSSRFProtection$$ -fuzztime=5s ./internal/infrastructure/wasm/hostfuncs/
+	@# Validation
+	@go test -fuzz=^FuzzPluginNameValidation$$ -fuzztime=5s ./internal/infrastructure/validation/
+	@go test -fuzz=^FuzzVersionValidation$$ -fuzztime=5s ./internal/infrastructure/validation/
+	@go test -fuzz=^FuzzSchemaValidation$$ -fuzztime=5s ./internal/infrastructure/validation/
+	@# Redaction
+	@go test -fuzz=^FuzzRedactorScrubString$$ -fuzztime=5s ./internal/infrastructure/redaction/
+	@go test -fuzz=^FuzzRedactorWalker$$ -fuzztime=5s ./internal/infrastructure/redaction/
+	@# Output
+	@go test -fuzz=^FuzzSARIFGeneration$$ -fuzztime=5s ./internal/infrastructure/output/
+	@echo "Fuzz tests completed"
+
+.PHONY: fuzz-extended
+fuzz-extended: ## Run extended fuzzing (5min per test)
+	@echo "Running extended fuzz tests..."
+	@# Capabilities
+	@go test -fuzz=^FuzzNetworkPatternMatching$$ -fuzztime=5m ./internal/domain/capabilities/
+	@go test -fuzz=^FuzzFilesystemPatternMatching$$ -fuzztime=5m ./internal/domain/capabilities/
+	@go test -fuzz=^FuzzExecPatternMatching$$ -fuzztime=5m ./internal/domain/capabilities/
+	@go test -fuzz=^FuzzEnvironmentPatternMatching$$ -fuzztime=5m ./internal/domain/capabilities/
+	@# Config
+	@go test -fuzz=^FuzzYAMLLoading$$ -fuzztime=5m ./internal/infrastructure/config/
+	@go test -fuzz=^FuzzVariableSubstitution$$ -fuzztime=5m ./internal/infrastructure/config/
+	@# Hostfuncs
+	@go test -fuzz=^FuzzHTTPRequestParsing$$ -fuzztime=5m ./internal/infrastructure/wasm/hostfuncs/
+	@go test -fuzz=^FuzzDNSRequestParsing$$ -fuzztime=5m ./internal/infrastructure/wasm/hostfuncs/
+	@go test -fuzz=^FuzzTCPRequestParsing$$ -fuzztime=5m ./internal/infrastructure/wasm/hostfuncs/
+	@go test -fuzz=^FuzzSMTPRequestParsing$$ -fuzztime=5m ./internal/infrastructure/wasm/hostfuncs/
+	@go test -fuzz=^FuzzPackedPtrLen$$ -fuzztime=5m ./internal/infrastructure/wasm/hostfuncs/
+	@go test -fuzz=^FuzzSSRFProtection$$ -fuzztime=5m ./internal/infrastructure/wasm/hostfuncs/
+	@# Validation
+	@go test -fuzz=^FuzzPluginNameValidation$$ -fuzztime=5m ./internal/infrastructure/validation/
+	@go test -fuzz=^FuzzVersionValidation$$ -fuzztime=5m ./internal/infrastructure/validation/
+	@go test -fuzz=^FuzzSchemaValidation$$ -fuzztime=5m ./internal/infrastructure/validation/
+	@# Redaction
+	@go test -fuzz=^FuzzRedactorScrubString$$ -fuzztime=5m ./internal/infrastructure/redaction/
+	@go test -fuzz=^FuzzRedactorWalker$$ -fuzztime=5m ./internal/infrastructure/redaction/
+	@# Output
+	@go test -fuzz=^FuzzSARIFGeneration$$ -fuzztime=5m ./internal/infrastructure/output/
 
 help: ## Display this help message
 	@echo "Reglet Makefile commands:"
