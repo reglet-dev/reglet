@@ -52,8 +52,8 @@ type ObservationResult struct {
 // The Message field provides human-readable context about failures, constructed by the
 // StatusAggregator which has full access to the evidence and expression evaluation context.
 type ExpectationResult struct {
-	Expression string `json:"expression" yaml:"expression"`           // The expect expression (e.g., "data.size == 2785")
-	Passed     bool   `json:"passed" yaml:"passed"`                   // Whether the expectation passed
+	Expression string `json:"expression" yaml:"expression"`               // The expect expression (e.g., "data.size == 2785")
+	Passed     bool   `json:"passed" yaml:"passed"`                       // Whether the expectation passed
 	Message    string `json:"message,omitempty" yaml:"message,omitempty"` // Human-readable description (only set on failure/error)
 }
 

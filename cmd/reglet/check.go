@@ -123,6 +123,10 @@ func buildCheckProfileRequest(profilePath string, opts *CheckOptions) dto.CheckP
 			FilterExpression:    opts.filterExpr,
 			IncludeDependencies: opts.includeDependencies,
 		},
+		Execution: dto.ExecutionOptions{
+			Parallel: true, // Default to parallel execution for performance
+			// MaxConcurrentControls and MaxConcurrentObservations will use defaults (0 = auto-detect)
+		},
 		Options: dto.CheckOptions{
 			TrustPlugins: opts.trustPlugins,
 		},

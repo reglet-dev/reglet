@@ -87,9 +87,9 @@ func TestCapabilityGatekeeper_SecurityLevels(t *testing.T) {
 			if tt.isBroad {
 				key := tt.capability.Kind + ":" + tt.capability.Pattern
 				capInfo[key] = CapabilityInfo{
-					Capability:  tt.capability,
-					IsBroad:     true,
-					PluginName:  "test",
+					Capability: tt.capability,
+					IsBroad:    true,
+					PluginName: "test",
 				}
 			}
 

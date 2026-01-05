@@ -214,9 +214,9 @@ func Test_ProfileCompiler_DeepCopyPreventsMutation(t *testing.T) {
 			},
 			Items: []entities.Control{
 				{
-					ID:       "C-001",
-					Name:     "Original Name",
-					Tags:     []string{"original"},
+					ID:        "C-001",
+					Name:      "Original Name",
+					Tags:      []string{"original"},
 					DependsOn: []string{},
 					ObservationDefinitions: []entities.ObservationDefinition{
 						{Plugin: "file", Config: map[string]interface{}{"path": "/original"}},

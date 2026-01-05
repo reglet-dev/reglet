@@ -32,9 +32,9 @@ type CapabilityInfo struct {
 // - CapabilityGatekeeper for granting (security boundary)
 type CapabilityOrchestrator struct {
 	analyzer       *domainServices.CapabilityAnalyzer // Domain service for extraction
-	gatekeeper     *CapabilityGatekeeper               // Application service for granting
-	trustAll       bool                                // Auto-grant all capabilities
-	capabilityInfo map[string]CapabilityInfo           // Metadata about requested capabilities
+	gatekeeper     *CapabilityGatekeeper              // Application service for granting
+	trustAll       bool                               // Auto-grant all capabilities
+	capabilityInfo map[string]CapabilityInfo          // Metadata about requested capabilities
 }
 
 // NewCapabilityOrchestrator creates a capability orchestrator with default security level (standard).
