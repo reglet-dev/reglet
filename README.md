@@ -12,7 +12,6 @@ Unlike traditional tools that run scripts with full host privileges, Reglet enfo
 
 ## Table of Contents
 - [Core Features](#core-features)
-- [Why Reglet?](#why-reglet)
 - [Architecture](#architecture)
 - [Quick Start](#quick-start-30-seconds)
 - [Security Model](#security-model)
@@ -24,7 +23,7 @@ Unlike traditional tools that run scripts with full host privileges, Reglet enfo
 ## Core Features
 - **Secure Sandbox**: All validation logic runs inside a CGO-free WebAssembly runtime (wazero). Plugins are memory-safe and isolated from the host OS.
 
-- **Capability-Based Security**: "Least Privilege" is enforced at the system call level. A plugin cannot access files, networks, or environment variables unless explicitly allowed. Reglet automatically extracts specific permissions from your profiles (e.g., only `/etc/ssh/sshd_config`) instead of requesting broad access (e.g., all files).
+- **Capability-Based Security**: "Least Privilege" is enforced at the system call level. A plugin cannot access files, networks, or environment variables unless explicitly allowed. Reglet uses **Static Profile Analysis** to extract permissions (e.g., access to only `/etc/ssh/sshd_config`) instead of requesting broad access (e.g., the entire filesystem).
 
 - **Smart Execution Security**: Automatically detects and restricts dangerous command execution patterns. Shells (`/bin/bash`) and interpreters (`python`, `perl`, `node`) are identified as high-risk "broad" capabilities, preventing arbitrary code execution bypasses while allowing safe script execution.
 
@@ -50,6 +49,16 @@ Reglet follows an open-core philosophy with a strict focus on security and porta
 - SDK: A Go SDK allowing developers to write plugins that compile to WASM/WASI.
 
 - WIT Contracts: The boundary between Host and Plugin is strictly typed using WASM Interface Types (WIT).
+
+## Execution Lifecycle
+
+Reglet ensures safety and consistency through a multi-stage execution pipeline:
+
+1. **Loading**: Raw YAML profiles are parsed into a domain model.
+2. **Compilation**: The `ProfileCompiler` performs a deep-copy and applies default values, ensuring the source profile remains immutable.
+3. **Validation**: The engine enforces domain invariants, including unique control IDs and circular dependency detection.
+4. **Security Discovery**: Reglet identifies the *minimum* required capabilities by analyzing the configuration before any plugin execution begins.
+5. **Parallel Execution**: Validated controls are executed in parallel using a sandboxed WebAssembly worker pool.
 
 ## Quick Start (30 seconds)
 
@@ -90,33 +99,17 @@ observations:
 
 Instead of requesting broad access like `read:**` (all files), Reglet requests only what your profile needs.
 
-### Security Levels
+### Security Governance Levels
 
-Control how Reglet handles capability requests with the `--security` flag:
+You can control how Reglet handles capability requests with the `--security` flag. This allows you to balance strict security with automation needs:
 
-**Strict Mode** (`--security=strict`)
-```bash
-reglet check profile.yaml --security=strict
-```
-- Automatically denies broad capabilities (e.g., `/**`, `**`, `/bin/bash`, `python`, `node`)
-- Best for: Production CI/CD pipelines
-- Example: Requesting `fs:read:/` would be denied
+| Mode | Behavior for "Broad" (Risky) Patterns | Target Environment |
+| :--- | :--- | :--- |
+| **Strict** | Automatically **denies** broad patterns (e.g., `/bin/bash` or `read:/**`). | Production CI/CD pipelines. |
+| **Standard** | **Warns and prompts** the user with risk descriptions and safer alternatives. | Local development / testing. |
+| **Permissive**| **Auto-grants** all requested capabilities without interaction. | Highly trusted local automation. |
 
-**Standard Mode** (default)
-```bash
-reglet check profile.yaml  # or --security=standard
-```
-- Warns about broad capabilities and prompts for approval
-- Shows security risks and profile-specific alternatives
-- Best for: Development and interactive use
-
-**Permissive Mode** (`--security=permissive`)
-```bash
-reglet check profile.yaml --security=permissive
-```
-- Auto-grants all capabilities without prompting
-- Best for: Automated testing, trusted environments
-- Use with `--trust-plugins` for completely non-interactive execution
+> **Note**: Reglet identifies interpreters (Python, Node, Bash) as high-risk "broad" capabilities because they can be used to bypass resource restrictions via arbitrary code execution.
 
 ### Configuration File
 
