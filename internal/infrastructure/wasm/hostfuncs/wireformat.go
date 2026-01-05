@@ -16,19 +16,32 @@ import (
 //nolint:gosec // G115: uint64->uint32 conversions are safe for WASM32 address space
 
 type (
+	// ContextWireFormat is a re-export of wireformat.ContextWireFormat
 	ContextWireFormat = wireformat.ContextWireFormat
-	DNSRequestWire    = wireformat.DNSRequestWire
-	DNSResponseWire   = wireformat.DNSResponseWire
-	HTTPRequestWire   = wireformat.HTTPRequestWire
-	HTTPResponseWire  = wireformat.HTTPResponseWire
-	TCPRequestWire    = wireformat.TCPRequestWire
-	TCPResponseWire   = wireformat.TCPResponseWire
-	SMTPRequestWire   = wireformat.SMTPRequestWire
-	SMTPResponseWire  = wireformat.SMTPResponseWire
-	ExecRequestWire   = wireformat.ExecRequestWire
-	ExecResponseWire  = wireformat.ExecResponseWire
-	ErrorDetail       = wireformat.ErrorDetail
-	MXRecordWire      = wireformat.MXRecordWire // New re-export
+	// DNSRequestWire is a re-export of wireformat.DNSRequestWire
+	DNSRequestWire = wireformat.DNSRequestWire
+	// DNSResponseWire is a re-export of wireformat.DNSResponseWire
+	DNSResponseWire = wireformat.DNSResponseWire
+	// HTTPRequestWire is a re-export of wireformat.HTTPRequestWire
+	HTTPRequestWire = wireformat.HTTPRequestWire
+	// HTTPResponseWire is a re-export of wireformat.HTTPResponseWire
+	HTTPResponseWire = wireformat.HTTPResponseWire
+	// TCPRequestWire is a re-export of wireformat.TCPRequestWire
+	TCPRequestWire = wireformat.TCPRequestWire
+	// TCPResponseWire is a re-export of wireformat.TCPResponseWire
+	TCPResponseWire = wireformat.TCPResponseWire
+	// SMTPRequestWire is a re-export of wireformat.SMTPRequestWire
+	SMTPRequestWire = wireformat.SMTPRequestWire
+	// SMTPResponseWire is a re-export of wireformat.SMTPResponseWire
+	SMTPResponseWire = wireformat.SMTPResponseWire
+	// ExecRequestWire is a re-export of wireformat.ExecRequestWire
+	ExecRequestWire = wireformat.ExecRequestWire
+	// ExecResponseWire is a re-export of wireformat.ExecResponseWire
+	ExecResponseWire = wireformat.ExecResponseWire
+	// ErrorDetail is a re-export of wireformat.ErrorDetail
+	ErrorDetail = wireformat.ErrorDetail
+	// MXRecordWire is a re-export of wireformat.MXRecordWire
+	MXRecordWire = wireformat.MXRecordWire
 )
 
 // createContextFromWire creates a new context from the wire format.

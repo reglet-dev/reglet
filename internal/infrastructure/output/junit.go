@@ -32,6 +32,7 @@ type JUnitTestSuites struct {
 	TestSuites []JUnitTestSuite `xml:"testsuite"`
 }
 
+// JUnitTestSuite represents a single test suite in JUnit XML.
 type JUnitTestSuite struct {
 	XMLName   xml.Name        `xml:"testsuite"`
 	Name      string          `xml:"name,attr"`
@@ -43,6 +44,7 @@ type JUnitTestSuite struct {
 	TestCases []JUnitTestCase `xml:"testcase"`
 }
 
+// JUnitTestCase represents a single test case in JUnit XML.
 type JUnitTestCase struct {
 	XMLName   xml.Name      `xml:"testcase"`
 	Name      string        `xml:"name,attr"`
@@ -53,16 +55,19 @@ type JUnitTestCase struct {
 	Skipped   *JUnitSkipped `xml:"skipped,omitempty"`
 }
 
+// JUnitFailure represents a failed test case.
 type JUnitFailure struct {
 	Message string `xml:"message,attr"`
 	Content string `xml:",chardata"`
 }
 
+// JUnitError represents a test case that encountered an error.
 type JUnitError struct {
 	Message string `xml:"message,attr"`
 	Content string `xml:",chardata"`
 }
 
+// JUnitSkipped represents a skipped test case.
 type JUnitSkipped struct {
 	Message string `xml:"message,attr,omitempty"`
 }
