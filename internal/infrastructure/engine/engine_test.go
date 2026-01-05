@@ -143,7 +143,7 @@ func TestExecuteControl_SingleObservation(t *testing.T) {
 
 	// Create empty execution result for dependency checking
 	execResult := execution.NewExecutionResult("test", "1.0.0")
-	result := engine.executeControl(ctx, ctrl, execResult, nil)
+	result := engine.executeControl(ctx, ctrl, 0, execResult, nil)
 
 	assert.Equal(t, "test-control", result.ID)
 	assert.Equal(t, "Test Control", result.Name)
@@ -185,7 +185,7 @@ func TestExecuteControl_MultipleObservations(t *testing.T) {
 
 	// Create empty execution result for dependency checking
 	execResult := execution.NewExecutionResult("test", "1.0.0")
-	result := engine.executeControl(ctx, ctrl, execResult, nil)
+	result := engine.executeControl(ctx, ctrl, 0, execResult, nil)
 
 	assert.Equal(t, "multi-test", result.ID)
 	assert.Len(t, result.ObservationResults, 2)

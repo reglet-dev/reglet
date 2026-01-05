@@ -200,8 +200,8 @@ func (e *Engine) Execute(ctx context.Context, profile entities.ProfileReader) (*
 		}
 	} else {
 		// Sequential execution of controls
-		for _, ctrl := range allControls {
-			controlResult := e.executeControl(ctx, ctrl, result, requiredControls)
+		for i, ctrl := range allControls {
+			controlResult := e.executeControl(ctx, ctrl, i, result, requiredControls)
 			result.AddControlResult(controlResult)
 		}
 	}
@@ -252,8 +252,9 @@ func (e *Engine) resolveDependencies(profile entities.ProfileReader) (map[string
 // dependencies are satisfied.
 type workerPoolState struct {
 	// Immutable after initialization (safe for concurrent reads)
-	controlByID map[string]entities.Control // Control lookup by ID
-	reverseDeps map[string][]string         // Control ID → list of dependent control IDs
+	controlByID      map[string]entities.Control // Control lookup by ID
+	controlIndexByID map[string]int              // Control ID → original definition order (for deterministic output)
+	reverseDeps      map[string][]string         // Control ID → list of dependent control IDs
 
 	// Mutable state (owned by coordinator goroutine)
 	inDegree      map[string]int  // Control ID → count of unmet dependencies
@@ -286,11 +287,13 @@ func (e *Engine) initializeWorkerPoolState(
 ) (*workerPoolState, error) {
 	// Build dependency graph structures
 	controlByID := make(map[string]entities.Control)
+	controlIndexByID := make(map[string]int) // Track original definition order
 	inDegree := make(map[string]int)
 	reverseDeps := make(map[string][]string)
 
-	for _, ctrl := range controls {
+	for i, ctrl := range controls {
 		controlByID[ctrl.ID] = ctrl
+		controlIndexByID[ctrl.ID] = i // Store original index for deterministic output
 		inDegree[ctrl.ID] = len(ctrl.DependsOn)
 
 		// Build reverse dependency map (control → dependents)
@@ -343,20 +346,21 @@ func (e *Engine) initializeWorkerPoolState(
 	// Setting it to MaxConcurrentControls would cause deadlock if numWorkers == MaxConcurrentControls.
 
 	return &workerPoolState{
-		controlByID:   controlByID,
-		reverseDeps:   reverseDeps,
-		inDegree:      inDegree,
-		readyQueue:    readyQueue,
-		completed:     make(map[string]bool),
-		totalControls: len(controls),
-		workChan:      workChan,
-		doneChan:      doneChan,
-		ctx:           gCtx,
-		cancel:        cancel,
-		errGroup:      g,
-		engine:        e,
-		execResult:    result,
-		requiredDeps:  requiredDeps,
+		controlByID:      controlByID,
+		controlIndexByID: controlIndexByID,
+		reverseDeps:      reverseDeps,
+		inDegree:         inDegree,
+		readyQueue:       readyQueue,
+		completed:        make(map[string]bool),
+		totalControls:    len(controls),
+		workChan:         workChan,
+		doneChan:         doneChan,
+		ctx:              gCtx,
+		cancel:           cancel,
+		errGroup:         g,
+		engine:           e,
+		execResult:       result,
+		requiredDeps:     requiredDeps,
 	}, nil
 }
 
@@ -446,11 +450,15 @@ func (state *workerPoolState) executeWorker() {
 			continue
 		}
 
+		// Lookup original index for deterministic output ordering
+		index := state.controlIndexByID[controlID]
+
 		// Execute control using existing executeControl method
 		// This handles dependency checking, observation execution, and status aggregation
 		controlResult := state.engine.executeControl(
 			state.ctx,
 			ctrl,
+			index,
 			state.execResult,
 			state.requiredDeps,
 		)
@@ -524,10 +532,12 @@ func (e *Engine) executeControlsWithWorkerPool(
 }
 
 // executeControl executes a single control and returns its result.
-func (e *Engine) executeControl(ctx context.Context, ctrl entities.Control, execResult *execution.ExecutionResult, requiredDeps map[string]bool) execution.ControlResult {
+// The index parameter tracks the control's original definition order for deterministic output.
+func (e *Engine) executeControl(ctx context.Context, ctrl entities.Control, index int, execResult *execution.ExecutionResult, requiredDeps map[string]bool) execution.ControlResult {
 	startTime := time.Now()
 
 	result := execution.ControlResult{
+		Index:              index,
 		ID:                 ctrl.ID,
 		Name:               ctrl.Name,
 		Description:        ctrl.Description,

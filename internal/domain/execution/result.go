@@ -2,6 +2,7 @@
 package execution
 
 import (
+	"sort"
 	"sync"
 	"time"
 
@@ -25,6 +26,7 @@ type ExecutionResult struct {
 
 // ControlResult represents the result of executing a single control.
 type ControlResult struct {
+	Index              int                 `json:"index" yaml:"index"` // Original definition order (0-indexed) for deterministic output
 	ID                 string              `json:"id" yaml:"id"`
 	Name               string              `json:"name" yaml:"name"`
 	Description        string              `json:"description,omitempty" yaml:"description,omitempty"`
@@ -152,9 +154,16 @@ func (r *ExecutionResult) IsComplete(expectedControlCount int) bool {
 }
 
 // Finalize completes the execution result and calculates the summary.
+// Controls are sorted by their original definition order for deterministic output.
 func (r *ExecutionResult) Finalize() {
 	r.EndTime = time.Now()
 	r.Duration = r.EndTime.Sub(r.StartTime)
+
+	// Sort controls by original definition order for deterministic output
+	sort.Slice(r.Controls, func(i, j int) bool {
+		return r.Controls[i].Index < r.Controls[j].Index
+	})
+
 	r.calculateSummary()
 }
 
