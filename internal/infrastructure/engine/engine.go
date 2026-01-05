@@ -405,6 +405,8 @@ func (state *workerPoolState) handleControlCompletion(controlID string) {
 // 3. Update dependencies and enqueue newly-ready controls
 // 4. Repeat until all controls complete
 func (state *workerPoolState) coordinateExecution() error {
+	defer close(state.workChan)
+
 	// Enqueue initial batch of ready controls
 	state.enqueueReadyControls()
 
@@ -429,7 +431,6 @@ func (state *workerPoolState) coordinateExecution() error {
 	}
 
 	// All controls completed, signal workers to exit
-	close(state.workChan)
 	return nil
 }
 
