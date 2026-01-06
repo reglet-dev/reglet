@@ -9,13 +9,11 @@ The Reglet Go SDK provides Go APIs for writing WebAssembly (WASM) plugins for th
 
 ## Features
 
-- ✅ **Full Context Propagation**: Deadlines, cancellation, and values flow to all operations
-- ✅ **Memory Management**: Automatic allocation tracking with 100 MB safety limit
-- ✅ **Network Operations**: DNS, HTTP, and TCP with explicit API
-- ✅ **Command Execution**: Sandboxed command execution via host
-- ✅ **Structured Logging**: Go `slog` integration with host-side collection
-- ✅ **Type-Safe Wire Protocol**: JSON-based ABI with validation
-- ✅ **Comprehensive Testing**: 85%+ test coverage
+- **Full Context Propagation**: Deadlines, cancellation, and values flow to all operations
+- **Memory Management**: Automatic allocation tracking with 100 MB safety limit
+- **Network Operations**: DNS, HTTP, and TCP with explicit API
+- **Command Execution**: Sandboxed command execution via host
+- **Type-Safe Wire Protocol**: JSON-based ABI with validation
 
 ## Installation
 
