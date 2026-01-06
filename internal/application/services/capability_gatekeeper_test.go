@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/whiskeyjimbo/reglet/internal/application/ports"
 	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
 )
 
@@ -15,7 +16,7 @@ func TestCapabilityGatekeeper_TrustAllMode(t *testing.T) {
 	required.Add(capabilities.Capability{Kind: "fs", Pattern: "read:/etc/passwd"})
 	required.Add(capabilities.Capability{Kind: "exec", Pattern: "/bin/ls"})
 
-	capInfo := make(map[string]CapabilityInfo)
+	capInfo := make(map[string]ports.CapabilityInfo)
 
 	// Trust all mode should grant everything without prompting
 	granted, err := gatekeeper.GrantCapabilities(required, capInfo, true)
@@ -83,10 +84,10 @@ func TestCapabilityGatekeeper_SecurityLevels(t *testing.T) {
 			required := capabilities.NewGrant()
 			required.Add(tt.capability)
 
-			capInfo := make(map[string]CapabilityInfo)
+			capInfo := make(map[string]ports.CapabilityInfo)
 			if tt.isBroad {
 				key := tt.capability.Kind + ":" + tt.capability.Pattern
-				capInfo[key] = CapabilityInfo{
+				capInfo[key] = ports.CapabilityInfo{
 					Capability: tt.capability,
 					IsBroad:    true,
 					PluginName: "test",
@@ -115,7 +116,7 @@ func TestCapabilityGatekeeper_EmptyRequired(t *testing.T) {
 	gatekeeper := NewCapabilityGatekeeper("/tmp/test-config.yaml", "standard")
 
 	required := capabilities.NewGrant() // Empty
-	capInfo := make(map[string]CapabilityInfo)
+	capInfo := make(map[string]ports.CapabilityInfo)
 
 	granted, err := gatekeeper.GrantCapabilities(required, capInfo, false)
 

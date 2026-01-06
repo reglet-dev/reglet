@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/whiskeyjimbo/reglet/internal/application/ports"
 	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
 	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
 	domainServices "github.com/whiskeyjimbo/reglet/internal/domain/services"
@@ -18,42 +19,47 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// CapabilityInfo contains metadata about a capability request.
-type CapabilityInfo struct {
-	Capability      capabilities.Capability
-	IsProfileBased  bool                     // True if extracted from profile config
-	PluginName      string                   // Which plugin requested this
-	IsBroad         bool                     // True if pattern is overly permissive
-	ProfileSpecific *capabilities.Capability // Profile-specific alternative if available
-}
-
 // CapabilityOrchestrator coordinates capability collection and granting.
 // It delegates to specialized services:
 // - CapabilityAnalyzer for extraction (domain logic)
 // - CapabilityGatekeeper for granting (security boundary)
 type CapabilityOrchestrator struct {
-	analyzer       *domainServices.CapabilityAnalyzer // Domain service for extraction
-	gatekeeper     *CapabilityGatekeeper              // Application service for granting
-	trustAll       bool                               // Auto-grant all capabilities
-	capabilityInfo map[string]CapabilityInfo          // Metadata about requested capabilities
+	analyzer       ports.CapabilityAnalyzer        // Domain service for extraction
+	gatekeeper     ports.CapabilityGatekeeperPort  // Application service for granting
+	trustAll       bool                            // Auto-grant all capabilities
+	capabilityInfo map[string]ports.CapabilityInfo // Metadata about requested capabilities
 }
 
 // NewCapabilityOrchestrator creates a capability orchestrator with default security level (standard).
-func NewCapabilityOrchestrator(trustAll bool, registry *capabilities.Registry) *CapabilityOrchestrator {
-	return NewCapabilityOrchestratorWithSecurity(trustAll, "standard", registry)
+// configPath specifies the path to the system config file (e.g., ~/.reglet/config.yaml).
+func NewCapabilityOrchestrator(configPath string, trustAll bool, registry *capabilities.Registry) *CapabilityOrchestrator {
+	return NewCapabilityOrchestratorWithSecurity(configPath, trustAll, "standard", registry)
 }
 
 // NewCapabilityOrchestratorWithSecurity creates a capability orchestrator with specified security level.
+// configPath specifies the path to the system config file (e.g., ~/.reglet/config.yaml).
 // securityLevel can be: "strict", "standard", or "permissive"
-func NewCapabilityOrchestratorWithSecurity(trustAll bool, securityLevel string, registry *capabilities.Registry) *CapabilityOrchestrator {
-	homeDir, _ := os.UserHomeDir()
-	configPath := filepath.Join(homeDir, ".reglet", "config.yaml")
-
+func NewCapabilityOrchestratorWithSecurity(configPath string, trustAll bool, securityLevel string, registry *capabilities.Registry) *CapabilityOrchestrator {
 	return &CapabilityOrchestrator{
 		analyzer:       domainServices.NewCapabilityAnalyzer(registry),
 		gatekeeper:     NewCapabilityGatekeeper(configPath, securityLevel),
 		trustAll:       trustAll,
-		capabilityInfo: make(map[string]CapabilityInfo),
+		capabilityInfo: make(map[string]ports.CapabilityInfo),
+	}
+}
+
+// NewCapabilityOrchestratorWithDeps creates an orchestrator with injected dependencies.
+// This constructor is primarily for testing, allowing mock implementations.
+func NewCapabilityOrchestratorWithDeps(
+	analyzer ports.CapabilityAnalyzer,
+	gatekeeper ports.CapabilityGatekeeperPort,
+	trustAll bool,
+) *CapabilityOrchestrator {
+	return &CapabilityOrchestrator{
+		analyzer:       analyzer,
+		gatekeeper:     gatekeeper,
+		trustAll:       trustAll,
+		capabilityInfo: make(map[string]ports.CapabilityInfo),
 	}
 }
 
@@ -165,7 +171,7 @@ func (o *CapabilityOrchestrator) CollectRequiredCapabilities(ctx context.Context
 	required := make(map[string][]capabilities.Capability)
 
 	// Clear and rebuild capability info metadata
-	o.capabilityInfo = make(map[string]CapabilityInfo)
+	o.capabilityInfo = make(map[string]ports.CapabilityInfo)
 
 	for name := range pluginNames {
 		profileSpecific, hasProfile := profileCaps[name]
@@ -183,7 +189,7 @@ func (o *CapabilityOrchestrator) CollectRequiredCapabilities(ctx context.Context
 			// Store metadata for each profile-specific capability
 			for _, capability := range profileSpecific {
 				key := capability.Kind + ":" + capability.Pattern
-				o.capabilityInfo[key] = CapabilityInfo{
+				o.capabilityInfo[key] = ports.CapabilityInfo{
 					Capability:      capability,
 					IsProfileBased:  true,
 					PluginName:      name,
@@ -203,7 +209,7 @@ func (o *CapabilityOrchestrator) CollectRequiredCapabilities(ctx context.Context
 			// Store metadata for plugin-declared capabilities
 			for _, capability := range metaCaps {
 				key := capability.Kind + ":" + capability.Pattern
-				info := CapabilityInfo{
+				info := ports.CapabilityInfo{
 					Capability:     capability,
 					IsProfileBased: false,
 					PluginName:     name,

@@ -40,6 +40,22 @@ type CapabilityCollector interface {
 	CollectRequiredCapabilities(ctx context.Context, profile entities.ProfileReader, runtime *wasm.Runtime, pluginDir string) (map[string][]capabilities.Capability, error)
 }
 
+// CapabilityAnalyzer extracts specific capability requirements from profiles.
+// This allows the orchestrator to be tested with mock analyzers.
+type CapabilityAnalyzer interface {
+	ExtractCapabilities(profile entities.ProfileReader) map[string][]capabilities.Capability
+}
+
+// CapabilityGatekeeperPort grants capabilities based on security policy.
+// Named with "Port" suffix to avoid collision with the concrete CapabilityGatekeeper type.
+type CapabilityGatekeeperPort interface {
+	GrantCapabilities(
+		required capabilities.Grant,
+		capabilityInfo map[string]CapabilityInfo,
+		trustAll bool,
+	) (capabilities.Grant, error)
+}
+
 // CapabilityGranter grants capabilities (interactively or automatically).
 type CapabilityGranter interface {
 	GrantCapabilities(ctx context.Context, required map[string][]capabilities.Capability, trustAll bool) (map[string][]capabilities.Capability, error)

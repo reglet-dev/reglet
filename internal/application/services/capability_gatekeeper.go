@@ -2,10 +2,10 @@ package services
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 
-	"log/slog"
-
+	"github.com/whiskeyjimbo/reglet/internal/application/ports"
 	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
 	infraCapabilities "github.com/whiskeyjimbo/reglet/internal/infrastructure/capabilities"
 )
@@ -40,7 +40,7 @@ func NewCapabilityGatekeeper(configPath string, securityLevel string) *Capabilit
 //   - error if user denies or security policy blocks
 func (g *CapabilityGatekeeper) GrantCapabilities(
 	required capabilities.Grant,
-	capabilityInfo map[string]CapabilityInfo,
+	capabilityInfo map[string]ports.CapabilityInfo,
 	trustAll bool,
 ) (capabilities.Grant, error) {
 	// If trustAll flag is set, grant everything
@@ -106,7 +106,7 @@ func (g *CapabilityGatekeeper) GrantCapabilities(
 // Returns: (granted, saveToConfig, error)
 func (g *CapabilityGatekeeper) evaluateCapability(
 	capability capabilities.Capability,
-	capabilityInfo map[string]CapabilityInfo,
+	capabilityInfo map[string]ports.CapabilityInfo,
 ) (bool, bool, error) {
 	// Look up metadata for this capability
 	key := capability.Kind + ":" + capability.Pattern
