@@ -62,7 +62,10 @@ func (p *MyPlugin) Schema(ctx context.Context) ([]byte, error) {
 }
 
 func (p *MyPlugin) Check(ctx context.Context, config sdk.Config) (sdk.Evidence, error) {
-    hostname := config["hostname"].(string)
+    hostname, err := sdk.MustGetString(config, "hostname")
+    if err != nil {
+        return sdk.Failure("config", err.Error()), nil
+    }
 
     slog.InfoContext(ctx, "Starting check", "hostname", hostname)
 
@@ -111,9 +114,7 @@ type Plugin interface {
 
 ### Context Propagation
 
-**New in v0.1.0-alpha**: Full context propagation support.
-
-All SDK functions now properly propagate Go contexts:
+All SDK functions properly propagate Go contexts:
 
 ```go
 // Timeouts
@@ -170,45 +171,30 @@ The **host is responsible** for validating compatibility:
 
 ### DNS Resolution
 
-**⚠️ Breaking Change (v0.1.0-alpha)**: Standalone DNS functions have been removed.
+Use the `WasmResolver` for DNS lookups:
 
-**Before:**
-```go
-import sdknet "github.com/whiskeyjimbo/reglet/sdk/net"
-ips, err := sdknet.LookupHost(ctx, "example.com")  // ❌ No longer works
-```
-
-**After:**
 ```go
 import sdknet "github.com/whiskeyjimbo/reglet/sdk/net"
 
 resolver := &sdknet.WasmResolver{
     Nameserver: "", // Empty = use host's default
 }
-ips, err := resolver.LookupHost(ctx, "example.com") // ✅ Correct
+ips, err := resolver.LookupHost(ctx, "example.com")
 ```
 
 See [net/README.md](net/README.md) for full DNS API documentation.
 
 ### HTTP Requests
 
-**⚠️ Breaking Change (v0.1.0-alpha)**: HTTP transport is now explicit.
-
-**Before:**
-```go
-import "net/http"
-resp, err := http.Get(url) // ❌ No longer works (no implicit transport)
-```
-
-**After (Option 1 - Recommended):**
+**Option 1 - SDK Helpers (Recommended):**
 ```go
 import sdknet "github.com/whiskeyjimbo/reglet/sdk/net"
 
-resp, err := sdknet.Get(ctx, "https://example.com") // ✅ Use SDK helpers
+resp, err := sdknet.Get(ctx, "https://example.com")
 defer resp.Body.Close()
 ```
 
-**After (Option 2 - Custom Client):**
+**Option 2 - Custom Client:**
 ```go
 import (
     "net/http"
@@ -216,7 +202,7 @@ import (
 )
 
 client := &http.Client{
-    Transport: &sdknet.WasmTransport{}, // ✅ Explicit transport
+    Transport: &sdknet.WasmTransport{},
     Timeout:   10 * time.Second,
 }
 resp, err := client.Get("https://example.com")
@@ -225,17 +211,6 @@ resp, err := client.Get("https://example.com")
 #### HTTP Body Size Limit
 
 HTTP response bodies are limited to **10 MB** (`net.MaxHTTPBodySize`).
-
-If a response exceeds this limit, you'll receive an error:
-
-```go
-resp, err := sdknet.Get(ctx, url)
-if err != nil {
-    // err: "HTTP response body exceeds maximum size (10485760 bytes)"
-}
-```
-
-**Workaround**: For large responses, use streaming APIs or request smaller chunks.
 
 See [net/README.md](net/README.md) for full HTTP API documentation.
 
@@ -517,47 +492,6 @@ GOOS=wasip1 GOARCH=wasm go build -o plugin.wasm
 
 # Run with reglet CLI
 reglet check --profile test-profile.yaml
-```
-
-## Migration Guide (v0.1.0-alpha)
-
-### Breaking Change #1: DNS API
-
-**Old Code:**
-```go
-import sdknet "github.com/whiskeyjimbo/reglet/sdk/net"
-ips, err := sdknet.LookupHost(ctx, "example.com")
-```
-
-**New Code:**
-```go
-import sdknet "github.com/whiskeyjimbo/reglet/sdk/net"
-resolver := &sdknet.WasmResolver{}
-ips, err := resolver.LookupHost(ctx, "example.com")
-```
-
-### Breaking Change #2: HTTP Transport
-
-**Old Code:**
-```go
-import "net/http"
-resp, err := http.Get("https://example.com")
-```
-
-**New Code (Option 1):**
-```go
-import sdknet "github.com/whiskeyjimbo/reglet/sdk/net"
-resp, err := sdknet.Get(ctx, "https://example.com")
-```
-
-**New Code (Option 2):**
-```go
-import (
-    "net/http"
-    sdknet "github.com/whiskeyjimbo/reglet/sdk/net"
-)
-client := &http.Client{Transport: &sdknet.WasmTransport{}}
-resp, err := client.Get("https://example.com")
 ```
 
 ## Troubleshooting

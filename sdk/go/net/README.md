@@ -160,12 +160,6 @@ ips, err := resolver.LookupHost(ctx, "example.com")
 
 ## HTTP Requests
 
-### ⚠️ Breaking Change (v0.1.0-alpha)
-
-HTTP transport is now **explicit** instead of implicit. You must either:
-1. Use SDK helper functions (recommended)
-2. Create an `http.Client` with `WasmTransport`
-
 ### Basic Usage (Recommended)
 
 ```go
@@ -659,43 +653,6 @@ func checkHealth(ctx context.Context, endpoint string) bool {
 4. **TCP Read/Write**: TCP connections are check-only, no bidirectional communication
 5. **No UDP**: UDP protocol not supported
 6. **No Raw Sockets**: Only standard protocols (HTTP, TCP, DNS)
-
----
-
-## Migration Guide (v0.1.0-alpha)
-
-### Breaking Change 1: DNS Functions Removed
-
-**Before:**
-```go
-ips, err := net.LookupHost(ctx, "example.com")
-```
-
-**After:**
-```go
-resolver := &net.WasmResolver{}
-ips, err := resolver.LookupHost(ctx, "example.com")
-```
-
-### Breaking Change 2: HTTP Transport
-
-**Before:**
-```go
-// Implicit transport (no longer works)
-resp, err := http.Get("https://example.com")
-```
-
-**After (Option 1 - Recommended):**
-```go
-import sdknet "github.com/whiskeyjimbo/reglet/sdk/net"
-resp, err := sdknet.Get(ctx, "https://example.com")
-```
-
-**After (Option 2 - Custom Client):**
-```go
-client := &http.Client{Transport: &net.WasmTransport{}}
-resp, err := client.Get("https://example.com")
-```
 
 ---
 
