@@ -291,6 +291,7 @@ func (m *sarifMapper) registerArtifact(path string, data map[string]interface{})
 		// Use os.Stat to check size first
 		if info, err := os.Stat(absPath); err == nil && !info.IsDir() {
 			if info.Size() < maxContentSize {
+				//nolint:gosec // G304: absPath is from evidence data, bounded by size check above
 				content, err := os.ReadFile(absPath)
 				if err == nil {
 					artifact.WithContents(sarif.NewArtifactContent().WithText(string(content)))

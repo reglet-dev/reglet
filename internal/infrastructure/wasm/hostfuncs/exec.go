@@ -122,6 +122,7 @@ func ExecCommand(ctx context.Context, mod api.Module, stack []uint64, checker *C
 	// SECURITY: exec.CommandContext does NOT use shell
 	// Arguments are passed directly to the binary, preventing shell injection
 	// Only shell execution can interpret arguments as shell commands
+	//nolint:gosec // G204: capability system validates commands; no shell interpretation
 	cmd := exec.CommandContext(execCtx, request.Command, request.Args...)
 	if request.Dir != "" {
 		cmd.Dir = request.Dir

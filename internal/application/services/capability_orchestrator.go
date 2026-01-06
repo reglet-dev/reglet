@@ -116,7 +116,9 @@ func (o *CapabilityOrchestrator) CollectRequiredCapabilities(ctx context.Context
 			if err != nil {
 				return fmt.Errorf("failed to open plugin directory %s: %w", pluginDir, err)
 			}
-			defer rootDir.Close()
+			defer func() {
+				_ = rootDir.Close() // Best-effort cleanup
+			}()
 
 			// Read plugin file using sandboxed Root.ReadFile (Go 1.25+)
 			pluginSubpath := filepath.Join(name, name+".wasm")

@@ -10,6 +10,8 @@ import (
 )
 
 // ExecutionResult represents the complete result of executing a profile.
+//
+//nolint:revive // ST1003: Name is intentional - "Result" alone lacks context in imports
 type ExecutionResult struct {
 	ExecutionID    values.ExecutionID `json:"execution_id" yaml:"execution_id"`
 	Version        int                `json:"version" yaml:"version"` // For optimistic locking

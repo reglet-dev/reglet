@@ -18,8 +18,6 @@ import (
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/wasm/hostfuncs"
 )
 
-//nolint:gosec // G115: uint64->uint32 conversions are safe for WASM32 address space
-
 // Plugin manages the lifecycle and execution of a compiled WASM module.
 type Plugin struct {
 	name    string
@@ -175,7 +173,7 @@ func (p *Plugin) extractFilesystemMounts() []fsMount {
 // createModuleConfig builds the wazero module configuration with necessary host functions.
 // It enables filesystem access, time, random, and logging.
 // stdout/stderr are automatically redacted to prevent secret leakage to logs.
-func (p *Plugin) createModuleConfig(ctx context.Context) wazero.ModuleConfig {
+func (p *Plugin) createModuleConfig(_ context.Context) wazero.ModuleConfig {
 	// Build filesystem mounts from capabilities
 	mounts := p.extractFilesystemMounts()
 	fsConfig := wazero.NewFSConfig()
@@ -333,8 +331,8 @@ func (p *Plugin) Describe(ctx context.Context) (*PluginInfo, error) {
 	}
 
 	packed := results[0]
-	ptr := uint32(packed >> 32)
-	size := uint32(packed & 0xFFFFFFFF)
+	ptr := uint32(packed >> 32)         //nolint:gosec // G115: WASM32 pointers are always 32-bit
+	size := uint32(packed & 0xFFFFFFFF) //nolint:gosec // G115: WASM32 lengths are always 32-bit
 
 	if ptr == 0 || size == 0 {
 		return nil, fmt.Errorf("describe() returned null pointer or zero length")
@@ -392,8 +390,8 @@ func (p *Plugin) Schema(ctx context.Context) (*ConfigSchema, error) {
 	}
 
 	packed := results[0]
-	ptr := uint32(packed >> 32)
-	size := uint32(packed & 0xFFFFFFFF)
+	ptr := uint32(packed >> 32)         //nolint:gosec // G115: WASM32 pointers are always 32-bit
+	size := uint32(packed & 0xFFFFFFFF) //nolint:gosec // G115: WASM32 lengths are always 32-bit
 
 	if ptr == 0 || size == 0 {
 		return nil, fmt.Errorf("schema() returned null pointer or zero length")
@@ -459,7 +457,7 @@ func (p *Plugin) Observe(ctx context.Context, cfg Config) (*PluginObservationRes
 
 		deallocateFn := instance.ExportedFunction("deallocate")
 		if deallocateFn != nil {
-			//nolint:errcheck // Deallocation is best-effort cleanup
+			//nolint:errcheck,gosec // G104: Deallocation is best-effort cleanup
 			deallocateFn.Call(ctx, uint64(configPtr), uint64(len(configData)))
 		}
 	}()
@@ -476,8 +474,8 @@ func (p *Plugin) Observe(ctx context.Context, cfg Config) (*PluginObservationRes
 
 	// Unpack ptr and length from uint64
 	packed := results[0]
-	resultPtr := uint32(packed >> 32)
-	resultSize := uint32(packed & 0xFFFFFFFF)
+	resultPtr := uint32(packed >> 32)         //nolint:gosec // G115: WASM32 pointers are always 32-bit
+	resultSize := uint32(packed & 0xFFFFFFFF) //nolint:gosec // G115: WASM32 lengths are always 32-bit
 
 	if resultPtr == 0 || resultSize == 0 {
 		return nil, fmt.Errorf("observe() returned null pointer or zero length")
@@ -525,7 +523,7 @@ func (p *Plugin) readString(ctx context.Context, instance api.Module, ptr uint32
 
 		deallocateFn := instance.ExportedFunction("deallocate")
 		if deallocateFn != nil {
-			//nolint:errcheck // Deallocation is best-effort cleanup
+			//nolint:errcheck,gosec // G104: Deallocation is best-effort cleanup
 			deallocateFn.Call(ctx, uint64(ptr), uint64(size))
 		}
 	}()
@@ -562,7 +560,7 @@ func (p *Plugin) writeToMemory(ctx context.Context, instance api.Module, data []
 		return 0, fmt.Errorf("allocate() returned no results")
 	}
 
-	ptr := uint32(results[0])
+	ptr := uint32(results[0]) //nolint:gosec // G115: WASM32 pointers are always 32-bit
 	if ptr == 0 {
 		return 0, fmt.Errorf("allocate() returned null pointer")
 	}

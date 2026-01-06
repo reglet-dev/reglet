@@ -8,6 +8,7 @@ import (
 // FileExtractor extracts filesystem capabilities.
 type FileExtractor struct{}
 
+// Extract analyzes observation config and returns required filesystem capabilities.
 func (e *FileExtractor) Extract(config map[string]interface{}) []capabilities.Capability {
 	var caps []capabilities.Capability
 	if pathVal, ok := config["path"]; ok {
@@ -24,6 +25,7 @@ func (e *FileExtractor) Extract(config map[string]interface{}) []capabilities.Ca
 // CommandExtractor extracts execution capabilities.
 type CommandExtractor struct{}
 
+// Extract analyzes observation config and returns required execution capabilities.
 func (e *CommandExtractor) Extract(config map[string]interface{}) []capabilities.Capability {
 	var caps []capabilities.Capability
 	if cmdVal, ok := config["command"]; ok {
@@ -40,6 +42,7 @@ func (e *CommandExtractor) Extract(config map[string]interface{}) []capabilities
 // NetworkExtractor extracts network capabilities.
 type NetworkExtractor struct{}
 
+// Extract analyzes observation config and returns required network capabilities.
 func (e *NetworkExtractor) Extract(config map[string]interface{}) []capabilities.Capability {
 	var caps []capabilities.Capability
 

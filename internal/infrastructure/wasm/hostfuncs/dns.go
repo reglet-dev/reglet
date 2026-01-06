@@ -101,7 +101,7 @@ func performDNSLookup(ctx context.Context, hostname string, recordType string, n
 		// Use custom resolver
 		resolver = &net.Resolver{
 			PreferGo: true,
-			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+			Dial: func(ctx context.Context, _, _ string) (net.Conn, error) { // network/address unused: always UDP to nameserver
 				d := net.Dialer{
 					Timeout: 5 * time.Second, // Default timeout for connection
 				}

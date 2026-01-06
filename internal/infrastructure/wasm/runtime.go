@@ -69,7 +69,7 @@ func NewRuntimeWithCapabilities(
 	if memoryLimitMB > 0 {
 		// Convert MB to pages (1 page = 64KB)
 		// 1 MB = 1024 KB = 16 * 64KB
-		pages := uint32(memoryLimitMB * 16)
+		pages := uint32(memoryLimitMB * 16) //nolint:gosec // G115: memoryLimitMB is validated (max ~134M pages, well under uint32)
 		config = config.WithMemoryLimitPages(pages)
 	}
 

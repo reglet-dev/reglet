@@ -106,6 +106,7 @@ func (l *ConfigLoader) Load(path string) (*Config, error) {
 	}
 
 	// Read config file
+	//nolint:gosec // G304: path is user-provided config file, validated to exist above
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read system config: %w", err)

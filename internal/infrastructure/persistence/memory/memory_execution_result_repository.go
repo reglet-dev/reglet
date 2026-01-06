@@ -31,7 +31,7 @@ func NewExecutionResultRepository() *ExecutionResultRepository {
 }
 
 // Save persists an execution result.
-func (r *ExecutionResultRepository) Save(ctx context.Context, result *execution.ExecutionResult) error {
+func (r *ExecutionResultRepository) Save(_ context.Context, result *execution.ExecutionResult) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -43,7 +43,7 @@ func (r *ExecutionResultRepository) Save(ctx context.Context, result *execution.
 }
 
 // FindByID retrieves an execution result by its unique ID.
-func (r *ExecutionResultRepository) FindByID(ctx context.Context, id uuid.UUID) (*execution.ExecutionResult, error) {
+func (r *ExecutionResultRepository) FindByID(_ context.Context, id uuid.UUID) (*execution.ExecutionResult, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -55,7 +55,7 @@ func (r *ExecutionResultRepository) FindByID(ctx context.Context, id uuid.UUID) 
 }
 
 // FindByProfile retrieves recent execution results for a specific profile.
-func (r *ExecutionResultRepository) FindByProfile(ctx context.Context, profileName string, limit int) ([]*execution.ExecutionResult, error) {
+func (r *ExecutionResultRepository) FindByProfile(_ context.Context, profileName string, limit int) ([]*execution.ExecutionResult, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -79,7 +79,7 @@ func (r *ExecutionResultRepository) FindByProfile(ctx context.Context, profileNa
 }
 
 // FindBetween retrieves execution results for a profile within a time range.
-func (r *ExecutionResultRepository) FindBetween(ctx context.Context, profileName string, start, end time.Time) ([]*execution.ExecutionResult, error) {
+func (r *ExecutionResultRepository) FindBetween(_ context.Context, profileName string, start, end time.Time) ([]*execution.ExecutionResult, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 

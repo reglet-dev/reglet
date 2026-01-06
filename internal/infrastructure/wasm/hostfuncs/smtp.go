@@ -130,6 +130,12 @@ func performSMTPConnect(ctx context.Context, validatedIP, port string, useTLS bo
 	// This prevents DNS rebinding attacks
 	address := net.JoinHostPort(validatedIP, port)
 
+	// Create dialer with reasonable timeout (also respects context cancellation)
+	dialer := &net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}
+
 	response := &SMTPResponseWire{
 		Connected: false,
 		// Use original hostname in address field for user-friendliness
@@ -144,7 +150,12 @@ func performSMTPConnect(ctx context.Context, validatedIP, port string, useTLS bo
 			MinVersion: tls.VersionTLS12,
 		}
 
-		conn, err := tls.Dial("tcp", address, tlsConfig)
+		// Use context-aware dial via tls.Dialer
+		tlsDialer := &tls.Dialer{
+			NetDialer: dialer,
+			Config:    tlsConfig,
+		}
+		conn, err := tlsDialer.DialContext(ctx, "tcp", address)
 		if err != nil {
 			return nil, fmt.Errorf("TLS connection failed: %w", err)
 		}
@@ -161,8 +172,9 @@ func performSMTPConnect(ctx context.Context, validatedIP, port string, useTLS bo
 
 		banner := fmt.Sprintf("%d %s", code, msg)
 
-		// Get TLS connection state
-		state := conn.ConnectionState()
+		// Get TLS connection state - conn is *tls.Conn
+		tlsConn := conn.(*tls.Conn)
+		state := tlsConn.ConnectionState()
 
 		response.Connected = true
 		response.Banner = strings.TrimSpace(banner)
@@ -175,7 +187,7 @@ func performSMTPConnect(ctx context.Context, validatedIP, port string, useTLS bo
 	}
 
 	// Plain connection (possibly with STARTTLS)
-	conn, err := net.Dial("tcp", address)
+	conn, err := dialer.DialContext(ctx, "tcp", address)
 	if err != nil {
 		return nil, fmt.Errorf("connection failed: %w", err)
 	}

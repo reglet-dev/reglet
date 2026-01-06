@@ -49,7 +49,7 @@ func (c *ProfileCompiler) Compile(raw *entities.Profile) (*entities.ValidatedPro
 // This ensures the original raw profile remains unchanged.
 func (c *ProfileCompiler) deepCopy(original *entities.Profile) *entities.Profile {
 	// Copy top-level fields
-	copy := &entities.Profile{
+	profileCopy := &entities.Profile{
 		Metadata: original.Metadata, // ProfileMetadata is a value type (copied)
 		Plugins:  copyStringSlice(original.Plugins),
 		Vars:     copyVars(original.Vars),
@@ -59,7 +59,7 @@ func (c *ProfileCompiler) deepCopy(original *entities.Profile) *entities.Profile
 		},
 	}
 
-	return copy
+	return profileCopy
 }
 
 // applyDefaults propagates default values to all controls.

@@ -13,8 +13,6 @@ import (
 	"github.com/whiskeyjimbo/reglet/wireformat"
 )
 
-//nolint:gosec // G115: uint64->uint32 conversions are safe for WASM32 address space
-
 type (
 	// ContextWireFormat is a re-export of wireformat.ContextWireFormat
 	ContextWireFormat = wireformat.ContextWireFormat
@@ -115,13 +113,13 @@ func hostWriteResponse(ctx context.Context, mod api.Module, response interface{}
 		slog.ErrorContext(ctx, "hostfuncs: critical - failed to call guest allocate function", "error", err)
 		return 0 // Return 0, Host will likely panic or handle this
 	}
-	ptr := uint32(results[0])
+	ptr := uint32(results[0]) //nolint:gosec // G115: WASM32 pointers are always 32-bit
 
 	// Copy data to Guest memory
 	mod.Memory().Write(ptr, data)
 
 	// Return packed ptr+len
-	return packPtrLen(ptr, uint32(len(data)))
+	return packPtrLen(ptr, uint32(len(data))) //nolint:gosec // G115: WASM memory allocations are bounded to 4GB
 }
 
 // packPtrLen and unpackPtrLen are helper functions consistent with SDK ABI.
@@ -130,7 +128,7 @@ func packPtrLen(ptr, length uint32) uint64 {
 }
 
 func unpackPtrLen(packed uint64) (ptr, length uint32) {
-	ptr = uint32(packed >> 32)
-	length = uint32(packed)
+	ptr = uint32(packed >> 32) //nolint:gosec // G115: Packed format stores 32-bit values
+	length = uint32(packed)    //nolint:gosec // G115: Packed format stores 32-bit values
 	return ptr, length
 }

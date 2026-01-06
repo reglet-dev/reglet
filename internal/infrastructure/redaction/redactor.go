@@ -53,14 +53,10 @@ func New(cfg Config) (*Redactor, error) {
 
 	// Initialize gitleaks detector (unless disabled)
 	if !cfg.DisableGitleaks {
-		detector, err := newGitleaksDetector()
-		if err != nil {
-			// Log warning but don't fail - fall back to regex patterns
-			// In production, we might want to log this
-			// For now, just continue without gitleaks
-		} else {
+		if detector, err := newGitleaksDetector(); err == nil {
 			r.gitleaksDetector = detector
 		}
+		// If err != nil, fall back to regex patterns silently
 	}
 
 	// Compile built-in patterns (used as fallback or when gitleaks is disabled)
@@ -124,6 +120,7 @@ func (r *Redactor) ScrubString(input string) string {
 
 	// Phase 1: Use gitleaks detector if available (comprehensive detection)
 	if r.gitleaksDetector != nil {
+		//nolint:staticcheck // SA1019: detect.Fragment deprecated, will update when gitleaks v9 releases
 		fragment := detect.Fragment{
 			Raw: result,
 		}

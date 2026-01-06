@@ -71,6 +71,7 @@ func (s *FileStore) Load() (capabilities.Grant, error) {
 func (s *FileStore) Save(grants capabilities.Grant) error {
 	// Create directory if it doesn't exist
 	dir := filepath.Dir(s.configPath)
+	//nolint:gosec // G301: 0o755 is standard for user config directories (~/.reglet)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}

@@ -136,7 +136,7 @@ func (s *StatusAggregator) getOrCompileExpression(expression string, options []e
 //
 // Returns: Status and list of expectation results
 func (s *StatusAggregator) DetermineObservationStatus(
-	ctx context.Context,
+	_ context.Context,
 	evidence *execution.Evidence,
 	expects []string,
 ) (values.Status, []execution.ExpectationResult) {

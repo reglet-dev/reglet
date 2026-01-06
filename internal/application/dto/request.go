@@ -78,9 +78,6 @@ type CheckOptions struct {
 type RequestMetadata struct {
 	// RequestID uniquely identifies this request
 	RequestID string
-
-	// Tags for custom metadata (e.g., CI build ID, user)
-	Tags map[string]string
 }
 
 // LoadProfileRequest encapsulates inputs for loading a profile.

@@ -209,7 +209,7 @@ func matchesInterpreter(pattern string) bool {
 func extractInterpreterName(pattern string) string {
 	// Find first non-letter character
 	for i, ch := range pattern {
-		if !((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')) {
+		if (ch < 'a' || ch > 'z') && (ch < 'A' || ch > 'Z') {
 			return pattern[:i]
 		}
 	}

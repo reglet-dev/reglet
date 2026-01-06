@@ -98,7 +98,7 @@ func NewSystemConfigAdapter() *SystemConfigAdapter {
 }
 
 // LoadConfig loads system configuration from path.
-func (a *SystemConfigAdapter) LoadConfig(ctx context.Context, path string) (*system.Config, error) {
+func (a *SystemConfigAdapter) LoadConfig(_ context.Context, path string) (*system.Config, error) {
 	if path == "" {
 		// Load from default location
 		homeDir, err := os.UserHomeDir()
@@ -120,7 +120,7 @@ func NewPluginDirectoryAdapter() *PluginDirectoryAdapter {
 }
 
 // ResolvePluginDir determines the plugin directory.
-func (a *PluginDirectoryAdapter) ResolvePluginDir(ctx context.Context) (string, error) {
+func (a *PluginDirectoryAdapter) ResolvePluginDir(_ context.Context) (string, error) {
 	// Try current working directory first
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -184,7 +184,7 @@ func (a *EngineFactoryAdapter) CreateEngine(
 	pluginDir string,
 	filters dto.FilterOptions,
 	execution dto.ExecutionOptions,
-	skipSchemaValidation bool,
+	_ bool, // skipSchemaValidation - reserved for future schema validation feature
 ) (ports.ExecutionEngine, error) {
 	// Create capability manager that uses the granted capabilities
 	capMgr := &staticCapabilityManager{granted: grantedCaps}
@@ -252,17 +252,17 @@ type staticCapabilityManager struct {
 }
 
 func (m *staticCapabilityManager) CollectRequiredCapabilities(
-	ctx context.Context,
-	profile entities.ProfileReader,
-	runtime *wasm.Runtime,
-	pluginDir string,
+	_ context.Context,
+	_ entities.ProfileReader,
+	_ *wasm.Runtime,
+	_ string,
 ) (map[string][]capabilities.Capability, error) {
 	// Return the pre-granted capabilities
 	return m.granted, nil
 }
 
 func (m *staticCapabilityManager) GrantCapabilities(
-	required map[string][]capabilities.Capability,
+	_ map[string][]capabilities.Capability,
 ) (map[string][]capabilities.Capability, error) {
 	// Return what was already granted
 	return m.granted, nil

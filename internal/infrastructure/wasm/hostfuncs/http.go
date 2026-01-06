@@ -50,7 +50,7 @@ func (t *dnsPinningTransport) RoundTrip(req *http.Request) (*http.Response, erro
 	// Create a new transport with DNS pinned to validated IP
 	// Clone base transport settings to preserve configuration
 	pinnedTransport := t.base.Clone()
-	pinnedTransport.DialContext = func(dialCtx context.Context, network, addr string) (net.Conn, error) {
+	pinnedTransport.DialContext = func(dialCtx context.Context, network, _ string) (net.Conn, error) { // addr bypassed with validatedIP
 		// Ignore addr parameter and use validated IP
 		// This ensures connection goes to IP we validated, not a potentially rebinded DNS result
 		targetAddr := net.JoinHostPort(validatedIP, port)
@@ -64,7 +64,7 @@ func (t *dnsPinningTransport) RoundTrip(req *http.Request) (*http.Response, erro
 	// For HTTPS, preserve hostname for SNI and certificate validation
 	if req.URL.Scheme == "https" {
 		if pinnedTransport.TLSClientConfig == nil {
-			pinnedTransport.TLSClientConfig = &tls.Config{}
+			pinnedTransport.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12}
 		}
 		pinnedTransport.TLSClientConfig.ServerName = hostname
 	}
@@ -204,7 +204,7 @@ func HTTPRequest(ctx context.Context, mod api.Module, stack []uint64, checker *C
 
 	client := &http.Client{
 		Transport: dnsPinnedTransport,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		CheckRedirect: func(_ *http.Request, via []*http.Request) error {
 			// Allow up to 10 redirects (http.DefaultClient default)
 			// DNS validation happens in RoundTrip for each request
 			if len(via) >= 10 {
