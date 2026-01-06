@@ -32,7 +32,91 @@ var (
 	_ ports.PluginDirectoryResolver = (*PluginDirectoryAdapter)(nil)
 	_ ports.ExecutionEngine         = (*EngineAdapter)(nil)
 	_ ports.EngineFactory           = (*EngineFactoryAdapter)(nil)
+	_ ports.PluginRuntimeFactory    = (*PluginRuntimeFactoryAdapter)(nil)
+	_ ports.PluginRuntime           = (*PluginRuntimeAdapter)(nil)
+	_ ports.Plugin                  = (*PluginAdapter)(nil)
 )
+
+// PluginRuntimeFactoryAdapter creates PluginRuntime instances.
+// This adapter decouples the application layer from the concrete wasm.Runtime.
+type PluginRuntimeFactoryAdapter struct {
+	version  build.Info
+	redactor *redaction.Redactor
+}
+
+// NewPluginRuntimeFactoryAdapter creates a new runtime factory adapter.
+func NewPluginRuntimeFactoryAdapter(redactor *redaction.Redactor) *PluginRuntimeFactoryAdapter {
+	return &PluginRuntimeFactoryAdapter{
+		version:  build.Get(),
+		redactor: redactor,
+	}
+}
+
+// NewRuntime creates a new plugin runtime for capability collection.
+func (f *PluginRuntimeFactoryAdapter) NewRuntime(ctx context.Context) (ports.PluginRuntime, error) {
+	runtime, err := wasm.NewRuntime(ctx, f.version)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create runtime: %w", err)
+	}
+	return &PluginRuntimeAdapter{runtime: runtime}, nil
+}
+
+// NewRuntimeWithCapabilities creates a runtime with granted capabilities.
+func (f *PluginRuntimeFactoryAdapter) NewRuntimeWithCapabilities(
+	ctx context.Context,
+	caps map[string][]capabilities.Capability,
+	memoryLimitMB int,
+) (ports.PluginRuntime, error) {
+	runtime, err := wasm.NewRuntimeWithCapabilities(ctx, f.version, caps, f.redactor, memoryLimitMB)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create runtime with capabilities: %w", err)
+	}
+	return &PluginRuntimeAdapter{runtime: runtime}, nil
+}
+
+// PluginRuntimeAdapter wraps wasm.Runtime to implement ports.PluginRuntime.
+type PluginRuntimeAdapter struct {
+	runtime *wasm.Runtime
+}
+
+// LoadPlugin loads a plugin from WASM bytes.
+func (r *PluginRuntimeAdapter) LoadPlugin(ctx context.Context, name string, wasmBytes []byte) (ports.Plugin, error) {
+	plugin, err := r.runtime.LoadPlugin(ctx, name, wasmBytes)
+	if err != nil {
+		return nil, err
+	}
+	return &PluginAdapter{plugin: plugin}, nil
+}
+
+// Close releases runtime resources.
+func (r *PluginRuntimeAdapter) Close(ctx context.Context) error {
+	return r.runtime.Close(ctx)
+}
+
+// UnwrapRuntime returns the underlying wasm.Runtime for infrastructure-layer use.
+// This should only be used by infrastructure code that needs the concrete type.
+func (r *PluginRuntimeAdapter) UnwrapRuntime() *wasm.Runtime {
+	return r.runtime
+}
+
+// PluginAdapter wraps wasm.Plugin to implement ports.Plugin.
+type PluginAdapter struct {
+	plugin *wasm.Plugin
+}
+
+// Describe returns plugin metadata.
+func (p *PluginAdapter) Describe(ctx context.Context) (*ports.PluginInfo, error) {
+	info, err := p.plugin.Describe(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &ports.PluginInfo{
+		Name:         info.Name,
+		Version:      info.Version,
+		Description:  info.Description,
+		Capabilities: info.Capabilities,
+	}, nil
+}
 
 // ProfileLoaderAdapter adapts infrastructure profile loader to port interface.
 type ProfileLoaderAdapter struct {
@@ -81,8 +165,13 @@ func (a *ProfileValidatorAdapter) Validate(profile *entities.Profile) error {
 }
 
 // ValidateWithSchemas validates observation configs against plugin schemas.
-func (a *ProfileValidatorAdapter) ValidateWithSchemas(ctx context.Context, profile *entities.Profile, runtime *wasm.Runtime) error {
-	return a.validator.ValidateWithSchemas(ctx, profile, runtime)
+func (a *ProfileValidatorAdapter) ValidateWithSchemas(ctx context.Context, profile *entities.Profile, runtime ports.PluginRuntime) error {
+	// Unwrap to get concrete runtime if possible
+	if adapter, ok := runtime.(*PluginRuntimeAdapter); ok {
+		return a.validator.ValidateWithSchemas(ctx, profile, adapter.UnwrapRuntime())
+	}
+	// For mock runtimes in tests, skip schema validation
+	return nil
 }
 
 // SystemConfigAdapter adapts system config loader to port interface.

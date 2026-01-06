@@ -75,7 +75,7 @@ func TestPolicy_IsGranted_Network(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, policy.IsGranted(tt.requested, tt.grants))
+			assert.Equal(t, tt.expected, policy.IsGranted(tt.requested, tt.grants, ""))
 		})
 	}
 }
@@ -133,7 +133,7 @@ func TestPolicy_IsGranted_Filesystem(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, policy.IsGranted(tt.requested, tt.grants))
+			assert.Equal(t, tt.expected, policy.IsGranted(tt.requested, tt.grants, ""))
 		})
 	}
 }
@@ -175,7 +175,7 @@ func TestPolicy_IsGranted_Environment(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, policy.IsGranted(tt.requested, tt.grants))
+			assert.Equal(t, tt.expected, policy.IsGranted(tt.requested, tt.grants, ""))
 		})
 	}
 }
@@ -217,7 +217,7 @@ func TestPolicy_IsGranted_Exec(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, policy.IsGranted(tt.requested, tt.grants))
+			assert.Equal(t, tt.expected, policy.IsGranted(tt.requested, tt.grants, ""))
 		})
 	}
 }

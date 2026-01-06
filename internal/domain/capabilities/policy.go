@@ -3,7 +3,6 @@ package capabilities
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -21,7 +20,9 @@ func NewPolicy() *Policy {
 }
 
 // IsGranted checks if a specific capability (request) is covered by any of the granted capabilities.
-func (p *Policy) IsGranted(request Capability, granted []Capability) bool {
+// The cwd parameter must be provided for filesystem capability checks that involve relative paths.
+// Pass an empty string if filesystem checks are not needed or all paths are absolute.
+func (p *Policy) IsGranted(request Capability, granted []Capability, cwd string) bool {
 	for _, grant := range granted {
 		if grant.Kind != request.Kind {
 			continue
@@ -32,7 +33,7 @@ func (p *Policy) IsGranted(request Capability, granted []Capability) bool {
 		case "network":
 			matches = matchNetworkPattern(request.Pattern, grant.Pattern)
 		case "fs":
-			matches = matchFilesystemPattern(request.Pattern, grant.Pattern)
+			matches = matchFilesystemPattern(request.Pattern, grant.Pattern, cwd)
 		case "env":
 			matches = MatchEnvironmentPattern(request.Pattern, grant.Pattern)
 		case "exec":
@@ -146,7 +147,10 @@ func parsePort(s string) (int, error) {
 	return port, nil
 }
 
-func matchFilesystemPattern(requested, granted string) bool {
+// matchFilesystemPattern checks if a filesystem request matches a granted pattern.
+// The cwd parameter is used to resolve relative paths. If cwd is empty,
+// relative paths will fail to match (defaulting to a safe deny).
+func matchFilesystemPattern(requested, granted, cwd string) bool {
 	reqParts := strings.SplitN(requested, ":", 2)
 	grantParts := strings.SplitN(granted, ":", 2)
 
@@ -161,9 +165,8 @@ func matchFilesystemPattern(requested, granted string) bool {
 	grantPattern := grantParts[1]
 
 	if !filepath.IsAbs(reqPath) {
-		cwd, err := os.Getwd()
-		if err != nil {
-			return false
+		if cwd == "" {
+			return false // No cwd provided, cannot resolve relative path
 		}
 		reqPath = filepath.Join(cwd, reqPath)
 		reqPath = filepath.Clean(reqPath)
@@ -175,9 +178,8 @@ func matchFilesystemPattern(requested, granted string) bool {
 	}
 
 	if !filepath.IsAbs(grantPattern) && !strings.Contains(grantPattern, "**") {
-		cwd, err := os.Getwd()
-		if err != nil {
-			return false
+		if cwd == "" {
+			return false // No cwd provided, cannot resolve relative pattern
 		}
 		grantPattern = filepath.Join(cwd, grantPattern)
 		grantPattern = filepath.Clean(grantPattern)

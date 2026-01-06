@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,10 +12,47 @@ import (
 	domainServices "github.com/whiskeyjimbo/reglet/internal/domain/services"
 )
 
+// mockPluginRuntimeFactory is a test double for PluginRuntimeFactory.
+type mockPluginRuntimeFactory struct{}
+
+func (m *mockPluginRuntimeFactory) NewRuntime(_ context.Context) (ports.PluginRuntime, error) {
+	return &mockPluginRuntime{}, nil
+}
+
+func (m *mockPluginRuntimeFactory) NewRuntimeWithCapabilities(
+	_ context.Context,
+	_ map[string][]capabilities.Capability,
+	_ int,
+) (ports.PluginRuntime, error) {
+	return &mockPluginRuntime{}, nil
+}
+
+// mockPluginRuntime is a test double for PluginRuntime.
+type mockPluginRuntime struct{}
+
+func (m *mockPluginRuntime) LoadPlugin(_ context.Context, _ string, _ []byte) (ports.Plugin, error) {
+	return &mockPlugin{}, nil
+}
+
+func (m *mockPluginRuntime) Close(_ context.Context) error {
+	return nil
+}
+
+// mockPlugin is a test double for Plugin.
+type mockPlugin struct{}
+
+func (m *mockPlugin) Describe(_ context.Context) (*ports.PluginInfo, error) {
+	return &ports.PluginInfo{
+		Name:         "mock",
+		Version:      "1.0.0",
+		Capabilities: nil,
+	}, nil
+}
+
 // TestCapabilityOrchestrator_UsesAnalyzer verifies that the orchestrator
 // delegates capability extraction to the domain service.
 func TestCapabilityOrchestrator_UsesAnalyzer(t *testing.T) {
-	orchestrator := NewCapabilityOrchestrator("", false, capabilities.NewRegistry())
+	orchestrator := NewCapabilityOrchestrator("", false, capabilities.NewRegistry(), &mockPluginRuntimeFactory{})
 
 	// Verify analyzer is injected
 	require.NotNil(t, orchestrator.analyzer)
@@ -24,7 +62,7 @@ func TestCapabilityOrchestrator_UsesAnalyzer(t *testing.T) {
 // TestCapabilityOrchestrator_UsesGatekeeper verifies that the orchestrator
 // delegates granting to the gatekeeper.
 func TestCapabilityOrchestrator_UsesGatekeeper(t *testing.T) {
-	orchestrator := NewCapabilityOrchestrator("", false, capabilities.NewRegistry())
+	orchestrator := NewCapabilityOrchestrator("", false, capabilities.NewRegistry(), &mockPluginRuntimeFactory{})
 
 	// Verify gatekeeper is injected
 	require.NotNil(t, orchestrator.gatekeeper)
@@ -65,7 +103,7 @@ func TestCapabilityOrchestrator_WithMockGatekeeper(t *testing.T) {
 	mockGK.grantResult.Add(capabilities.Capability{Kind: "fs", Pattern: "read:/etc/passwd"})
 
 	// Create orchestrator with injected dependencies
-	orchestrator := NewCapabilityOrchestratorWithDeps(analyzer, mockGK, false)
+	orchestrator := NewCapabilityOrchestratorWithDeps(analyzer, mockGK, &mockPluginRuntimeFactory{}, false)
 
 	// Test GrantCapabilities delegates to the mock
 	required := map[string][]capabilities.Capability{
@@ -88,7 +126,7 @@ func TestCapabilityOrchestrator_ErrorPropagation(t *testing.T) {
 		grantError: assert.AnError, // Use testify's standard error
 	}
 
-	orchestrator := NewCapabilityOrchestratorWithDeps(analyzer, mockGK, false)
+	orchestrator := NewCapabilityOrchestratorWithDeps(analyzer, mockGK, &mockPluginRuntimeFactory{}, false)
 
 	required := map[string][]capabilities.Capability{
 		"file": {{Kind: "fs", Pattern: "read:/etc/passwd"}},
@@ -141,7 +179,7 @@ func TestCapabilityOrchestrator_TrustAllFlagPropagation(t *testing.T) {
 				grantResult: capabilities.NewGrant(),
 			}
 
-			orchestrator := NewCapabilityOrchestratorWithDeps(analyzer, mockGK, tt.orchestratorTrust)
+			orchestrator := NewCapabilityOrchestratorWithDeps(analyzer, mockGK, &mockPluginRuntimeFactory{}, tt.orchestratorTrust)
 
 			required := map[string][]capabilities.Capability{
 				"file": {{Kind: "fs", Pattern: "read:/etc/passwd"}},
@@ -180,7 +218,7 @@ func TestCapabilityOrchestrator_WithMockAnalyzer(t *testing.T) {
 	}
 	mockGK.grantResult.Add(capabilities.Capability{Kind: "fs", Pattern: "read:/etc/passwd"})
 
-	orchestrator := NewCapabilityOrchestratorWithDeps(mockAnalyzer, mockGK, false)
+	orchestrator := NewCapabilityOrchestratorWithDeps(mockAnalyzer, mockGK, &mockPluginRuntimeFactory{}, false)
 
 	// GrantCapabilities doesn't call the analyzer directly (it's called in CollectRequiredCapabilities)
 	// but we can verify the orchestrator was constructed with the mock

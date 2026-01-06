@@ -97,8 +97,23 @@ func New(opts Options) (*Container, error) {
 		}
 	}
 
-	// Create capability orchestrator
-	capOrchestrator := services.NewCapabilityOrchestratorWithSecurity(configPath, opts.TrustPlugins, securityLevel, capRegistry)
+	// Create plugin runtime factory (decouples application from wasm infrastructure)
+	runtimeFactory := adapters.NewPluginRuntimeFactoryAdapter(redactor)
+
+	// Create capability analyzer (domain service)
+	capAnalyzer := domainservices.NewCapabilityAnalyzer(capRegistry)
+
+	// Create capability gatekeeper (application service)
+	capGatekeeper := services.NewCapabilityGatekeeper(configPath, securityLevel)
+
+	// Create capability orchestrator with all dependencies injected
+	// This makes the full dependency graph visible at the composition root
+	capOrchestrator := services.NewCapabilityOrchestratorWithDeps(
+		capAnalyzer,
+		capGatekeeper,
+		runtimeFactory,
+		opts.TrustPlugins,
+	)
 
 	// Create domain services
 	profileCompiler := domainservices.NewProfileCompiler()

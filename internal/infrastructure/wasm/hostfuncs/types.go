@@ -4,6 +4,7 @@ package hostfuncs
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
 )
@@ -12,13 +13,17 @@ import (
 type CapabilityChecker struct {
 	policy              *capabilities.Policy
 	grantedCapabilities map[string][]capabilities.Capability
+	cwd                 string // Current working directory for resolving relative paths
 }
 
-// NewCapabilityChecker creates a new capability checker with the given capabilities
+// NewCapabilityChecker creates a new capability checker with the given capabilities.
+// The cwd is obtained at construction time to avoid side-effects during capability checks.
 func NewCapabilityChecker(caps map[string][]capabilities.Capability) *CapabilityChecker {
+	cwd, _ := os.Getwd() // Best effort - empty string will cause relative paths to fail safely
 	return &CapabilityChecker{
 		policy:              capabilities.NewPolicy(),
 		grantedCapabilities: caps,
+		cwd:                 cwd,
 	}
 }
 
@@ -30,7 +35,7 @@ func (c *CapabilityChecker) Check(pluginName, kind, pattern string) error {
 		return fmt.Errorf("no capabilities granted to plugin %s", pluginName)
 	}
 
-	if c.policy.IsGranted(requested, pluginGrants) {
+	if c.policy.IsGranted(requested, pluginGrants, c.cwd) {
 		return nil
 	}
 

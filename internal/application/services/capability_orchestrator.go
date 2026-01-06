@@ -14,8 +14,6 @@ import (
 	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
 	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
 	domainServices "github.com/whiskeyjimbo/reglet/internal/domain/services"
-	"github.com/whiskeyjimbo/reglet/internal/infrastructure/build"
-	"github.com/whiskeyjimbo/reglet/internal/infrastructure/wasm"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -26,23 +24,25 @@ import (
 type CapabilityOrchestrator struct {
 	analyzer       ports.CapabilityAnalyzer        // Domain service for extraction
 	gatekeeper     ports.CapabilityGatekeeperPort  // Application service for granting
+	runtimeFactory ports.PluginRuntimeFactory      // Factory for creating runtimes (injected)
 	trustAll       bool                            // Auto-grant all capabilities
 	capabilityInfo map[string]ports.CapabilityInfo // Metadata about requested capabilities
 }
 
 // NewCapabilityOrchestrator creates a capability orchestrator with default security level (standard).
 // configPath specifies the path to the system config file (e.g., ~/.reglet/config.yaml).
-func NewCapabilityOrchestrator(configPath string, trustAll bool, registry *capabilities.Registry) *CapabilityOrchestrator {
-	return NewCapabilityOrchestratorWithSecurity(configPath, trustAll, "standard", registry)
+func NewCapabilityOrchestrator(configPath string, trustAll bool, registry *capabilities.Registry, runtimeFactory ports.PluginRuntimeFactory) *CapabilityOrchestrator {
+	return NewCapabilityOrchestratorWithSecurity(configPath, trustAll, "standard", registry, runtimeFactory)
 }
 
 // NewCapabilityOrchestratorWithSecurity creates a capability orchestrator with specified security level.
 // configPath specifies the path to the system config file (e.g., ~/.reglet/config.yaml).
 // securityLevel can be: "strict", "standard", or "permissive"
-func NewCapabilityOrchestratorWithSecurity(configPath string, trustAll bool, securityLevel string, registry *capabilities.Registry) *CapabilityOrchestrator {
+func NewCapabilityOrchestratorWithSecurity(configPath string, trustAll bool, securityLevel string, registry *capabilities.Registry, runtimeFactory ports.PluginRuntimeFactory) *CapabilityOrchestrator {
 	return &CapabilityOrchestrator{
 		analyzer:       domainServices.NewCapabilityAnalyzer(registry),
 		gatekeeper:     NewCapabilityGatekeeper(configPath, securityLevel),
+		runtimeFactory: runtimeFactory,
 		trustAll:       trustAll,
 		capabilityInfo: make(map[string]ports.CapabilityInfo),
 	}
@@ -53,11 +53,13 @@ func NewCapabilityOrchestratorWithSecurity(configPath string, trustAll bool, sec
 func NewCapabilityOrchestratorWithDeps(
 	analyzer ports.CapabilityAnalyzer,
 	gatekeeper ports.CapabilityGatekeeperPort,
+	runtimeFactory ports.PluginRuntimeFactory,
 	trustAll bool,
 ) *CapabilityOrchestrator {
 	return &CapabilityOrchestrator{
 		analyzer:       analyzer,
 		gatekeeper:     gatekeeper,
+		runtimeFactory: runtimeFactory,
 		trustAll:       trustAll,
 		capabilityInfo: make(map[string]ports.CapabilityInfo),
 	}
@@ -65,9 +67,9 @@ func NewCapabilityOrchestratorWithDeps(
 
 // CollectCapabilities creates a temporary runtime and collects required capabilities.
 // Returns the required capabilities and the temporary runtime (caller must close it).
-func (o *CapabilityOrchestrator) CollectCapabilities(ctx context.Context, profile entities.ProfileReader, pluginDir string) (map[string][]capabilities.Capability, *wasm.Runtime, error) {
+func (o *CapabilityOrchestrator) CollectCapabilities(ctx context.Context, profile entities.ProfileReader, pluginDir string) (map[string][]capabilities.Capability, ports.PluginRuntime, error) {
 	// Create temporary runtime for capability collection
-	runtime, err := wasm.NewRuntime(ctx, build.Get())
+	runtime, err := o.runtimeFactory.NewRuntime(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create temporary runtime: %w", err)
 	}
@@ -85,7 +87,7 @@ func (o *CapabilityOrchestrator) CollectCapabilities(ctx context.Context, profil
 
 // CollectRequiredCapabilities loads plugins and identifies requirements.
 // It prioritizes specific capabilities extracted from profile configs over plugin metadata.
-func (o *CapabilityOrchestrator) CollectRequiredCapabilities(ctx context.Context, profile entities.ProfileReader, runtime *wasm.Runtime, pluginDir string) (map[string][]capabilities.Capability, error) {
+func (o *CapabilityOrchestrator) CollectRequiredCapabilities(ctx context.Context, profile entities.ProfileReader, runtime ports.PluginRuntime, pluginDir string) (map[string][]capabilities.Capability, error) {
 	// First, extract specific capabilities from profile observation configs using domain service
 	profileCaps := o.analyzer.ExtractCapabilities(profile)
 

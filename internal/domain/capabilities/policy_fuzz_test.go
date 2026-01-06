@@ -91,7 +91,7 @@ func FuzzFilesystemPatternMatching(f *testing.F) {
 		cap := Capability{Kind: "fs", Pattern: pattern}
 		requestCap := Capability{Kind: "fs", Pattern: "read:/etc/passwd"}
 
-		_ = matchFilesystemPattern(requestCap.Pattern, cap.Pattern)
+		_ = matchFilesystemPattern(requestCap.Pattern, cap.Pattern, "/tmp")
 	})
 }
 

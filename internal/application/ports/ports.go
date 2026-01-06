@@ -5,14 +5,55 @@ package ports
 
 import (
 	"context"
+	"io"
 
 	"github.com/whiskeyjimbo/reglet/internal/application/dto"
 	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
 	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
 	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/system"
-	"github.com/whiskeyjimbo/reglet/internal/infrastructure/wasm"
 )
+
+// PluginInfo contains metadata about a plugin.
+// This is the application-layer representation of plugin metadata.
+type PluginInfo struct {
+	Name         string
+	Version      string
+	Description  string
+	Capabilities []capabilities.Capability
+}
+
+// Plugin represents a loaded WASM plugin that can be inspected and executed.
+// This interface abstracts the concrete wasm.Plugin implementation.
+type Plugin interface {
+	// Describe returns plugin metadata including declared capabilities.
+	Describe(ctx context.Context) (*PluginInfo, error)
+}
+
+// PluginRuntime abstracts the WASM runtime for plugin loading and management.
+// This interface allows the application layer to work with plugins without
+// depending on concrete infrastructure types like wasm.Runtime.
+type PluginRuntime interface {
+	// LoadPlugin compiles and caches a plugin from WASM bytes.
+	LoadPlugin(ctx context.Context, name string, wasmBytes []byte) (Plugin, error)
+
+	// Close releases runtime resources.
+	Close(ctx context.Context) error
+}
+
+// PluginRuntimeFactory creates runtime instances.
+// This allows the application layer to create runtimes without importing infrastructure.
+type PluginRuntimeFactory interface {
+	// NewRuntime creates a new plugin runtime for capability collection.
+	NewRuntime(ctx context.Context) (PluginRuntime, error)
+
+	// NewRuntimeWithCapabilities creates a runtime with granted capabilities.
+	NewRuntimeWithCapabilities(
+		ctx context.Context,
+		caps map[string][]capabilities.Capability,
+		memoryLimitMB int,
+	) (PluginRuntime, error)
+}
 
 // ProfileLoader loads profiles from storage.
 type ProfileLoader interface {
@@ -22,7 +63,7 @@ type ProfileLoader interface {
 // ProfileValidator validates profile structure and schemas.
 type ProfileValidator interface {
 	Validate(profile *entities.Profile) error
-	ValidateWithSchemas(ctx context.Context, profile *entities.Profile, runtime *wasm.Runtime) error
+	ValidateWithSchemas(ctx context.Context, profile *entities.Profile, runtime PluginRuntime) error
 }
 
 // SystemConfigProvider loads system configuration.
@@ -37,7 +78,7 @@ type PluginDirectoryResolver interface {
 
 // CapabilityCollector collects required capabilities from plugins.
 type CapabilityCollector interface {
-	CollectRequiredCapabilities(ctx context.Context, profile entities.ProfileReader, runtime *wasm.Runtime, pluginDir string) (map[string][]capabilities.Capability, error)
+	CollectRequiredCapabilities(ctx context.Context, profile entities.ProfileReader, runtime PluginRuntime, pluginDir string) (map[string][]capabilities.Capability, error)
 }
 
 // CapabilityAnalyzer extracts specific capability requirements from profiles.
@@ -80,4 +121,9 @@ type OutputFormatter interface {
 // OutputWriter writes formatted output to destination.
 type OutputWriter interface {
 	Write(ctx context.Context, data []byte, dest string) error
+}
+
+// Closer is a common interface for resources that need cleanup.
+type Closer interface {
+	io.Closer
 }
