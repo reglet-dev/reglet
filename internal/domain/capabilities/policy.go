@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -97,27 +98,52 @@ func matchNetworkPattern(requested, granted string) bool {
 	return false
 }
 
+// matchPortRange checks if a port falls within a port range (e.g., "80-443").
+// Uses strict parsing - rejects malformed input like "80abc" or " 80".
 func matchPortRange(port, portRange string) bool {
+	// Parse port range "start-end"
 	rangeParts := strings.SplitN(portRange, "-", 2)
 	if len(rangeParts) != 2 {
 		return false
 	}
-	reqPortNum := 0
-	if _, err := fmt.Sscanf(port, "%d", &reqPortNum); err != nil {
+
+	// Parse requested port (must be pure numeric)
+	reqPort, err := parsePort(port)
+	if err != nil {
 		return false
 	}
-	startPort := 0
-	if _, err := fmt.Sscanf(strings.TrimSpace(rangeParts[0]), "%d", &startPort); err != nil {
+
+	// Parse range bounds (allow whitespace around parts for flexibility)
+	startPort, err := parsePort(strings.TrimSpace(rangeParts[0]))
+	if err != nil {
 		return false
 	}
-	endPort := 0
-	if _, err := fmt.Sscanf(strings.TrimSpace(rangeParts[1]), "%d", &endPort); err != nil {
+
+	endPort, err := parsePort(strings.TrimSpace(rangeParts[1]))
+	if err != nil {
 		return false
 	}
-	if reqPortNum < 1 || reqPortNum > 65535 || startPort < 1 || startPort > 65535 || endPort < 1 || endPort > 65535 || startPort > endPort {
+
+	// Validate range semantics
+	if startPort > endPort {
 		return false
 	}
-	return reqPortNum >= startPort && reqPortNum <= endPort
+
+	return reqPort >= startPort && reqPort <= endPort
+}
+
+// parsePort parses a port string and validates it's in the valid TCP/UDP range (1-65535).
+// Rejects non-numeric input like "80abc" that fmt.Sscanf would partially parse.
+func parsePort(s string) (int, error) {
+	// strconv.Atoi is strict - "80abc" returns error, unlike fmt.Sscanf
+	port, err := strconv.Atoi(s)
+	if err != nil {
+		return 0, err
+	}
+	if port < 1 || port > 65535 {
+		return 0, fmt.Errorf("port %d out of valid range 1-65535", port)
+	}
+	return port, nil
 }
 
 func matchFilesystemPattern(requested, granted string) bool {
