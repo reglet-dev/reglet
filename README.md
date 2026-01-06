@@ -115,23 +115,23 @@ Reglet is in active development. Core features work, but expect breaking changes
 ### Roadmap
 
 **v0.2.0-alpha** (Current)
-- ✅ Core execution engine with parallel execution
-- ✅ Plugins: File, HTTP, DNS, TCP, Command, SMTP
-- ✅ Capability system with profile-based discovery
-- ✅ Configurable security levels (strict/standard/permissive)
-- ✅ Automatic secret redaction
-- ✅ Output formatters (Table, JSON, YAML, JUnit, SARIF)
+- [x] Core execution engine with parallel execution
+- [x] Plugins: File, HTTP, DNS, TCP, Command, SMTP
+- [x] Capability system with profile-based discovery
+- [x] Configurable security levels (strict/standard/permissive)
+- [x] Automatic secret redaction
+- [x] Output formatters (Table, JSON, YAML, JUnit, SARIF)
 
 **v0.3.0-alpha**
-- Profile inheritance
-- OSCAL output
-- Binary releases for Linux/macOS/Windows
+- [ ] Profile inheritance
+- [ ] OSCAL output
+- [ ] Binary releases for Linux/macOS/Windows
 
 **v1.0**
-- Cloud provider plugins (AWS, GCP, Azure)
-- Compliance packs (SOC2, ISO27001, FedRAMP)
-- CI/CD integrations (GitHub Actions, GitLab CI)
-- Plugin SDK documentation
+- [ ] Cloud provider plugins (AWS, GCP, Azure)
+- [ ] Compliance packs (SOC2, ISO27001, FedRAMP)
+- [ ] CI/CD integrations (GitHub Actions, GitLab CI)
+- [ ] Plugin SDK documentation
 
 ## Community
 
