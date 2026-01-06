@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"os"
 
+	"log/slog"
+
 	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
 	infraCapabilities "github.com/whiskeyjimbo/reglet/internal/infrastructure/capabilities"
-	"log/slog"
 )
 
 // CapabilityGatekeeper handles capability granting decisions, user interaction, and persistence.
