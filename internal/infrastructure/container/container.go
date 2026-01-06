@@ -4,6 +4,8 @@ package container
 import (
 	"context"
 	"log/slog"
+	"os"
+	"path/filepath"
 
 	"github.com/whiskeyjimbo/reglet/internal/application/ports"
 	"github.com/whiskeyjimbo/reglet/internal/application/services"
@@ -85,8 +87,18 @@ func New(opts Options) (*Container, error) {
 	capRegistry := capabilities.NewRegistry()
 	plugins.RegisterDefaultExtractors(capRegistry)
 
+	// Resolve config path for capability orchestrator
+	// This follows 12-Factor App principles by passing config from cmd layer
+	configPath := opts.SystemConfigPath
+	if configPath == "" {
+		homeDir, err := os.UserHomeDir()
+		if err == nil {
+			configPath = filepath.Join(homeDir, ".reglet", "config.yaml")
+		}
+	}
+
 	// Create capability orchestrator
-	capOrchestrator := services.NewCapabilityOrchestratorWithSecurity(opts.TrustPlugins, securityLevel, capRegistry)
+	capOrchestrator := services.NewCapabilityOrchestratorWithSecurity(configPath, opts.TrustPlugins, securityLevel, capRegistry)
 
 	// Create domain services
 	profileCompiler := domainservices.NewProfileCompiler()

@@ -79,10 +79,12 @@ Filtering:
 // runCheckAction encapsulates the logic for the check command.
 func runCheckAction(ctx context.Context, profilePath string, opts *CheckOptions) error {
 	// 1. Create dependency injection container
+	// cfgFile comes from the global --config flag in root.go
 	c, err := container.New(container.Options{
-		TrustPlugins:  opts.trustPlugins,
-		SecurityLevel: opts.securityLevel,
-		Logger:        slog.Default(),
+		TrustPlugins:     opts.trustPlugins,
+		SecurityLevel:    opts.securityLevel,
+		SystemConfigPath: cfgFile, // Pass config path from CLI flag
+		Logger:           slog.Default(),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to initialize application: %w", err)
