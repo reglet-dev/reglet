@@ -73,7 +73,7 @@ redaction:
 
 **Output:**
 ```
-[sha256:a1b2c3d4]
+[hmac:a1b2c3d4e5f6g7h8]
 ```
 
 **Salting:**

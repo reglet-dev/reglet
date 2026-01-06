@@ -1,6 +1,6 @@
 # Net Package
 
-The `net` package provides network operations for Reglet WASM plugins, including DNS resolution, HTTP requests, and TCP connections. All network operations are routed through the host via WASM host functions.
+The `net` package provides network operations for Reglet WASM plugins, including DNS resolution, HTTP requests, TCP connections, and SMTP checks. All network operations are routed through the host via WASM host functions.
 
 ## Overview
 
@@ -20,6 +20,7 @@ This package wraps the host's network functionality, allowing plugins to perform
 - [DNS Resolution](#dns-resolution)
 - [HTTP Requests](#http-requests)
 - [TCP Connections](#tcp-connections)
+- [SMTP Connections](#smtp-connections)
 - [Wire Format](#wire-format)
 - [Context Propagation](#context-propagation)
 - [Common Patterns](#common-patterns)
@@ -312,20 +313,20 @@ import (
     "context"
 
     "github.com/whiskeyjimbo/reglet/sdk"
-    "github.com/whiskeyjimbo/reglet/sdk/net"
+    sdknet "github.com/whiskeyjimbo/reglet/sdk/net"
 )
 
 func (p *TCPPlugin) Check(ctx context.Context, config sdk.Config) (sdk.Evidence, error) {
-    // Connect to TCP service
-    conn, err := net.DialTCP(ctx, "tcp", "example.com:443")
+    // DialTCP(ctx, host, port, timeoutMs, useTLS)
+    conn, err := sdknet.DialTCP(ctx, "example.com", "443", 5000, true)
     if err != nil {
         return sdk.Failure("tcp", err.Error()), nil
     }
 
     return sdk.Success(map[string]interface{}{
-        "host":      "example.com:443",
-        "connected": true,
-        "duration":  conn.Duration,
+        "host":        conn.Address,
+        "connected":   conn.Connected,
+        "response_ms": conn.ResponseTimeMs,
     }), nil
 }
 ```
@@ -333,50 +334,148 @@ func (p *TCPPlugin) Check(ctx context.Context, config sdk.Config) (sdk.Evidence,
 ### DialTCP API
 
 ```go
-func DialTCP(ctx context.Context, network, address string) (*TCPConnection, error)
+func DialTCP(ctx context.Context, host, port string, timeoutMs int, useTLS bool) (*TCPConnectResult, error)
 ```
 
 **Parameters:**
-- `network`: "tcp", "tcp4", or "tcp6"
-- `address`: "host:port" format
+- `host`: Target hostname or IP address
+- `port`: Target port (e.g., "443", "80")
+- `timeoutMs`: Connection timeout in milliseconds
+- `useTLS`: Whether to establish TLS connection
 
 **Returns:**
-- `TCPConnection`: Connection metadata
+- `TCPConnectResult`: Connection metadata
 - `error`: Connection error if failed
 
-### TCPConnection
+### TCPConnectResult
 
 ```go
-type TCPConnection struct {
-    RemoteAddr string        // Remote address (host:port)
-    LocalAddr  string        // Local address
-    Duration   time.Duration // Connection establishment time
-    TLS        bool          // Whether TLS is enabled
-    TLSVersion string        // TLS version (if TLS enabled)
+type TCPConnectResult struct {
+    Connected       bool       // Whether connection succeeded
+    Address         string     // Target address (host:port)
+    RemoteAddr      string     // Remote address 
+    LocalAddr       string     // Local address
+    ResponseTimeMs  int64      // Connection establishment time in ms
+    TLS             bool       // Whether TLS is enabled
+    TLSVersion      string     // TLS version (e.g., "TLS 1.3")
+    TLSCipherSuite  string     // TLS cipher suite used
+    TLSServerName   string     // TLS server name (SNI)
+    TLSCertSubject  string     // TLS certificate subject
+    TLSCertIssuer   string     // TLS certificate issuer
+    TLSCertNotAfter *time.Time // TLS certificate expiry
 }
 ```
 
 ### TLS Connections
 
 ```go
-// TLS connection (requires TLS on target port)
-conn, err := net.DialTCP(ctx, "tcp", "example.com:443")
+// TLS connection with certificate info
+conn, err := sdknet.DialTCP(ctx, "example.com", "443", 5000, true)
 if err != nil {
     return sdk.Failure("tcp", err.Error()), nil
 }
 
 return sdk.Success(map[string]interface{}{
-    "tls_enabled": conn.TLS,
-    "tls_version": conn.TLSVersion,
+    "tls_enabled":   conn.TLS,
+    "tls_version":   conn.TLSVersion,
+    "cert_subject":  conn.TLSCertSubject,
+    "cert_expires":  conn.TLSCertNotAfter,
 }), nil
 ```
 
 ### TCP Best Practices
 
-1. **Use Timeouts**: Always use context with timeout
+1. **Use Timeouts**: Set appropriate timeoutMs for your use case
 2. **Handle Connection Failures**: Network issues are common
-3. **Check Ports**: Verify target ports are reachable
-4. **TLS Validation**: Check TLS status for secure connections
+3. **Check TLS Fields**: Use useTLS=true for secure connections and inspect cert info
+4. **Validate Certificates**: Check TLSCertNotAfter for expiring certificates
+
+---
+
+## SMTP Connections
+
+### Basic Usage
+
+```go
+import (
+    "context"
+
+    "github.com/whiskeyjimbo/reglet/sdk"
+    sdknet "github.com/whiskeyjimbo/reglet/sdk/net"
+)
+
+func (p *SMTPPlugin) Check(ctx context.Context, config sdk.Config) (sdk.Evidence, error) {
+    // DialSMTP(ctx, host, port, timeoutMs, useTLS, useStartTLS)
+    result, err := sdknet.DialSMTP(ctx, "mail.example.com", "587", 5000, false, true)
+    if err != nil {
+        return sdk.Failure("smtp", err.Error()), nil
+    }
+
+    return sdk.Success(map[string]interface{}{
+        "connected":   result.Connected,
+        "banner":      result.Banner,
+        "tls_enabled": result.TLS,
+    }), nil
+}
+```
+
+### DialSMTP API
+
+```go
+func DialSMTP(ctx context.Context, host, port string, timeoutMs int, useTLS bool, useStartTLS bool) (*SMTPConnectResult, error)
+```
+
+**Parameters:**
+- `host`: SMTP server hostname
+- `port`: SMTP port (e.g., "25", "465", "587")
+- `timeoutMs`: Connection timeout in milliseconds
+- `useTLS`: Whether to use implicit TLS (port 465)
+- `useStartTLS`: Whether to upgrade via STARTTLS (port 587)
+
+**Returns:**
+- `SMTPConnectResult`: Connection metadata
+- `error`: Connection error if failed
+
+### SMTPConnectResult
+
+```go
+type SMTPConnectResult struct {
+    Connected      bool   // Whether connection succeeded
+    Address        string // Server address
+    Banner         string // SMTP banner message
+    ResponseTimeMs int64  // Connection time in ms
+    TLS            bool   // Whether TLS is enabled
+    TLSVersion     string // TLS version (e.g., "TLS 1.3")
+    TLSCipherSuite string // TLS cipher suite used
+    TLSServerName  string // TLS server name (SNI)
+}
+```
+
+### Common Port Configurations
+
+| Port | Protocol | useTLS | useStartTLS |
+|------|----------|--------|-------------|
+| 25   | Plain SMTP | `false` | `false` |
+| 465  | SMTPS (implicit TLS) | `true` | `false` |
+| 587  | Submission (STARTTLS) | `false` | `true` |
+
+### Example: Email Server Validation
+
+```go
+// Check if SMTP server supports STARTTLS
+result, err := sdknet.DialSMTP(ctx, "smtp.example.com", "587", 5000, false, true)
+if err != nil {
+    return sdk.Failure("smtp", err.Error()), nil
+}
+
+return sdk.Success(map[string]interface{}{
+    "server":       result.Address,
+    "banner":       result.Banner,
+    "starttls":     result.TLS,
+    "tls_version":  result.TLSVersion,
+    "response_ms":  result.ResponseTimeMs,
+}), nil
+```
 
 ---
 
@@ -603,5 +702,4 @@ resp, err := client.Get("https://example.com")
 ## See Also
 
 - [Main SDK Documentation](../README.md)
-- [Context Package](../internal/context/README.md)
-- [Plugin Development Guide](../../docs/plugin-development.md)
+- [Plugin Development Guide](../../../docs/plugin-development.md)

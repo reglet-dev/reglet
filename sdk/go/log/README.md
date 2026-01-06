@@ -351,4 +351,3 @@ defer func() {
 
 - [Go slog Documentation](https://pkg.go.dev/log/slog)
 - [Main SDK Documentation](../README.md)
-- [Context Package](../internal/context/README.md)

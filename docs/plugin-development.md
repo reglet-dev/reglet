@@ -186,7 +186,7 @@ func observe(configPtr uint32, configLen uint32) uint32 {
 make build
 
 # Test loading in integration tests
-# See internal/wasm/plugin_integration_test.go for examples
+# See internal/infrastructure/wasm/plugin_integration_test.go for examples
 ```
 
 ## Memory Management Pattern
@@ -286,7 +286,7 @@ Plugin logic can be unit tested as normal Go code before compilation to WASM.
 
 ### Integration Testing
 
-Add tests to `internal/wasm/plugin_integration_test.go`:
+Add tests to `internal/infrastructure/wasm/plugin_integration_test.go`:
 
 ```go
 func Test_MyPlugin_Success(t *testing.T) {
@@ -421,23 +421,24 @@ return successResponse(map[string]interface{}{
 
 ## Network Operations
 
-**IMPORTANT**: WASI Preview 1 does not support network sockets. Network operations (DNS, HTTP, TCP, SMTP) require host functions.
+**IMPORTANT**: WASI Preview 1 does not support network sockets directly. Network operations use **host functions** provided by Reglet.
 
-See `docs/wasi-network-limitation.md` for details.
+### Available Host Functions
 
-### Current Status
+| Plugin | Host Function | Status |
+|:-------|:--------------|:-------|
+| **dns** | `dns_resolve` | ✅ Complete |
+| **http** | `http_request` | ✅ Complete |
+| **tcp** | `tcp_connect` | ✅ Complete |
+| **smtp** | `smtp_connect` | ✅ Complete |
 
-- Network plugins can be implemented and will compile successfully
-- Schema and describe functions work correctly
-- **Actual network operations fail** with "Connection reset by peer" errors
-- Host functions for network access planned for Phase 2C
+### How It Works
 
-### Workaround
+1. Plugin calls the host function (e.g., `dns_resolve`)
+2. Host performs the network operation with capability checking
+3. Results are marshaled back to the plugin via shared memory
 
-For now, network plugins:
-- ✅ Implement full logic using Go's `net` and `net/http` packages
-- ✅ Test schema, describe, and config validation
-- ⏸️  Skip actual network operation tests with `t.Skip("WASI Preview 1 does not support network sockets")`
+See existing network plugins (`plugins/dns/`, `plugins/http/`, `plugins/tcp/`, `plugins/smtp/`) for implementation examples.
 
 ## Platform Considerations
 
@@ -466,5 +467,5 @@ Network plugins (http, tcp, dns) work on all platforms.
 
 - **File Plugin**: `plugins/file/main.go` - Reference implementation
 - **Memory Guide**: `docs/plugin-memory-management.md` - Deep dive on memory
-- **Integration Tests**: `internal/wasm/plugin_integration_test.go` - Test patterns
-- **Host Interface**: `internal/wasm/plugin.go` - How host calls plugins
+- **Integration Tests**: `internal/infrastructure/wasm/plugin_integration_test.go` - Test patterns
+- **Host Interface**: `internal/infrastructure/wasm/plugin.go` - How host calls plugins

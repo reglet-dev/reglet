@@ -387,5 +387,4 @@ func allocate(size uint32) uint32 {
 ## See Also
 
 - [Main SDK Documentation](../../README.md)
-- [Plugin Development Guide](../../../docs/plugin-development.md)
-- [Wire Format Protocol](../../../wireformat/README.md)
+- [Plugin Development Guide](../../../../docs/plugin-development.md)

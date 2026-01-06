@@ -142,7 +142,7 @@ func main() {
 }
 ```
 
-### In the Host (`internal/wasm/plugin.go`)
+### In the Host (`internal/infrastructure/wasm/plugin.go`)
 
 The host must:
 1. Call `allocate()` to get memory for writing data to the plugin
@@ -417,7 +417,7 @@ resultData, _ := p.readString(instance, resultPtr)
 ## References
 
 - [File Plugin Implementation](../plugins/file/main.go) - Reference implementation
-- [Host Plugin Wrapper](../internal/wasm/plugin.go) - Host-side memory management
+- [Host Plugin Wrapper](../internal/infrastructure/wasm/plugin.go) - Host-side memory management
 - [wazero Documentation](https://wazero.io/) - WASM runtime details
 - [WASI Filesystem](https://wazero.io/languages/go/#wasi) - Filesystem configuration
 

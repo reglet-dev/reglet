@@ -30,7 +30,7 @@ type MyPlugin struct{}
 
 func (p *MyPlugin) Check(ctx context.Context, config sdk.Config) (sdk.Evidence, error) {
     // Simple command execution
-    req := exec.Request{
+    req := exec.CommandRequest{
         Command: "ls",
         Args:    []string{"-la", "/tmp"},
     }
@@ -41,10 +41,10 @@ func (p *MyPlugin) Check(ctx context.Context, config sdk.Config) (sdk.Evidence, 
     }
 
     return sdk.Success(map[string]interface{}{
-        "stdout":    result.Stdout,
-        "stderr":    result.Stderr,
-        "exit_code": result.ExitCode,
-        "duration":  result.Duration,
+        "stdout":      result.Stdout,
+        "stderr":      result.Stderr,
+        "exit_code":   result.ExitCode,
+        "duration_ms": result.DurationMs,
     }), nil
 }
 ```
@@ -54,12 +54,9 @@ func (p *MyPlugin) Check(ctx context.Context, config sdk.Config) (sdk.Evidence, 
 ### Environment Variables
 
 ```go
-req := exec.Request{
+req := exec.CommandRequest{
     Command: "env",
-    Env: map[string]string{
-        "MY_VAR":    "value",
-        "PATH":      "/usr/local/bin:/usr/bin:/bin",
-    },
+    Env:     []string{"MY_VAR=value", "PATH=/usr/local/bin:/usr/bin:/bin"},
 }
 
 result, err := exec.Run(ctx, req)
@@ -68,7 +65,7 @@ result, err := exec.Run(ctx, req)
 ### Working Directory
 
 ```go
-req := exec.Request{
+req := exec.CommandRequest{
     Command: "pwd",
     Dir:     "/var/log",  // Run command in specific directory
 }
@@ -85,21 +82,25 @@ Use Go's context to enforce timeouts:
 ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 defer cancel()
 
-req := exec.Request{
+req := exec.CommandRequest{
     Command: "sleep",
     Args:    []string{"10"},
+    Timeout: 5, // Also set timeout in request
 }
 
 result, err := exec.Run(ctx, req)
 if err != nil {
     // err will be timeout error if command exceeds 5 seconds
 }
+if result != nil && result.IsTimeout {
+    // Command timed out
+}
 ```
 
 ### Exit Code Handling
 
 ```go
-req := exec.Request{
+req := exec.CommandRequest{
     Command: "grep",
     Args:    []string{"pattern", "file.txt"},
 }
@@ -125,25 +126,27 @@ return sdk.Success(map[string]interface{}{
 
 ## API Reference
 
-### Request
+### CommandRequest
 
 ```go
-type Request struct {
-    Command string            // Command to execute (required)
-    Args    []string          // Command arguments (optional)
-    Dir     string            // Working directory (optional, defaults to host's choice)
-    Env     map[string]string // Environment variables (optional)
+type CommandRequest struct {
+    Command string   // Command to execute (required)
+    Args    []string // Command arguments (optional)
+    Dir     string   // Working directory (optional, defaults to host's choice)
+    Env     []string // Environment variables as "KEY=VALUE" pairs (optional)
+    Timeout int      // Timeout in seconds (optional)
 }
 ```
 
-### Response
+### CommandResponse
 
 ```go
-type Response struct {
-    Stdout   string        // Standard output from command
-    Stderr   string        // Standard error from command
-    ExitCode int           // Exit code (0 = success)
-    Duration time.Duration // How long the command took to execute
+type CommandResponse struct {
+    Stdout     string // Standard output from command
+    Stderr     string // Standard error from command
+    ExitCode   int    // Exit code (0 = success)
+    DurationMs int64  // How long the command took to execute in milliseconds
+    IsTimeout  bool   // True if command timed out
 }
 ```
 
@@ -152,7 +155,7 @@ type Response struct {
 #### Run
 
 ```go
-func Run(ctx context.Context, req Request) (*Response, error)
+func Run(ctx context.Context, req CommandRequest) (*CommandResponse, error)
 ```
 
 Executes a command on the host system. Returns the command output and metadata, or an error if the command cannot be executed.
@@ -167,7 +170,7 @@ Executes a command on the host system. Returns the command output and metadata, 
 ### Checking Service Status
 
 ```go
-req := exec.Request{
+req := exec.CommandRequest{
     Command: "systemctl",
     Args:    []string{"is-active", "nginx"},
 }
@@ -188,7 +191,7 @@ return sdk.Success(map[string]interface{}{
 ### File Validation
 
 ```go
-req := exec.Request{
+req := exec.CommandRequest{
     Command: "test",
     Args:    []string{"-f", "/etc/passwd"},
 }
@@ -204,7 +207,7 @@ fileExists := result.ExitCode == 0
 ### Parsing Command Output
 
 ```go
-req := exec.Request{
+req := exec.CommandRequest{
     Command: "df",
     Args:    []string{"-h", "/"},
 }
@@ -277,5 +280,4 @@ The exec package fully supports Go context propagation:
 ## See Also
 
 - [Main SDK Documentation](../README.md)
-- [Plugin Development Guide](../../docs/plugin-development.md)
-- [Capability System](../../docs/capabilities.md)
+- [Plugin Development Guide](../../../docs/plugin-development.md)

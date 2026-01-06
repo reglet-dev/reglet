@@ -7,6 +7,10 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
+// validate is a package-level singleton for better performance.
+// Creating a new validator on each call is expensive; reusing is recommended.
+var validate = validator.New()
+
 // ValidateConfig validates a Config map against a struct with validation tags.
 // It first marshals the map to JSON, then unmarshals it into the target struct,
 // and finally runs the validator on the struct.
@@ -23,7 +27,6 @@ func ValidateConfig(config Config, targetStruct interface{}) error {
 	}
 
 	// 3. Validate the struct using go-playground/validator
-	validate := validator.New()
 	if err := validate.Struct(targetStruct); err != nil {
 		return fmt.Errorf("config validation failed: %w", err)
 	}

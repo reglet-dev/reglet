@@ -244,16 +244,17 @@ See [net/README.md](net/README.md) for full HTTP API documentation.
 ```go
 import sdknet "github.com/whiskeyjimbo/reglet/sdk/net"
 
-conn, err := sdknet.DialTCP(ctx, "tcp", "example.com:443")
+// DialTCP(ctx, host, port, timeoutMs, useTLS)
+conn, err := sdknet.DialTCP(ctx, "example.com", "443", 5000, true)
 if err != nil {
     return sdk.Failure("tcp", err.Error()), nil
 }
 
 return sdk.Success(map[string]interface{}{
-    "connected":   true,
-    "tls":         conn.TLS,
-    "tls_version": conn.TLSVersion,
-    "duration_ms": conn.Duration.Milliseconds(),
+    "connected":      conn.Connected,
+    "tls":            conn.TLS,
+    "tls_version":    conn.TLSVersion,
+    "response_ms":    conn.ResponseTimeMs,
 }), nil
 ```
 
@@ -266,7 +267,7 @@ Execute host commands via sandboxed interface:
 ```go
 import "github.com/whiskeyjimbo/reglet/sdk/exec"
 
-req := exec.Request{
+req := exec.CommandRequest{
     Command: "systemctl",
     Args:    []string{"is-active", "nginx"},
 }
@@ -589,15 +590,32 @@ resp, err := client.Get("https://example.com")
 - Optimize slow operations
 - Use concurrent requests (via goroutines)
 
+## Config Helpers
+
+The SDK provides safe config extraction functions to prevent panics from direct type assertions:
+
+```go
+// Required fields - returns error if missing
+hostname, err := sdk.MustGetString(config, "hostname")
+port, err := sdk.MustGetInt(config, "port")
+enabled, err := sdk.MustGetBool(config, "enabled")
+
+// Optional fields with defaults
+timeout := sdk.GetIntDefault(config, "timeout", 30)
+protocol := sdk.GetStringDefault(config, "protocol", "https")
+verbose := sdk.GetBoolDefault(config, "verbose", false)
+
+// Safe extraction (returns ok=false if missing or wrong type)
+value, ok := sdk.GetString(config, "optional_field")
+number, ok := sdk.GetInt(config, "optional_number")
+tags, ok := sdk.GetStringSlice(config, "tags")
+```
+
 ## Examples
 
-See the [examples directory](../../examples/) for complete plugin examples:
+See the [examples directory](examples/) for complete working plugins:
 
-- **DNS Plugin**: Validate DNS records
-- **HTTP Plugin**: Check API endpoints
-- **TCP Plugin**: Verify port connectivity
-- **Command Plugin**: Execute system commands
-- **File Plugin**: Validate file contents
+- **[basic-plugin](examples/basic-plugin/)** - HTTP endpoint checker demonstrating SDK patterns
 
 ## Contributing
 
