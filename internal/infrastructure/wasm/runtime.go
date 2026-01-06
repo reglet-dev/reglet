@@ -16,8 +16,20 @@ import (
 	"github.com/whiskeyjimbo/reglet/internal/infrastructure/wasm/hostfuncs"
 )
 
-// globalCache speeds up compilation across runtimes.
+// globalCache speeds up compilation across runtimes within a single process.
+//
+// Cleanup considerations:
+//   - CLI tools: No explicit cleanup needed - OS reclaims memory on exit.
+//   - Servers/Workers: Call CloseGlobalCache() during graceful shutdown to
+//     release resources before the process exits.
 var globalCache = wazero.NewCompilationCache()
+
+// CloseGlobalCache releases resources held by the global compilation cache.
+// This is only needed for long-running processes (servers, workers) that require
+// graceful shutdown. CLI tools can skip this - the OS handles cleanup on exit.
+func CloseGlobalCache(ctx context.Context) error {
+	return globalCache.Close(ctx)
+}
 
 // Runtime manages WASM execution.
 type Runtime struct {
