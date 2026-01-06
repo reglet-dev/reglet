@@ -24,6 +24,18 @@ func FuzzNetworkPatternMatching(f *testing.F) {
 		"outbound:8000-7000",        // Reverse range
 		"outbound:999999",           // Large number
 		"*",                         // Wildcard
+		// Additional seeds for strict strconv.Atoi parsing
+		"outbound:80abc",     // Numeric prefix with trailing letters (strconv rejects)
+		"outbound:80 ",       // Trailing space
+		"outbound: 80",       // Leading space in port
+		"outbound:80-443abc", // Trailing letters in range
+		"outbound:80abc-443", // Letters in range start
+		"outbound:1-65536",   // Range end overflow
+		"outbound:0-100",     // Range start at 0 (invalid)
+		"outbound:+80",       // Plus sign prefix
+		"outbound:0x50",      // Hex notation (should fail)
+		"outbound:8.0",       // Decimal notation
+		"outbound:80e2",      // Scientific notation
 	}
 
 	for _, seed := range seeds {
