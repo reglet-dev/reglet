@@ -54,25 +54,45 @@ func (p *httpPlugin) Schema(ctx context.Context) ([]byte, error) {
 
 // Check executes HTTP request.
 func (p *httpPlugin) Check(ctx context.Context, config regletsdk.Config) (regletsdk.Evidence, error) {
-	// Set default method
+	cfg, err := parseHTTPConfig(config)
+	if err != nil {
+		return regletsdk.Evidence{Status: false, Error: regletsdk.ToErrorDetail(err)}, nil
+	}
+
+	resp, respBody, duration, err := p.executeRequest(ctx, cfg)
+	if err != nil {
+		return regletsdk.Evidence{Status: false, Error: regletsdk.ToErrorDetail(err)}, nil
+	}
+	defer resp.Body.Close()
+
+	result := buildHTTPResult(resp, respBody, duration, cfg)
+
+	if err := validateExpectations(cfg, resp, respBody, result); err != nil {
+		return regletsdk.Success(result), nil
+	}
+
+	return regletsdk.Success(result), nil
+}
+
+// parseHTTPConfig validates and parses the config with defaults.
+func parseHTTPConfig(config regletsdk.Config) (*HTTPConfig, error) {
+	// Set defaults
 	if _, ok := config["method"]; !ok {
 		config["method"] = "GET"
 	}
-
-	// Set default body_preview_length
 	if _, ok := config["body_preview_length"]; !ok {
 		config["body_preview_length"] = 200
 	}
 
 	var cfg HTTPConfig
 	if err := regletsdk.ValidateConfig(config, &cfg); err != nil {
-		return regletsdk.Evidence{
-			Status: false,
-			Error:  regletsdk.ToErrorDetail(&regletsdk.ConfigError{Err: err}),
-		}, nil
+		return nil, &regletsdk.ConfigError{Err: err}
 	}
+	return &cfg, nil
+}
 
-	// Prepare Request
+// executeRequest performs the HTTP request.
+func (p *httpPlugin) executeRequest(ctx context.Context, cfg *HTTPConfig) (*http.Response, []byte, int64, error) {
 	var bodyReader io.Reader
 	if cfg.Body != "" {
 		bodyReader = strings.NewReader(cfg.Body)
@@ -80,11 +100,9 @@ func (p *httpPlugin) Check(ctx context.Context, config regletsdk.Config) (reglet
 
 	req, err := http.NewRequestWithContext(ctx, cfg.Method, cfg.URL, bodyReader)
 	if err != nil {
-		return regletsdk.Evidence{Status: false, Error: regletsdk.ToErrorDetail(&regletsdk.ConfigError{Err: fmt.Errorf("failed to create request: %w", err)})}, nil
+		return nil, nil, 0, &regletsdk.ConfigError{Err: fmt.Errorf("failed to create request: %w", err)}
 	}
 
-	// Execute Request using SDK's HTTP helper (which uses WasmTransport)
-	// This is more efficient than creating a new client each time
 	start := time.Now()
 	var resp *http.Response
 	if p.client != nil {
@@ -93,85 +111,67 @@ func (p *httpPlugin) Check(ctx context.Context, config regletsdk.Config) (reglet
 		resp, err = regletnet.Do(req)
 	}
 	duration := time.Since(start).Milliseconds()
-	if err != nil {
-		return regletsdk.Evidence{
-			Status: false,
-			Error: regletsdk.ToErrorDetail(
-				&regletsdk.NetworkError{
-					Operation: "http_request",
-					Target:    cfg.URL,
-					Err:       err,
-				},
-			),
-		}, nil
-	}
-	defer resp.Body.Close()
 
-	// Read Body
+	if err != nil {
+		return nil, nil, 0, &regletsdk.NetworkError{Operation: "http_request", Target: cfg.URL, Err: err}
+	}
+
 	respBodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return regletsdk.Evidence{
-			Status: false,
-			Error: regletsdk.ToErrorDetail(
-				&regletsdk.NetworkError{
-					Operation: "http_read_body",
-					Target:    cfg.URL,
-					Err:       err,
-				},
-			),
-		}, nil
+		return nil, nil, 0, &regletsdk.NetworkError{Operation: "http_read_body", Target: cfg.URL, Err: err}
 	}
 
-	// Calculate body hash for verification
-	hash := sha256.Sum256(respBodyBytes)
+	return resp, respBodyBytes, duration, nil
+}
+
+// buildHTTPResult constructs the result map from the response.
+func buildHTTPResult(resp *http.Response, respBody []byte, duration int64, cfg *HTTPConfig) map[string]interface{} {
+	hash := sha256.Sum256(respBody)
 	bodyHash := hex.EncodeToString(hash[:])
 
-	// Collect Result Data
 	result := map[string]interface{}{
 		"status_code":      resp.StatusCode,
 		"response_time_ms": duration,
 		"protocol":         resp.Proto,
 		"headers":          resp.Header,
-		"body_size":        len(respBodyBytes),
+		"body_size":        len(respBody),
 		"body_sha256":      bodyHash,
 	}
 
-	// Include body content based on configuration
-	if cfg.BodyPreviewLength == -1 {
-		// Include full body
-		result["body"] = string(respBodyBytes)
-	} else if cfg.BodyPreviewLength > 0 {
-		// Include preview
-		respBody := string(respBodyBytes)
-		if len(respBody) > cfg.BodyPreviewLength {
-			result["body_preview"] = respBody[:cfg.BodyPreviewLength] + "..."
+	addBodyContent(result, respBody, cfg.BodyPreviewLength)
+	return result
+}
+
+// addBodyContent adds body content to result based on configuration.
+func addBodyContent(result map[string]interface{}, respBody []byte, previewLength int) {
+	switch {
+	case previewLength == -1:
+		result["body"] = string(respBody)
+	case previewLength > 0:
+		respBodyStr := string(respBody)
+		if len(respBodyStr) > previewLength {
+			result["body_preview"] = respBodyStr[:previewLength] + "..."
 			result["body_truncated"] = true
 		} else {
-			result["body"] = respBody
+			result["body"] = respBodyStr
 		}
 	}
-	// If BodyPreviewLength == 0, only include hash and size (no body content)
+	// If previewLength == 0, only include hash and size (no body content)
+}
 
-	// Validate Expectations
-	if cfg.ExpectedStatus != 0 {
-		if resp.StatusCode != cfg.ExpectedStatus {
-			result["expectation_failed"] = true
-			result["expectation_error"] = fmt.Sprintf("expected status %d, got %d", cfg.ExpectedStatus, resp.StatusCode)
-			// Return success (valid observation) but with expectation failure data?
-			// Or failure?
-			// Previous implementation returned success response with "expectation_failed" flag.
-			return regletsdk.Success(result), nil
-		}
+// validateExpectations checks if response matches expected values.
+func validateExpectations(cfg *HTTPConfig, resp *http.Response, respBody []byte, result map[string]interface{}) error {
+	if cfg.ExpectedStatus != 0 && resp.StatusCode != cfg.ExpectedStatus {
+		result["expectation_failed"] = true
+		result["expectation_error"] = fmt.Sprintf("expected status %d, got %d", cfg.ExpectedStatus, resp.StatusCode)
+		return fmt.Errorf("status mismatch")
 	}
 
-	if cfg.ExpectedBodyContains != "" {
-		respBody := string(respBodyBytes)
-		if !strings.Contains(respBody, cfg.ExpectedBodyContains) {
-			result["expectation_failed"] = true
-			result["expectation_error"] = fmt.Sprintf("expected body to contain '%s'", cfg.ExpectedBodyContains)
-			return regletsdk.Success(result), nil
-		}
+	if cfg.ExpectedBodyContains != "" && !strings.Contains(string(respBody), cfg.ExpectedBodyContains) {
+		result["expectation_failed"] = true
+		result["expectation_error"] = fmt.Sprintf("expected body to contain '%s'", cfg.ExpectedBodyContains)
+		return fmt.Errorf("body mismatch")
 	}
 
-	return regletsdk.Success(result), nil
+	return nil
 }
