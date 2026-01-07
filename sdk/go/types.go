@@ -56,108 +56,147 @@ func ToErrorDetail(err error) *ErrorDetail {
 		return wfError
 	}
 
-	// Check for custom SDK error types and categorize appropriately
-	var (
-		netErr     *NetworkError
-		dnsErr     *DNSError
-		httpErr    *HTTPError
-		tcpErr     *TCPError
-		timeoutErr *TimeoutError
-		capErr     *CapabilityError
-		confErr    *ConfigError
-		execErr    *ExecError
-		schemaErr  *SchemaError
-		memErr     *MemoryError
-		wireErr    *WireFormatError
-	)
+	// Try each custom error type
+	if detail := convertNetworkError(err); detail != nil {
+		return detail
+	}
+	if detail := convertDNSError(err); detail != nil {
+		return detail
+	}
+	if detail := convertHTTPError(err); detail != nil {
+		return detail
+	}
+	if detail := convertTCPError(err); detail != nil {
+		return detail
+	}
+	if detail := convertTimeoutError(err); detail != nil {
+		return detail
+	}
+	if detail := convertCapabilityError(err); detail != nil {
+		return detail
+	}
+	if detail := convertConfigError(err); detail != nil {
+		return detail
+	}
+	if detail := convertExecError(err); detail != nil {
+		return detail
+	}
+	if detail := convertSchemaError(err); detail != nil {
+		return detail
+	}
+	if detail := convertMemoryError(err); detail != nil {
+		return detail
+	}
+	if detail := convertWireFormatError(err); detail != nil {
+		return detail
+	}
 
-	switch {
-	case errors.As(err, &netErr):
-		return &ErrorDetail{
-			Message: netErr.Error(),
-			Type:    "network",
-			Code:    netErr.Operation,
-		}
-	case errors.As(err, &dnsErr):
-		detail := &ErrorDetail{
-			Message: dnsErr.Error(),
-			Type:    "network",
-			Code:    "dns_" + dnsErr.RecordType,
-		}
+	// Generic error - categorize as internal
+	return &ErrorDetail{
+		Message: err.Error(),
+		Type:    "internal",
+		Code:    "",
+	}
+}
+
+func convertNetworkError(err error) *ErrorDetail {
+	var netErr *NetworkError
+	if errors.As(err, &netErr) {
+		return &ErrorDetail{Message: netErr.Error(), Type: "network", Code: netErr.Operation}
+	}
+	return nil
+}
+
+func convertDNSError(err error) *ErrorDetail {
+	var dnsErr *DNSError
+	if errors.As(err, &dnsErr) {
+		detail := &ErrorDetail{Message: dnsErr.Error(), Type: "network", Code: "dns_" + dnsErr.RecordType}
 		if dnsErr.Timeout() {
 			detail.Type = "timeout"
 		}
 		return detail
-	case errors.As(err, &httpErr):
-		detail := &ErrorDetail{
-			Message: httpErr.Error(),
-			Type:    "network",
-			Code:    fmt.Sprintf("http_%d", httpErr.StatusCode),
-		}
+	}
+	return nil
+}
+
+func convertHTTPError(err error) *ErrorDetail {
+	var httpErr *HTTPError
+	if errors.As(err, &httpErr) {
+		detail := &ErrorDetail{Message: httpErr.Error(), Type: "network", Code: fmt.Sprintf("http_%d", httpErr.StatusCode)}
 		if httpErr.Timeout() {
 			detail.Type = "timeout"
 		}
 		return detail
-	case errors.As(err, &tcpErr):
-		detail := &ErrorDetail{
-			Message: tcpErr.Error(),
-			Type:    "network",
-			Code:    "tcp_connect",
-		}
+	}
+	return nil
+}
+
+func convertTCPError(err error) *ErrorDetail {
+	var tcpErr *TCPError
+	if errors.As(err, &tcpErr) {
+		detail := &ErrorDetail{Message: tcpErr.Error(), Type: "network", Code: "tcp_connect"}
 		if tcpErr.Timeout() {
 			detail.Type = "timeout"
 		}
 		return detail
-	case errors.As(err, &timeoutErr):
-		return &ErrorDetail{
-			Message: timeoutErr.Error(),
-			Type:    "timeout",
-			Code:    timeoutErr.Operation,
-		}
-	case errors.As(err, &capErr):
-		return &ErrorDetail{
-			Message: capErr.Error(),
-			Type:    "capability",
-			Code:    capErr.Required,
-		}
-	case errors.As(err, &confErr):
-		return &ErrorDetail{
-			Message: confErr.Error(),
-			Type:    "config",
-			Code:    confErr.Field,
-		}
-	case errors.As(err, &execErr):
-		return &ErrorDetail{
-			Message: execErr.Error(),
-			Type:    "exec",
-			Code:    fmt.Sprintf("exit_%d", execErr.ExitCode),
-		}
-	case errors.As(err, &schemaErr):
-		return &ErrorDetail{
-			Message: schemaErr.Error(),
-			Type:    "validation",
-			Code:    "schema",
-		}
-	case errors.As(err, &memErr):
-		return &ErrorDetail{
-			Message: memErr.Error(),
-			Type:    "internal",
-			Code:    "memory_limit",
-		}
-	case errors.As(err, &wireErr):
-		return &ErrorDetail{
-			Message: wireErr.Error(),
-			Type:    "internal",
-			Code:    "wire_format",
-		}
-	default:
-		// Generic error - categorize as internal
-		return &ErrorDetail{
-			Message: err.Error(),
-			Type:    "internal",
-			Code:    "",
-		}
 	}
+	return nil
+}
+
+func convertTimeoutError(err error) *ErrorDetail {
+	var timeoutErr *TimeoutError
+	if errors.As(err, &timeoutErr) {
+		return &ErrorDetail{Message: timeoutErr.Error(), Type: "timeout", Code: timeoutErr.Operation}
+	}
+	return nil
+}
+
+func convertCapabilityError(err error) *ErrorDetail {
+	var capErr *CapabilityError
+	if errors.As(err, &capErr) {
+		return &ErrorDetail{Message: capErr.Error(), Type: "capability", Code: capErr.Required}
+	}
+	return nil
+}
+
+func convertConfigError(err error) *ErrorDetail {
+	var confErr *ConfigError
+	if errors.As(err, &confErr) {
+		return &ErrorDetail{Message: confErr.Error(), Type: "config", Code: confErr.Field}
+	}
+	return nil
+}
+
+func convertExecError(err error) *ErrorDetail {
+	var execErr *ExecError
+	if errors.As(err, &execErr) {
+		return &ErrorDetail{Message: execErr.Error(), Type: "exec", Code: fmt.Sprintf("exit_%d", execErr.ExitCode)}
+	}
+	return nil
+}
+
+func convertSchemaError(err error) *ErrorDetail {
+	var schemaErr *SchemaError
+	if errors.As(err, &schemaErr) {
+		return &ErrorDetail{Message: schemaErr.Error(), Type: "validation", Code: "schema"}
+	}
+	return nil
+}
+
+func convertMemoryError(err error) *ErrorDetail {
+	var memErr *MemoryError
+	if errors.As(err, &memErr) {
+		return &ErrorDetail{Message: memErr.Error(), Type: "internal", Code: "memory_limit"}
+	}
+	return nil
+}
+
+func convertWireFormatError(err error) *ErrorDetail {
+	var wireErr *WireFormatError
+	if errors.As(err, &wireErr) {
+		return &ErrorDetail{Message: wireErr.Error(), Type: "internal", Code: "wire_format"}
+	}
+	return nil
 }
 
 // Success creates a successful Evidence with data.

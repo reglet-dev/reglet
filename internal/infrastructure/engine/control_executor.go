@@ -16,8 +16,23 @@ import (
 // The index parameter tracks the control's original definition order for deterministic output.
 func (e *Engine) executeControl(ctx context.Context, ctrl entities.Control, index int, execResult *execution.ExecutionResult, requiredDeps map[string]bool) execution.ControlResult {
 	startTime := time.Now()
+	result := newControlResult(ctrl, index)
 
-	result := execution.ControlResult{
+	// Check skip conditions
+	if skipReason := e.checkSkipConditions(ctrl, execResult, requiredDeps); skipReason != "" {
+		return skipControl(result, skipReason, startTime)
+	}
+
+	// Execute observations
+	result.ObservationResults = e.runObservations(ctx, ctrl)
+
+	// Aggregate and finalize
+	return finalizeResult(result, startTime)
+}
+
+// newControlResult creates an initial ControlResult from a control definition.
+func newControlResult(ctrl entities.Control, index int) execution.ControlResult {
+	return execution.ControlResult{
 		Index:              index,
 		ID:                 ctrl.ID,
 		Name:               ctrl.Name,
@@ -26,8 +41,10 @@ func (e *Engine) executeControl(ctx context.Context, ctrl entities.Control, inde
 		Tags:               ctrl.Tags,
 		ObservationResults: make([]execution.ObservationResult, 0, len(ctrl.ObservationDefinitions)),
 	}
+}
 
-	// Check if control should run (filtering)
+// checkSkipConditions returns a skip reason if the control should be skipped.
+func (e *Engine) checkSkipConditions(ctrl entities.Control, execResult *execution.ExecutionResult, requiredDeps map[string]bool) string {
 	shouldRun, skipReason := e.shouldRun(ctrl)
 
 	// If filtering says skip, check if it's required as a dependency
@@ -37,53 +54,59 @@ func (e *Engine) executeControl(ctx context.Context, ctrl entities.Control, inde
 	}
 
 	if !shouldRun {
-		result.Status = values.StatusSkipped
-		result.SkipReason = skipReason
-		result.Message = skipReason
-		result.Duration = time.Since(startTime)
-		return result
+		return skipReason
 	}
 
-	// Check dependencies before execution
-	if len(ctrl.DependsOn) > 0 {
-		for _, depID := range ctrl.DependsOn {
-			depStatus, found := execResult.GetControlStatus(depID)
+	// Check dependencies
+	return e.checkDependencies(ctrl, execResult)
+}
 
-			if !found || depStatus == values.StatusFail || depStatus == values.StatusError || depStatus == values.StatusSkipped {
-				result.Status = values.StatusSkipped
-				if !found {
-					result.Message = fmt.Sprintf("Skipped: dependency '%s' not found", depID)
-				} else {
-					result.Message = fmt.Sprintf("Skipped: dependency '%s' has status '%s'", depID, depStatus)
-				}
-				result.Duration = time.Since(startTime)
-				return result
-			}
+// checkDependencies verifies all dependencies have passed.
+func (e *Engine) checkDependencies(ctrl entities.Control, execResult *execution.ExecutionResult) string {
+	for _, depID := range ctrl.DependsOn {
+		depStatus, found := execResult.GetControlStatus(depID)
+		if !found {
+			return fmt.Sprintf("Skipped: dependency '%s' not found", depID)
+		}
+		if depStatus == values.StatusFail || depStatus == values.StatusError || depStatus == values.StatusSkipped {
+			return fmt.Sprintf("Skipped: dependency '%s' has status '%s'", depID, depStatus)
 		}
 	}
+	return ""
+}
 
-	// Execute observations
+// skipControl creates a skipped control result.
+func skipControl(result execution.ControlResult, skipReason string, startTime time.Time) execution.ControlResult {
+	result.Status = values.StatusSkipped
+	result.SkipReason = skipReason
+	result.Message = skipReason
+	result.Duration = time.Since(startTime)
+	return result
+}
+
+// runObservations executes observations sequentially or in parallel.
+func (e *Engine) runObservations(ctx context.Context, ctrl entities.Control) []execution.ObservationResult {
 	if e.config.Parallel && len(ctrl.ObservationDefinitions) > 1 {
-		result.ObservationResults = e.executeObservationsParallel(ctx, ctrl.ObservationDefinitions)
-	} else {
-		for _, obs := range ctrl.ObservationDefinitions {
-			obsResult := e.executor.Execute(ctx, obs)
-			result.ObservationResults = append(result.ObservationResults, obsResult)
-		}
+		return e.executeObservationsParallel(ctx, ctrl.ObservationDefinitions)
 	}
 
-	// Aggregate observation results to determine control status
-	observationStatuses := make([]values.Status, len(result.ObservationResults))
+	results := make([]execution.ObservationResult, 0, len(ctrl.ObservationDefinitions))
+	for _, obs := range ctrl.ObservationDefinitions {
+		results = append(results, e.executor.Execute(ctx, obs))
+	}
+	return results
+}
+
+// finalizeResult aggregates observation statuses and generates the control message.
+func finalizeResult(result execution.ControlResult, startTime time.Time) execution.ControlResult {
+	statuses := make([]values.Status, len(result.ObservationResults))
 	for i, obs := range result.ObservationResults {
-		observationStatuses[i] = obs.Status
+		statuses[i] = obs.Status
 	}
 
 	aggregator := services.NewStatusAggregator()
-	result.Status = aggregator.AggregateControlStatus(observationStatuses)
-
-	// Generate message based on status
+	result.Status = aggregator.AggregateControlStatus(statuses)
 	result.Message = generateControlMessage(result.Status, result.ObservationResults)
-
 	result.Duration = time.Since(startTime)
 
 	return result

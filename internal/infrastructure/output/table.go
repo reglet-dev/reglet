@@ -136,78 +136,110 @@ func (f *TableFormatter) formatControl(ctrl execution.ControlResult) {
 func (f *TableFormatter) formatObservation(obs execution.ObservationResult, index int) {
 	statusSymbol, statusColor := f.getStatusInfo(obs.Status)
 	coloredSymbol := f.colorize(statusSymbol, statusColor)
-
-	// Plugin name in cyan
 	pluginName := f.colorize(obs.Plugin, colorCyan)
 
 	fmt.Fprintf(f.writer, "    %d. %s Plugin: %s (%s)\n", index, coloredSymbol, pluginName, obs.Status)
 
-	// Show error if present
-	if obs.Error != nil {
-		errMsg := fmt.Sprintf("[%s] %s", obs.Error.Code, obs.Error.Message)
-		fmt.Fprintf(f.writer, "       %s: %s\n", f.colorize("Error", colorRed), errMsg)
-	}
-
-	// Show failed expectations (only show failures for clarity)
-	if len(obs.Expectations) > 0 {
-		failedExpectations := []execution.ExpectationResult{}
-		for _, exp := range obs.Expectations {
-			if !exp.Passed {
-				failedExpectations = append(failedExpectations, exp)
-			}
-		}
-
-		if len(failedExpectations) > 0 {
-			fmt.Fprintf(f.writer, "       %s:\n", f.colorize("Failed Expectations", colorRed))
-			for _, exp := range failedExpectations {
-				fmt.Fprintf(f.writer, "         - %s\n", exp.Expression)
-				if exp.Message != "" {
-					fmt.Fprintf(f.writer, "           %s\n", f.colorize(exp.Message, colorYellow))
-				}
-			}
-		}
-	}
-
-	// Show evidence summary if present
-	if obs.Evidence != nil {
-		// Collect valid keys to print (excluding internal/redundant ones)
-		var keys []string
-		for k, v := range obs.Evidence.Data {
-			if k == "status" || k == "error" || k == "success" {
-				continue
-			}
-			// Skip empty/nil values to reduce noise
-			if v == nil {
-				continue
-			}
-			if s, ok := v.(string); ok && s == "" {
-				continue
-			}
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-
-		if len(keys) > 0 {
-			fmt.Fprintf(f.writer, "       Evidence:\n")
-			for _, key := range keys {
-				value := obs.Evidence.Data[key]
-				valStr := f.formatValue(value)
-
-				// If value is multi-line, indent it properly
-				if strings.Contains(valStr, "\n") {
-					fmt.Fprintf(f.writer, "         - %s:\n", f.colorize(key, colorBlue))
-					lines := strings.Split(valStr, "\n")
-					for _, line := range lines {
-						fmt.Fprintf(f.writer, "           %s\n", line)
-					}
-				} else {
-					fmt.Fprintf(f.writer, "         - %s: %s\n", f.colorize(key, colorBlue), valStr)
-				}
-			}
-		}
-	}
+	f.formatObsError(obs)
+	f.formatFailedExpectations(obs)
+	f.formatEvidence(obs)
 
 	fmt.Fprintf(f.writer, "       Duration: %s\n", obs.Duration.Round(time.Millisecond))
+}
+
+// formatObsError formats the error section of an observation.
+//
+//nolint:errcheck // Best-effort terminal output
+func (f *TableFormatter) formatObsError(obs execution.ObservationResult) {
+	if obs.Error == nil {
+		return
+	}
+	errMsg := fmt.Sprintf("[%s] %s", obs.Error.Code, obs.Error.Message)
+	fmt.Fprintf(f.writer, "       %s: %s\n", f.colorize("Error", colorRed), errMsg)
+}
+
+// formatFailedExpectations formats the failed expectations section.
+//
+//nolint:errcheck // Best-effort terminal output
+func (f *TableFormatter) formatFailedExpectations(obs execution.ObservationResult) {
+	if len(obs.Expectations) == 0 {
+		return
+	}
+
+	var failedExpectations []execution.ExpectationResult
+	for _, exp := range obs.Expectations {
+		if !exp.Passed {
+			failedExpectations = append(failedExpectations, exp)
+		}
+	}
+
+	if len(failedExpectations) == 0 {
+		return
+	}
+
+	fmt.Fprintf(f.writer, "       %s:\n", f.colorize("Failed Expectations", colorRed))
+	for _, exp := range failedExpectations {
+		fmt.Fprintf(f.writer, "         - %s\n", exp.Expression)
+		if exp.Message != "" {
+			fmt.Fprintf(f.writer, "           %s\n", f.colorize(exp.Message, colorYellow))
+		}
+	}
+}
+
+// formatEvidence formats the evidence section of an observation.
+//
+//nolint:errcheck // Best-effort terminal output
+func (f *TableFormatter) formatEvidence(obs execution.ObservationResult) {
+	if obs.Evidence == nil {
+		return
+	}
+
+	keys := f.collectEvidenceKeys(obs.Evidence.Data)
+	if len(keys) == 0 {
+		return
+	}
+
+	fmt.Fprintf(f.writer, "       Evidence:\n")
+	for _, key := range keys {
+		f.formatEvidenceValue(key, obs.Evidence.Data[key])
+	}
+}
+
+// collectEvidenceKeys collects valid keys for evidence display.
+func (f *TableFormatter) collectEvidenceKeys(data map[string]interface{}) []string {
+	var keys []string
+	for k, v := range data {
+		// Skip internal/redundant keys
+		if k == "status" || k == "error" || k == "success" {
+			continue
+		}
+		// Skip empty/nil values
+		if v == nil {
+			continue
+		}
+		if s, ok := v.(string); ok && s == "" {
+			continue
+		}
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+// formatEvidenceValue formats a single evidence key-value pair.
+//
+//nolint:errcheck // Best-effort terminal output
+func (f *TableFormatter) formatEvidenceValue(key string, value interface{}) {
+	valStr := f.formatValue(value)
+
+	if strings.Contains(valStr, "\n") {
+		fmt.Fprintf(f.writer, "         - %s:\n", f.colorize(key, colorBlue))
+		for _, line := range strings.Split(valStr, "\n") {
+			fmt.Fprintf(f.writer, "           %s\n", line)
+		}
+	} else {
+		fmt.Fprintf(f.writer, "         - %s: %s\n", f.colorize(key, colorBlue), valStr)
+	}
 }
 
 // formatValue formats a value for display

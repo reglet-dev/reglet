@@ -126,40 +126,59 @@ func (c Capability) RiskLevel() RiskLevel {
 func (c Capability) RiskDescription() string {
 	switch c.Kind {
 	case "fs":
-		if strings.Contains(c.Pattern, "**") {
-			return "Plugin can access ALL files on the system"
-		}
-		if strings.Contains(c.Pattern, "/etc") {
-			return "Plugin can access sensitive system configuration"
-		}
-		if strings.Contains(c.Pattern, "/root") || strings.Contains(c.Pattern, "/home") {
-			return "Plugin can access user home directories and private files"
-		}
-		if strings.HasPrefix(c.Pattern, "write:") {
-			return "Plugin can modify files on disk"
-		}
-		return "Plugin can read specific files"
-
+		return c.fsRiskDescription()
 	case "exec":
-		if matchesAny(c.Pattern, dangerousShells) {
-			return "Plugin can execute arbitrary shell commands"
-		}
-		if matchesInterpreter(c.Pattern) {
-			// Extract interpreter name (before : or version number)
-			name := extractInterpreterName(c.Pattern)
-			return "Plugin can execute arbitrary code via " + name + " interpreter"
-		}
-		return "Plugin can execute specific command: " + c.Pattern
-
+		return c.execRiskDescription()
 	case "network":
-		if c.Pattern == "*" || c.Pattern == "outbound:*" {
-			return "Plugin can connect to any host on the internet"
-		}
-		return "Plugin can make network requests to: " + c.Pattern
-
+		return c.networkRiskDescription()
 	case "env":
-		if c.Pattern == "*" {
-			return `Grants access to ALL environment variables including:
+		return c.envRiskDescription()
+	default:
+		return "Plugin requires capability: " + c.String()
+	}
+}
+
+// fsRiskDescription returns the risk description for filesystem capabilities.
+func (c Capability) fsRiskDescription() string {
+	if strings.Contains(c.Pattern, "**") {
+		return "Plugin can access ALL files on the system"
+	}
+	if strings.Contains(c.Pattern, "/etc") {
+		return "Plugin can access sensitive system configuration"
+	}
+	if strings.Contains(c.Pattern, "/root") || strings.Contains(c.Pattern, "/home") {
+		return "Plugin can access user home directories and private files"
+	}
+	if strings.HasPrefix(c.Pattern, "write:") {
+		return "Plugin can modify files on disk"
+	}
+	return "Plugin can read specific files"
+}
+
+// execRiskDescription returns the risk description for exec capabilities.
+func (c Capability) execRiskDescription() string {
+	if matchesAny(c.Pattern, dangerousShells) {
+		return "Plugin can execute arbitrary shell commands"
+	}
+	if matchesInterpreter(c.Pattern) {
+		name := extractInterpreterName(c.Pattern)
+		return "Plugin can execute arbitrary code via " + name + " interpreter"
+	}
+	return "Plugin can execute specific command: " + c.Pattern
+}
+
+// networkRiskDescription returns the risk description for network capabilities.
+func (c Capability) networkRiskDescription() string {
+	if c.Pattern == "*" || c.Pattern == "outbound:*" {
+		return "Plugin can connect to any host on the internet"
+	}
+	return "Plugin can make network requests to: " + c.Pattern
+}
+
+// envRiskDescription returns the risk description for env capabilities.
+func (c Capability) envRiskDescription() string {
+	if c.Pattern == "*" {
+		return `Grants access to ALL environment variables including:
     • Secrets and API keys from other tools
     • Shell configuration (PATH, HOME, etc.)
     • Potential credential leakage
@@ -168,20 +187,16 @@ Recommendation: Grant only specific variables:
     env:AWS_ACCESS_KEY_ID
     env:AWS_SECRET_ACCESS_KEY
     env:AWS_REGION`
-		}
-		if c.Pattern == "AWS_*" {
-			return `Grants access to ALL AWS environment variables including:
+	}
+	if c.Pattern == "AWS_*" {
+		return `Grants access to ALL AWS environment variables including:
     • AWS_ACCESS_KEY_ID (needed)
     • AWS_SECRET_ACCESS_KEY (needed)
     • AWS_SESSION_TOKEN (temporary credentials - high risk if leaked)
 
 Recommendation: Grant only required variables individually`
-		}
-		return "Plugin can access environment variable: " + c.Pattern
-
-	default:
-		return "Plugin requires capability: " + c.String()
 	}
+	return "Plugin can access environment variable: " + c.Pattern
 }
 
 // matchesAny checks if pattern exactly matches any string in the list

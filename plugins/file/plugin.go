@@ -53,42 +53,89 @@ func (p *filePlugin) Check(ctx context.Context, config regletsdk.Config) (reglet
 		}, nil
 	}
 
+	return checkFile(cfg)
+}
+
+// checkFile performs the actual file check logic.
+func checkFile(cfg FileConfig) (regletsdk.Evidence, error) {
 	result := map[string]interface{}{
 		"path": cfg.Path,
 	}
 
-	// 1. Check Existence & Metadata (Open First to avoid TOCTOU)
-	var info os.FileInfo
-	var f *os.File
-	var openErr error
-
-	// Attempt to open the file first
-	f, openErr = os.Open(cfg.Path)
-	if openErr == nil {
+	// 1. Open file and get metadata
+	f, info, err := openAndStat(cfg.Path)
+	if err != nil {
+		return handleOpenError(err, cfg.Path, result)
+	}
+	if f != nil {
 		defer f.Close()
 		result["readable"] = true
-
-		// Use the open file handle to get stats (atomic check)
-		info, openErr = f.Stat()
-		if openErr != nil {
-			return regletsdk.Failure("fs", fmt.Sprintf("stat on open file failed: %v", openErr)), nil
-		}
 	} else {
 		result["readable"] = false
+	}
 
-		// Open failed. Fallback to os.Stat to check existence/metadata.
-		// It might exist but be unreadable (permission denied, directory, etc.)
-		var statErr error
-		info, statErr = os.Stat(cfg.Path)
-		if statErr != nil {
-			if os.IsNotExist(statErr) || os.IsNotExist(openErr) {
-				result["exists"] = false
-				return regletsdk.Success(result), nil
-			}
-			return regletsdk.Failure("fs", fmt.Sprintf("stat failed: %v", statErr)), nil
+	// 2. Populate metadata
+	populateMetadata(result, info)
+
+	// 3. Check for symlink
+	checkSymlink(result, cfg.Path)
+
+	// 4. Read content if requested
+	if cfg.ReadContent && !info.IsDir() {
+		if err := readContent(f, result); err != nil {
+			return err.(regletsdk.Evidence), nil
 		}
 	}
 
+	// 5. Calculate hash if requested
+	if cfg.Hash && !info.IsDir() {
+		if err := calculateHash(f, result); err != nil {
+			return err.(regletsdk.Evidence), nil
+		}
+	}
+
+	return regletsdk.Success(result), nil
+}
+
+// openAndStat attempts to open the file and get its metadata.
+// Returns (file, info, error). file may be nil if unreadable but exists.
+func openAndStat(path string) (*os.File, os.FileInfo, error) {
+	f, openErr := os.Open(path)
+	if openErr == nil {
+		// Successfully opened - get stats from file handle (atomic)
+		info, err := f.Stat()
+		if err != nil {
+			f.Close()
+			return nil, nil, fmt.Errorf("stat on open file failed: %w", err)
+		}
+		return f, info, nil
+	}
+
+	// Open failed - try stat to check if file exists but is unreadable
+	info, statErr := os.Stat(path)
+	if statErr != nil {
+		if os.IsNotExist(statErr) || os.IsNotExist(openErr) {
+			return nil, nil, os.ErrNotExist
+		}
+		return nil, nil, fmt.Errorf("stat failed: %w", statErr)
+	}
+
+	// File exists but is unreadable
+	return nil, info, nil
+}
+
+// handleOpenError handles errors from openAndStat.
+func handleOpenError(err error, path string, result map[string]interface{}) (regletsdk.Evidence, error) {
+	if os.IsNotExist(err) {
+		result["exists"] = false
+		result["readable"] = false
+		return regletsdk.Success(result), nil
+	}
+	return regletsdk.Failure("fs", err.Error()), nil
+}
+
+// populateMetadata fills in file metadata fields.
+func populateMetadata(result map[string]interface{}, info os.FileInfo) {
 	result["exists"] = true
 	result["is_dir"] = info.IsDir()
 	result["size"] = info.Size()
@@ -96,68 +143,66 @@ func (p *filePlugin) Check(ctx context.Context, config regletsdk.Config) (reglet
 	result["permissions"] = info.Mode().String()
 	result["mod_time"] = info.ModTime().Format(time.RFC3339)
 
-	// Update readable status if it's a directory (directories might trigger openErr if utilizing file flags,
-	// but os.Open(".") usually works. If os.Open failed but Stat passed, we keep readable=false unless logic dictates otherwise)
-	if info.IsDir() {
-		// If we couldn't open the dir, it's not readable (listing would fail)
-		// So result["readable"] from openErr is correct.
-	}
-
-	// Attempt to get ownership
+	// Attempt to get ownership (Unix-specific)
 	if stat, ok := info.Sys().(*syscall.Stat_t); ok {
 		result["uid"] = stat.Uid
 		result["gid"] = stat.Gid
 	}
+}
 
-	// Check for symlink (Must use Lstat on path, inherently racy but necessary for detection)
-	// We can't use f.Stat() for this because it follows links.
-	linfo, err := os.Lstat(cfg.Path)
-	if err == nil && linfo.Mode()&os.ModeSymlink != 0 {
+// checkSymlink checks if the path is a symlink and populates result.
+func checkSymlink(result map[string]interface{}, path string) {
+	linfo, err := os.Lstat(path)
+	if err != nil {
+		result["is_symlink"] = false
+		return
+	}
+
+	if linfo.Mode()&os.ModeSymlink != 0 {
 		result["is_symlink"] = true
-		target, err := os.Readlink(cfg.Path)
-		if err == nil {
+		if target, err := os.Readlink(path); err == nil {
 			result["symlink_target"] = target
 		}
 	} else {
 		result["is_symlink"] = false
 	}
+}
 
-	// 2. Read Content (if requested and not a directory)
-	if cfg.ReadContent && !info.IsDir() {
-		if f != nil {
-			// Use the existing handle
-			if _, err := f.Seek(0, 0); err != nil {
-				return regletsdk.Failure("fs", fmt.Sprintf("seek failed: %v", err)), nil
-			}
-			content, err := io.ReadAll(f)
-			if err != nil {
-				return regletsdk.Failure("fs", fmt.Sprintf("read failed: %v", err)), nil
-			}
-			result["content_b64"] = base64.StdEncoding.EncodeToString(content)
-			result["encoding"] = "base64"
-		} else {
-			// File exists but we couldn't open it (shouldn't happen if we passed the checks above,
-			// unless we implement fine-grained permission logic, but here readable was false)
-			return regletsdk.Failure("fs", fmt.Sprintf("read failed: file not readable")), nil
-		}
+// readContent reads file content into result. Returns Evidence on error.
+func readContent(f *os.File, result map[string]interface{}) interface{} {
+	if f == nil {
+		return regletsdk.Failure("fs", "read failed: file not readable")
 	}
 
-	// 3. Calculate Hash (if requested and not a directory)
-	if cfg.Hash && !info.IsDir() {
-		if f != nil {
-			// Use the existing handle
-			if _, err := f.Seek(0, 0); err != nil {
-				return regletsdk.Failure("fs", fmt.Sprintf("seek for hash failed: %v", err)), nil
-			}
-			hasher := sha256.New()
-			if _, err := io.Copy(hasher, f); err != nil {
-				return regletsdk.Failure("fs", fmt.Sprintf("hash calculation failed: %v", err)), nil
-			}
-			result["sha256"] = hex.EncodeToString(hasher.Sum(nil))
-		} else {
-			return regletsdk.Failure("fs", fmt.Sprintf("hash calculation failed: file not readable")), nil
-		}
+	if _, err := f.Seek(0, 0); err != nil {
+		return regletsdk.Failure("fs", fmt.Sprintf("seek failed: %v", err))
 	}
 
-	return regletsdk.Success(result), nil
+	content, err := io.ReadAll(f)
+	if err != nil {
+		return regletsdk.Failure("fs", fmt.Sprintf("read failed: %v", err))
+	}
+
+	result["content_b64"] = base64.StdEncoding.EncodeToString(content)
+	result["encoding"] = "base64"
+	return nil
+}
+
+// calculateHash calculates SHA256 hash of file content. Returns Evidence on error.
+func calculateHash(f *os.File, result map[string]interface{}) interface{} {
+	if f == nil {
+		return regletsdk.Failure("fs", "hash calculation failed: file not readable")
+	}
+
+	if _, err := f.Seek(0, 0); err != nil {
+		return regletsdk.Failure("fs", fmt.Sprintf("seek for hash failed: %v", err))
+	}
+
+	hasher := sha256.New()
+	if _, err := io.Copy(hasher, f); err != nil {
+		return regletsdk.Failure("fs", fmt.Sprintf("hash calculation failed: %v", err))
+	}
+
+	result["sha256"] = hex.EncodeToString(hasher.Sum(nil))
+	return nil
 }

@@ -93,102 +93,121 @@ func DNSLookup(ctx context.Context, mod api.Module, stack []uint64, checker *Cap
 	})
 }
 
-// performDNSLookup executes the actual DNS lookup based on record type
+// performDNSLookup executes the actual DNS lookup based on record type.
 func performDNSLookup(ctx context.Context, hostname string, recordType string, nameserver string) (*DNSLookupResult, error) {
-	var resolver *net.Resolver
+	resolver := createResolver(nameserver)
+	return lookupByType(ctx, resolver, hostname, recordType)
+}
 
-	if nameserver != "" {
-		// Use custom resolver
-		resolver = &net.Resolver{
-			PreferGo: true,
-			Dial: func(ctx context.Context, _, _ string) (net.Conn, error) { // network/address unused: always UDP to nameserver
-				d := net.Dialer{
-					Timeout: 5 * time.Second, // Default timeout for connection
-				}
-				return d.DialContext(ctx, "udp", nameserver)
-			},
-		}
-	} else {
-		// Use default resolver
-		resolver = net.DefaultResolver
+// createResolver creates a DNS resolver, optionally using a custom nameserver.
+func createResolver(nameserver string) *net.Resolver {
+	if nameserver == "" {
+		return net.DefaultResolver
 	}
 
-	result := &DNSLookupResult{}
+	return &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, _, _ string) (net.Conn, error) {
+			d := net.Dialer{Timeout: 5 * time.Second}
+			return d.DialContext(ctx, "udp", nameserver)
+		},
+	}
+}
 
+// lookupByType dispatches to the appropriate lookup function based on record type.
+func lookupByType(ctx context.Context, resolver *net.Resolver, hostname, recordType string) (*DNSLookupResult, error) {
 	switch recordType {
 	case "A":
-		ips, err := resolver.LookupHost(ctx, hostname)
-		if err != nil {
-			return nil, err
-		}
-		// Filter to IPv4 only
-		var ipv4s []string
-		for _, ip := range ips {
-			parsed := net.ParseIP(ip)
-			if parsed != nil && parsed.To4() != nil {
-				ipv4s = append(ipv4s, ip)
-			}
-		}
-		result.Records = ipv4s
-		return result, nil
-
+		return lookupA(ctx, resolver, hostname)
 	case "AAAA":
-		ips, err := resolver.LookupHost(ctx, hostname)
-		if err != nil {
-			return nil, err
-		}
-		// Filter to IPv6 only
-		var ipv6s []string
-		for _, ip := range ips {
-			parsed := net.ParseIP(ip)
-			if parsed != nil && parsed.To4() == nil {
-				ipv6s = append(ipv6s, ip)
-			}
-		}
-		result.Records = ipv6s
-		return result, nil
-
+		return lookupAAAA(ctx, resolver, hostname)
 	case "CNAME":
-		cname, err := resolver.LookupCNAME(ctx, hostname)
-		if err != nil {
-			return nil, err
-		}
-		result.Records = []string{cname}
-		return result, nil
-
+		return lookupCNAME(ctx, resolver, hostname)
 	case "MX":
-		mxRecords, err := resolver.LookupMX(ctx, hostname)
-		if err != nil {
-			return nil, err
-		}
-		var wiredMXRecords []MXRecordWire
-		for _, mx := range mxRecords {
-			wiredMXRecords = append(wiredMXRecords, MXRecordWire{Host: mx.Host, Pref: mx.Pref})
-		}
-		result.MXRecords = wiredMXRecords
-		return result, nil
-
+		return lookupMX(ctx, resolver, hostname)
 	case "TXT":
-		txtRecords, err := resolver.LookupTXT(ctx, hostname)
-		if err != nil {
-			return nil, err
-		}
-		result.Records = txtRecords
-		return result, nil
-
+		return lookupTXT(ctx, resolver, hostname)
 	case "NS":
-		nsRecords, err := resolver.LookupNS(ctx, hostname)
-		if err != nil {
-			return nil, err
-		}
-		var records []string
-		for _, ns := range nsRecords {
-			records = append(records, ns.Host)
-		}
-		result.Records = records
-		return result, nil
-
+		return lookupNS(ctx, resolver, hostname)
 	default:
 		return nil, fmt.Errorf("unsupported record type: %s", recordType)
 	}
+}
+
+// lookupA returns IPv4 addresses for the hostname.
+func lookupA(ctx context.Context, resolver *net.Resolver, hostname string) (*DNSLookupResult, error) {
+	ips, err := resolver.LookupHost(ctx, hostname)
+	if err != nil {
+		return nil, err
+	}
+
+	var ipv4s []string
+	for _, ip := range ips {
+		if parsed := net.ParseIP(ip); parsed != nil && parsed.To4() != nil {
+			ipv4s = append(ipv4s, ip)
+		}
+	}
+	return &DNSLookupResult{Records: ipv4s}, nil
+}
+
+// lookupAAAA returns IPv6 addresses for the hostname.
+func lookupAAAA(ctx context.Context, resolver *net.Resolver, hostname string) (*DNSLookupResult, error) {
+	ips, err := resolver.LookupHost(ctx, hostname)
+	if err != nil {
+		return nil, err
+	}
+
+	var ipv6s []string
+	for _, ip := range ips {
+		if parsed := net.ParseIP(ip); parsed != nil && parsed.To4() == nil {
+			ipv6s = append(ipv6s, ip)
+		}
+	}
+	return &DNSLookupResult{Records: ipv6s}, nil
+}
+
+// lookupCNAME returns the canonical name for the hostname.
+func lookupCNAME(ctx context.Context, resolver *net.Resolver, hostname string) (*DNSLookupResult, error) {
+	cname, err := resolver.LookupCNAME(ctx, hostname)
+	if err != nil {
+		return nil, err
+	}
+	return &DNSLookupResult{Records: []string{cname}}, nil
+}
+
+// lookupMX returns mail exchange records for the hostname.
+func lookupMX(ctx context.Context, resolver *net.Resolver, hostname string) (*DNSLookupResult, error) {
+	mxRecords, err := resolver.LookupMX(ctx, hostname)
+	if err != nil {
+		return nil, err
+	}
+
+	var wiredMX []MXRecordWire
+	for _, mx := range mxRecords {
+		wiredMX = append(wiredMX, MXRecordWire{Host: mx.Host, Pref: mx.Pref})
+	}
+	return &DNSLookupResult{MXRecords: wiredMX}, nil
+}
+
+// lookupTXT returns TXT records for the hostname.
+func lookupTXT(ctx context.Context, resolver *net.Resolver, hostname string) (*DNSLookupResult, error) {
+	txtRecords, err := resolver.LookupTXT(ctx, hostname)
+	if err != nil {
+		return nil, err
+	}
+	return &DNSLookupResult{Records: txtRecords}, nil
+}
+
+// lookupNS returns nameserver records for the hostname.
+func lookupNS(ctx context.Context, resolver *net.Resolver, hostname string) (*DNSLookupResult, error) {
+	nsRecords, err := resolver.LookupNS(ctx, hostname)
+	if err != nil {
+		return nil, err
+	}
+
+	var records []string
+	for _, ns := range nsRecords {
+		records = append(records, ns.Host)
+	}
+	return &DNSLookupResult{Records: records}, nil
 }
