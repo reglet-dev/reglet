@@ -3,14 +3,16 @@ package main
 import (
 	"log/slog"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 var (
-	cfgFile string
-	verbose bool
+	cfgFile  string
+	logLevel string
+	quiet    bool
 )
 
 // rootCmd is the application entry point.
@@ -38,8 +40,9 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	// Global flags
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.reglet.yaml)")
-	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable verbose output")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.reglet/config.yaml)")
+	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "info", "log level: debug, info, warn, error")
+	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "suppress all log output (equivalent to --log-level=error)")
 }
 
 // initConfig loads configuration from the config file and environment.
@@ -66,9 +69,11 @@ func initConfig() {
 }
 
 func setupLogging() {
-	level := slog.LevelInfo
-	if verbose {
-		level = slog.LevelDebug
+	level := parseLogLevel(logLevel)
+
+	// --quiet flag overrides --log-level to suppress output
+	if quiet {
+		level = slog.LevelError + 1 // Above error = effectively silent
 	}
 
 	// Using TextHandler for CLI friendliness
@@ -76,4 +81,20 @@ func setupLogging() {
 		Level: level,
 	}))
 	slog.SetDefault(logger)
+}
+
+// parseLogLevel converts a string log level to slog.Level.
+func parseLogLevel(level string) slog.Level {
+	switch strings.ToLower(level) {
+	case "debug":
+		return slog.LevelDebug
+	case "info":
+		return slog.LevelInfo
+	case "warn", "warning":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
 }
