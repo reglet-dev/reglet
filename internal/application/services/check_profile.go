@@ -220,14 +220,10 @@ var builtInPlugins = map[string]bool{
 	"command": true,
 }
 
-// validateDeclaredPlugins validates that declared plugins exist and are used.
-// This provides early feedback if a profile references unavailable plugins.
+// validateDeclaredPlugins validates that declared plugins exist and all used plugins are declared.
+// This enforces explicit dependency declaration during development.
 func (uc *CheckProfileUseCase) validateDeclaredPlugins(profile entities.ProfileReader, pluginDir string) error {
 	declaredPlugins := profile.GetPlugins()
-	if len(declaredPlugins) == 0 {
-		// No plugins declared - skip validation (backwards compatibility)
-		return nil
-	}
 
 	// Build set of plugins used in observations
 	usedPlugins := make(map[string]bool)
@@ -237,7 +233,25 @@ func (uc *CheckProfileUseCase) validateDeclaredPlugins(profile entities.ProfileR
 		}
 	}
 
-	// Validate each declared plugin
+	// Require plugins field if any observations use plugins
+	if len(declaredPlugins) == 0 && len(usedPlugins) > 0 {
+		var pluginList []string
+		for p := range usedPlugins {
+			pluginList = append(pluginList, p)
+		}
+		return apperrors.NewValidationError(
+			"plugins",
+			fmt.Sprintf("plugins field is required; add 'plugins:' section declaring: %v", pluginList),
+		)
+	}
+
+	// Build set of declared plugin names for lookup
+	declaredSet := make(map[string]bool)
+	for _, declared := range declaredPlugins {
+		declaredSet[extractPluginName(declared)] = true
+	}
+
+	// Validate each declared plugin exists
 	for _, declared := range declaredPlugins {
 		// Extract plugin name from path if it's a path (e.g., ./plugins/file/file.wasm -> file)
 		pluginName := extractPluginName(declared)
@@ -268,19 +282,13 @@ func (uc *CheckProfileUseCase) validateDeclaredPlugins(profile entities.ProfileR
 		)
 	}
 
-	// Warn if plugins are used but not declared (informational only)
+	// Error if plugins are used but not declared
 	for used := range usedPlugins {
-		found := false
-		for _, declared := range declaredPlugins {
-			if extractPluginName(declared) == used {
-				found = true
-				break
-			}
-		}
-		if !found && !builtInPlugins[used] {
-			uc.logger.Warn("plugin used in observations but not declared in profile",
-				"plugin", used,
-				"hint", "add to 'plugins:' section for explicit dependency tracking")
+		if !declaredSet[used] {
+			return apperrors.NewValidationError(
+				"plugins",
+				fmt.Sprintf("plugin %q used in observations but not declared in 'plugins:' section", used),
+			)
 		}
 	}
 

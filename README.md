@@ -91,15 +91,19 @@ profile:
   description: Check SSH configuration
   version: 1.0.0
 
+plugins:
+  - file
+
 controls:
-  - id: sshd-config
-    name: SSH password authentication disabled
-    observations:
-      - plugin: file
-        config:
-          path: /etc/ssh/sshd_config
-        expect: |
-          data.content.contains("PasswordAuthentication no")
+  items:
+    - id: sshd-config
+      name: SSH password authentication disabled
+      observations:
+        - plugin: file
+          config:
+            path: /etc/ssh/sshd_config
+          expect: |
+            data.content.contains("PasswordAuthentication no")
 ```
 
 ## Installation
