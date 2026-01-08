@@ -218,6 +218,7 @@ var builtInPlugins = map[string]bool{
 	"tcp":     true,
 	"smtp":    true,
 	"command": true,
+	"process": true,
 }
 
 // validateDeclaredPlugins validates that declared plugins exist and all used plugins are declared.

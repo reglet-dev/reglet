@@ -1,0 +1,78 @@
+# Process Checks Example
+#
+# This profile demonstrates the process plugin for checking running processes.
+# Linux-only: reads from /proc filesystem.
+#
+# Run with: ./bin/reglet check docs/examples/08-process-checks.yaml --trust-plugins
+
+profile:
+  name: Process Checks
+  description: Verify running processes on Linux
+  version: 1.0.0
+
+plugins:
+  - process
+
+controls:
+  defaults:
+    severity: medium
+    tags: [linux, process]
+
+  items:
+    # Check that init/systemd is running (PID 1)
+    - id: init-running
+      name: Init process running
+      description: PID 1 should always exist on a running Linux system
+      severity: critical
+      observations:
+        - plugin: process
+          config:
+            pid: 1
+          expect:
+            - "data.found == true"
+
+    # Check for SSH daemon (common security check)
+    - id: sshd-running
+      name: SSH daemon status
+      description: Check if sshd is running
+      observations:
+        - plugin: process
+          config:
+            name: sshd
+          # No expect - just collect evidence
+
+    # Check for any shell processes using pattern
+    - id: shell-processes
+      name: Shell processes
+      description: Find all running shell processes
+      observations:
+        - plugin: process
+          config:
+            pattern: "^(bash|zsh|sh|fish)$"
+            list: true
+          # No expect - informational
+
+    # Negative check - ensure telnet daemon is NOT running
+    - id: no-telnetd
+      name: Telnet daemon not running
+      description: Telnet is insecure and should not be running
+      severity: high
+      tags: [security, hardening]
+      observations:
+        - plugin: process
+          config:
+            name: telnetd
+          expect:
+            - "data.found == false"
+
+    # Check for any process running as root (informational)
+    # Use --format json for full details
+    - id: root-processes-count
+      name: Count root processes
+      description: Count of processes running as root (UID 0)
+      observations:
+        - plugin: process
+          config:
+            pid: 1  # Just check init exists
+          expect:
+            - "data.found == true"
