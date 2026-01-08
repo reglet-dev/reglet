@@ -1,0 +1,10 @@
+package main
+
+import (
+	sdk "github.com/whiskeyjimbo/reglet/sdk"
+	_ "github.com/whiskeyjimbo/reglet/sdk/log" // Initialize WASM logging
+)
+
+func main() {
+	sdk.Register(&{{.PluginStructName}}{})
+}

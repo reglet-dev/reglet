@@ -1,0 +1,57 @@
+package main
+
+import (
+	"context"
+
+	sdk "github.com/whiskeyjimbo/reglet/sdk"
+)
+
+// {{.PluginStructName}} implements the sdk.Plugin interface.
+type {{.PluginStructName}} struct{}
+
+// Describe returns metadata about the plugin including its name,
+// version, description, and required capabilities.
+func (p *{{.PluginStructName}}) Describe(ctx context.Context) (sdk.Metadata, error) {
+	return sdk.Metadata{
+		Name:        "{{.PluginName}}",
+		Version:     "0.1.0",
+		Description: "TODO: Add plugin description",
+		Capabilities: []sdk.Capability{
+			{{- range .Capabilities}}
+			{Kind: "{{.Kind}}", Pattern: "{{.Pattern}}"},
+			{{- end}}
+		},
+	}, nil
+}
+
+// Schema returns the JSON schema for validating plugin configuration.
+func (p *{{.PluginStructName}}) Schema(ctx context.Context) ([]byte, error) {
+	return sdk.GenerateSchema(Config{})
+}
+
+// Check executes the main plugin logic and returns evidence.
+func (p *{{.PluginStructName}}) Check(ctx context.Context, config sdk.Config) (sdk.Evidence, error) {
+	var cfg Config
+	if err := sdk.ValidateConfig(config, &cfg); err != nil {
+		return sdk.Evidence{
+			Status: false,
+			Error:  sdk.ToErrorDetail(&sdk.ConfigError{Err: err}),
+		}, nil
+	}
+
+	// TODO: Implement check logic here
+	// Example: validate something and collect evidence
+
+	return sdk.Success(map[string]interface{}{
+		"status": "not_implemented",
+	}), nil
+}
+
+// Config defines the configuration schema for this plugin.
+// Add fields with appropriate json tags and validation.
+type Config struct {
+	// TODO: Define configuration fields
+	// Example:
+	// Host string `json:"host" validate:"required" description:"Target host to check"`
+	// Port int    `json:"port,omitempty" description:"Port number (default: 443)"`
+}

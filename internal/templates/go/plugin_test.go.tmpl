@@ -1,0 +1,69 @@
+package main
+
+import (
+	"context"
+	"testing"
+
+	sdk "github.com/whiskeyjimbo/reglet/sdk"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func Test_{{.PluginStructName}}_Describe(t *testing.T) {
+	t.Parallel()
+
+	plugin := &{{.PluginStructName}}{}
+	ctx := context.Background()
+
+	metadata, err := plugin.Describe(ctx)
+
+	require.NoError(t, err)
+	assert.Equal(t, "{{.PluginName}}", metadata.Name)
+	assert.Equal(t, "0.1.0", metadata.Version)
+	assert.NotEmpty(t, metadata.Description)
+}
+
+func Test_{{.PluginStructName}}_Schema(t *testing.T) {
+	t.Parallel()
+
+	plugin := &{{.PluginStructName}}{}
+	ctx := context.Background()
+
+	schema, err := plugin.Schema(ctx)
+
+	require.NoError(t, err)
+	assert.NotEmpty(t, schema)
+}
+
+func Test_{{.PluginStructName}}_Check_Success(t *testing.T) {
+	t.Parallel()
+
+	plugin := &{{.PluginStructName}}{}
+	ctx := context.Background()
+	config := sdk.Config{
+		// TODO: Add test configuration
+	}
+
+	evidence, err := plugin.Check(ctx, config)
+
+	require.NoError(t, err)
+	// TODO: Update assertions based on your implementation
+	// assert.True(t, evidence.Status)
+	_ = evidence // Remove this line after implementing tests
+}
+
+func Test_{{.PluginStructName}}_Check_InvalidConfig(t *testing.T) {
+	t.Parallel()
+
+	plugin := &{{.PluginStructName}}{}
+	ctx := context.Background()
+	config := sdk.Config{
+		// Missing required fields
+	}
+
+	evidence, err := plugin.Check(ctx, config)
+
+	require.NoError(t, err) // Check returns Evidence.Error, not Go error
+	// TODO: Update based on required fields in Config
+	_ = evidence // Remove this line after implementing tests
+}

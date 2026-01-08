@@ -1,0 +1,49 @@
+# {{.PluginName}} Plugin
+
+TODO: Add plugin description.
+
+## Configuration
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| TODO  | TODO | TODO     | TODO        |
+
+## Example Profile
+
+```yaml
+controls:
+  - id: {{.PluginName}}-check
+    title: {{.PluginTitle}} Check
+    description: TODO - describe what this control validates
+    severity: medium
+    plugin: {{.PluginName}}
+    config:
+      # TODO: Add configuration
+```
+
+## Building
+
+```bash
+# Build WASM plugin
+make build
+
+# Run tests
+make test
+
+# Clean artifacts
+make clean
+```
+
+## Capabilities
+
+This plugin requires the following capabilities:
+{{- range .Capabilities}}
+- `{{.Kind}}:{{.Pattern}}`
+{{- end}}
+
+## Development
+
+1. Implement the check logic in `plugin.go`
+2. Define configuration fields in `Config` struct
+3. Add tests in `plugin_test.go`
+4. Update this README with accurate documentation
