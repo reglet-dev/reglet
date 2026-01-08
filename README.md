@@ -22,11 +22,12 @@ make build
 ./bin/reglet check docs/examples/01-quickstart.yaml
 
 # Example output:
-# ✓ root-home-permissions - Root home directory permissions
-# ✓ shadow-file-permissions - Shadow file is not world-readable
-# ✓ tmp-directory-exists - Temporary directory exists and is writable
+# ✓ go-mod-exists: Go module file exists
+# ✓ readme-exists: README file exists  
+# ✓ makefile-exists: Makefile exists
+# ✓ go-mod-readable: Go module file is readable
 #
-# 3 passed, 0 failed
+# 4 passed, 0 failed
 ```
 
 ## Usage
@@ -34,13 +35,17 @@ make build
 # Output formats
 reglet check profile.yaml --format=json
 reglet check profile.yaml --format=sarif -o results.sarif
+
 # Quiet mode for CI/scripts
 reglet check profile.yaml --quiet
+
 # Debug mode
 reglet check profile.yaml --log-level=debug
+
 # Filter controls
 reglet check profile.yaml --tags security
 reglet check profile.yaml --severity critical,high
+```
 
 ## Features
 
@@ -141,7 +146,10 @@ Reglet is in active development. Core features work, but expect breaking changes
 - [x] Output formatters (Table, JSON, YAML, JUnit, SARIF)
 
 **v0.3.0-alpha**
+- [ ] OCI-based plugin registry (version pinning, aliases)
 - [ ] Profile inheritance
+
+**v0.4.0-alpha**
 - [ ] OSCAL output
 - [ ] Binary releases for Linux/macOS/Windows
 
