@@ -2,11 +2,13 @@
 
 > **Compliance as Code. Secure by Design.**
 
-Reglet is a compliance and infrastructure validation engine that runs security checks in isolated WebAssembly sandboxes. Define policies as code, validate systems and services, and get standardized audit output—ready for SOC2, ISO27001, and more.
+Reglet is a compliance and infrastructure validation engine that runs security checks in isolated WebAssembly sandboxes. Define policies as code, validate systems and services, and get standardized audit output ready for SOC2, ISO27001, and more.
 
 [![Build Status](https://github.com/whiskeyjimbo/reglet/workflows/CI/badge.svg)](https://github.com/whiskeyjimbo/reglet/actions)
 [![Go Report Card](https://goreportcard.com/badge/github.com/whiskeyjimbo/reglet)](https://goreportcard.com/report/github.com/whiskeyjimbo/reglet)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
+**Prerequisites:** Go 1.25+, Make
 
 ## Quick Start (30 seconds)
 
@@ -27,16 +29,27 @@ make build
 # 3 passed, 0 failed
 ```
 
-**Prerequisites:** Go 1.25+, Make
+## Usage
+```bash
+# Output formats
+reglet check profile.yaml --format=json
+reglet check profile.yaml --format=sarif -o results.sarif
+# Quiet mode for CI/scripts
+reglet check profile.yaml --quiet
+# Debug mode
+reglet check profile.yaml --log-level=debug
+# Filter controls
+reglet check profile.yaml --tags security
+reglet check profile.yaml --severity critical,high
 
 ## Features
 
-- **Declarative Profiles** — Define validation rules in simple, versioned YAML
-- **Parallel Execution** — Optimized for CI/CD with concurrent execution of independent controls
-- **Standardized Output** — JSON, YAML, JUnit, SARIF—ready for compliance platforms or OSCAL integration (coming soon)
-- **Secure Sandbox** — All validation logic runs inside a CGO-free WebAssembly runtime (wazero)
-- **Capability-Based Security** — Plugins can only access files, networks, or environment variables if explicitly allowed
-- **Automatic Redaction** — Sensitive data (secrets, tokens) is automatically detected and redacted before reporting
+- **Declarative Profiles** - Define validation rules in simple, versioned YAML
+- **Parallel Execution** - Optimized for CI/CD with concurrent execution of independent controls
+- **Standardized Output** - JSON, YAML, JUnit, SARIF - ready for compliance platforms or OSCAL integration (coming soon)
+- **Secure Sandbox** - All validation logic runs inside a CGO-free WebAssembly runtime (wazero)
+- **Capability-Based Security** - Plugins can only access files, networks, or environment variables if explicitly allowed
+- **Automatic Redaction** - Sensitive data (secrets, tokens) is automatically detected and redacted before reporting
 
 ## What Can It Validate?
 
@@ -53,14 +66,14 @@ See [examples/](docs/examples/) for working profiles.
 
 ## Security Model
 
-Reglet uses **capability-based security**—plugins can only access what's explicitly granted:
+Reglet uses **capability-based security** - plugins can only access what's explicitly granted:
 
-- **Automatic Discovery**: Permissions are extracted from your profile (e.g., `path: /etc/passwd` → only grants read to that file)
+- **Automatic Discovery**: Permissions are extracted from your profile (e.g., `path: /etc/passwd` grants read to only that file)
 - **No Broad Access**: Unlike scripts with full host access, plugins are sandboxed
 - **Security Levels**: Control how Reglet handles risky patterns:
-  - `strict` — Deny broad capabilities automatically
-  - `standard` — Warn and prompt before granting (default)
-  - `permissive` — Auto-grant for trusted environments
+  - `strict` - Deny broad capabilities automatically
+  - `standard` - Warn and prompt before granting (default)
+  - `permissive` - Auto-grant for trusted environments
 
 ```yaml
 # ~/.reglet/config.yaml
@@ -102,11 +115,12 @@ make build
 
 ### Examples
 
-- **[01-quickstart.yaml](docs/examples/01-quickstart.yaml)** — Basic system security checks
-- **[02-ssh-hardening.yaml](docs/examples/02-ssh-hardening.yaml)** — SSH hardening (SOC2 CC6.1)
-- **[03-web-security.yaml](docs/examples/03-web-security.yaml)** — HTTP/HTTPS validation
-- **[04-dns-validation.yaml](docs/examples/04-dns-validation.yaml)** — DNS resolution and records
-- **[05-tcp-connectivity.yaml](docs/examples/05-tcp-connectivity.yaml)** — TCP ports and TLS testing
+- **[01-quickstart.yaml](docs/examples/01-quickstart.yaml)** - Basic system security checks
+- **[02-ssh-hardening.yaml](docs/examples/02-ssh-hardening.yaml)** - SSH hardening (SOC2 CC6.1)
+- **[03-web-security.yaml](docs/examples/03-web-security.yaml)** - HTTP/HTTPS validation
+- **[04-dns-validation.yaml](docs/examples/04-dns-validation.yaml)** - DNS resolution and records
+- **[05-tcp-connectivity.yaml](docs/examples/05-tcp-connectivity.yaml)** - TCP ports and TLS testing
+- **[06-command-checks.yaml](docs/examples/06-command-checks.yaml)** - Command execution and output validation
 
 ## Status: Alpha (v0.2.0-alpha)
 
@@ -142,4 +156,4 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) a
 
 ## License
 
-Apache-2.0 — See [LICENSE](LICENSE)
+Apache-2.0 - See [LICENSE](LICENSE)

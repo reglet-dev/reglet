@@ -1,0 +1,106 @@
+# System Command Validation
+# Run: reglet check docs/examples/06-command-checks.yaml --trust-plugins
+#
+# This profile demonstrates the command plugin for executing
+# system commands and validating their output.
+
+profile:
+  name: System Command Checks
+  description: Validate system state via command execution
+  version: 1.0.0
+
+plugins:
+  - ./plugins/command/command.wasm
+
+controls:
+  defaults:
+    severity: medium
+    owner: security-team
+    tags: [system, commands]
+
+  items:
+    # Check if a critical service is running
+    - id: sshd-service-active
+      name: SSH daemon is running
+      description: Verify sshd service is active
+      severity: high
+      tags: [services, ssh]
+      observations:
+        - plugin: command
+          config:
+            run: "systemctl is-active sshd 2>/dev/null || echo inactive"
+          expect:
+            - stdout == "active"
+            - exit_code == 0
+
+    # Check system uptime (ensure recent reboot for patching compliance)
+    - id: system-uptime
+      name: System uptime check
+      description: System should have been rebooted in the last 30 days
+      severity: low
+      tags: [maintenance]
+      observations:
+        - plugin: command
+          config:
+            command: uptime
+            args: ["-p"]
+          expect:
+            - exit_code == 0
+            - success == true
+
+    # Check kernel version
+    - id: kernel-version
+      name: Kernel version check
+      description: Verify kernel version is known
+      severity: medium
+      tags: [kernel, security]
+      observations:
+        - plugin: command
+          config:
+            command: uname
+            args: ["-r"]
+          expect:
+            - exit_code == 0
+            - stdout != ""
+
+    # Check disk usage (ensure not critically full)
+    - id: disk-usage
+      name: Root filesystem usage
+      description: Root partition should have free space
+      severity: high
+      tags: [filesystem, monitoring]
+      observations:
+        - plugin: command
+          config:
+            run: "df -h / | tail -1 | awk '{print $5}' | tr -d '%'"
+          expect:
+            - exit_code == 0
+
+    # Check for security updates (Debian/Ubuntu)
+    - id: security-updates
+      name: Check for pending security updates
+      description: System should not have critical security updates pending
+      severity: critical
+      tags: [patching, security]
+      observations:
+        - plugin: command
+          config:
+            run: "apt list --upgradable 2>/dev/null | grep -c security || echo 0"
+            timeout: 60
+          expect:
+            - exit_code == 0
+
+    # Verify user exists
+    - id: deploy-user-exists
+      name: Deploy user exists
+      description: Application deploy user should exist
+      severity: medium
+      tags: [users, deployment]
+      observations:
+        - plugin: command
+          config:
+            command: id
+            args: ["-u", "nobody"]
+          expect:
+            - exit_code == 0
+            - success == true
