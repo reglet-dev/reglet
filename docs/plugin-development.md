@@ -1,471 +1,297 @@
 # Plugin Development Guide
 
-This guide explains how to create new WASM plugins for Reglet.
+This guide explains how to create WASM plugins for Reglet using the Reglet SDK.
 
 ## Quick Start
 
-Use the plugin generator to scaffold a new plugin:
+### 1. Create Plugin Directory
 
 ```bash
-./scripts/new-plugin.sh <name> --description "Plugin description" \
-    --capability-kind <fs|network|exec|env> \
-    --capability-pattern "<pattern>"
-```
-
-### Examples
-
-```bash
-# HTTP plugin
-./scripts/new-plugin.sh http \
-    --description "HTTP/HTTPS endpoint checking" \
-    --capability-kind network \
-    --capability-pattern "outbound:80,443,*"
-
-# DNS plugin
-./scripts/new-plugin.sh dns \
-    --description "DNS resolution validation" \
-    --capability-kind network \
-    --capability-pattern "outbound:53"
-
-# Process plugin
-./scripts/new-plugin.sh process \
-    --description "Running process checks" \
-    --capability-kind fs \
-    --capability-pattern "read:/proc/**"
-```
-
-## Plugin Structure
-
-A plugin consists of:
-
-```
-plugins/<name>/
-├── main.go      # Plugin implementation
-├── Makefile     # Build configuration
-└── README.md    # Documentation
-```
-
-## Required Exports
-
-Every plugin MUST export these five functions:
-
-### 1. Memory Management
-
-```go
-//go:wasmexport allocate
-func allocate(size uint32) uint32
-
-//go:wasmexport deallocate
-func deallocate(ptr uint32, size uint32)
-```
-
-**Critical**: These functions implement the memory pinning pattern that prevents
-garbage collection corruption. The template provides the correct implementation.
-
-### 2. Plugin Metadata
-
-```go
-//go:wasmexport describe
-func describe() uint32
-```
-
-Returns JSON with plugin name, version, description, and capabilities.
-
-### 3. Configuration Schema
-
-```go
-//go:wasmexport schema
-func schema() uint32
-```
-
-Returns JSON Schema defining valid configuration fields.
-
-### 4. Observation Execution
-
-```go
-//go:wasmexport observe
-func observe(configPtr uint32, configLen uint32) uint32
-```
-
-Main entry point - reads config, performs the check, returns results.
-
-## Helper Functions
-
-The template provides these helper functions:
-
-```go
-// Memory operations (WASM-specific, uses unsafe.Pointer)
-copyToMemory(ptr uint32, data []byte)
-readFromMemory(ptr uint32, length uint32) []byte
-
-// JSON marshaling
-marshalToPtr(data interface{}) uint32
-
-// Response builders
-successResponse(data map[string]interface{}) uint32
-errorResponse(message string) uint32
-```
-
-## Implementation Workflow
-
-### 1. Generate Plugin Scaffold
-
-```bash
-./scripts/new-plugin.sh myplugin --description "My plugin"
+mkdir -p plugins/myplugin
 cd plugins/myplugin
 ```
 
-### 2. Define Configuration Schema
-
-Edit `schema()` function:
-
-```go
-func schema() uint32 {
-    configSchema := map[string]interface{}{
-        "type": "object",
-        "properties": map[string]interface{}{
-            "url": map[string]interface{}{
-                "type":        "string",
-                "description": "URL to check",
-            },
-            "timeout": map[string]interface{}{
-                "type":        "integer",
-                "description": "Timeout in seconds",
-                "default":     30,
-            },
-        },
-        "required": []string{"url"},
-    }
-    return marshalToPtr(configSchema)
-}
-```
-
-### 3. Implement Observation Logic
-
-Edit `observe()` function:
-
-```go
-func observe(configPtr uint32, configLen uint32) uint32 {
-    // 1. Read config
-    configData := readFromMemory(configPtr, configLen)
-    var config map[string]interface{}
-    if err := json.Unmarshal(configData, &config); err != nil {
-        return errorResponse(fmt.Sprintf("invalid config: %v", err))
-    }
-
-    // 2. Extract and validate fields
-    url, ok := config["url"].(string)
-    if !ok || url == "" {
-        return errorResponse("missing required field: url")
-    }
-
-    timeout := 30 // default
-    if t, ok := config["timeout"].(float64); ok {
-        timeout = int(t)
-    }
-
-    // 3. Perform your check/validation
-    result, err := doYourCheck(url, timeout)
-    if err != nil {
-        return errorResponse(fmt.Sprintf("check failed: %v", err))
-    }
-
-    // 4. Return success response with evidence
-    return successResponse(map[string]interface{}{
-        "url":           url,
-        "response_code": result.Code,
-        "response_time": result.TimeMs,
-    })
-}
-```
-
-### 4. Build and Test
+### 2. Initialize Go Module
 
 ```bash
-# Build to WASM
-make build
-
-# Test loading in integration tests
-# See internal/infrastructure/wasm/plugin_integration_test.go for examples
+go mod init github.com/yourorg/reglet-plugins/myplugin
+go get github.com/whiskeyjimbo/reglet/sdk@latest
 ```
 
-## Memory Management Pattern
-
-**CRITICAL**: The memory pinning pattern is essential for WASM plugins.
-
-### The Problem
-
-When a Go WASM plugin allocates memory and returns a pointer to the host,
-the Go garbage collector doesn't know the host still needs that memory.
-Without keeping a reference, the GC will reclaim it, causing corruption.
-
-### The Solution
+### 3. Create Plugin
 
 ```go
-// Global map "pins" memory by keeping references
-var allocations = make(map[uint32][]byte)
+// plugin.go
+package main
 
-func allocate(size uint32) uint32 {
-    buf := make([]byte, size)
-    ptr := uint32(uintptr(unsafe.Pointer(&buf[0])))
+import (
+    "context"
+    
+    sdk "github.com/whiskeyjimbo/reglet/sdk"
+)
 
-    // PIN: Store slice in map so GC sees it as "in use"
-    allocations[ptr] = buf
+type myPlugin struct{}
 
-    return ptr
+func (p *myPlugin) Describe(ctx context.Context) (sdk.Metadata, error) {
+    return sdk.Metadata{
+        Name:        "myplugin",
+        Version:     "1.0.0",
+        Description: "My custom plugin",
+        Capabilities: []sdk.Capability{
+            {Kind: "fs", Pattern: "read:/etc/**"},
+        },
+    }, nil
 }
 
-func deallocate(ptr uint32, size uint32) {
-    // UNPIN: Remove from map, allowing GC to collect
-    delete(allocations, ptr)
+func (p *myPlugin) Schema(ctx context.Context) ([]byte, error) {
+    return sdk.GenerateSchema(MyConfig{})
+}
+
+func (p *myPlugin) Check(ctx context.Context, config sdk.Config) (sdk.Evidence, error) {
+    var cfg MyConfig
+    if err := sdk.ValidateConfig(config, &cfg); err != nil {
+        return sdk.Evidence{Status: false, Error: sdk.ToErrorDetail(err)}, nil
+    }
+    
+    // Your logic here
+    return sdk.Success(map[string]interface{}{
+        "result": "ok",
+    }), nil
+}
+
+type MyConfig struct {
+    Path string `json:"path" validate:"required"`
+}
+
+func init() {
+    sdk.Register(&myPlugin{})
+}
+
+func main() {} // Required but never called
+```
+
+### 4. Build WASM
+
+```bash
+GOOS=wasip1 GOARCH=wasm go build -o myplugin.wasm .
+```
+
+## Plugin Interface
+
+Every plugin must implement the `sdk.Plugin` interface:
+
+```go
+type Plugin interface {
+    Describe(ctx context.Context) (Metadata, error)
+    Schema(ctx context.Context) ([]byte, error)
+    Check(ctx context.Context, config Config) (Evidence, error)
 }
 ```
 
-### Memory Lifecycle
+### Describe
 
-```
-1. Plugin calls allocate() → returns ptr
-2. Plugin stores data in allocations[ptr] (pinned)
-3. Plugin writes JSON to ptr via copyToMemory()
-4. Plugin returns ptr to host
-5. Host reads JSON from ptr
-6. Host calls deallocate(ptr)
-7. Plugin removes allocations[ptr] (unpinned)
-8. GC can now collect the memory
-```
+Returns plugin metadata and required capabilities:
 
-## Response Format
-
-### Success Response
-
-```json
-{
-  "status": true,
-  "field1": "value",
-  "field2": 123,
-  "field3": true
+```go
+func (p *myPlugin) Describe(ctx context.Context) (sdk.Metadata, error) {
+    return sdk.Metadata{
+        Name:        "myplugin",
+        Version:     "1.0.0",
+        Description: "What this plugin does",
+        Capabilities: []sdk.Capability{
+            {Kind: "fs", Pattern: "read:/etc/**"},
+            {Kind: "network", Pattern: "outbound:443"},
+        },
+    }, nil
 }
 ```
 
-### Error Response
+### Schema
 
-```json
-{
-  "status": false,
-  "error": "error message here"
+Returns JSON Schema for configuration validation:
+
+```go
+type MyConfig struct {
+    URL     string `json:"url" validate:"required" description:"Target URL"`
+    Timeout int    `json:"timeout,omitempty" description:"Timeout in seconds"`
 }
+
+func (p *myPlugin) Schema(ctx context.Context) ([]byte, error) {
+    return sdk.GenerateSchema(MyConfig{})
+}
+```
+
+### Check
+
+Executes the plugin logic and returns evidence:
+
+```go
+func (p *myPlugin) Check(ctx context.Context, config sdk.Config) (sdk.Evidence, error) {
+    // 1. Parse and validate config
+    var cfg MyConfig
+    if err := sdk.ValidateConfig(config, &cfg); err != nil {
+        return sdk.Evidence{
+            Status: false,
+            Error:  sdk.ToErrorDetail(&sdk.ConfigError{Err: err}),
+        }, nil
+    }
+    
+    // 2. Perform your check
+    result, err := doCheck(cfg)
+    if err != nil {
+        return sdk.Failure("internal", err.Error()), nil
+    }
+    
+    // 3. Return success with evidence
+    return sdk.Success(map[string]interface{}{
+        "url":        cfg.URL,
+        "status":     result.Status,
+        "latency_ms": result.LatencyMs,
+    }), nil
+}
+```
+
+## SDK Functions
+
+### Config Validation
+
+```go
+// Parse config map into typed struct
+var cfg MyConfig
+if err := sdk.ValidateConfig(config, &cfg); err != nil {
+    return sdk.Evidence{Status: false, Error: sdk.ToErrorDetail(err)}, nil
+}
+```
+
+### Schema Generation
+
+```go
+// Generate JSON Schema from struct tags
+type Config struct {
+    Path    string `json:"path" validate:"required" description:"File path"`
+    Timeout int    `json:"timeout,omitempty" description:"Timeout in seconds"`
+}
+
+schema, err := sdk.GenerateSchema(Config{})
+```
+
+### Response Builders
+
+```go
+// Success with data
+return sdk.Success(map[string]interface{}{
+    "exists": true,
+    "size":   1024,
+}), nil
+
+// Failure with typed error
+return sdk.Failure("network", "connection refused"), nil
+
+// Failure with error detail
+return sdk.Evidence{
+    Status: false,
+    Error:  sdk.ToErrorDetail(err),
+}, nil
+```
+
+### Error Types
+
+Use typed errors for better error categorization:
+
+```go
+// Config errors
+&sdk.ConfigError{Field: "path", Err: errors.New("path is required")}
+
+// Network errors
+&sdk.NetworkError{Operation: "connect", Host: "example.com", Err: err}
+
+// Timeout errors
+&sdk.TimeoutError{Operation: "http_request", Duration: 30*time.Second}
+
+// Capability errors
+&sdk.CapabilityError{Required: "fs:read:/etc/passwd"}
 ```
 
 ## Capabilities
 
 Capabilities declare what resources the plugin needs:
 
-- **`fs:read:<pattern>`** - Read filesystem access
-- **`fs:write:<pattern>`** - Write filesystem access
-- **`network:outbound:<ports>`** - Network access
-- **`exec:<commands>`** - Command execution
-- **`env:<pattern>`** - Environment variables
+| Kind | Pattern | Example |
+|:-----|:--------|:--------|
+| `fs` | `read:<path>` | `read:/etc/**` |
+| `fs` | `write:<path>` | `write:/tmp/**` |
+| `network` | `outbound:<ports>` | `outbound:80,443` |
+| `exec` | `<command>` | `systemctl` |
+| `env` | `<pattern>` | `AWS_*` |
 
-Examples:
+## Plugin Structure
 
-```go
-"capabilities": []map[string]string{
-    {"kind": "fs", "pattern": "read:/etc/**"},           // Read /etc
-    {"kind": "network", "pattern": "outbound:80,443"},   // HTTP/HTTPS
-    {"kind": "network", "pattern": "outbound:*"},        // Any port
-    {"kind": "exec", "pattern": "systemctl"},            // Run systemctl
-    {"kind": "env", "pattern": "AWS_*"},                 // AWS env vars
-}
+```
+plugins/myplugin/
+├── plugin.go     # Main plugin implementation
+├── go.mod        # Go module
+├── Makefile      # Build configuration (optional)
+└── README.md     # Documentation
+```
+
+## Build Commands
+
+```bash
+# Build single plugin
+GOOS=wasip1 GOARCH=wasm go build -o myplugin.wasm .
+
+# Build all plugins (from project root)
+make build-plugins
 ```
 
 ## Testing
 
-### Unit Testing
+### Unit Tests
 
-Plugin logic can be unit tested as normal Go code before compilation to WASM.
-
-### Integration Testing
-
-Add tests to `internal/infrastructure/wasm/plugin_integration_test.go`:
+Test your plugin logic as normal Go code:
 
 ```go
-func Test_MyPlugin_Success(t *testing.T) {
+func TestMyPlugin_Check(t *testing.T) {
+    p := &myPlugin{}
     ctx := context.Background()
-    runtime, err := wasm.NewRuntime(ctx)
+    
+    config := sdk.Config{"url": "https://example.com"}
+    evidence, err := p.Check(ctx, config)
+    
     require.NoError(t, err)
-    defer runtime.Close()
-
-    // Load plugin WASM
-    wasmBytes, err := os.ReadFile("../../plugins/myplugin/myplugin.wasm")
-    require.NoError(t, err)
-
-    plugin, err := runtime.LoadPlugin("myplugin", wasmBytes)
-    require.NoError(t, err)
-
-    // Test describe()
-    info, err := plugin.Describe()
-    require.NoError(t, err)
-    assert.Equal(t, "myplugin", info.Name)
-
-    // Test observe() - success case
-    config := wasm.Config{
-        Values: map[string]string{
-            "url": "https://example.com",
-        },
-    }
-    result, err := plugin.Observe(config)
-    require.NoError(t, err)
-    assert.True(t, result.Evidence.Data["status"].(bool))
+    assert.True(t, evidence.Status)
 }
 ```
 
-## Build System
+### Integration Tests
 
-### Building Single Plugin
-
-```bash
-cd plugins/myplugin
-make build
-```
-
-### Building All Plugins
-
-```bash
-make build-plugins       # From project root
-```
-
-### Build Command
-
-```bash
-GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -o plugin.wasm main.go
-```
-
-- `GOOS=wasip1` - WebAssembly System Interface (POSIX subset)
-- `GOARCH=wasm` - WebAssembly architecture
-- `-buildmode=c-shared` - Required for WASI
-- Output: ~3-4MB per plugin (acceptable for embedding)
-
-## Common Patterns
-
-### Reading Configuration
-
-```go
-// String field
-url, ok := config["url"].(string)
-if !ok || url == "" {
-    return errorResponse("missing required field: url")
-}
-
-// Integer field with default
-timeout := 30
-if t, ok := config["timeout"].(float64); ok {
-    timeout = int(t) // JSON numbers are float64
-}
-
-// Boolean field
-verify := true
-if v, ok := config["verify_tls"].(bool); ok {
-    verify = v
-}
-
-// Array field
-var hosts []string
-if h, ok := config["hosts"].([]interface{}); ok {
-    for _, item := range h {
-        if s, ok := item.(string); ok {
-            hosts = append(hosts, s)
-        }
-    }
-}
-```
-
-### Error Handling
-
-```go
-result, err := someOperation()
-if err != nil {
-    return errorResponse(fmt.Sprintf("operation failed: %v", err))
-}
-
-// Validation error
-if value < 0 {
-    return errorResponse(fmt.Sprintf("invalid value: %d (must be >= 0)", value))
-}
-```
-
-### Timing Operations
-
-```go
-import "time"
-
-start := time.Now()
-result, err := doSomething()
-duration := time.Since(start)
-
-return successResponse(map[string]interface{}{
-    "result":      result,
-    "duration_ms": duration.Milliseconds(),
-})
-```
-
-## Best Practices
-
-1. **Validate all config fields** before use
-2. **Return specific error messages** - help users fix their profiles
-3. **Include relevant evidence** - timestamps, response codes, sizes, etc.
-4. **Use timeouts** for network/exec operations
-5. **Handle edge cases** - empty strings, nil values, out-of-range numbers
-6. **Document your schema** in README.md with examples
-7. **Test both success and failure paths**
-8. **Keep plugins focused** - one responsibility per plugin
+See `internal/infrastructure/wasm/plugin_integration_test.go` for WASM integration test examples.
 
 ## Network Operations
 
-**IMPORTANT**: WASI Preview 1 does not support network sockets directly. Network operations use **host functions** provided by Reglet.
-
-### Available Host Functions
+WASI doesn't support direct network sockets. Network plugins use **host functions**:
 
 | Plugin | Host Function | Status |
 |:-------|:--------------|:-------|
-| **dns** | `dns_resolve` | ✅ Complete |
-| **http** | `http_request` | ✅ Complete |
-| **tcp** | `tcp_connect` | ✅ Complete |
-| **smtp** | `smtp_connect` | ✅ Complete |
+| `dns` | `dns_resolve` | ✅ |
+| `http` | `http_request` | ✅ |
+| `tcp` | `tcp_connect` | ✅ |
+| `smtp` | `smtp_connect` | ✅ |
 
-### How It Works
+See `sdk/go/net/` for the SDK network client implementations.
 
-1. Plugin calls the host function (e.g., `dns_resolve`)
-2. Host performs the network operation with capability checking
-3. Results are marshaled back to the plugin via shared memory
+## Best Practices
 
-See existing network plugins (`plugins/dns/`, `plugins/http/`, `plugins/tcp/`, `plugins/smtp/`) for implementation examples.
-
-## Platform Considerations
-
-### Linux-Specific Plugins
-
-Some plugins only work on Linux (process, systemd). Document this clearly:
-
-```go
-// In describe()
-"platform": "linux",
-```
-
-In tests, skip gracefully:
-
-```go
-if runtime.GOOS != "linux" {
-    t.Skip("process plugin is Linux-only")
-}
-```
-
-### Cross-Platform Plugins
-
-Network plugins (http, tcp, dns) work on all platforms.
+1. **Use typed configs** — Define struct with `json` and `validate` tags
+2. **Validate early** — Call `sdk.ValidateConfig` at start of Check()
+3. **Return specific errors** — Use typed error types for categorization
+4. **Include evidence** — Return useful data for expect expressions
+5. **Handle timeouts** — Use context for cancellation
+6. **Keep plugins focused** — One responsibility per plugin
 
 ## References
 
-- **File Plugin**: `plugins/file/main.go` - Reference implementation
-- **Memory Guide**: `docs/plugin-memory-management.md` - Deep dive on memory
-- **Integration Tests**: `internal/infrastructure/wasm/plugin_integration_test.go` - Test patterns
-- **Host Interface**: `internal/infrastructure/wasm/plugin.go` - How host calls plugins
+- **File Plugin**: `plugins/file/plugin.go` — Reference implementation
+- **SDK Types**: `sdk/go/types.go` — Core types (Evidence, Config, Metadata)
+- **SDK Helpers**: `sdk/go/helpers.go` — ValidateConfig, GenerateSchema
+- **Network SDK**: `sdk/go/net/` — HTTP, DNS, TCP, SMTP clients
