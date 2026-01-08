@@ -2,6 +2,15 @@
 
 Reglet includes a built-in redaction system to sanitize sensitive data (secrets, PII, credentials) from plugin output before it is stored or displayed. This ensures audit artifacts are safe to share with auditors or store in logs.
 
+## How It Works
+
+Redaction uses a **two-phase approach**:
+
+1. **Gitleaks Detection** — Industry-standard secret detection covering AWS keys, GitHub tokens, JWTs, Stripe keys, private keys, and more
+2. **Custom Pattern Matching** — Your own regex patterns for organization-specific secrets
+
+Both phases are applied automatically to all plugin output.
+
 ## Configuration
 
 Redaction is configured in your system configuration file (usually `~/.reglet/config.yaml`).
@@ -25,11 +34,35 @@ redaction:
     - "secret_key"
     - "token"
     - "auth.bearer"
+
+  # Disable gitleaks detector (use only custom patterns)
+  # Default: false (gitleaks enabled)
+  disable_gitleaks: false
 ```
 
-### 1. Pattern Matching (Regex)
+### 1. Gitleaks Detection (Default)
 
-You can define regular expressions to find and redact secrets within text blocks (like log files or command output). Reglet comes with built-in patterns for common secrets (AWS keys, private keys, etc.), but you can add your own.
+By default, Reglet uses the [gitleaks](https://github.com/gitleaks/gitleaks) library to detect secret patterns including:
+
+- AWS Access Keys, Secret Keys, Session Tokens
+- GitHub/GitLab/Bitbucket tokens
+- Private keys (RSA, DSA, EC, PGP)
+- JWTs and Bearer tokens
+- Stripe, Slack, Twilio, SendGrid API keys
+- Database connection strings
+- And many more...
+
+This provides comprehensive coverage without configuration.
+
+**To disable gitleaks** (use only custom patterns):
+```yaml
+redaction:
+  disable_gitleaks: true
+```
+
+### 2. Custom Pattern Matching (Regex)
+
+You can define regular expressions to find and redact organization-specific secrets.
 
 **Example:**
 If you define `patterns: ["MySecret-[0-9]+"]`, the text:
@@ -37,7 +70,7 @@ If you define `patterns: ["MySecret-[0-9]+"]`, the text:
 becomes:
 `"The code is [REDACTED]"`
 
-### 2. Path Matching (Structural)
+### 3. Path Matching (Structural)
 
 For structured data (JSON results from plugins), you can redact values based on their key name. This is faster and safer than regex for known fields.
 
@@ -58,17 +91,18 @@ If you define `paths: ["password"]`, any field named `password` in the evidence 
 }
 ```
 
-### 3. Hash Mode
+### 4. Hash Mode
 
 By default, secrets are replaced with the static string `[REDACTED]`. 
 
-If you enable `hash_mode`, secrets are replaced with a truncated SHA-256 hash of the value. This allows you to correlate secrets (prove they are the same across two different checks) without revealing the secret itself.
+If you enable `hash_mode`, secrets are replaced with a truncated HMAC-SHA256 hash of the value. This allows you to correlate secrets (prove they are the same across two different checks) without revealing the secret itself.
 
 **Config:**
 ```yaml
 redaction:
   hash_mode:
     enabled: true
+    salt: "random-string-generated-by-you"
 ```
 
 **Output:**
@@ -77,25 +111,12 @@ redaction:
 ```
 
 **Salting:**
-To prevent rainbow table attacks (where an attacker pre-computes hashes for common passwords), you should configure a **salt**. This ensures that the hash of "password123" is unique to your organization.
-
-```yaml
-redaction:
-  hash_mode:
-    enabled: true
-    salt: "random-string-generated-by-you"
-```
-
-## Built-in Patterns
-
-Reglet automatically attempts to detect and redact high-confidence secrets even without configuration, including:
-- AWS Access Key IDs (`AKIA...`)
-- Generic Private Key headers (`-----BEGIN RSA PRIVATE KEY-----`)
-- GitHub Tokens (`ghp_...`)
+To prevent rainbow table attacks, always configure a **salt**. This ensures that the hash of "password123" is unique to your organization.
 
 ## Best Practices
 
-1.  **Prefer Path Matching**: Whenever possible, rely on path matching (`paths`) rather than regex. It is more performant and less prone to false positives.
-2.  **Use Hash Mode for Audits**: Hash mode is useful when an auditor asks "Is the API key on Server A the same as Server B?". You can show them matching hashes without revealing the key.
-3.  **Test Your Patterns**: Regex can be tricky. Test your patterns against dummy data to ensure they catch what you expect without redacting too much.
-4.  **Use a Salt**: If using Hash Mode, always configure a secret salt in your local config to prevent reversing the hashes.
+1. **Leave Gitleaks Enabled**: The patterns cover most common secrets with minimal false positives
+2. **Add Custom Patterns**: Use `patterns` for organization-specific secrets (internal IDs, custom tokens)
+3. **Use Path Matching for Known Fields**: Faster and more precise than regex for structured data
+4. **Use Hash Mode for Audits**: Useful when an auditor asks "Is the API key on Server A the same as Server B?"
+5. **Always Use a Salt**: If using Hash Mode, configure a secret salt to prevent reversing the hashes
