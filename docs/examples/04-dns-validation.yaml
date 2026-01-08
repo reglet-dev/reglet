@@ -11,6 +11,9 @@ profile:
   description: DNS record validation and resolution checks
   version: 1.0.0
 
+plugins:
+  - dns
+
 controls:
   items:
     - id: dns-google-a-record

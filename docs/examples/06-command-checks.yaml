@@ -10,7 +10,7 @@ profile:
   version: 1.0.0
 
 plugins:
-  - ./plugins/command/command.wasm
+  - command
 
 controls:
   defaults:

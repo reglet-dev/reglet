@@ -12,6 +12,9 @@ profile:
   description: SOC2 control CC6.1 - SSH security baseline
   version: 1.0.0
 
+plugins:
+  - file
+
 controls:
   items:
     - id: soc2-cc6.1-ssh-config-exists

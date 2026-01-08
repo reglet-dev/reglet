@@ -11,6 +11,9 @@ profile:
   description: TCP port checks and TLS validation
   version: 1.0.0
 
+plugins:
+  - tcp
+
 controls:
   items:
     - id: tcp-google-http

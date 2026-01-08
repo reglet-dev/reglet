@@ -17,9 +17,10 @@ import (
 
 // ObservationExecutor executes observations using WASM plugins.
 type ObservationExecutor struct {
-	runtime   *wasm.Runtime
-	pluginDir string // Base directory where plugins are located (e.g., /path/to/project/plugins)
-	redactor  *redaction.Redactor
+	runtime        *wasm.Runtime
+	pluginDir      string // Base directory where plugins are located (e.g., /path/to/project/plugins)
+	redactor       *redaction.Redactor
+	pluginRegistry *entities.PluginRegistry // Optional registry for alias resolution
 }
 
 // NewObservationExecutor creates a new observation executor with auto-detected plugin directory.
@@ -49,6 +50,21 @@ func NewExecutor(runtime *wasm.Runtime, pluginDir string, redactor *redaction.Re
 		pluginDir: pluginDir,
 		redactor:  redactor,
 	}
+}
+
+// NewExecutorWithRegistry creates an executor with plugin alias resolution support.
+func NewExecutorWithRegistry(runtime *wasm.Runtime, pluginDir string, redactor *redaction.Redactor, registry *entities.PluginRegistry) *ObservationExecutor {
+	return &ObservationExecutor{
+		runtime:        runtime,
+		pluginDir:      pluginDir,
+		redactor:       redactor,
+		pluginRegistry: registry,
+	}
+}
+
+// SetPluginRegistry sets the plugin registry for alias resolution.
+func (e *ObservationExecutor) SetPluginRegistry(registry *entities.PluginRegistry) {
+	e.pluginRegistry = registry
 }
 
 // findProjectRoot attempts to find the project root by looking for the go.mod file.
@@ -163,19 +179,32 @@ func (e *ObservationExecutor) Execute(ctx context.Context, obs entities.Observat
 	return result
 }
 
-// LoadPlugin loads a plugin by name.
+// LoadPlugin loads a plugin by name or alias.
+// If a plugin registry is set, aliases are resolved to their actual plugin names.
 // Phase 1b loads from file system. Phase 2 will use embedded plugins.
 func (e *ObservationExecutor) LoadPlugin(ctx context.Context, pluginName string) (*wasm.Plugin, error) {
-	// Check if already loaded in runtime cache
+	// Resolve alias if registry is set
+	resolvedName := pluginName
+	if e.pluginRegistry != nil {
+		spec := e.pluginRegistry.Resolve(pluginName)
+		resolvedName = spec.PluginName()
+	}
+
+	// Check if already loaded in runtime cache (check both alias and resolved name)
 	if plugin, ok := e.runtime.GetPlugin(pluginName); ok {
 		return plugin, nil
+	}
+	if resolvedName != pluginName {
+		if plugin, ok := e.runtime.GetPlugin(resolvedName); ok {
+			return plugin, nil
+		}
 	}
 
 	// Validate plugin name to prevent path traversal
 	// NewPluginName enforces strict character set (alphanumeric, _, -) and no paths
-	validName, err := values.NewPluginName(pluginName)
+	validName, err := values.NewPluginName(resolvedName)
 	if err != nil {
-		return nil, fmt.Errorf("invalid plugin name %q: %w", pluginName, err)
+		return nil, fmt.Errorf("invalid plugin name %q (resolved from %q): %w", resolvedName, pluginName, err)
 	}
 
 	// Construct plugin path using the pre-calculated pluginDir
@@ -187,10 +216,10 @@ func (e *ObservationExecutor) LoadPlugin(ctx context.Context, pluginName string)
 	//nolint:gosec // G304: pluginPath is constructed from validated pluginName (alphanumeric only)
 	wasmBytes, err := os.ReadFile(pluginPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read plugin %s: %w (expected at %s)", pluginName, err, pluginPath)
+		return nil, fmt.Errorf("failed to read plugin %s: %w (expected at %s)", resolvedName, err, pluginPath)
 	}
 
-	// Load the plugin into the runtime
+	// Load the plugin into the runtime with the alias as the key for caching
 	return e.runtime.LoadPlugin(ctx, pluginName, wasmBytes)
 }
 

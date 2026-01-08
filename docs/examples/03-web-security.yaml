@@ -11,6 +11,9 @@ profile:
   description: HTTP/HTTPS validation and security header checks
   version: 1.0.0
 
+plugins:
+  - http
+
 controls:
   items:
     - id: http-responds

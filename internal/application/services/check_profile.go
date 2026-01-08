@@ -5,6 +5,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/expr-lang/expr"
@@ -95,7 +98,12 @@ func (uc *CheckProfileUseCase) Execute(ctx context.Context, req dto.CheckProfile
 		}
 	}
 
-	// 5. Collect required capabilities using capability orchestrator
+	// 5. Validate declared plugins exist and match used plugins
+	if err := uc.validateDeclaredPlugins(profile, pluginDir); err != nil {
+		return nil, err
+	}
+
+	// 6. Collect required capabilities using capability orchestrator
 	requiredCaps, tempRuntime, err := uc.capOrchestrator.CollectCapabilities(ctx, profile, pluginDir)
 	if err != nil {
 		return nil, apperrors.NewConfigurationError("capabilities", "failed to collect capabilities", err)
@@ -106,13 +114,13 @@ func (uc *CheckProfileUseCase) Execute(ctx context.Context, req dto.CheckProfile
 		}
 	}()
 
-	// 6. Grant capabilities (interactive or auto-grant)
+	// 7. Grant capabilities (interactive or auto-grant)
 	grantedCaps, err := uc.capOrchestrator.GrantCapabilities(requiredCaps, req.Options.TrustPlugins)
 	if err != nil {
 		return nil, apperrors.NewCapabilityError("capability grant failed", flattenCapabilities(requiredCaps))
 	}
 
-	// 7. Create execution engine with granted capabilities and filters
+	// 8. Create execution engine with granted capabilities and filters
 	eng, err := uc.engineFactory.CreateEngine(ctx, profile, grantedCaps, pluginDir, req.Filters, req.Execution, req.Options.SkipSchemaValidation)
 	if err != nil {
 		return nil, apperrors.NewConfigurationError("engine", "failed to create engine", err)
@@ -121,7 +129,7 @@ func (uc *CheckProfileUseCase) Execute(ctx context.Context, req dto.CheckProfile
 		_ = eng.Close(ctx)
 	}()
 
-	// 8. Execute profile
+	// 9. Execute profile
 	uc.logger.Info("executing profile")
 	result, err := eng.Execute(ctx, profile)
 	if err != nil {
@@ -136,7 +144,7 @@ func (uc *CheckProfileUseCase) Execute(ctx context.Context, req dto.CheckProfile
 		"errors", result.Summary.ErrorControls,
 		"skipped", result.Summary.SkippedControls)
 
-	// 9. Build response
+	// 10. Build response
 	response := &dto.CheckProfileResponse{
 		ExecutionResult: result,
 		Metadata: dto.ResponseMetadata{
@@ -200,6 +208,97 @@ func (uc *CheckProfileUseCase) validateFilters(profile entities.ProfileReader, f
 	}
 
 	return nil
+}
+
+// builtInPlugins lists plugins that are embedded in the reglet binary.
+var builtInPlugins = map[string]bool{
+	"file":    true,
+	"http":    true,
+	"dns":     true,
+	"tcp":     true,
+	"smtp":    true,
+	"command": true,
+}
+
+// validateDeclaredPlugins validates that declared plugins exist and are used.
+// This provides early feedback if a profile references unavailable plugins.
+func (uc *CheckProfileUseCase) validateDeclaredPlugins(profile entities.ProfileReader, pluginDir string) error {
+	declaredPlugins := profile.GetPlugins()
+	if len(declaredPlugins) == 0 {
+		// No plugins declared - skip validation (backwards compatibility)
+		return nil
+	}
+
+	// Build set of plugins used in observations
+	usedPlugins := make(map[string]bool)
+	for _, ctrl := range profile.GetAllControls() {
+		for _, obs := range ctrl.ObservationDefinitions {
+			usedPlugins[obs.Plugin] = true
+		}
+	}
+
+	// Validate each declared plugin
+	for _, declared := range declaredPlugins {
+		// Extract plugin name from path if it's a path (e.g., ./plugins/file/file.wasm -> file)
+		pluginName := extractPluginName(declared)
+
+		// Check if it's a built-in plugin
+		if builtInPlugins[pluginName] {
+			continue
+		}
+
+		// Check if external plugin exists on filesystem
+		if pluginDir != "" {
+			pluginPath := filepath.Join(pluginDir, pluginName, pluginName+".wasm")
+			if _, err := os.Stat(pluginPath); err == nil {
+				continue
+			}
+		}
+
+		// Check if declared path exists directly (for ./plugins/... format)
+		if strings.HasPrefix(declared, "./") || strings.HasPrefix(declared, "/") {
+			if _, err := os.Stat(declared); err == nil {
+				continue
+			}
+		}
+
+		return apperrors.NewValidationError(
+			"plugins",
+			fmt.Sprintf("declared plugin %q not found (not built-in and not found at %s)", declared, pluginDir),
+		)
+	}
+
+	// Warn if plugins are used but not declared (informational only)
+	for used := range usedPlugins {
+		found := false
+		for _, declared := range declaredPlugins {
+			if extractPluginName(declared) == used {
+				found = true
+				break
+			}
+		}
+		if !found && !builtInPlugins[used] {
+			uc.logger.Warn("plugin used in observations but not declared in profile",
+				"plugin", used,
+				"hint", "add to 'plugins:' section for explicit dependency tracking")
+		}
+	}
+
+	return nil
+}
+
+// extractPluginName extracts the plugin name from a path or returns the input.
+// Examples:
+//   - "./plugins/file/file.wasm" -> "file"
+//   - "file" -> "file"
+//   - "/path/to/custom.wasm" -> "custom"
+func extractPluginName(declared string) string {
+	// If it's a path, extract the base name without extension
+	if strings.Contains(declared, "/") {
+		base := filepath.Base(declared)
+		return strings.TrimSuffix(base, ".wasm")
+	}
+	return declared
 }
 
 // flattenCapabilities converts map of capabilities to flat list.

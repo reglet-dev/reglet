@@ -9,6 +9,9 @@ profile:
   description: Basic security checks for project files
   version: 1.0.0
 
+plugins:
+  - file
+
 controls:
   items:
     - id: go-mod-exists

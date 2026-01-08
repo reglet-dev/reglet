@@ -81,6 +81,25 @@ func (p *Profile) GetPlugins() []string {
 	return p.Plugins
 }
 
+// BuildPluginRegistry creates a PluginRegistry from the profile's plugin declarations.
+// This supports the current simple list format for backwards compatibility.
+// Future versions will support map format with aliases.
+func (p *Profile) BuildPluginRegistry() (*PluginRegistry, error) {
+	registry := NewPluginRegistry()
+
+	for _, decl := range p.Plugins {
+		spec, err := ParsePluginDeclaration(decl)
+		if err != nil {
+			return nil, fmt.Errorf("invalid plugin declaration %q: %w", decl, err)
+		}
+		if err := registry.Register(spec); err != nil {
+			return nil, err
+		}
+	}
+
+	return registry, nil
+}
+
 // GetVars returns the profile variables.
 func (p *Profile) GetVars() map[string]interface{} {
 	return p.Vars
