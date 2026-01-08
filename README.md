@@ -1,4 +1,4 @@
-# ![logov1-small](https://github.com/user-attachments/assets/d62c9bd1-d769-4775-a9d4-1871d4be8f74) Reglet
+# ![logo-small](.github/assets/logo-small.svg) Reglet
 
 > **Compliance as Code. Secure by Design.**
 
@@ -20,15 +20,8 @@ make build
 
 # Try it
 ./bin/reglet check docs/examples/01-quickstart.yaml
-
-# Example output:
-# ✓ go-mod-exists: Go module file exists
-# ✓ readme-exists: README file exists  
-# ✓ makefile-exists: Makefile exists
-# ✓ go-mod-readable: Go module file is readable
-#
-# 4 passed, 0 failed
 ```
+![demo](.github/assets/demo.gif)
 
 ## Usage
 ```bash
