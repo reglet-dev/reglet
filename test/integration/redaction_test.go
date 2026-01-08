@@ -25,7 +25,7 @@ func TestRedaction_EndToEnd(t *testing.T) {
 	// 2. Create a temporary home directory for config
 	tempHome := t.TempDir()
 	configDir := filepath.Join(tempHome, ".reglet")
-	err = os.MkdirAll(configDir, 0755)
+	err = os.MkdirAll(configDir, 0o755)
 	require.NoError(t, err)
 
 	// 3. Create config.yaml with redaction rules
@@ -38,7 +38,7 @@ redaction:
   hash_mode:
     enabled: false
 `
-	err = os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte(configContent), 0600)
+	err = os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte(configContent), 0o600)
 	require.NoError(t, err)
 
 	// 4. Create a test profile
@@ -47,6 +47,9 @@ redaction:
 profile:
   name: redaction-test
   version: 1.0.0
+
+plugins:
+  - command
 
 controls:
   items:
@@ -61,7 +64,7 @@ controls:
           expect:
             - data.exit_code == 0
 `
-	err = os.WriteFile(profilePath, []byte(profileContent), 0600)
+	err = os.WriteFile(profilePath, []byte(profileContent), 0o600)
 	require.NoError(t, err)
 
 	// 5. Run reglet check
