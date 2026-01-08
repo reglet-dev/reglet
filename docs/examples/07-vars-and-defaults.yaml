@@ -1,0 +1,69 @@
+# Variables and Defaults Example
+#
+# This profile demonstrates:
+# - vars: Reusable variables for paths, configs, etc.
+# - defaults: Default values inherited by all controls
+#
+# Run with: ./bin/reglet check docs/examples/07-vars-and-defaults.yaml --trust-plugins
+
+profile:
+  name: Variables and Defaults Demo
+  description: Demonstrates vars substitution and control defaults
+  version: 1.0.0
+
+plugins:
+  - file
+
+# Variables are substituted using {{ .vars.key }} syntax
+vars:
+  config_dir: /etc
+  app_name: myapp
+
+# Defaults are inherited by all controls
+controls:
+  defaults:
+    severity: medium
+    owner: platform-team
+    tags: [compliance, baseline]
+
+  items:
+    # This control inherits: severity=medium, owner=platform-team, tags=[compliance, baseline]
+    - id: passwd-exists
+      name: Password file exists
+      description: Verify system password file using variable substitution
+      observations:
+        - plugin: file
+          config:
+            path: "{{ .vars.config_dir }}/passwd"
+
+    # Override severity but inherit owner and tags
+    - id: group-file
+      name: Group file exists
+      description: Verify system group file exists
+      severity: high
+      observations:
+        - plugin: file
+          config:
+            path: "{{ .vars.config_dir }}/group"
+          expect:
+            - "data.exists == true"
+
+    # Override tags but inherit severity and owner
+    - id: hosts-file
+      name: Hosts file exists
+      tags: [networking, dns]
+      observations:
+        - plugin: file
+          config:
+            path: "{{ .vars.config_dir }}/hosts"
+
+    # Full override - specify everything
+    - id: ssh-config
+      name: SSH config exists
+      severity: critical
+      owner: security-team
+      tags: [ssh, security, hardening]
+      observations:
+        - plugin: file
+          config:
+            path: "{{ .vars.config_dir }}/ssh/sshd_config"

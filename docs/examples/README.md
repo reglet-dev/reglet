@@ -7,7 +7,7 @@ These examples demonstrate Reglet's capabilities with real-world checks.
 Try the quickstart example first - it works on any Linux system:
 
 ```bash
-./bin/reglet check examples/01-quickstart.yaml
+./bin/reglet check docs/examples/01-quickstart.yaml --trust-plugins
 ```
 
 ## Available Examples
@@ -155,6 +155,56 @@ controls:
 
 ---
 
+### 06-command-checks.yaml - Command Execution
+
+**What it checks:**
+- Service status (systemd)
+- System uptime
+- Kernel version
+- Disk usage thresholds
+- Security updates
+- User existence
+
+**Requirements:** Linux system with systemd
+**Plugins:** `command`
+
+**Try it:**
+```bash
+./bin/reglet check docs/examples/06-command-checks.yaml --trust-plugins
+```
+
+---
+
+### 07-vars-and-defaults.yaml - Variables and Defaults
+
+**What it checks:**
+- Demonstrates `vars` substitution using `{{ .vars.key }}` syntax
+- Shows `controls.defaults` for inherited severity, owner, tags
+- Various file existence checks using variables
+
+**Requirements:** None - works on any Linux system
+**Plugins:** `file`
+
+**Try it:**
+```bash
+./bin/reglet check docs/examples/07-vars-and-defaults.yaml --trust-plugins
+```
+
+**Features demonstrated:**
+```yaml
+vars:
+  config_dir: /etc
+
+controls:
+  defaults:
+    severity: medium
+    owner: platform-team
+  items:
+    - id: example
+      # Uses {{ .vars.config_dir }}/passwd
+      # Inherits severity=medium, owner=platform-team
+```
+
 ## Running Examples
 
 ### Basic usage
@@ -196,9 +246,9 @@ controls:
 ## Plugin Summary
 
 | Plugin | Examples | Use Cases |
-|--------|--------|----------|-----------|
-| `file` | 01, 02 | File permissions, content checks, config validation |
-| `command` | 02 | Service status, command output validation |
+|--------|----------|----------|
+| `file` | 01, 02, 07 | File permissions, content checks, config validation |
+| `command` | 06 | Service status, command output validation |
 | `http` | 03 | Web endpoints, APIs, status codes, response validation |
 | `dns` | 04 | DNS resolution, record validation, propagation checks |
 | `tcp` | 05 | Port connectivity, TLS validation, service availability |
@@ -226,6 +276,12 @@ You can combine checks from different examples:
 profile:
   name: Complete Infrastructure Audit
   description: File, network, and service checks
+
+plugins:
+  - file
+  - http
+  - dns
+  - tcp
 
 controls:
   # From quickstart
@@ -268,12 +324,6 @@ controls:
           data.connected == true &&
           data.tls_version >= "TLS 1.2"
 ```
-
-## Next Steps
-
-- **Read the guide:** [docs/getting-started.md](../docs/getting-started.md)
-- **Profile syntax:** [docs/writing-profiles.md](../docs/writing-profiles.md)
-- **Plugin reference:** [docs/plugins.md](../docs/plugins.md)
 
 ## Need Help?
 

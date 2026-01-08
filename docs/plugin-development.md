@@ -282,16 +282,16 @@ See `sdk/go/net/` for the SDK network client implementations.
 
 ## Best Practices
 
-1. **Use typed configs** — Define struct with `json` and `validate` tags
-2. **Validate early** — Call `sdk.ValidateConfig` at start of Check()
-3. **Return specific errors** — Use typed error types for categorization
-4. **Include evidence** — Return useful data for expect expressions
-5. **Handle timeouts** — Use context for cancellation
-6. **Keep plugins focused** — One responsibility per plugin
+1. **Use typed configs** - Define struct with `json` and `validate` tags
+2. **Validate early** - Call `sdk.ValidateConfig` at start of Check()
+3. **Return specific errors** - Use typed error types for categorization
+4. **Include evidence** - Return useful data for expect expressions
+5. **Handle timeouts** - Use context for cancellation
+6. **Keep plugins focused** - One responsibility per plugin
 
 ## References
 
-- **File Plugin**: `plugins/file/plugin.go` — Reference implementation
-- **SDK Types**: `sdk/go/types.go` — Core types (Evidence, Config, Metadata)
-- **SDK Helpers**: `sdk/go/helpers.go` — ValidateConfig, GenerateSchema
-- **Network SDK**: `sdk/go/net/` — HTTP, DNS, TCP, SMTP clients
+- **File Plugin**: `plugins/file/plugin.go` - Reference implementation
+- **SDK Types**: `sdk/go/types.go` - Core types (Evidence, Config, Metadata)
+- **SDK Helpers**: `sdk/go/helpers.go` - ValidateConfig, GenerateSchema
+- **Network SDK**: `sdk/go/net/` - HTTP, DNS, TCP, SMTP clients

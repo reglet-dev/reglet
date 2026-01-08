@@ -130,6 +130,7 @@ make build
 - **[04-dns-validation.yaml](docs/examples/04-dns-validation.yaml)** - DNS resolution and records
 - **[05-tcp-connectivity.yaml](docs/examples/05-tcp-connectivity.yaml)** - TCP ports and TLS testing
 - **[06-command-checks.yaml](docs/examples/06-command-checks.yaml)** - Command execution and output validation
+- **[07-vars-and-defaults.yaml](docs/examples/07-vars-and-defaults.yaml)** - Variables and control defaults
 
 ## Status: Alpha (v0.2.0-alpha)
 

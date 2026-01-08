@@ -6,8 +6,8 @@ Reglet includes a built-in redaction system to sanitize sensitive data (secrets,
 
 Redaction uses a **two-phase approach**:
 
-1. **Gitleaks Detection** — Industry-standard secret detection covering AWS keys, GitHub tokens, JWTs, Stripe keys, private keys, and more
-2. **Custom Pattern Matching** — Your own regex patterns for organization-specific secrets
+1. **Gitleaks Detection** - Industry-standard secret detection covering AWS keys, GitHub tokens, JWTs, Stripe keys, private keys, and more
+2. **Custom Pattern Matching** - Your own regex patterns for organization-specific secrets
 
 Both phases are applied automatically to all plugin output.
 
