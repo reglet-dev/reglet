@@ -48,24 +48,33 @@ func init() {
 // initConfig loads configuration from the config file and environment.
 func initConfig() {
 	if cfgFile != "" {
+		// User explicitly specified a config file - it must exist
 		viper.SetConfigFile(cfgFile)
-	} else {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			slog.Error("failed to find home directory", "error", err)
+		if err := viper.ReadInConfig(); err != nil {
+			slog.Error("failed to read specified config file", "file", cfgFile, "error", err)
 			os.Exit(1)
 		}
-
-		viper.AddConfigPath(home)
-		viper.SetConfigType("yaml")
-		viper.SetConfigName(".reglet")
+		slog.Debug("using config file", "file", viper.ConfigFileUsed())
+		return
 	}
+
+	// Default config path - optional, don't fail if missing
+	home, err := os.UserHomeDir()
+	if err != nil {
+		slog.Error("failed to find home directory", "error", err)
+		os.Exit(1)
+	}
+
+	viper.AddConfigPath(home + "/.reglet")
+	viper.SetConfigType("yaml")
+	viper.SetConfigName("config")
 
 	viper.AutomaticEnv()
 
 	if err := viper.ReadInConfig(); err == nil {
 		slog.Debug("using config file", "file", viper.ConfigFileUsed())
 	}
+	// Silently continue if default config doesn't exist
 }
 
 func setupLogging() {
