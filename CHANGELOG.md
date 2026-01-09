@@ -72,6 +72,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Create plugin cli command
 - Enhance install script and documentation
 
+### CI/CD
+- Run changelog update after goreleaser succeeds
+
 ### Changed
 - **cli:** Move from flags to cobra
 - **plugins:** Swap plugins to use go sdk
