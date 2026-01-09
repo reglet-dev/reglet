@@ -36,10 +36,12 @@ builds:
 
 archives:
   - id: reglet-archive
-    format: tar.gz
+    formats:
+      - tar.gz
     format_overrides:
       - goos: windows
-        format: zip
+        formats:
+          - zip
     name_template: "reglet-{{ .Os }}-{{ .Arch }}"
     files:
       - LICENSE
@@ -109,22 +111,23 @@ release:
     **Manual Download:**
     Download the appropriate archive for your platform below, extract and move to your PATH.
 
-# Homebrew tap
-brews:
+# Homebrew cask (migrated from brews)
+homebrew_casks:
   - repository:
       owner: whiskeyjimbo
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    directory: Formula
+    directory: Casks
     homepage: https://github.com/whiskeyjimbo/reglet
     description: "Compliance as Code - Infrastructure validation with WASM plugins"
     license: "Apache-2.0"
     skip_upload: auto
-    test: |
-      system "#{bin}/reglet", "--version"
-    install: |
-      bin.install "reglet"
-      (pkgshare/"examples").install Dir["docs/examples/*"]
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/reglet"]
+          end
 
 # Container images using ko (distroless)
 kos:
