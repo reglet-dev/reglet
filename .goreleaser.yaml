@@ -130,8 +130,8 @@ brews:
 kos:
   - id: reglet-ko
     build: reglet
-    image_refs:
-      - '{{ .ProjectName }}-{{.Arch}}'
+    repositories:
+      - '{{ .Env.KO_DOCKER_REPO }}'
     tags:
       - '{{.Tag}}'
       - '{{ if not .Prerelease }}{{.Major}}.{{.Minor}}{{ end }}'
