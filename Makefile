@@ -7,7 +7,7 @@
 #
 
 .PHONY: all build clean test test-race test-coverage lint fmt vet help install dev
-.PHONY: fuzz fuzz-extended profile-cpu profile-mem test-bench tidy changelog
+.PHONY: fuzz fuzz-nightly fuzz-extended profile-cpu profile-mem test-bench tidy changelog
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Configuration
@@ -208,6 +208,8 @@ fuzz:  ## Run all fuzz tests (5s each, for CI)
 	@go test -fuzz=^FuzzSMTPRequestParsing$$ -fuzztime=5s ./internal/infrastructure/wasm/hostfuncs/
 	@go test -fuzz=^FuzzPackedPtrLen$$ -fuzztime=5s ./internal/infrastructure/wasm/hostfuncs/
 	@go test -fuzz=^FuzzSSRFProtection$$ -fuzztime=5s ./internal/infrastructure/wasm/hostfuncs/
+	@go test -fuzz=^FuzzExecRequestParsing$$ -fuzztime=5s ./internal/infrastructure/wasm/hostfuncs/
+	@go test -fuzz=^FuzzExecutionTypeDetection$$ -fuzztime=5s ./internal/infrastructure/wasm/hostfuncs/
 	@printf "\n$(BOLD)$(BLUE)◆ Validation$(RESET)\n"
 	@go test -fuzz=^FuzzPluginNameValidation$$ -fuzztime=5s ./internal/infrastructure/validation/
 	@go test -fuzz=^FuzzVersionValidation$$ -fuzztime=5s ./internal/infrastructure/validation/
@@ -239,6 +241,8 @@ fuzz-extended:  ## Run extended fuzz tests (30m each)
 	@go test -fuzz=^FuzzSMTPRequestParsing$$ -fuzztime=30m ./internal/infrastructure/wasm/hostfuncs/
 	@go test -fuzz=^FuzzPackedPtrLen$$ -fuzztime=30m ./internal/infrastructure/wasm/hostfuncs/
 	@go test -fuzz=^FuzzSSRFProtection$$ -fuzztime=30m ./internal/infrastructure/wasm/hostfuncs/
+	@go test -fuzz=^FuzzExecRequestParsing$$ -fuzztime=30m ./internal/infrastructure/wasm/hostfuncs/
+	@go test -fuzz=^FuzzExecutionTypeDetection$$ -fuzztime=30m ./internal/infrastructure/wasm/hostfuncs/
 	@printf "\n$(BOLD)$(BLUE)◆ Validation$(RESET)\n"
 	@go test -fuzz=^FuzzPluginNameValidation$$ -fuzztime=30m ./internal/infrastructure/validation/
 	@go test -fuzz=^FuzzVersionValidation$$ -fuzztime=30m ./internal/infrastructure/validation/
@@ -250,6 +254,38 @@ fuzz-extended:  ## Run extended fuzz tests (30m each)
 	@go test -fuzz=^FuzzSARIFGeneration$$ -fuzztime=30m ./internal/infrastructure/output/
 	$(SUCCESS)
 	@printf "$(GREEN)Extended fuzz tests completed$(RESET)\n"
+
+fuzz-nightly:  ## Run fuzz tests for nightly CI (1m each)
+	$(INFO)
+	@printf "Running $(BOLD)nightly$(RESET) fuzz tests $(YELLOW)(1m each)$(RESET)...\n"
+	@printf "\n$(BOLD)$(BLUE)◆ Capabilities$(RESET)\n"
+	@go test -fuzz=^FuzzNetworkPatternMatching$$ -fuzztime=1m ./internal/domain/capabilities/
+	@go test -fuzz=^FuzzFilesystemPatternMatching$$ -fuzztime=1m ./internal/domain/capabilities/
+	@go test -fuzz=^FuzzExecPatternMatching$$ -fuzztime=1m ./internal/domain/capabilities/
+	@go test -fuzz=^FuzzEnvironmentPatternMatching$$ -fuzztime=1m ./internal/domain/capabilities/
+	@printf "\n$(BOLD)$(BLUE)◆ Config$(RESET)\n"
+	@go test -fuzz=^FuzzYAMLLoading$$ -fuzztime=1m ./internal/infrastructure/config/
+	@go test -fuzz=^FuzzVariableSubstitution$$ -fuzztime=1m ./internal/infrastructure/config/
+	@printf "\n$(BOLD)$(BLUE)◆ Host Functions$(RESET)\n"
+	@go test -fuzz=^FuzzHTTPRequestParsing$$ -fuzztime=1m ./internal/infrastructure/wasm/hostfuncs/
+	@go test -fuzz=^FuzzDNSRequestParsing$$ -fuzztime=1m ./internal/infrastructure/wasm/hostfuncs/
+	@go test -fuzz=^FuzzTCPRequestParsing$$ -fuzztime=1m ./internal/infrastructure/wasm/hostfuncs/
+	@go test -fuzz=^FuzzSMTPRequestParsing$$ -fuzztime=1m ./internal/infrastructure/wasm/hostfuncs/
+	@go test -fuzz=^FuzzPackedPtrLen$$ -fuzztime=1m ./internal/infrastructure/wasm/hostfuncs/
+	@go test -fuzz=^FuzzSSRFProtection$$ -fuzztime=1m ./internal/infrastructure/wasm/hostfuncs/
+	@go test -fuzz=^FuzzExecRequestParsing$$ -fuzztime=1m ./internal/infrastructure/wasm/hostfuncs/
+	@go test -fuzz=^FuzzExecutionTypeDetection$$ -fuzztime=1m ./internal/infrastructure/wasm/hostfuncs/
+	@printf "\n$(BOLD)$(BLUE)◆ Validation$(RESET)\n"
+	@go test -fuzz=^FuzzPluginNameValidation$$ -fuzztime=1m ./internal/infrastructure/validation/
+	@go test -fuzz=^FuzzVersionValidation$$ -fuzztime=1m ./internal/infrastructure/validation/
+	@go test -fuzz=^FuzzSchemaValidation$$ -fuzztime=1m ./internal/infrastructure/validation/
+	@printf "\n$(BOLD)$(BLUE)◆ Redaction$(RESET)\n"
+	@go test -fuzz=^FuzzRedactorScrubString$$ -fuzztime=1m ./internal/infrastructure/redaction/
+	@go test -fuzz=^FuzzRedactorWalker$$ -fuzztime=1m ./internal/infrastructure/redaction/
+	@printf "\n$(BOLD)$(BLUE)◆ Output$(RESET)\n"
+	@go test -fuzz=^FuzzSARIFGeneration$$ -fuzztime=1m ./internal/infrastructure/output/
+	$(SUCCESS)
+	@printf "$(GREEN)Nightly fuzz tests completed$(RESET)\n"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # CLEANUP
