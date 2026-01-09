@@ -31,6 +31,8 @@ type CommandResponse struct {
 }
 
 // Run is a stub that returns an error when called outside WASM.
-func Run(_ context.Context, _ CommandRequest) (*CommandResponse, error) {
+func Run(ctx context.Context, req CommandRequest) (*CommandResponse, error) {
+	_ = ctx
+	_ = req
 	return nil, ErrNotWASM
 }
