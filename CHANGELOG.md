@@ -154,6 +154,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update plugin dev doc
 - Update examples
 - Readme polish
+- Update CHANGELOG for v0.2.0-alpha
 
 ### Fixed
 - **wasm:** Implement proper memory pinning for WASM plugins
