@@ -14,37 +14,26 @@ import (
 // Config represents the global configuration file (~/.reglet/config.yaml).
 // This is infrastructure-level configuration separate from profile configuration.
 type Config struct {
-	// User-defined capabilities
+	Redaction    RedactionConfig `yaml:"redaction"`
+	Security     SecurityConfig  `yaml:"security"`
 	Capabilities []struct {
 		Kind    string `yaml:"kind"`
 		Pattern string `yaml:"pattern"`
 	} `yaml:"capabilities"`
-
-	// WasmMemoryLimitMB limits WASM memory per plugin in Megabytes (MB).
-	// 0 = default (256MB), -1 = unlimited, >0 = explicit limit in MB.
 	WasmMemoryLimitMB int `yaml:"wasm_memory_limit_mb"`
-
-	// Redaction configuration for secrets
-	Redaction RedactionConfig `yaml:"redaction"`
-
-	// Security configuration for capability prompting
-	Security SecurityConfig `yaml:"security"`
 }
 
 // RedactionConfig configures how sensitive data is sanitized.
 type RedactionConfig struct {
-	// Custom patterns to redact (regex strings)
-	Patterns []string `yaml:"patterns"`
-	// JSON paths to always redact (e.g. "config.password")
-	Paths []string `yaml:"paths"`
-	// If true, replace with hash instead of [REDACTED]
 	HashMode HashModeConfig `yaml:"hash_mode"`
+	Patterns []string       `yaml:"patterns"`
+	Paths    []string       `yaml:"paths"`
 }
 
 // HashModeConfig controls hash-based redaction.
 type HashModeConfig struct {
+	Salt    string `yaml:"salt"`
 	Enabled bool   `yaml:"enabled"`
-	Salt    string `yaml:"salt"` // Optional salt for stable hashing
 }
 
 // SecurityConfig configures capability security policies.

@@ -21,10 +21,10 @@ import (
 // dnsPinningTransport is a custom http.RoundTripper that prevents DNS rebinding attacks
 // by resolving DNS once, validating the IP, and connecting to that specific IP.
 type dnsPinningTransport struct {
-	base       *http.Transport
 	ctx        context.Context
-	pluginName string
+	base       *http.Transport
 	checker    *CapabilityChecker
+	pluginName string
 }
 
 // RoundTrip implements http.RoundTripper with DNS pinning and SSRF protection.

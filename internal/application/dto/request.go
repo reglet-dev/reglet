@@ -7,43 +7,21 @@ import (
 
 // CheckProfileRequest encapsulates all inputs needed to check a profile.
 type CheckProfileRequest struct {
-	// ProfilePath is the path to the profile YAML file
+	Options     CheckOptions
 	ProfilePath string
-
-	// Filters control which controls to execute
-	Filters FilterOptions
-
-	// Execution controls how the profile is executed
-	Execution ExecutionOptions
-
-	// Options for plugin and capability management
-	Options CheckOptions
-
-	// Metadata for request tracking and diagnostics
-	Metadata RequestMetadata
+	Metadata    RequestMetadata
+	Filters     FilterOptions
+	Execution   ExecutionOptions
 }
 
 // FilterOptions defines filters for control selection.
 type FilterOptions struct {
-	// IncludeTags - only run controls with these tags (OR logic)
-	IncludeTags []string
-
-	// IncludeSeverities - only run controls with these severities (OR logic)
-	IncludeSeverities []string
-
-	// IncludeControlIDs - only run these specific controls (exclusive)
-	IncludeControlIDs []string
-
-	// ExcludeTags - skip controls with these tags
-	ExcludeTags []string
-
-	// ExcludeControlIDs - skip these specific controls
-	ExcludeControlIDs []string
-
-	// FilterExpression - advanced filter using expr language
-	FilterExpression string
-
-	// IncludeDependencies - automatically include dependency controls
+	FilterExpression    string
+	IncludeTags         []string
+	IncludeSeverities   []string
+	IncludeControlIDs   []string
+	ExcludeTags         []string
+	ExcludeControlIDs   []string
 	IncludeDependencies bool
 }
 
@@ -61,17 +39,10 @@ type ExecutionOptions struct {
 
 // CheckOptions contains options for plugin and capability management.
 type CheckOptions struct {
-	// TrustPlugins - if true, auto-grant all capabilities
-	TrustPlugins bool
-
-	// PluginDir - custom plugin directory (empty = auto-detect)
-	PluginDir string
-
-	// SkipSchemaValidation - skip plugin config schema validation
+	PluginDir            string
+	SystemConfigPath     string
+	TrustPlugins         bool
 	SkipSchemaValidation bool
-
-	// SystemConfigPath - custom system config path (empty = default ~/.reglet/config.yaml)
-	SystemConfigPath string
 }
 
 // RequestMetadata contains metadata for request tracking.
@@ -94,9 +65,9 @@ type CollectCapabilitiesRequest struct {
 
 // ExecuteProfileRequest encapsulates inputs for profile execution.
 type ExecuteProfileRequest struct {
+	GrantedCapabilities  map[string][]capabilities.Capability
 	ProfilePath          string
 	Filters              FilterOptions
 	Execution            ExecutionOptions
-	GrantedCapabilities  map[string][]capabilities.Capability
 	SkipSchemaValidation bool
 }

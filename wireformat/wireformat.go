@@ -13,7 +13,7 @@ type ContextWireFormat struct {
 	Deadline  *time.Time `json:"deadline,omitempty"`
 	TimeoutMs int64      `json:"timeout_ms,omitempty"`
 	RequestID string     `json:"request_id,omitempty"` // For log correlation
-	Cancelled bool       `json:"cancelled,omitempty"`  // True if context is already cancelled
+	Canceled  bool       `json:"Canceled,omitempty"`   // True if context is already Canceled
 }
 
 // DNSRequestWire is the JSON wire format for a DNS lookup request from Guest to Host.

@@ -1,5 +1,5 @@
-// Package errors defines application-level error types.
-package errors
+// Package apperrors defines application-level error types.
+package apperrors
 
 import (
 	"fmt"
@@ -32,8 +32,8 @@ func NewValidationError(field, message string, details ...string) *ValidationErr
 
 // CapabilityError indicates capability permission issue.
 type CapabilityError struct {
-	Required []capabilities.Capability
 	Reason   string
+	Required []capabilities.Capability
 }
 
 func (e *CapabilityError) Error() string {
@@ -50,9 +50,9 @@ func NewCapabilityError(reason string, required []capabilities.Capability) *Capa
 
 // ExecutionError indicates execution failed (not validation).
 type ExecutionError struct {
+	Cause     error
 	ControlID string
 	Message   string
-	Cause     error
 }
 
 func (e *ExecutionError) Error() string {
@@ -77,9 +77,9 @@ func NewExecutionError(controlID, message string, cause error) *ExecutionError {
 
 // ConfigurationError indicates system config or setup issue.
 type ConfigurationError struct {
-	Aspect  string // What failed: "system_config", "plugin_dir", "redaction"
-	Message string
 	Cause   error
+	Aspect  string
+	Message string
 }
 
 func (e *ConfigurationError) Error() string {

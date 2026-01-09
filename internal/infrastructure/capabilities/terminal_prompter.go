@@ -66,7 +66,7 @@ func (p *TerminalPrompter) PromptForCapabilityWithInfo(
 		Value(&selection).
 		Run()
 	if err != nil {
-		// Return error if huh selection failed or was cancelled
+		// Return error if huh selection failed or was canceled
 		return false, false, err
 	}
 

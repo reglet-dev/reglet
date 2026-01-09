@@ -7,9 +7,9 @@ import "github.com/reglet-dev/reglet/internal/domain/capabilities"
 
 // CapabilityInfo contains metadata about a capability request.
 type CapabilityInfo struct {
+	ProfileSpecific *capabilities.Capability
 	Capability      capabilities.Capability
-	IsProfileBased  bool                     // True if extracted from profile config
-	PluginName      string                   // Which plugin requested this
-	IsBroad         bool                     // True if pattern is overly permissive
-	ProfileSpecific *capabilities.Capability // Profile-specific alternative if available
+	PluginName      string
+	IsProfileBased  bool
+	IsBroad         bool
 }

@@ -888,7 +888,7 @@ func TestWorkerPool_ContextCancellation(t *testing.T) {
 	require.NoError(t, err)
 	defer engine.Close(context.Background())
 
-	// Create many controls to ensure some are in-flight when cancelled
+	// Create many controls to ensure some are in-flight when canceled
 	controls := make([]entities.Control, 50)
 	for i := 0; i < 50; i++ {
 		controls[i] = entities.Control{

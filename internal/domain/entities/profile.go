@@ -56,8 +56,8 @@ type Control struct {
 	Owner                  string                  `yaml:"owner,omitempty"`
 	Tags                   []string                `yaml:"tags,omitempty"`
 	DependsOn              []string                `yaml:"depends_on,omitempty"`
-	Timeout                time.Duration           `yaml:"timeout,omitempty"`
 	ObservationDefinitions []ObservationDefinition `yaml:"observations"`
+	Timeout                time.Duration           `yaml:"timeout,omitempty"`
 }
 
 // ObservationDefinition configuration for a specific plugin execution.
@@ -143,11 +143,7 @@ func (p *Profile) Validate() error {
 		}
 	}
 
-	if err := p.CheckForCycles(); err != nil {
-		return err
-	}
-
-	return nil
+	return p.CheckForCycles()
 }
 
 // AddControl safely adds a new control to the profile.

@@ -19,28 +19,23 @@ import (
 
 // Container holds all application dependencies.
 type Container struct {
-	// Ports (adapters)
-	profileLoader    ports.ProfileLoader
-	profileValidator ports.ProfileValidator
-	systemConfig     ports.SystemConfigProvider
-	pluginResolver   ports.PluginDirectoryResolver
-	engineFactory    ports.EngineFactory
-
-	// Use cases
+	profileLoader       ports.ProfileLoader
+	profileValidator    ports.ProfileValidator
+	systemConfig        ports.SystemConfigProvider
+	pluginResolver      ports.PluginDirectoryResolver
+	engineFactory       ports.EngineFactory
 	checkProfileUseCase *services.CheckProfileUseCase
-
-	// Configuration
-	trustPlugins bool
-	systemCfg    *system.Config
-	logger       *slog.Logger
+	systemCfg           *system.Config
+	logger              *slog.Logger
+	trustPlugins        bool
 }
 
 // Options configure the container.
 type Options struct {
-	TrustPlugins     bool
-	SecurityLevel    string // Security level: strict, standard, permissive (overrides config file)
-	SystemConfigPath string
 	Logger           *slog.Logger
+	SecurityLevel    string
+	SystemConfigPath string
+	TrustPlugins     bool
 }
 
 // New creates a new dependency injection container.

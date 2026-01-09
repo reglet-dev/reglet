@@ -40,8 +40,8 @@ var (
 // PluginRuntimeFactoryAdapter creates PluginRuntime instances.
 // This adapter decouples the application layer from the concrete wasm.Runtime.
 type PluginRuntimeFactoryAdapter struct {
-	version  build.Info
 	redactor *redaction.Redactor
+	version  build.Info
 }
 
 // NewPluginRuntimeFactoryAdapter creates a new runtime factory adapter.

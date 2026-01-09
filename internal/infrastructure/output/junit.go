@@ -25,34 +25,34 @@ func NewJUnitFormatter(w io.Writer) *JUnitFormatter {
 type JUnitTestSuites struct {
 	XMLName    xml.Name         `xml:"testsuites"`
 	Name       string           `xml:"name,attr"`
+	TestSuites []JUnitTestSuite `xml:"testsuite"`
 	Tests      int              `xml:"tests,attr"`
 	Failures   int              `xml:"failures,attr"`
 	Errors     int              `xml:"errors,attr"`
 	Time       float64          `xml:"time,attr"`
-	TestSuites []JUnitTestSuite `xml:"testsuite"`
 }
 
 // JUnitTestSuite represents a single test suite in JUnit XML.
 type JUnitTestSuite struct {
 	XMLName   xml.Name        `xml:"testsuite"`
 	Name      string          `xml:"name,attr"`
+	TestCases []JUnitTestCase `xml:"testcase"`
 	Tests     int             `xml:"tests,attr"`
 	Failures  int             `xml:"failures,attr"`
 	Errors    int             `xml:"errors,attr"`
 	Skipped   int             `xml:"skipped,attr"`
 	Time      float64         `xml:"time,attr"`
-	TestCases []JUnitTestCase `xml:"testcase"`
 }
 
 // JUnitTestCase represents a single test case in JUnit XML.
 type JUnitTestCase struct {
+	Failure   *JUnitFailure `xml:"failure,omitempty"`
+	Error     *JUnitError   `xml:"error,omitempty"`
+	Skipped   *JUnitSkipped `xml:"skipped,omitempty"`
 	XMLName   xml.Name      `xml:"testcase"`
 	Name      string        `xml:"name,attr"`
 	ClassName string        `xml:"classname,attr"`
 	Time      float64       `xml:"time,attr"`
-	Failure   *JUnitFailure `xml:"failure,omitempty"`
-	Error     *JUnitError   `xml:"error,omitempty"`
-	Skipped   *JUnitSkipped `xml:"skipped,omitempty"`
 }
 
 // JUnitFailure represents a failed test case.

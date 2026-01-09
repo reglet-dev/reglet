@@ -16,8 +16,8 @@ func NewDependencyResolver() *DependencyResolver {
 
 // ControlLevel represents controls at a specific dependency level
 type ControlLevel struct {
-	Level    int
 	Controls []entities.Control
+	Level    int
 }
 
 // BuildControlDAG builds a dependency graph using Kahn's algorithm.

@@ -273,7 +273,7 @@ The exec package uses JSON-based wire format to communicate with the host:
 
 The exec package fully supports Go context propagation:
 
-- **Cancellation**: Cancelled context terminates the running command
+- **Cancellation**: Canceled context terminates the running command
 - **Deadlines**: Context deadlines enforce command timeouts
 - **Values**: Context values (like request IDs) are passed to host
 

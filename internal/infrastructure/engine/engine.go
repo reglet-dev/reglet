@@ -18,11 +18,11 @@ import (
 
 // Engine coordinates profile execution.
 type Engine struct {
+	repository repositories.ExecutionResultRepository
 	runtime    *wasm.Runtime
 	executor   *ObservationExecutor
-	config     ExecutionConfig
-	repository repositories.ExecutionResultRepository // Optional repository for persistence
 	version    build.Info
+	config     ExecutionConfig
 }
 
 // CapabilityCollector collects required capabilities from plugins.

@@ -13,31 +13,31 @@ import (
 //
 //nolint:revive // ST1003: Name is intentional - "Result" alone lacks context in imports
 type ExecutionResult struct {
+	StartTime      time.Time       `json:"start_time" yaml:"start_time"`
+	EndTime        time.Time       `json:"end_time" yaml:"end_time"`
+	RegletVersion  string          `json:"reglet_version,omitempty" yaml:"reglet_version,omitempty"`
+	ProfileName    string          `json:"profile_name" yaml:"profile_name"`
+	ProfileVersion string          `json:"profile_version" yaml:"profile_version"`
+	Controls       []ControlResult `json:"controls" yaml:"controls"`
+	Summary        ResultSummary   `json:"summary" yaml:"summary"`
+	Version        int             `json:"version" yaml:"version"`
+	Duration       time.Duration   `json:"duration_ms" yaml:"duration_ms"`
+	mu             sync.Mutex
 	ExecutionID    values.ExecutionID `json:"execution_id" yaml:"execution_id"`
-	Version        int                `json:"version" yaml:"version"` // For optimistic locking
-	RegletVersion  string             `json:"reglet_version,omitempty" yaml:"reglet_version,omitempty"`
-	ProfileName    string             `json:"profile_name" yaml:"profile_name"`
-	ProfileVersion string             `json:"profile_version" yaml:"profile_version"`
-	StartTime      time.Time          `json:"start_time" yaml:"start_time"`
-	EndTime        time.Time          `json:"end_time" yaml:"end_time"`
-	Duration       time.Duration      `json:"duration_ms" yaml:"duration_ms"`
-	Controls       []ControlResult    `json:"controls" yaml:"controls"`
-	Summary        ResultSummary      `json:"summary" yaml:"summary"`
-	mu             sync.Mutex         // Protects Controls for concurrent AddControlResult calls
 }
 
 // ControlResult represents the result of executing a single control.
 type ControlResult struct {
-	Index              int                 `json:"index" yaml:"index"` // Original definition order (0-indexed) for deterministic output
 	ID                 string              `json:"id" yaml:"id"`
 	Name               string              `json:"name" yaml:"name"`
 	Description        string              `json:"description,omitempty" yaml:"description,omitempty"`
 	Severity           string              `json:"severity,omitempty" yaml:"severity,omitempty"`
-	Tags               []string            `json:"tags,omitempty" yaml:"tags,omitempty"`
 	Status             values.Status       `json:"status" yaml:"status"`
-	ObservationResults []ObservationResult `json:"observations" yaml:"observations"`
 	Message            string              `json:"message,omitempty" yaml:"message,omitempty"`
 	SkipReason         string              `json:"skip_reason,omitempty" yaml:"skip_reason,omitempty"`
+	Tags               []string            `json:"tags,omitempty" yaml:"tags,omitempty"`
+	ObservationResults []ObservationResult `json:"observations" yaml:"observations"`
+	Index              int                 `json:"index" yaml:"index"`
 	Duration           time.Duration       `json:"duration_ms" yaml:"duration_ms"`
 }
 
@@ -56,9 +56,9 @@ type ObservationResult struct {
 // The Message field provides human-readable context about failures, constructed by the
 // StatusAggregator which has full access to the evidence and expression evaluation context.
 type ExpectationResult struct {
-	Expression string `json:"expression" yaml:"expression"`               // The expect expression (e.g., "data.size == 2785")
-	Passed     bool   `json:"passed" yaml:"passed"`                       // Whether the expectation passed
-	Message    string `json:"message,omitempty" yaml:"message,omitempty"` // Human-readable description (only set on failure/error)
+	Expression string `json:"expression" yaml:"expression"`
+	Message    string `json:"message,omitempty" yaml:"message,omitempty"`
+	Passed     bool   `json:"passed" yaml:"passed"`
 }
 
 // ResultSummary provides aggregate statistics about the execution.
@@ -206,11 +206,11 @@ func (r *ExecutionResult) calculateSummary() {
 // Evidence represents observation results (proof of compliance state).
 // This is a core domain concept representing the evidence collected during a check.
 type Evidence struct {
-	Status    bool
-	Error     *PluginError // Plugin execution error
 	Timestamp time.Time
+	Error     *PluginError
 	Data      map[string]interface{}
-	Raw       *string // Optional raw data
+	Raw       *string
+	Status    bool
 }
 
 // PluginError represents an error from plugin execution.

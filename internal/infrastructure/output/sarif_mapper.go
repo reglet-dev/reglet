@@ -13,9 +13,9 @@ import (
 
 type sarifMapper struct {
 	result      *execution.ExecutionResult
+	artifacts   map[string]*sarif.Artifact
 	profilePath string
-	cwd         string                     // Current working directory
-	artifacts   map[string]*sarif.Artifact // Deduplicated artifacts
+	cwd         string
 }
 
 func newSARIFMapper(result *execution.ExecutionResult, profilePath string) *sarifMapper {

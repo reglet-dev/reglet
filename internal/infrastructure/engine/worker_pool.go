@@ -16,30 +16,21 @@ import (
 // maintains a dynamic ready queue and executes controls as soon as their
 // dependencies are satisfied.
 type workerPoolState struct {
-	// Immutable after initialization (safe for concurrent reads)
-	controlByID      map[string]entities.Control // Control lookup by ID
-	controlIndexByID map[string]int              // Control ID → original definition order (for deterministic output)
-	reverseDeps      map[string][]string         // Control ID → list of dependent control IDs
-
-	// Mutable state (owned by coordinator goroutine)
-	inDegree      map[string]int  // Control ID → count of unmet dependencies
-	readyQueue    []string        // Control IDs ready to execute (dependencies satisfied)
-	completed     map[string]bool // Control IDs that have completed execution
-	totalControls int             // Total number of controls to execute
-
-	// Channels for work distribution and completion signaling
-	workChan chan string // Buffered channel for control IDs ready to execute
-	doneChan chan string // Buffered channel for completion signals (prevents worker blocking)
-
-	// Context and error handling
-	ctx      context.Context
-	cancel   context.CancelFunc
-	errGroup *errgroup.Group
-
-	// Execution dependencies
-	engine       *Engine
-	execResult   *execution.ExecutionResult
-	requiredDeps map[string]bool
+	ctx              context.Context
+	inDegree         map[string]int
+	doneChan         chan string
+	controlByID      map[string]entities.Control
+	requiredDeps     map[string]bool
+	completed        map[string]bool
+	execResult       *execution.ExecutionResult
+	workChan         chan string
+	reverseDeps      map[string][]string
+	controlIndexByID map[string]int
+	cancel           context.CancelFunc
+	errGroup         *errgroup.Group
+	engine           *Engine
+	readyQueue       []string
+	totalControls    int
 }
 
 // initializeWorkerPoolState builds the dependency graph and prepares initial state.

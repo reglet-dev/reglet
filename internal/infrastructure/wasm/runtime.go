@@ -34,12 +34,12 @@ func CloseGlobalCache(ctx context.Context) error {
 // Runtime manages WASM execution.
 type Runtime struct {
 	runtime             wazero.Runtime
-	mu                  sync.RWMutex       // Protects plugins map from concurrent access
-	plugins             map[string]*Plugin // Loaded plugins by name
+	plugins             map[string]*Plugin
+	redactor            *redaction.Redactor
+	grantedCapabilities map[string][]capabilities.Capability
 	version             build.Info
-	redactor            *redaction.Redactor                  // Optional redactor for plugin output
-	grantedCapabilities map[string][]capabilities.Capability // Per-plugin granted capabilities
-	frozenEnv           []string                             // Snapshot of environment at startup (frozen for security)
+	frozenEnv           []string
+	mu                  sync.RWMutex
 }
 
 // NewRuntime creates a runtime with no capabilities and no redaction.

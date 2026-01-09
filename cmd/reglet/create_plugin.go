@@ -18,10 +18,10 @@ import (
 type CreatePluginOptions struct {
 	name         string
 	lang         string
-	capabilities []string
 	output       string
 	sdkVersion   string
 	modulePath   string
+	capabilities []string
 	force        bool
 }
 

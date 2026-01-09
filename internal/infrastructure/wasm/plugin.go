@@ -20,28 +20,16 @@ import (
 
 // Plugin manages the lifecycle and execution of a compiled WASM module.
 type Plugin struct {
-	name    string
-	module  wazero.CompiledModule
-	runtime wazero.Runtime
-
-	// Mutex protects cached metadata
-	mu sync.Mutex
-
-	// Cached plugin info
-	info *PluginInfo
-
-	// Cached schema
-	schema *ConfigSchema
-
-	// Redacted output streams (wraps os.Stderr with redaction)
-	stdout io.Writer
-	stderr io.Writer
-
-	// Granted capabilities for this plugin (used to build filesystem mounts)
+	module       wazero.CompiledModule
+	runtime      wazero.Runtime
+	stdout       io.Writer
+	stderr       io.Writer
+	info         *PluginInfo
+	schema       *ConfigSchema
+	name         string
 	capabilities []capabilities.Capability
-
-	// Frozen environment snapshot from runtime initialization (prevents runtime env leakage)
-	frozenEnv []string
+	frozenEnv    []string
+	mu           sync.Mutex
 }
 
 // fsMount represents a filesystem mount configuration

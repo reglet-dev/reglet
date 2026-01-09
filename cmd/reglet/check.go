@@ -21,14 +21,14 @@ import (
 type CheckOptions struct {
 	format              string
 	outFile             string
-	trustPlugins        bool
 	securityLevel       string
+	filterExpr          string
 	includeTags         []string
 	includeSeverities   []string
 	includeControlIDs   []string
 	excludeTags         []string
 	excludeControlIDs   []string
-	filterExpr          string
+	trustPlugins        bool
 	includeDependencies bool
 }
 

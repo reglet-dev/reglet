@@ -41,9 +41,9 @@ type ConfigSchema struct {
 // Maps to the WIT field-def record
 type FieldDef struct {
 	Name        string
-	FieldType   string // JSON Schema type: string, integer, boolean, object, array
-	Required    bool
+	FieldType   string
 	Description string
+	Required    bool
 }
 
 // PluginObservationResult is the result of running an observation through a WASM plugin.

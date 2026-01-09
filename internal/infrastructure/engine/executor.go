@@ -18,9 +18,9 @@ import (
 // ObservationExecutor executes observations using WASM plugins.
 type ObservationExecutor struct {
 	runtime        *wasm.Runtime
-	pluginDir      string // Base directory where plugins are located (e.g., /path/to/project/plugins)
 	redactor       *redaction.Redactor
-	pluginRegistry *entities.PluginRegistry // Optional registry for alias resolution
+	pluginRegistry *entities.PluginRegistry
+	pluginDir      string
 }
 
 // NewObservationExecutor creates a new observation executor with auto-detected plugin directory.

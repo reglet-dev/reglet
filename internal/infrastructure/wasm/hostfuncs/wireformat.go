@@ -44,8 +44,8 @@ type (
 
 // createContextFromWire creates a new context from the wire format.
 func createContextFromWire(parentCtx context.Context, wireCtx ContextWireFormat) (context.Context, context.CancelFunc) {
-	if wireCtx.Cancelled {
-		slog.Warn("hostfuncs: received already cancelled context from plugin")
+	if wireCtx.Canceled {
+		slog.Warn("hostfuncs: received already canceled context from plugin")
 		ctx, cancel := context.WithCancel(parentCtx)
 		cancel() // Immediately cancel
 		return ctx, cancel

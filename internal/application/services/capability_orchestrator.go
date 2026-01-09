@@ -22,11 +22,11 @@ import (
 // - CapabilityAnalyzer for extraction (domain logic)
 // - CapabilityGatekeeper for granting (security boundary)
 type CapabilityOrchestrator struct {
-	analyzer       ports.CapabilityAnalyzer        // Domain service for extraction
-	gatekeeper     ports.CapabilityGatekeeperPort  // Application service for granting
-	runtimeFactory ports.PluginRuntimeFactory      // Factory for creating runtimes (injected)
-	trustAll       bool                            // Auto-grant all capabilities
-	capabilityInfo map[string]ports.CapabilityInfo // Metadata about requested capabilities
+	analyzer       ports.CapabilityAnalyzer
+	gatekeeper     ports.CapabilityGatekeeperPort
+	runtimeFactory ports.PluginRuntimeFactory
+	capabilityInfo map[string]ports.CapabilityInfo
+	trustAll       bool
 }
 
 // NewCapabilityOrchestrator creates a capability orchestrator with default security level (standard).

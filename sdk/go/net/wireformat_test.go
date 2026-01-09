@@ -13,19 +13,19 @@ func TestCreateContextWireFormat(t *testing.T) {
 	// 1. Background context (empty)
 	ctx := context.Background()
 	wire := sdkcontext.ContextToWire(ctx)
-	if wire.Cancelled {
-		t.Error("Background context should not be cancelled")
+	if wire.Canceled {
+		t.Error("Background context should not be Canceled")
 	}
 	if wire.Deadline != nil {
 		t.Error("Background context should not have deadline")
 	}
 
-	// 2. Cancelled context
+	// 2. Canceled context
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	wire = sdkcontext.ContextToWire(ctx)
-	if !wire.Cancelled {
-		t.Error("Context should be cancelled")
+	if !wire.Canceled {
+		t.Error("Context should be Canceled")
 	}
 
 	// 3. Deadline context

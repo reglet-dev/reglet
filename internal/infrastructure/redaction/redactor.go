@@ -17,28 +17,19 @@ import (
 // Redactor handles sanitization of sensitive data.
 // All fields are read-only after construction, making it safe for concurrent use.
 type Redactor struct {
-	patterns []*regexp.Regexp
-	paths    []string
-	hashMode bool
-	salt     string
-
-	// Gitleaks detector for secret detection (222+ patterns)
-	// If nil, falls back to regex patterns only
 	gitleaksDetector *detect.Detector
+	salt             string
+	patterns         []*regexp.Regexp
+	paths            []string
+	hashMode         bool
 }
 
 // Config holds the configuration for the Redactor.
 type Config struct {
-	// Custom patterns to redact (e.g. "INT-[A-Z0-9]{16}")
-	Patterns []string
-	// JSON paths to always redact (e.g. "config.password")
-	Paths []string
-	// If true, replace with hash instead of [REDACTED]
-	HashMode bool
-	// Salt for hashing (prevents rainbow tables). If empty, hash is deterministic but unsalted.
-	Salt string
-	// If true, disable gitleaks detector and use only custom patterns
-	// Default: false (gitleaks enabled for comprehensive 222+ pattern coverage)
+	Salt            string
+	Patterns        []string
+	Paths           []string
+	HashMode        bool
 	DisableGitleaks bool
 }
 

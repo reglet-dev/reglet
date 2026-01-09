@@ -54,12 +54,12 @@ func ContextToWire(ctx stdcontext.Context) wireformat.ContextWireFormat {
 		}
 	}
 
-	// Check if context is cancelled
+	// Check if context is Canceled
 	select {
 	case <-ctx.Done():
-		wire.Cancelled = true
+		wire.Canceled = true
 	default:
-		wire.Cancelled = false
+		wire.Canceled = false
 	}
 
 	// Extract request ID from context if available
@@ -96,8 +96,8 @@ func WireToContext(parent stdcontext.Context, wire wireformat.ContextWireFormat)
 		ctx = stdcontext.WithValue(ctx, "request_id", wire.RequestID)
 	}
 
-	// If context is already cancelled, cancel immediately
-	if wire.Cancelled {
+	// If context is already Canceled, cancel immediately
+	if wire.Canceled {
 		cancel()
 	}
 

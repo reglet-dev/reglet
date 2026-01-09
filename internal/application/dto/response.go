@@ -9,35 +9,22 @@ import (
 
 // CheckProfileResponse contains the result of checking a profile.
 type CheckProfileResponse struct {
-	// ExecutionResult contains the detailed execution results
+	Diagnostics     Diagnostics
 	ExecutionResult *execution.ExecutionResult
-
-	// Metadata contains response metadata
-	Metadata ResponseMetadata
-
-	// Diagnostics contains additional diagnostic information
-	Diagnostics Diagnostics
+	Metadata        ResponseMetadata
 }
 
 // ResponseMetadata contains metadata about the response.
 type ResponseMetadata struct {
-	// RequestID from the original request
-	RequestID string
-
-	// ProcessedAt is when the request was processed
 	ProcessedAt time.Time
-
-	// Duration is how long the request took
-	Duration time.Duration
+	RequestID   string
+	Duration    time.Duration
 }
 
 // Diagnostics contains diagnostic information about execution.
 type Diagnostics struct {
-	// Warnings are non-fatal issues encountered
-	Warnings []string
-
-	// Capabilities shows what capabilities were involved
 	Capabilities CapabilityDiagnostics
+	Warnings     []string
 }
 
 // CapabilityDiagnostics contains capability-related diagnostics.

@@ -23,27 +23,16 @@ const (
 
 // ExecutionConfig controls execution behavior.
 type ExecutionConfig struct {
-	// MaxConcurrentControls limits parallel control execution (0 = no limit)
-	MaxConcurrentControls int
-	// MaxConcurrentObservations limits parallel observation execution within a control (0 = no limit)
+	FilterProgram             *vm.Program
+	IncludeTags               []string
+	IncludeSeverities         []string
+	IncludeControlIDs         []string
+	ExcludeTags               []string
+	ExcludeControlIDs         []string
+	MaxConcurrentControls     int
 	MaxConcurrentObservations int
-	// Parallel enables parallel execution (default: true for performance)
-	Parallel bool
-
-	// Include Filters (OR logic within slice, AND between types)
-	IncludeTags       []string
-	IncludeSeverities []string
-	IncludeControlIDs []string // Exclusive - if set, other filters ignored
-
-	// Exclude Filters (take precedence over includes)
-	ExcludeTags       []string
-	ExcludeControlIDs []string
-
-	// Advanced Filter (Compiled Expression)
-	FilterProgram *vm.Program
-
-	// Dependency Strategy
-	IncludeDependencies bool
+	Parallel                  bool
+	IncludeDependencies       bool
 }
 
 // DefaultExecutionConfig returns sensible defaults for parallel execution.
