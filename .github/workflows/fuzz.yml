@@ -1,8 +1,6 @@
 name: Continuous Fuzzing
 
 on:
-  pull_request:
-  push:
   schedule:
     - cron: '0 2 * * *'  # Nightly fuzzing
 
