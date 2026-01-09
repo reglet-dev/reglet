@@ -8,26 +8,8 @@ on:
     - cron: '0 2 * * *'  # Nightly fuzzing
 
 jobs:
-  fuzz-quick:
-    name: Quick Fuzz Tests (PR/Push)
-    runs-on: ubuntu-latest
-    if: github.event_name != 'schedule'
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.25'
-      - name: Run quick fuzz tests
-        run: make fuzz
-      - name: Upload crash artifacts
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: fuzz-crashes
-          path: '**/testdata/fuzz/**/crash-*'
-
-  fuzz-extended:
-    name: Extended Fuzzing (Nightly)
+  fuzz-nightly:
+    name: Nightly Fuzzing
     runs-on: ubuntu-latest
     if: github.event_name == 'schedule'
     steps:
