@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
-	"github.com/whiskeyjimbo/reglet/internal/domain/repositories"
+	"github.com/reglet-dev/reglet/internal/domain/execution"
+	"github.com/reglet-dev/reglet/internal/domain/repositories"
 )
 
 // Ensure interface compliance

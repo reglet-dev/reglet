@@ -2,7 +2,7 @@
 package dto
 
 import (
-	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
+	"github.com/reglet-dev/reglet/internal/domain/capabilities"
 )
 
 // CheckProfileRequest encapsulates all inputs needed to check a profile.

@@ -3,8 +3,8 @@ package dto
 import (
 	"time"
 
-	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
-	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
+	"github.com/reglet-dev/reglet/internal/domain/capabilities"
+	"github.com/reglet-dev/reglet/internal/domain/execution"
 )
 
 // CheckProfileResponse contains the result of checking a profile.

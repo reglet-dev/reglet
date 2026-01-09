@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time" // Added for Timestamp
 
-	"github.com/whiskeyjimbo/reglet/wireformat"
+	"github.com/reglet-dev/reglet/wireformat"
 )
 
 // Config represents the configuration passed to a plugin observation.

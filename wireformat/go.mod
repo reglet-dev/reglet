@@ -1,3 +1,3 @@
-module github.com/whiskeyjimbo/reglet/wireformat
+module github.com/reglet-dev/reglet/wireformat
 
 go 1.25.4

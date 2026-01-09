@@ -1,15 +1,15 @@
-module github.com/whiskeyjimbo/reglet/plugins/command
+module github.com/reglet-dev/reglet/plugins/command
 
 go 1.25.4
 
 replace (
-	github.com/whiskeyjimbo/reglet/sdk => ../../sdk/go
-	github.com/whiskeyjimbo/reglet/wireformat => ../../wireformat
+	github.com/reglet-dev/reglet/sdk => ../../sdk/go
+	github.com/reglet-dev/reglet/wireformat => ../../wireformat
 )
 
 require (
 	github.com/stretchr/testify v1.8.4
-	github.com/whiskeyjimbo/reglet/sdk v0.0.0-00010101000000-000000000000
+	github.com/reglet-dev/reglet/sdk v0.0.0-00010101000000-000000000000
 )
 
 require (
@@ -24,7 +24,7 @@ require (
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/whiskeyjimbo/reglet/wireformat v0.0.0 // indirect
+	github.com/reglet-dev/reglet/wireformat v0.0.0 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	golang.org/x/crypto v0.45.0 // indirect
 	golang.org/x/sys v0.38.0 // indirect

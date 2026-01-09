@@ -5,9 +5,9 @@ import (
 	"net"
 	"testing"
 
+	"github.com/reglet-dev/reglet/internal/domain/capabilities"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
 )
 
 func TestIsPrivateOrReservedIP(t *testing.T) {

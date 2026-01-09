@@ -327,5 +327,5 @@ controls:
 
 ## Need Help?
 
-- **Issues:** https://github.com/whiskeyjimbo/reglet/issues
-- **Discussions:** https://github.com/whiskeyjimbo/reglet/discussions
+- **Issues:** https://github.com/reglet-dev/reglet/issues
+- **Discussions:** https://github.com/reglet-dev/reglet/discussions

@@ -8,8 +8,8 @@ import (
 	"context"
 	"log/slog"
 
-	regletsdk "github.com/whiskeyjimbo/reglet/sdk"     // Import the new SDK
-	regletnet "github.com/whiskeyjimbo/reglet/sdk/net" // Import SDK net package
+	regletsdk "github.com/reglet-dev/reglet/sdk"     // Import the new SDK
+	regletnet "github.com/reglet-dev/reglet/sdk/net" // Import SDK net package
 )
 
 // wasmResolver adapts the SDK's static functions to the dnsResolver interface.

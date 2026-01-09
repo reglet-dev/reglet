@@ -24,9 +24,9 @@ import (
 	"io"
 	"log/slog"
 
-	sdk "github.com/whiskeyjimbo/reglet/sdk"
-	_ "github.com/whiskeyjimbo/reglet/sdk/log" // Initialize WASM logging
-	sdknet "github.com/whiskeyjimbo/reglet/sdk/net"
+	sdk "github.com/reglet-dev/reglet/sdk"
+	_ "github.com/reglet-dev/reglet/sdk/log" // Initialize WASM logging
+	sdknet "github.com/reglet-dev/reglet/sdk/net"
 )
 
 // BasicPlugin is a simple example plugin that checks HTTP endpoint availability.

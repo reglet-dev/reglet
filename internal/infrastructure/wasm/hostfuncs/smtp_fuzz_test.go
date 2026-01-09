@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/whiskeyjimbo/reglet/wireformat"
+	"github.com/reglet-dev/reglet/wireformat"
 )
 
 // FuzzSMTPRequestParsing fuzzes SMTP request wire format parsing

@@ -3,8 +3,8 @@ package execution
 import (
 	"testing"
 
+	"github.com/reglet-dev/reglet/internal/domain/values"
 	"github.com/stretchr/testify/assert"
-	"github.com/whiskeyjimbo/reglet/internal/domain/values"
 )
 
 func TestNewExecutionResultWithID(t *testing.T) {

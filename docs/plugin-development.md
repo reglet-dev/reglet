@@ -15,7 +15,7 @@ cd plugins/myplugin
 
 ```bash
 go mod init github.com/yourorg/reglet-plugins/myplugin
-go get github.com/whiskeyjimbo/reglet/sdk@latest
+go get github.com/reglet-dev/reglet/sdk@latest
 ```
 
 ### 3. Create Plugin
@@ -27,7 +27,7 @@ package main
 import (
     "context"
     
-    sdk "github.com/whiskeyjimbo/reglet/sdk"
+    sdk "github.com/reglet-dev/reglet/sdk"
 )
 
 type myPlugin struct{}

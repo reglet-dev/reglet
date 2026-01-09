@@ -6,9 +6,9 @@ import (
 	"context"
 	"testing"
 
+	regletsdk "github.com/reglet-dev/reglet/sdk"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	regletsdk "github.com/whiskeyjimbo/reglet/sdk"
 )
 
 func TestDNSPlugin_Check_ConfigValidation(t *testing.T) {

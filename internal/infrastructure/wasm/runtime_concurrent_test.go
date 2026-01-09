@@ -7,9 +7,9 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/reglet-dev/reglet/internal/infrastructure/build"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/whiskeyjimbo/reglet/internal/infrastructure/build"
 )
 
 // TestRuntime_ConcurrentPluginAccess verifies that the Runtime can safely handle

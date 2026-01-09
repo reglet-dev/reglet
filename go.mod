@@ -1,4 +1,4 @@
-module github.com/whiskeyjimbo/reglet
+module github.com/reglet-dev/reglet
 
 go 1.25.5
 
@@ -13,12 +13,12 @@ require (
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
 	github.com/tetratelabs/wazero v1.11.0
-	github.com/whiskeyjimbo/reglet/wireformat v0.0.0
+	github.com/reglet-dev/reglet/wireformat v0.0.0
 	github.com/zricethezav/gitleaks/v8 v8.30.0
 	golang.org/x/sync v0.19.0
 )
 
-replace github.com/whiskeyjimbo/reglet/wireformat => ./wireformat
+replace github.com/reglet-dev/reglet/wireformat => ./wireformat
 
 require (
 	dario.cat/mergo v1.0.2 // indirect

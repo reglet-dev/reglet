@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/whiskeyjimbo/reglet/internal/domain/values"
+	"github.com/reglet-dev/reglet/internal/domain/values"
 )
 
 // ExecutionResult represents the complete result of executing a profile.

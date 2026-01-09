@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/huh"
-	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
+	"github.com/reglet-dev/reglet/internal/domain/capabilities"
 )
 
 // TerminalPrompter provides interactive terminal prompting for capability grants.

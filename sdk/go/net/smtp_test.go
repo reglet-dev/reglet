@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/reglet-dev/reglet/wireformat"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/whiskeyjimbo/reglet/wireformat"
 )
 
 // Note: Actual SMTP connections require WASM runtime with host functions.

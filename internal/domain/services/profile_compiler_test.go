@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/reglet-dev/reglet/internal/domain/entities"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
 )
 
 func Test_ProfileCompiler_Compile_Success(t *testing.T) {

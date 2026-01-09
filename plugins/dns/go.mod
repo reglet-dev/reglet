@@ -1,16 +1,16 @@
-module github.com/whiskeyjimbo/reglet/plugins/dns
+module github.com/reglet-dev/reglet/plugins/dns
 
 go 1.25.4
 
 replace (
-	github.com/whiskeyjimbo/reglet/sdk => ../../sdk/go
-	github.com/whiskeyjimbo/reglet/wireformat => ../../wireformat
+	github.com/reglet-dev/reglet/sdk => ../../sdk/go
+	github.com/reglet-dev/reglet/wireformat => ../../wireformat
 )
 
 require (
 	github.com/stretchr/testify v1.8.4
-	github.com/whiskeyjimbo/reglet/sdk v0.0.0-00010101000000-000000000000
-	github.com/whiskeyjimbo/reglet/wireformat v0.0.0
+	github.com/reglet-dev/reglet/sdk v0.0.0-00010101000000-000000000000
+	github.com/reglet-dev/reglet/wireformat v0.0.0
 )
 
 require (

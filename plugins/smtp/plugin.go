@@ -6,8 +6,8 @@ import (
 	"context"
 	"fmt"
 
-	regletsdk "github.com/whiskeyjimbo/reglet/sdk"
-	regletnet "github.com/whiskeyjimbo/reglet/sdk/net"
+	regletsdk "github.com/reglet-dev/reglet/sdk"
+	regletnet "github.com/reglet-dev/reglet/sdk/net"
 )
 
 // smtpPlugin implements the sdk.Plugin interface.

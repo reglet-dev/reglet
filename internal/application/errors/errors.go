@@ -4,7 +4,7 @@ package errors
 import (
 	"fmt"
 
-	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
+	"github.com/reglet-dev/reglet/internal/domain/capabilities"
 )
 
 // ValidationError indicates profile or filter validation failed.

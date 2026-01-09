@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/whiskeyjimbo/reglet/wireformat"
+	"github.com/reglet-dev/reglet/wireformat"
 )
 
 // FuzzTCPRequestParsing fuzzes TCP request wire format parsing

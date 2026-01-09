@@ -6,11 +6,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/whiskeyjimbo/reglet/internal/infrastructure/build"
+	"github.com/reglet-dev/reglet/internal/infrastructure/build"
 
+	"github.com/reglet-dev/reglet/internal/domain/capabilities"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
 )
 
 // TestCommandPlugin_Integration tests the command plugin end-to-end with WASM runtime.

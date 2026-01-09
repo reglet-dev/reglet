@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	sdkcontext "github.com/whiskeyjimbo/reglet/sdk/internal/context"
+	sdkcontext "github.com/reglet-dev/reglet/sdk/internal/context"
 )
 
 func TestCreateContextWireFormat(t *testing.T) {

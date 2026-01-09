@@ -7,9 +7,9 @@ import (
 	"errors"
 	"time"
 
-	regletsdk "github.com/whiskeyjimbo/reglet/sdk"
-	regletnet "github.com/whiskeyjimbo/reglet/sdk/net"
-	"github.com/whiskeyjimbo/reglet/wireformat"
+	regletsdk "github.com/reglet-dev/reglet/sdk"
+	regletnet "github.com/reglet-dev/reglet/sdk/net"
+	"github.com/reglet-dev/reglet/wireformat"
 )
 
 // dnsPlugin implements the sdk.Plugin interface.

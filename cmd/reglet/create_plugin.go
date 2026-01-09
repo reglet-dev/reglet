@@ -10,8 +10,8 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/reglet-dev/reglet/internal/templates"
 	"github.com/spf13/cobra"
-	"github.com/whiskeyjimbo/reglet/internal/templates"
 )
 
 // CreatePluginOptions holds options for the create plugin command.

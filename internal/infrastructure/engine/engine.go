@@ -6,14 +6,14 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
-	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
-	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
-	"github.com/whiskeyjimbo/reglet/internal/domain/repositories"
-	"github.com/whiskeyjimbo/reglet/internal/domain/services"
-	"github.com/whiskeyjimbo/reglet/internal/infrastructure/build"
-	"github.com/whiskeyjimbo/reglet/internal/infrastructure/redaction"
-	"github.com/whiskeyjimbo/reglet/internal/infrastructure/wasm"
+	"github.com/reglet-dev/reglet/internal/domain/capabilities"
+	"github.com/reglet-dev/reglet/internal/domain/entities"
+	"github.com/reglet-dev/reglet/internal/domain/execution"
+	"github.com/reglet-dev/reglet/internal/domain/repositories"
+	"github.com/reglet-dev/reglet/internal/domain/services"
+	"github.com/reglet-dev/reglet/internal/infrastructure/build"
+	"github.com/reglet-dev/reglet/internal/infrastructure/redaction"
+	"github.com/reglet-dev/reglet/internal/infrastructure/wasm"
 )
 
 // Engine coordinates profile execution.

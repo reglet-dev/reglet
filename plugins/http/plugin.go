@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	regletsdk "github.com/whiskeyjimbo/reglet/sdk"
-	regletnet "github.com/whiskeyjimbo/reglet/sdk/net"
+	regletsdk "github.com/reglet-dev/reglet/sdk"
+	regletnet "github.com/reglet-dev/reglet/sdk/net"
 )
 
 // httpPlugin implements the sdk.Plugin interface.

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
+	"github.com/reglet-dev/reglet/internal/domain/entities"
 )
 
 // FuzzPluginNameValidation fuzzes plugin name validation for path traversal and invalid chars

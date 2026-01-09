@@ -47,7 +47,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
-          KO_DOCKER_REPO: ${{ env.REGISTRY }}/whiskeyjimbo/reglet
+          KO_DOCKER_REPO: ${{ env.REGISTRY }}/reglet-dev/reglet
 
   update-changelog:
     needs: goreleaser

@@ -6,9 +6,9 @@ import (
 	"testing"
 
 	"github.com/goccy/go-yaml"
+	"github.com/reglet-dev/reglet/internal/domain/capabilities"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
 )
 
 func TestFileStore_LoadAndSave(t *testing.T) {
@@ -63,7 +63,7 @@ func TestFileStore_Load_InvalidYAML(t *testing.T) {
 	store := NewFileStore(configPath)
 
 	// Write invalid YAML to file
-	err := os.WriteFile(configPath, []byte("invalid yaml: ---\n-"), 0600)
+	err := os.WriteFile(configPath, []byte("invalid yaml: ---\n-"), 0o600)
 	require.NoError(t, err)
 
 	_, err = store.Load()
@@ -93,7 +93,7 @@ func TestFileStore_Load_EmptyCapabilities(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.yaml")
 	store := NewFileStore(configPath)
 
-	err := os.WriteFile(configPath, []byte("capabilities: []\n"), 0600)
+	err := os.WriteFile(configPath, []byte("capabilities: []\n"), 0o600)
 	require.NoError(t, err)
 
 	grants, err := store.Load()

@@ -11,9 +11,9 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/reglet-dev/reglet/internal/domain/entities"
+	"github.com/reglet-dev/reglet/internal/domain/values"
 	"github.com/santhosh-tekuri/jsonschema/v5"
-	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
-	"github.com/whiskeyjimbo/reglet/internal/domain/values"
 )
 
 // Control ID must be alphanumeric with dashes and underscores

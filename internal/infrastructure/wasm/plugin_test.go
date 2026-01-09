@@ -7,10 +7,10 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/reglet-dev/reglet/internal/domain/capabilities"
+	"github.com/reglet-dev/reglet/internal/infrastructure/build"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
-	"github.com/whiskeyjimbo/reglet/internal/infrastructure/build"
 )
 
 // TestPlugin_Observe_Concurrent tests that multiple goroutines can call

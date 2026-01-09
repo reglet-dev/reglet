@@ -9,8 +9,8 @@ import (
 	"net" // New import
 	"time"
 
+	"github.com/reglet-dev/reglet/wireformat"
 	"github.com/tetratelabs/wazero/api"
-	"github.com/whiskeyjimbo/reglet/wireformat"
 )
 
 type (

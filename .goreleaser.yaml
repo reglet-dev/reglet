@@ -29,9 +29,9 @@ builds:
         goarch: arm64
     ldflags:
       - -s -w
-      - -X github.com/whiskeyjimbo/reglet/internal/infrastructure/build.Version={{.Version}}
-      - -X github.com/whiskeyjimbo/reglet/internal/infrastructure/build.Commit={{.Commit}}
-      - -X github.com/whiskeyjimbo/reglet/internal/infrastructure/build.BuildDate={{.Date}}
+      - -X github.com/reglet-dev/reglet/internal/infrastructure/build.Version={{.Version}}
+      - -X github.com/reglet-dev/reglet/internal/infrastructure/build.Commit={{.Commit}}
+      - -X github.com/reglet-dev/reglet/internal/infrastructure/build.BuildDate={{.Date}}
     mod_timestamp: "{{ .CommitTimestamp }}"
 
 archives:
@@ -89,7 +89,7 @@ changelog:
 
 release:
   github:
-    owner: whiskeyjimbo
+    owner: reglet-dev
     name: reglet
   prerelease: auto
   mode: replace
@@ -115,13 +115,13 @@ release:
     {{ if .Prerelease }}
     **Homebrew (macOS/Linux):**
     ```bash
-    brew install whiskeyjimbo/tap/reglet
+    brew install reglet-dev/tap/reglet
     ```
     {{ end }}
 
     **Docker:**
     ```bash
-    docker pull ghcr.io/whiskeyjimbo/reglet:{{ .Tag }}
+    docker pull ghcr.io/reglet-dev/reglet:{{ .Tag }}
     ```
 
     **Manual Download:**
@@ -130,19 +130,19 @@ release:
     ### ⚠️ Alpha Status
 
     This is an early alpha release. APIs may change. Not recommended for production use.
-    See [roadmap](https://github.com/whiskeyjimbo/reglet#roadmap) for planned features.
+    See [roadmap](https://github.com/reglet-dev/reglet#roadmap) for planned features.
     {{ end }}
   footer: |
-    **Full Changelog**: https://github.com/whiskeyjimbo/reglet/commits/{{ .Tag }}
+    **Full Changelog**: https://github.com/reglet-dev/reglet/commits/{{ .Tag }}
 
 # Homebrew cask (migrated from brews)
 homebrew_casks:
   - repository:
-      owner: whiskeyjimbo
+      owner: reglet-dev
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     directory: Casks
-    homepage: https://github.com/whiskeyjimbo/reglet
+    homepage: https://github.com/reglet-dev/reglet
     description: "Compliance as Code - Infrastructure validation with WASM plugins"
     license: "Apache-2.0"
     skip_upload: auto
@@ -172,8 +172,8 @@ kos:
     labels:
       org.opencontainers.image.title: Reglet
       org.opencontainers.image.description: Compliance as Code - Infrastructure validation with WASM plugins
-      org.opencontainers.image.url: https://github.com/whiskeyjimbo/reglet
-      org.opencontainers.image.source: https://github.com/whiskeyjimbo/reglet
+      org.opencontainers.image.url: https://github.com/reglet-dev/reglet
+      org.opencontainers.image.source: https://github.com/reglet-dev/reglet
       org.opencontainers.image.version: '{{.Version}}'
       org.opencontainers.image.created: '{{.Date}}'
       org.opencontainers.image.revision: '{{.FullCommit}}'

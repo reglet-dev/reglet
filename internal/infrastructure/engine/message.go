@@ -3,8 +3,8 @@ package engine
 import (
 	"fmt"
 
-	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
-	"github.com/whiskeyjimbo/reglet/internal/domain/values"
+	"github.com/reglet-dev/reglet/internal/domain/execution"
+	"github.com/reglet-dev/reglet/internal/domain/values"
 )
 
 // generateControlMessage generates a human-readable message for the control result.

@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	regletsdk "github.com/whiskeyjimbo/reglet/sdk"
-	"github.com/whiskeyjimbo/reglet/sdk/exec"
+	regletsdk "github.com/reglet-dev/reglet/sdk"
+	"github.com/reglet-dev/reglet/sdk/exec"
 )
 
 // commandPlugin implements the sdk.Plugin interface.
@@ -101,7 +101,6 @@ func (p *commandPlugin) Check(ctx context.Context, config regletsdk.Config) (reg
 		Env:     cfg.Env,
 		Timeout: cfg.Timeout,
 	})
-
 	if err != nil {
 		return regletsdk.Failure("exec", fmt.Sprintf("execution failed: %v", err)), nil
 	}

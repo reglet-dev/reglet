@@ -5,7 +5,7 @@ import (
 
 	"github.com/expr-lang/expr"
 	"github.com/expr-lang/expr/vm"
-	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
+	"github.com/reglet-dev/reglet/internal/domain/entities"
 )
 
 // ControlSpecification defines a condition that a control must meet.

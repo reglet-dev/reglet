@@ -8,8 +8,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/whiskeyjimbo/reglet/sdk/internal/abi"
-	_ "github.com/whiskeyjimbo/reglet/sdk/log" // Initialize WASM logging handler
+	"github.com/reglet-dev/reglet/sdk/internal/abi"
+	_ "github.com/reglet-dev/reglet/sdk/log" // Initialize WASM logging handler
 )
 
 // host_smtp_connect calls the host function to establish an SMTP connection

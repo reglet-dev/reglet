@@ -5,9 +5,9 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/whiskeyjimbo/reglet/internal/application/ports"
-	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
-	infraCapabilities "github.com/whiskeyjimbo/reglet/internal/infrastructure/capabilities"
+	"github.com/reglet-dev/reglet/internal/application/ports"
+	"github.com/reglet-dev/reglet/internal/domain/capabilities"
+	infraCapabilities "github.com/reglet-dev/reglet/internal/infrastructure/capabilities"
 )
 
 // CapabilityGatekeeper handles capability granting decisions, user interaction, and persistence.

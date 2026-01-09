@@ -10,10 +10,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/whiskeyjimbo/reglet/internal/application/ports"
-	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
-	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
-	domainServices "github.com/whiskeyjimbo/reglet/internal/domain/services"
+	"github.com/reglet-dev/reglet/internal/application/ports"
+	"github.com/reglet-dev/reglet/internal/domain/capabilities"
+	"github.com/reglet-dev/reglet/internal/domain/entities"
+	domainServices "github.com/reglet-dev/reglet/internal/domain/services"
 	"golang.org/x/sync/errgroup"
 )
 

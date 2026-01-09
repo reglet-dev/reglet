@@ -3,8 +3,8 @@
 package wasm
 
 import (
-	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
-	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
+	"github.com/reglet-dev/reglet/internal/domain/capabilities"
+	"github.com/reglet-dev/reglet/internal/domain/execution"
 )
 
 // PluginInfo contains metadata about a plugin

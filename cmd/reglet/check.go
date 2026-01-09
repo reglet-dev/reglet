@@ -10,11 +10,11 @@ import (
 	"os"
 	"time"
 
+	"github.com/reglet-dev/reglet/internal/application/dto"
+	"github.com/reglet-dev/reglet/internal/domain/execution"
+	"github.com/reglet-dev/reglet/internal/infrastructure/container"
+	"github.com/reglet-dev/reglet/internal/infrastructure/output"
 	"github.com/spf13/cobra"
-	"github.com/whiskeyjimbo/reglet/internal/application/dto"
-	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
-	"github.com/whiskeyjimbo/reglet/internal/infrastructure/container"
-	"github.com/whiskeyjimbo/reglet/internal/infrastructure/output"
 )
 
 // CheckOptions holds the configuration for the check command.

@@ -3,9 +3,9 @@ package services
 import (
 	"testing"
 
+	"github.com/reglet-dev/reglet/internal/domain/capabilities"
+	"github.com/reglet-dev/reglet/internal/domain/entities"
 	"github.com/stretchr/testify/assert"
-	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
-	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
 )
 
 // Mock extractors for testing (replicates logic that moved to infrastructure)

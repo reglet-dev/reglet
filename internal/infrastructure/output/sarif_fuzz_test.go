@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
-	"github.com/whiskeyjimbo/reglet/internal/domain/values"
+	"github.com/reglet-dev/reglet/internal/domain/execution"
+	"github.com/reglet-dev/reglet/internal/domain/values"
 )
 
 // FuzzSARIFGeneration fuzzes SARIF output generation

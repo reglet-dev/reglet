@@ -1,8 +1,8 @@
 package services
 
 import (
-	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
-	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
+	"github.com/reglet-dev/reglet/internal/domain/capabilities"
+	"github.com/reglet-dev/reglet/internal/domain/entities"
 )
 
 // CapabilityAnalyzer extracts specific capability requirements from profiles.

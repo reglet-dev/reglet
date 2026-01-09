@@ -3,8 +3,8 @@ package wasm
 import (
 	"testing"
 
+	"github.com/reglet-dev/reglet/internal/domain/capabilities"
 	"github.com/stretchr/testify/assert"
-	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
 )
 
 func TestMatchEnvPattern(t *testing.T) {

@@ -9,9 +9,9 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/whiskeyjimbo/reglet/sdk/internal/abi"
-	sdkcontext "github.com/whiskeyjimbo/reglet/sdk/internal/context"
-	"github.com/whiskeyjimbo/reglet/wireformat"
+	"github.com/reglet-dev/reglet/sdk/internal/abi"
+	sdkcontext "github.com/reglet-dev/reglet/sdk/internal/context"
+	"github.com/reglet-dev/reglet/wireformat"
 )
 
 // Define the host function signature for logging messages.

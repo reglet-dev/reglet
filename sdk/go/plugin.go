@@ -10,9 +10,9 @@ import (
 	"runtime/debug" // For stack traces in panic recovery
 	"time"          // For time.Now()
 
-	"github.com/whiskeyjimbo/reglet/sdk/internal/abi"
-	sdkcontext "github.com/whiskeyjimbo/reglet/sdk/internal/context"
-	_ "github.com/whiskeyjimbo/reglet/sdk/log" // Initialize WASM logging handler
+	"github.com/reglet-dev/reglet/sdk/internal/abi"
+	sdkcontext "github.com/reglet-dev/reglet/sdk/internal/context"
+	_ "github.com/reglet-dev/reglet/sdk/log" // Initialize WASM logging handler
 )
 
 // Plugin is the interface every Reglet plugin must implement.

@@ -1,9 +1,9 @@
 #!/bin/bash
 # Install Reglet - Infrastructure compliance validation
-# Usage: curl -sSL https://raw.githubusercontent.com/whiskeyjimbo/reglet/main/scripts/install.sh | sh
+# Usage: curl -sSL https://raw.githubusercontent.com/reglet-dev/reglet/main/scripts/install.sh | sh
 set -euo pipefail
 
-REPO="whiskeyjimbo/reglet"
+REPO="reglet-dev/reglet"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 USE_SUDO="${USE_SUDO:-true}"
 
@@ -42,7 +42,7 @@ case $OS in
         echo "  Supported: Linux, macOS (Darwin)"
         echo ""
         echo "Alternative installation methods:"
-        echo "  • Docker (all platforms): docker pull ghcr.io/whiskeyjimbo/reglet:latest"
+        echo "  • Docker (all platforms): docker pull ghcr.io/reglet-dev/reglet:latest"
         echo "  • Manual download: https://github.com/${REPO}/releases"
         exit 1
         ;;
@@ -74,9 +74,9 @@ if ! curl -fsSL "$URL" | tar -xz -C "$TMP_DIR"; then
     echo ""
     echo "Alternative installation methods:"
     if [ "$OS" = "darwin" ]; then
-        echo "  • Homebrew: brew install whiskeyjimbo/tap/reglet"
+        echo "  • Homebrew: brew install reglet-dev/tap/reglet"
     fi
-    echo "  • Docker: docker pull ghcr.io/whiskeyjimbo/reglet:latest"
+    echo "  • Docker: docker pull ghcr.io/reglet-dev/reglet:latest"
     echo "  • Manual: https://github.com/${REPO}/releases"
     exit 1
 fi
@@ -93,9 +93,9 @@ if [ ! -f "$BINARY" ]; then
     echo ""
     echo "Alternative installation methods:"
     if [ "$OS" = "darwin" ]; then
-        echo "  • Homebrew: brew install whiskeyjimbo/tap/reglet"
+        echo "  • Homebrew: brew install reglet-dev/tap/reglet"
     fi
-    echo "  • Docker: docker pull ghcr.io/whiskeyjimbo/reglet:latest"
+    echo "  • Docker: docker pull ghcr.io/reglet-dev/reglet:latest"
     echo "  • Manual: https://github.com/${REPO}/releases"
     exit 1
 fi
@@ -119,11 +119,11 @@ if command -v reglet >/dev/null 2>&1; then
     echo ""
     echo "Next steps:"
     echo "  1. Try an example:"
-    echo "     curl -fsSL https://raw.githubusercontent.com/whiskeyjimbo/reglet/main/docs/examples/01-quickstart.yaml > quickstart.yaml"
+    echo "     curl -fsSL https://raw.githubusercontent.com/reglet-dev/reglet/main/docs/examples/01-quickstart.yaml > quickstart.yaml"
     echo "     reglet check quickstart.yaml"
     echo ""
     echo "  2. Read the documentation:"
-    echo "     https://github.com/whiskeyjimbo/reglet#readme"
+    echo "     https://github.com/reglet-dev/reglet#readme"
     echo ""
 else
     echo ""

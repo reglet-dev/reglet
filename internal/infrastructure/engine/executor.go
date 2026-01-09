@@ -7,12 +7,12 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
-	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
-	"github.com/whiskeyjimbo/reglet/internal/domain/services"
-	"github.com/whiskeyjimbo/reglet/internal/domain/values"
-	"github.com/whiskeyjimbo/reglet/internal/infrastructure/redaction"
-	"github.com/whiskeyjimbo/reglet/internal/infrastructure/wasm"
+	"github.com/reglet-dev/reglet/internal/domain/entities"
+	"github.com/reglet-dev/reglet/internal/domain/execution"
+	"github.com/reglet-dev/reglet/internal/domain/services"
+	"github.com/reglet-dev/reglet/internal/domain/values"
+	"github.com/reglet-dev/reglet/internal/infrastructure/redaction"
+	"github.com/reglet-dev/reglet/internal/infrastructure/wasm"
 )
 
 // ObservationExecutor executes observations using WASM plugins.

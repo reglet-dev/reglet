@@ -3,8 +3,8 @@ package validation
 import (
 	"testing"
 
+	"github.com/reglet-dev/reglet/internal/domain/entities"
 	"github.com/stretchr/testify/assert"
-	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
 )
 
 // Test_validatePluginName_ValidNames tests that valid plugin names are accepted

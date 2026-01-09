@@ -6,14 +6,14 @@ import (
 	"path/filepath"
 	"testing"
 
-	regletsdk "github.com/whiskeyjimbo/reglet/sdk"
+	regletsdk "github.com/reglet-dev/reglet/sdk"
 )
 
 func TestFilePlugin_Check_Exists(t *testing.T) {
 	// Create temp file
 	tmpDir := t.TempDir()
 	tmpFile := filepath.Join(tmpDir, "testfile")
-	if err := os.WriteFile(tmpFile, []byte("content"), 0644); err != nil {
+	if err := os.WriteFile(tmpFile, []byte("content"), 0o644); err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
 
@@ -48,7 +48,7 @@ func TestFilePlugin_Check_Content(t *testing.T) {
 	tmpDir := t.TempDir()
 	tmpFile := filepath.Join(tmpDir, "testfile")
 	content := "hello world"
-	if err := os.WriteFile(tmpFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(tmpFile, []byte(content), 0o644); err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
 
@@ -81,7 +81,7 @@ func TestFilePlugin_Check_Hash(t *testing.T) {
 	tmpDir := t.TempDir()
 	tmpFile := filepath.Join(tmpDir, "testfile")
 	content := "test hash"
-	if err := os.WriteFile(tmpFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(tmpFile, []byte(content), 0o644); err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
 

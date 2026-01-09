@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 
+	"github.com/reglet-dev/reglet/internal/infrastructure/build"
 	"github.com/spf13/cobra"
-	"github.com/whiskeyjimbo/reglet/internal/infrastructure/build"
 )
 
 // versionCmd implements the version command.

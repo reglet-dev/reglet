@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/owenrumney/go-sarif/v3/pkg/report/v210/sarif"
-	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
-	"github.com/whiskeyjimbo/reglet/internal/domain/values"
+	"github.com/reglet-dev/reglet/internal/domain/execution"
+	"github.com/reglet-dev/reglet/internal/domain/values"
 )
 
 type sarifMapper struct {

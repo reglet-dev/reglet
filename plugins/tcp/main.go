@@ -7,8 +7,8 @@ package main
 import (
 	"log/slog"
 
-	regletsdk "github.com/whiskeyjimbo/reglet/sdk"
-	regletnet "github.com/whiskeyjimbo/reglet/sdk/net"
+	regletsdk "github.com/reglet-dev/reglet/sdk"
+	regletnet "github.com/reglet-dev/reglet/sdk/net"
 )
 
 func init() {

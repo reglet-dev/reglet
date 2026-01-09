@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/goccy/go-yaml"
-	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
+	"github.com/reglet-dev/reglet/internal/domain/capabilities"
 )
 
 // FileStore provides file-based persistence for capability grants.

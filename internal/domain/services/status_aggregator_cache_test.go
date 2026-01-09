@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/reglet-dev/reglet/internal/domain/execution"
+	"github.com/reglet-dev/reglet/internal/domain/values"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
-	"github.com/whiskeyjimbo/reglet/internal/domain/values"
 )
 
 // TestStatusAggregator_ExpressionCaching verifies that expressions are cached and reused

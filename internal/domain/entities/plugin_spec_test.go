@@ -34,16 +34,16 @@ func TestParsePluginDeclaration(t *testing.T) {
 		},
 		{
 			name:        "OCI reference with tag",
-			declaration: "ghcr.io/whiskeyjimbo/reglet-plugins/file:1.2.0",
+			declaration: "ghcr.io/reglet-dev/reglet-plugins/file:1.2.0",
 			wantName:    "file",
-			wantSource:  "ghcr.io/whiskeyjimbo/reglet-plugins/file:1.2.0",
+			wantSource:  "ghcr.io/reglet-dev/reglet-plugins/file:1.2.0",
 			wantVersion: "1.2.0",
 		},
 		{
 			name:        "OCI reference with digest",
-			declaration: "ghcr.io/whiskeyjimbo/reglet-plugins/file@sha256:abc123",
+			declaration: "ghcr.io/reglet-dev/reglet-plugins/file@sha256:abc123",
 			wantName:    "file",
-			wantSource:  "ghcr.io/whiskeyjimbo/reglet-plugins/file@sha256:abc123",
+			wantSource:  "ghcr.io/reglet-dev/reglet-plugins/file@sha256:abc123",
 			wantDigest:  "sha256:abc123",
 		},
 		{
@@ -172,8 +172,8 @@ func TestPluginSpec_PluginName(t *testing.T) {
 	}{
 		{"file", "file"},
 		{"file@1.0.0", "file"},
-		{"ghcr.io/whiskeyjimbo/reglet-plugins/file:1.2.0", "file"},
-		{"ghcr.io/whiskeyjimbo/reglet-plugins/file@sha256:abc", "file"},
+		{"ghcr.io/reglet-dev/reglet-plugins/file:1.2.0", "file"},
+		{"ghcr.io/reglet-dev/reglet-plugins/file@sha256:abc", "file"},
 		{"registry.corp.com/security/scanner:3.0.0", "scanner"},
 	}
 

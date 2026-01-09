@@ -6,11 +6,11 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/reglet-dev/reglet/internal/domain/capabilities"
+	"github.com/reglet-dev/reglet/internal/infrastructure/build"
+	"github.com/reglet-dev/reglet/internal/infrastructure/wasm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
-	"github.com/whiskeyjimbo/reglet/internal/infrastructure/build"
-	"github.com/whiskeyjimbo/reglet/internal/infrastructure/wasm"
 )
 
 // TestPluginFilesystemIsolation verifies plugins can only access granted paths
@@ -28,8 +28,8 @@ func TestPluginFilesystemIsolation(t *testing.T) {
 	allowedFile := filepath.Join(allowedDir, "allowed.txt")
 	forbiddenFile := filepath.Join(forbiddenDir, "forbidden.txt")
 
-	require.NoError(t, os.WriteFile(allowedFile, []byte("allowed content"), 0644))
-	require.NoError(t, os.WriteFile(forbiddenFile, []byte("secret content"), 0644))
+	require.NoError(t, os.WriteFile(allowedFile, []byte("allowed content"), 0o644))
+	require.NoError(t, os.WriteFile(forbiddenFile, []byte("secret content"), 0o644))
 
 	// Grant access only to allowedDir, not forbiddenDir
 	caps := map[string][]capabilities.Capability{
@@ -133,11 +133,11 @@ func TestPluginSpecificFileAccess(t *testing.T) {
 	deniedFile := filepath.Join(tmpDir, "secrets", "api-key.txt")
 
 	// Create directories
-	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "config"), 0755))
-	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "secrets"), 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "config"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, "secrets"), 0o755))
 
-	require.NoError(t, os.WriteFile(allowedFile, []byte("public config"), 0644))
-	require.NoError(t, os.WriteFile(deniedFile, []byte("secret-api-key-12345"), 0644))
+	require.NoError(t, os.WriteFile(allowedFile, []byte("public config"), 0o644))
+	require.NoError(t, os.WriteFile(deniedFile, []byte("secret-api-key-12345"), 0o644))
 
 	// Grant access only to config directory
 	caps := map[string][]capabilities.Capability{
@@ -232,7 +232,7 @@ func TestPluginReadOnlyVsReadWrite(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	testFile := filepath.Join(tmpDir, "test.txt")
-	require.NoError(t, os.WriteFile(testFile, []byte("initial content"), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte("initial content"), 0o644))
 
 	// Grant read-only access
 	caps := map[string][]capabilities.Capability{

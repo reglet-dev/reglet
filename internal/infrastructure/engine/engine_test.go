@@ -8,14 +8,14 @@ import (
 
 	"github.com/expr-lang/expr"
 	"github.com/expr-lang/expr/vm"
+	"github.com/reglet-dev/reglet/internal/domain/entities"
+	"github.com/reglet-dev/reglet/internal/domain/execution"
+	"github.com/reglet-dev/reglet/internal/domain/services"
+	"github.com/reglet-dev/reglet/internal/domain/values"
+	"github.com/reglet-dev/reglet/internal/infrastructure/build"
+	"github.com/reglet-dev/reglet/internal/infrastructure/wasm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
-	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
-	"github.com/whiskeyjimbo/reglet/internal/domain/services"
-	"github.com/whiskeyjimbo/reglet/internal/domain/values"
-	"github.com/whiskeyjimbo/reglet/internal/infrastructure/build"
-	"github.com/whiskeyjimbo/reglet/internal/infrastructure/wasm"
 )
 
 func TestNewEngine(t *testing.T) {

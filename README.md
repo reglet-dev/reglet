@@ -5,29 +5,29 @@
 Reglet is a compliance and infrastructure validation engine that runs security checks in isolated WebAssembly sandboxes. Define policies as code, validate systems and services, and get standardized audit output ready for SOC2, ISO27001, and more.
 
 <p align="center">
-  <a href="https://github.com/whiskeyjimbo/reglet/actions"><img src="https://github.com/whiskeyjimbo/reglet/workflows/CI/badge.svg" alt="Build Status"></a>
-  <a href="https://goreportcard.com/report/github.com/whiskeyjimbo/reglet"><img src="https://goreportcard.com/badge/github.com/whiskeyjimbo/reglet" alt="Go Report Card"></a>
+  <a href="https://github.com/reglet-dev/reglet/actions"><img src="https://github.com/reglet-dev/reglet/workflows/CI/badge.svg" alt="Build Status"></a>
+  <a href="https://goreportcard.com/report/github.com/reglet-dev/reglet"><img src="https://goreportcard.com/badge/github.com/reglet-dev/reglet" alt="Go Report Card"></a>
   <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License"></a>
-  <img src="https://img.shields.io/github/v/release/whiskeyjimbo/reglet?include_prereleases" alt="Latest Release">
+  <img src="https://img.shields.io/github/v/release/reglet-dev/reglet?include_prereleases" alt="Latest Release">
 </p>
 
 ## Quick Start
 
 ```bash
 # Install (choose one)
-brew install whiskeyjimbo/tap/reglet           # macOS/Linux
-docker pull ghcr.io/whiskeyjimbo/reglet:latest # Docker
-curl -sSL https://raw.githubusercontent.com/whiskeyjimbo/reglet/main/scripts/install.sh | sh  # Script
+brew install reglet-dev/tap/reglet           # macOS/Linux
+docker pull ghcr.io/reglet-dev/reglet:latest # Docker
+curl -sSL https://raw.githubusercontent.com/reglet-dev/reglet/main/scripts/install.sh | sh  # Script
 
 # Get an example profile
-curl -fsSL https://raw.githubusercontent.com/whiskeyjimbo/reglet/main/docs/examples/01-quickstart.yaml > quickstart.yaml
+curl -fsSL https://raw.githubusercontent.com/reglet-dev/reglet/main/docs/examples/01-quickstart.yaml > quickstart.yaml
 
 # Run it
 reglet check quickstart.yaml
 
 # Or with Docker
 docker run --rm -v $(pwd)/quickstart.yaml:/quickstart.yaml \
-  ghcr.io/whiskeyjimbo/reglet:latest check /quickstart.yaml
+  ghcr.io/reglet-dev/reglet:latest check /quickstart.yaml
 ```
 ![demo](.github/assets/demo.gif)
 
@@ -117,7 +117,7 @@ controls:
 ### Homebrew (macOS/Linux)
 
 ```bash
-brew install whiskeyjimbo/tap/reglet
+brew install reglet-dev/tap/reglet
 reglet version
 ```
 
@@ -125,29 +125,29 @@ reglet version
 
 ```bash
 # Pull image
-docker pull ghcr.io/whiskeyjimbo/reglet:latest
+docker pull ghcr.io/reglet-dev/reglet:latest
 
 # Quick version check
-docker run --rm ghcr.io/whiskeyjimbo/reglet:latest version
+docker run --rm ghcr.io/reglet-dev/reglet:latest version
 
 # Run with profile from host
 docker run --rm -v $(pwd)/profile.yaml:/profile.yaml \
-  ghcr.io/whiskeyjimbo/reglet:latest check /profile.yaml
+  ghcr.io/reglet-dev/reglet:latest check /profile.yaml
 
 # Try built-in examples
-docker run --rm ghcr.io/whiskeyjimbo/reglet:latest \
+docker run --rm ghcr.io/reglet-dev/reglet:latest \
   check /home/reglet/docs/examples/01-quickstart.yaml
 ```
 
 ### Install Script (Linux/macOS)
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/whiskeyjimbo/reglet/main/scripts/install.sh | sh
+curl -sSL https://raw.githubusercontent.com/reglet-dev/reglet/main/scripts/install.sh | sh
 ```
 
 ### Manual Download
 
-Download the appropriate archive for your platform from the [releases page](https://github.com/whiskeyjimbo/reglet/releases), extract it, and move the binary to your PATH:
+Download the appropriate archive for your platform from the [releases page](https://github.com/reglet-dev/reglet/releases), extract it, and move the binary to your PATH:
 
 ```bash
 # Linux/macOS
@@ -166,7 +166,7 @@ reglet version
 Requires Go 1.25+:
 
 ```bash
-git clone https://github.com/whiskeyjimbo/reglet.git
+git clone https://github.com/reglet-dev/reglet.git
 cd reglet
 make build
 ./bin/reglet check docs/examples/01-quickstart.yaml
@@ -217,8 +217,8 @@ Reglet is in active development. Core features work, but expect breaking changes
 
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md).
 
-- **Issues:** [GitHub Issues](https://github.com/whiskeyjimbo/reglet/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/whiskeyjimbo/reglet/discussions)
+- **Issues:** [GitHub Issues](https://github.com/reglet-dev/reglet/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/reglet-dev/reglet/discussions)
 
 ## License
 

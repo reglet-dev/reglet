@@ -2,7 +2,7 @@ package services
 
 import (
 	"github.com/expr-lang/expr/vm"
-	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
+	"github.com/reglet-dev/reglet/internal/domain/entities"
 )
 
 // ControlEnv defines the variables available during filter expression evaluation.

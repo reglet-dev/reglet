@@ -8,12 +8,12 @@ import (
 	"os"
 	"sync"
 
+	"github.com/reglet-dev/reglet/internal/domain/capabilities"
+	"github.com/reglet-dev/reglet/internal/infrastructure/build"
+	"github.com/reglet-dev/reglet/internal/infrastructure/redaction"
+	"github.com/reglet-dev/reglet/internal/infrastructure/wasm/hostfuncs"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
-	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
-	"github.com/whiskeyjimbo/reglet/internal/infrastructure/build"
-	"github.com/whiskeyjimbo/reglet/internal/infrastructure/redaction"
-	"github.com/whiskeyjimbo/reglet/internal/infrastructure/wasm/hostfuncs"
 )
 
 // globalCache speeds up compilation across runtimes within a single process.

@@ -14,8 +14,8 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/reglet-dev/reglet/internal/infrastructure/build"
 	"github.com/tetratelabs/wazero/api"
-	"github.com/whiskeyjimbo/reglet/internal/infrastructure/build"
 )
 
 // dnsPinningTransport is a custom http.RoundTripper that prevents DNS rebinding attacks

@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	sdk "github.com/whiskeyjimbo/reglet/sdk"
+	sdk "github.com/reglet-dev/reglet/sdk"
 )
 
 func TestGetString(t *testing.T) {

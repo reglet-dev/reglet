@@ -4,12 +4,12 @@ import (
 	"context"
 	"testing"
 
+	"github.com/reglet-dev/reglet/internal/application/ports"
+	"github.com/reglet-dev/reglet/internal/domain/capabilities"
+	"github.com/reglet-dev/reglet/internal/domain/entities"
+	domainServices "github.com/reglet-dev/reglet/internal/domain/services"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/whiskeyjimbo/reglet/internal/application/ports"
-	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
-	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
-	domainServices "github.com/whiskeyjimbo/reglet/internal/domain/services"
 )
 
 // mockPluginRuntimeFactory is a test double for PluginRuntimeFactory.

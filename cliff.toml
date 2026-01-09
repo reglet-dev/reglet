@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 body = """
 {%- macro remote_url() -%}
-  https://github.com/whiskeyjimbo/reglet
+  https://github.com/reglet-dev/reglet
 {%- endmacro -%}
 
 {% if version -%}
@@ -43,10 +43,10 @@ footer = """
 {% for release in releases -%}
 {% if release.version -%}
 {% if release.previous.version -%}
-[{{ release.version | trim_start_matches(pat="v") }}]: https://github.com/whiskeyjimbo/reglet/compare/{{ release.previous.version }}...{{ release.version }}
+[{{ release.version | trim_start_matches(pat="v") }}]: https://github.com/reglet-dev/reglet/compare/{{ release.previous.version }}...{{ release.version }}
 {% endif -%}
 {% else -%}
-[Unreleased]: https://github.com/whiskeyjimbo/reglet/compare/{{ release.previous.version }}...HEAD
+[Unreleased]: https://github.com/reglet-dev/reglet/compare/{{ release.previous.version }}...HEAD
 {% endif -%}
 {% endfor %}
 """

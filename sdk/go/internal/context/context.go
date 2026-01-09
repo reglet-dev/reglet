@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/whiskeyjimbo/reglet/wireformat"
+	"github.com/reglet-dev/reglet/wireformat"
 )
 
 // contextStore holds the current context for the plugin execution.

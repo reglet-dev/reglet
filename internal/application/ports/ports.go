@@ -7,11 +7,11 @@ import (
 	"context"
 	"io"
 
-	"github.com/whiskeyjimbo/reglet/internal/application/dto"
-	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
-	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
-	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
-	"github.com/whiskeyjimbo/reglet/internal/infrastructure/system"
+	"github.com/reglet-dev/reglet/internal/application/dto"
+	"github.com/reglet-dev/reglet/internal/domain/capabilities"
+	"github.com/reglet-dev/reglet/internal/domain/entities"
+	"github.com/reglet-dev/reglet/internal/domain/execution"
+	"github.com/reglet-dev/reglet/internal/infrastructure/system"
 )
 
 // PluginInfo contains metadata about a plugin.

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
+	"github.com/reglet-dev/reglet/internal/domain/execution"
 )
 
 // ExecutionResultRepository defines the interface for persisting execution results.

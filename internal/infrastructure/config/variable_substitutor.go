@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
+	"github.com/reglet-dev/reglet/internal/domain/entities"
 )
 
 // Variable pattern: {{ .vars.key }} or {{ .vars.nested.key }}

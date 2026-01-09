@@ -19,9 +19,9 @@ COMMIT      := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE  := $(shell date -u '+%Y-%m-%d_%H:%M:%S')
 
 LDFLAGS := -ldflags "\
-	-X github.com/whiskeyjimbo/reglet/internal/infrastructure/build.Version=$(VERSION) \
-	-X github.com/whiskeyjimbo/reglet/internal/infrastructure/build.Commit=$(COMMIT) \
-	-X github.com/whiskeyjimbo/reglet/internal/infrastructure/build.BuildDate=$(BUILD_DATE)"
+	-X github.com/reglet-dev/reglet/internal/infrastructure/build.Version=$(VERSION) \
+	-X github.com/reglet-dev/reglet/internal/infrastructure/build.Commit=$(COMMIT) \
+	-X github.com/reglet-dev/reglet/internal/infrastructure/build.BuildDate=$(BUILD_DATE)"
 
 # Go commands
 GOCMD   := go

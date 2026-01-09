@@ -3,8 +3,8 @@ package capabilities
 import (
 	"testing"
 
+	"github.com/reglet-dev/reglet/internal/domain/capabilities"
 	"github.com/stretchr/testify/assert"
-	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
 )
 
 func TestTerminalPrompter_IsInteractive(t *testing.T) {

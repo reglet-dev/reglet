@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/goccy/go-yaml"
-	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
+	"github.com/reglet-dev/reglet/internal/domain/entities"
 )
 
 // ProfileLoader handles loading profiles from YAML files.

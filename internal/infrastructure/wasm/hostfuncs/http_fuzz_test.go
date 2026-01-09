@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/whiskeyjimbo/reglet/wireformat"
+	"github.com/reglet-dev/reglet/wireformat"
 )
 
 // FuzzHTTPRequestParsing fuzzes HTTP request wire format parsing

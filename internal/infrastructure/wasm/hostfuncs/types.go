@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
+	"github.com/reglet-dev/reglet/internal/domain/capabilities"
 )
 
 // CapabilityChecker checks if operations are allowed based on granted capabilities

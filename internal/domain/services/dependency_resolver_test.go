@@ -3,9 +3,9 @@ package services
 import (
 	"testing"
 
+	"github.com/reglet-dev/reglet/internal/domain/entities"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
 )
 
 func Test_DependencyResolver_BuildControlDAG_NoDependencies(t *testing.T) {

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
-	"github.com/whiskeyjimbo/reglet/internal/domain/values"
+	"github.com/reglet-dev/reglet/internal/domain/execution"
+	"github.com/reglet-dev/reglet/internal/domain/values"
 )
 
 // JUnitFormatter formats execution results as JUnit XML.

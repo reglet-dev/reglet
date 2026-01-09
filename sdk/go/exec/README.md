@@ -22,8 +22,8 @@ import (
     "context"
     "log"
 
-    "github.com/whiskeyjimbo/reglet/sdk"
-    "github.com/whiskeyjimbo/reglet/sdk/exec"
+    "github.com/reglet-dev/reglet/sdk"
+    "github.com/reglet-dev/reglet/sdk/exec"
 )
 
 type MyPlugin struct{}

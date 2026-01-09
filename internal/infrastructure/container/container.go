@@ -7,14 +7,14 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/whiskeyjimbo/reglet/internal/application/ports"
-	"github.com/whiskeyjimbo/reglet/internal/application/services"
-	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
-	domainservices "github.com/whiskeyjimbo/reglet/internal/domain/services"
-	"github.com/whiskeyjimbo/reglet/internal/infrastructure/adapters"
-	"github.com/whiskeyjimbo/reglet/internal/infrastructure/plugins"
-	"github.com/whiskeyjimbo/reglet/internal/infrastructure/redaction"
-	"github.com/whiskeyjimbo/reglet/internal/infrastructure/system"
+	"github.com/reglet-dev/reglet/internal/application/ports"
+	"github.com/reglet-dev/reglet/internal/application/services"
+	"github.com/reglet-dev/reglet/internal/domain/capabilities"
+	domainservices "github.com/reglet-dev/reglet/internal/domain/services"
+	"github.com/reglet-dev/reglet/internal/infrastructure/adapters"
+	"github.com/reglet-dev/reglet/internal/infrastructure/plugins"
+	"github.com/reglet-dev/reglet/internal/infrastructure/redaction"
+	"github.com/reglet-dev/reglet/internal/infrastructure/system"
 )
 
 // Container holds all application dependencies.

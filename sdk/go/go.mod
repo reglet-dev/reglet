@@ -1,4 +1,4 @@
-module github.com/whiskeyjimbo/reglet/sdk
+module github.com/reglet-dev/reglet/sdk
 
 go 1.25.4
 
@@ -6,10 +6,10 @@ require (
 	github.com/go-playground/validator/v10 v10.28.0
 	github.com/invopop/jsonschema v0.13.0
 	github.com/stretchr/testify v1.8.4
-	github.com/whiskeyjimbo/reglet/wireformat v0.0.0
+	github.com/reglet-dev/reglet/wireformat v0.0.0
 )
 
-replace github.com/whiskeyjimbo/reglet/wireformat => ../../wireformat
+replace github.com/reglet-dev/reglet/wireformat => ../../wireformat
 
 require (
 	github.com/bahlo/generic-list-go v0.2.0 // indirect

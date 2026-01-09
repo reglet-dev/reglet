@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
+	"github.com/reglet-dev/reglet/internal/infrastructure/build"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/whiskeyjimbo/reglet/internal/infrastructure/build"
 )
 
 func TestNewRuntime(t *testing.T) {

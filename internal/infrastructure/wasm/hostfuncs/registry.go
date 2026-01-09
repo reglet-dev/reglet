@@ -3,10 +3,10 @@ package hostfuncs
 import (
 	"context"
 
+	"github.com/reglet-dev/reglet/internal/domain/capabilities"
+	"github.com/reglet-dev/reglet/internal/infrastructure/build"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
-	"github.com/whiskeyjimbo/reglet/internal/infrastructure/build"
 )
 
 // RegisterHostFunctions registers all host functions with the wazero runtime

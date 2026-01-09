@@ -3,8 +3,8 @@ package services
 import (
 	"testing"
 
+	"github.com/reglet-dev/reglet/internal/domain/capabilities"
 	"github.com/stretchr/testify/assert"
-	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
 )
 
 // TestIsBroadCapability_ExecWildcards verifies that exec wildcard patterns are detected as broad.

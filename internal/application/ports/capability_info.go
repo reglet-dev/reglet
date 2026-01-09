@@ -3,7 +3,7 @@
 // This is placed in ports to avoid circular imports between services and ports.
 package ports
 
-import "github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
+import "github.com/reglet-dev/reglet/internal/domain/capabilities"
 
 // CapabilityInfo contains metadata about a capability request.
 type CapabilityInfo struct {

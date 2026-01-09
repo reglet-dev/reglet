@@ -11,7 +11,7 @@ type PluginSpec struct {
 	// Name is the alias used in observations (e.g., "file", "file-legacy")
 	Name string
 
-	// Source is the plugin source (e.g., "file", "ghcr.io/whiskeyjimbo/reglet-plugins/file:1.0.0")
+	// Source is the plugin source (e.g., "file", "ghcr.io/reglet-dev/reglet-plugins/file:1.0.0")
 	Source string
 
 	// Version is the explicit version constraint (e.g., "1.2.0")

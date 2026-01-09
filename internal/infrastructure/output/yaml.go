@@ -4,7 +4,7 @@ import (
 	"io"
 
 	"github.com/goccy/go-yaml"
-	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
+	"github.com/reglet-dev/reglet/internal/domain/execution"
 )
 
 // YAMLFormatter formats execution results as YAML.

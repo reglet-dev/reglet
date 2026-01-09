@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
-	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
-	"github.com/whiskeyjimbo/reglet/internal/domain/services"
-	"github.com/whiskeyjimbo/reglet/internal/domain/values"
+	"github.com/reglet-dev/reglet/internal/domain/entities"
+	"github.com/reglet-dev/reglet/internal/domain/execution"
+	"github.com/reglet-dev/reglet/internal/domain/services"
+	"github.com/reglet-dev/reglet/internal/domain/values"
 	"golang.org/x/sync/errgroup"
 )
 

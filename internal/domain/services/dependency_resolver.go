@@ -3,7 +3,7 @@ package services
 import (
 	"fmt"
 
-	"github.com/whiskeyjimbo/reglet/internal/domain/entities"
+	"github.com/reglet-dev/reglet/internal/domain/entities"
 )
 
 // DependencyResolver handles control dependency graph operations

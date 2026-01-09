@@ -12,10 +12,10 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/reglet-dev/reglet/internal/domain/capabilities"
+	"github.com/reglet-dev/reglet/internal/infrastructure/wasm/hostfuncs"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
-	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
-	"github.com/whiskeyjimbo/reglet/internal/infrastructure/wasm/hostfuncs"
 )
 
 // Plugin manages the lifecycle and execution of a compiled WASM module.

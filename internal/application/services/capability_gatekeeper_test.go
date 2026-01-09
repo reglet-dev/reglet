@@ -3,10 +3,10 @@ package services
 import (
 	"testing"
 
+	"github.com/reglet-dev/reglet/internal/application/ports"
+	"github.com/reglet-dev/reglet/internal/domain/capabilities"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/whiskeyjimbo/reglet/internal/application/ports"
-	"github.com/whiskeyjimbo/reglet/internal/domain/capabilities"
 )
 
 func TestCapabilityGatekeeper_TrustAllMode(t *testing.T) {

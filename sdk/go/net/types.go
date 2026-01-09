@@ -1,7 +1,7 @@
 package net
 
 import (
-	"github.com/whiskeyjimbo/reglet/wireformat"
+	"github.com/reglet-dev/reglet/wireformat"
 )
 
 // Re-export wire format types from shared wireformat package

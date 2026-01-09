@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/reglet-dev/reglet/internal/domain/execution"
+	"github.com/reglet-dev/reglet/internal/domain/values"
 	"github.com/stretchr/testify/assert"
-	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
-	"github.com/whiskeyjimbo/reglet/internal/domain/values"
 )
 
 func Test_StatusAggregator_AggregateControlStatus(t *testing.T) {

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/whiskeyjimbo/reglet/internal/domain/execution"
+	"github.com/reglet-dev/reglet/internal/domain/execution"
 )
 
 // JSONFormatter formats execution results as JSON.
