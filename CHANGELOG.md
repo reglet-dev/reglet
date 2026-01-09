@@ -5,65 +5,258 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
 ## [0.2.0-alpha] - 2026-01-09
 
 ### Added
+- **cli:** Add CLI entry point and version package
+- **plugin:** Define WIT interface for plugin contract
+- **wasm:** Implement WASM runtime with wazero
+- **plugin:** Add file plugin proof-of-concept
+- **plugin/file:** Implement file plugin with Go 1.25 wasmexport
+- **wasm:** Implement plugin function calls and WASI filesystem access
+- **config:** Implement profile configuration loader
+- **output:** Add formatters for table, JSON, and YAML
+- **cli:** Add check command with output format
+- **main:** Complete file wasm with end-to-end functionality
+- **plugins:** Add plugin generator and development infrastructure
+- **wasm:** Implement full capability pattern matching and host functions
+- **plugins:** Add DNS, HTTP, and TCP WASM plugins with host function integration
+- **network:** Support port ranges
+- **engine:** Add thread-safe result aggregation for parallel execution
+- **engine:** Add parallel execution with configurable concurrency
+- **sdk:** Add go sdk to simplify plugin development
+- **wasm:** Add various hostfunctions
+- **http:** Add sha256 for http body and configurable output length
+- **engine:** Implement tag and severity filtering
+- **engine:** Add owner field to filter expression environment
+- Implement command plugin
+- **cli:** Improve table output formatting with colors and better evidence display
+- **file:** Update file plugin with detailed metadata and hash support
+- **redaction:** Implement evidence redaction system
+- **redaction:** Add salt support for hash mode
+- **http:** Add more outputs
+- **command:** Add more outputs for command plugin
+- **plugins:** Add more outputs for dns, file, tcp plugins
+- **sdk:** Implement context propagation throughout SDK
+- **sdk:** Add explicit HTTP body size validation
+- **sdk:** Add version checking documentation and memory limits
+- **sdk:** Add custom error types for better error handling
+- **output:** Add junit output
+- **smtp:** Add smtp plugin
+- **domain:** Add StatusAggregator service
+- **domain:** Implement StatusAggregator service
+- **domain:** Add DependencyResolver service
+- **domain:** Add ControlFilter service
+- **domain:** Integrate ControlFilter service
+- **domain:** Complete tactical DDD refactoring (Phase 1)
+- **domain:** Implement Phase 2 Value Objects
+- **domain:** Enrich entities with behavior (Phase 3)
+- **domain:** Complete Phase 3 entity enrichment
+- **domain:** Implement Repository Interfaces and Engine integration
+- **domain:** Adding domain entities
+- **domain:** Update services to use domain entities
+- **infra:** Add yaml profile loader
+- **config:** Update config package to use domain entities
+- **cleanup:** Remove deprecated config files and update tests
+- **infra:** Move config logic to infrastructure
+- **capabilities:** Move capability value object to domain
+- **capabilities:** Add Policy domain service
+- **capabilities:** Add Grant entity
+- **capabilities:** Extract FileStore infrastructure
+- **capabilities:** Extract TerminalPrompter infrastructure
+- **redaction:** Switch to gitleaks library
+- **output:** Add sarif output support
+- Implement security posture around executables
+- Add env variable injection
+- Initial plugin registry scaffolding
+- Create plugin cli command
+- Enhance install script and documentation
 
-- **WASM Plugin Runtime** - Sandboxed execution using wazero (pure Go, CGO-free)
-- **6 Built-in Plugins** - file, command, http, dns, tcp, smtp
-- **Capability-Based Security** - Fine-grained permission system extracted from profiles
-- **Configurable Security Levels** - strict, standard, permissive modes
-- **Automatic Secret Redaction** - Powered by gitleaks pattern detection
-- **Multiple Output Formats** - Table, JSON, YAML, JUnit, SARIF
-- **Parallel Execution** - Independent controls run concurrently with DAG-based scheduling
-- **Profile System** - OSCAL-aligned declarative YAML configuration
-- **Tag & Severity Filtering** - Filter controls by tags or severity levels
-- **Environment Variable Injection** - Pass variables into profiles
-- **Plugin CLI** - `reglet create plugin` command for scaffolding new plugins
-- **Go SDK** - Simplified plugin development with typed errors and context propagation
+### Changed
+- **cli:** Move from flags to cobra
+- **plugins:** Swap plugins to use go sdk
+- **engine:** Update engine values and add capabilities
+- **engine:** Failures take precendence over errors
+- **plugin:** Add maxbodysize exceeded, de-dupe types
+- Remove un-needed locking
+- Lint error fixes
+- More lint cleanup
+- **sdk:** Add support for new plugin outputs
+- **redactor:** Truncate to 8 bytes
+- **plugin:** Support structure for new outputs
+- **sdk:** Remove redundant DNS standalone function
+- **sdk:** Use typed errors throughout SDK
+- Remove deprecated functions and cleanup
+- **engine:** Use StatusAggregator and DependencyResolver services
+- **domain:** Move ExecutionResult to domain/execution and enrich entities
+- **capabilities:** Move Capability value object to domain
+- **engine:** Update engine to use domain capabilities
+- **capabilities:** Complete migration to domain value object
+- **capabilities:** Use Grant entity in Manager
+- Move to infrastructure
+- Cleanup
+- Style (gofmt), move valueobjects to values, move status
+- Valueobjects to values
+- Move version to infrastructure/build and inject into runtime
+- Clean up ineffiecient loop for filters
+- **terminal:** Move to huh prompt library
+- Move to hmac hash
+- Move files around, create interfaces
+- Change MaxConcurrent to default to numcpu
+- Increase lower memory limit
+- Move global state in check cmd
+- Remove global state from check cmd
+- Add buffer limit to output.
+- Update worker pool to not wait on levels
+- Remove duplicat env methods
+- Add prefix based pattern matching for interpreters
+- Rename observation to observationresult
+- Standardize observation terminology
+- Move to specification pattern for filters
+- Move risk logic from app layer to domain layer
+- Compile profile vs mutating in-place
+- Remove sql driver for now since it will be moved elsewhere when used one day
+- Show expectation failure properly in output
+- Move engine to use profilereader interface
+- Extract capability extraction logic into domain service
+- Move capability granting logic into gatekeeper
+- Add caching to expr expects
+- Remove strcontains and use innate contains
+- Validate plugin name
+- Move capability analyzer to allow plugins to define extraction logic
+- Add capability register to container
+- Move to sandboxed file access in cap orchestrator
+- Update request id generator
+- Split up engine into multiple files
+- Update sdk and docs
+- Allow for config file from cli
+- Move capability info into ports and update interfaces
+- Improve port range parser
+- Move orchestrator dependencies to container
+- Allow for log silencing via cmd line
+- Make plugins required.
 
-### Distribution
-
-- Multi-platform binaries (Linux/macOS/Windows, amd64/arm64)
-- Docker images on GitHub Container Registry (multi-arch)
-- Homebrew tap (`brew install whiskeyjimbo/tap/reglet`)
-- Install script with platform auto-detection
-
-### Security
-
-- Path traversal protection in plugin loading
-- SSRF protection for HTTP plugin
-- Memory limits for WASM execution
-- Sandboxed file access via `os.OpenRoot`
-- No global mutable state
+### Documentation
+- Add license
+- Add examples
+- Add redaction system documentation
+- Update quickstarts to new working conditions
+- **sdk:** Add sdk READMEs
+- Move quickstart
+- Update comments
+- Update readme
+- Add security doc
+- General cleanup
+- Update contributing add governance
+- Add comments on globalcache
+- Update README add another example
+- Update redaction document
+- Update plugin dev doc
+- Update examples
+- Readme polish
 
 ### Fixed
+- **wasm:** Implement proper memory pinning for WASM plugins
+- **wasm:** Prevent memory leaks with defer-based deallocation
+- **wasm:** Implement per-call instance creation for thread-safety
+- **plugin/file:** Use base64 encoding for binary-safe content reading
+- **wasm,engine:** Fix critical ABI bug, implement DAG, remove dead code
+- **engine,wasm:** Resolve issues from architecture review
+- **http:** Memory blind read fixed
+- **wasm:** Fixed wasm runtime/int errors and build errors
+- **general:** Mutex locking, plugindir calculation
+- **various:** Silence usage on error, use openroot, return error vs exit
+- Determine relative plugin dir
+- **output:** Fix error output from unreadable map
+- **plugins:** Normalize evidence format, CWD mount
+- **plugin:** Cross-Plugin Capability Leak
+- **schema:** Pre-flight Schema Validation
+- **validation:** ID did not allow for .
+- **config:** Schema compilation repeating
+- Path traversal and ssrf protection
+- **logging:** Standardize logging format across host and plugins
+- Redaction on stderr/stdout now working
+- Normalize ip4 mapped ipv6 addresses
+- Block env inheritance unless set
+- Add memory limit and associated config for wasm
+- Read capabilities from profile and prompt for access
+- Race condition in wasm runtime
+- Embed file contents in SARIF
+- Race cond in file plugin
+- Handle relative path
+- Various
+- Check for cycles and circular dependencies
+- Deterministic order of observations
+- Filters were not working in certain circumstances
+- Buffer done channel to prevent blocking
+- Remove path separators and directory traversal from plugin name
+- Defer close on engine execution
+- Parallel execution needed ID's for deterministic output
+- Json marshalling for plugins
+- Config file loading
+- **ci:** Use repositories instead of image_refs for ko config
+- **ci:** Install syft for SBOM generation
+- Update deprecated goreleaser options
 
-- Thread-safety issues in WASM runtime with per-call instance creation
-- Memory leaks with defer-based deallocation
-- Race conditions in parallel execution
-- Deterministic output ordering for controls
-- IPv4-mapped IPv6 address normalization
+### Maintenance
+- Initialize project structure and tooling
+- **lint:** Add golangci-lint configuration and development rules
+- Naming change
+- More from gopkg.in/yaml.v3 to github.com/goccy/go-yaml
+- Update compiled WASM plugins
+- **sdk:** Cleanup code and improve consistency
+- Move redaction test
+- Update makefile, go.mod/sum
+- Go.mod/sum update
+- Update demo.gif
+- Add github issue templates
+- Add dependabot config
+- Add pull request template
+- Clean up verbiage on cli
+- Add goreleaser config and release workflow
+- Fix dependabot
+- Update changelog output
+- Add git-cliff, changelog, update readme, makefile
 
-### Known Issues
+### Testing
+- **wasm:** Add plugin integration tests
+- **wasm:** Add concurrent execution tests for plugin thread-safety
+- **wasm:** Add binary content test and update for base64 format
+- Add parallel to engine and output tests
+- Cache wasm to speedup tests
+- Add integration test for feature filtering
+- Add filter test
+- **command:** Add tests for command plugin and host execution
+- **cli:** Fix output formatting tests
+- **integration:** Add end-to-end redaction test
+- Filtering test
+- Fix failing tests
+- **sdk:** Add core plugin interface tests
+- **sdk:** Add schema generation tests
+- **sdk:** Add config validation tests
+- **sdk:** Add DNS resolver tests
+- **sdk:** Add HTTP transport tests
+- **sdk:** Add TCP connection tests
+- **sdk:** Add exec command tests
+- **sdk:** Add log handler tests
+- **tcp:** Clean up tcp plugin tests
+- Add getsecurity level test and security config test
+- Add fuzz testing
+- Tcp fuzz test
+- Fix failing fuzz test
+- Update port range testing for atoi
+- Fix plugin validation test
+- Add more fuzz
 
-- Windows builds are experimental (not fully tested)
-- Profile inheritance not yet implemented
-- Plugin registry is RFC-only (manual plugin management)
-
+### Style
+- Fix lint issues, change cap to capability
+- Staticcheck issue
+- Fix comments on exported items
+- Import order
+- Fix lint issues
+- Fix cyclo > 15 for points i suppose
+- Fix cyclo issues in plugin.go
+- Clean up lint errors
 ---
 
-## [0.1.0-alpha] - 2025-12-01
 
-### Added
-
-- Initial proof of concept
-- Basic file validation plugin
-- YAML profile parsing
-- Table output format
-
-[Unreleased]: https://github.com/whiskeyjimbo/reglet/compare/v0.2.0-alpha...HEAD
-[0.2.0-alpha]: https://github.com/whiskeyjimbo/reglet/compare/v0.1.0-alpha...v0.2.0-alpha
-[0.1.0-alpha]: https://github.com/whiskeyjimbo/reglet/releases/tag/v0.1.0-alpha
