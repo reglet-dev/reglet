@@ -7,19 +7,25 @@ Reglet is a compliance and infrastructure validation engine that runs security c
 [![Build Status](https://github.com/whiskeyjimbo/reglet/workflows/CI/badge.svg)](https://github.com/whiskeyjimbo/reglet/actions)
 [![Go Report Card](https://goreportcard.com/badge/github.com/whiskeyjimbo/reglet)](https://goreportcard.com/report/github.com/whiskeyjimbo/reglet)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+![Latest Release](https://img.shields.io/github/v/release/whiskeyjimbo/reglet?include_prereleases)
 
-**Prerequisites:** Go 1.25+, Make
-
-## Quick Start (30 seconds)
+## Quick Start
 
 ```bash
-# Clone and build
-git clone https://github.com/whiskeyjimbo/reglet.git
-cd reglet
-make build
+# Install (choose one)
+brew install whiskeyjimbo/tap/reglet           # macOS/Linux
+docker pull ghcr.io/whiskeyjimbo/reglet:latest # Docker
+curl -sSL https://raw.githubusercontent.com/whiskeyjimbo/reglet/main/scripts/install.sh | sh  # Script
 
-# Try it
-./bin/reglet check docs/examples/01-quickstart.yaml
+# Get an example profile
+curl -fsSL https://raw.githubusercontent.com/whiskeyjimbo/reglet/main/docs/examples/01-quickstart.yaml > quickstart.yaml
+
+# Run it
+reglet check quickstart.yaml
+
+# Or with Docker
+docker run --rm -v $(pwd)/quickstart.yaml:/quickstart.yaml \
+  ghcr.io/whiskeyjimbo/reglet:latest check /quickstart.yaml
 ```
 ![demo](.github/assets/demo.gif)
 
@@ -106,7 +112,56 @@ controls:
 
 ## Installation
 
+### Homebrew (macOS/Linux)
+
+```bash
+brew install whiskeyjimbo/tap/reglet
+reglet version
+```
+
+### Docker
+
+```bash
+# Pull image
+docker pull ghcr.io/whiskeyjimbo/reglet:latest
+
+# Quick version check
+docker run --rm ghcr.io/whiskeyjimbo/reglet:latest version
+
+# Run with profile from host
+docker run --rm -v $(pwd)/profile.yaml:/profile.yaml \
+  ghcr.io/whiskeyjimbo/reglet:latest check /profile.yaml
+
+# Try built-in examples
+docker run --rm ghcr.io/whiskeyjimbo/reglet:latest \
+  check /home/reglet/docs/examples/01-quickstart.yaml
+```
+
+### Install Script (Linux/macOS)
+
+```bash
+curl -sSL https://raw.githubusercontent.com/whiskeyjimbo/reglet/main/scripts/install.sh | sh
+```
+
+### Manual Download
+
+Download the appropriate archive for your platform from the [releases page](https://github.com/whiskeyjimbo/reglet/releases), extract it, and move the binary to your PATH:
+
+```bash
+# Linux/macOS
+tar -xzf reglet-*.tar.gz
+sudo mv reglet /usr/local/bin/
+reglet version
+
+# Windows (PowerShell)
+Expand-Archive reglet-*.zip
+Move-Item reglet.exe C:\Windows\System32\
+reglet version
+```
+
 ### From Source
+
+Requires Go 1.25+:
 
 ```bash
 git clone https://github.com/whiskeyjimbo/reglet.git
@@ -138,14 +193,17 @@ Reglet is in active development. Core features work, but expect breaking changes
 - [x] Configurable security levels (strict/standard/permissive)
 - [x] Automatic secret redaction
 - [x] Output formatters (Table, JSON, YAML, JUnit, SARIF)
+- [x] Binary releases for Linux/macOS/Windows (amd64/arm64)
+- [x] Docker images (GHCR multi-arch)
+- [x] Homebrew tap
+- [x] Automated releases with goreleaser
 
 **v0.3.0-alpha**
 - [ ] OCI-based plugin registry (version pinning, aliases)
-- [ ] Profile inheritance
 
 **v0.4.0-alpha**
+- [ ] Profile inheritance
 - [ ] OSCAL output
-- [ ] Binary releases for Linux/macOS/Windows
 
 **v1.0**
 - [ ] Cloud provider plugins (AWS, GCP, Azure)
