@@ -138,6 +138,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Move orchestrator dependencies to container
 - Allow for log silencing via cmd line
 - Make plugins required.
+- Change names for new repo
 
 ### Documentation
 - Add license
@@ -221,6 +222,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix dependabot
 - Update changelog output
 - Add git-cliff, changelog, update readme, makefile
+- Update Makefile, add nightly fuzz with cache
+- Remove fuzz on push
 
 ### Testing
 - **wasm:** Add plugin integration tests
