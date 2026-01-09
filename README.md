@@ -6,7 +6,7 @@ Reglet is a compliance and infrastructure validation engine that runs security c
 
 <p align="center">
   <a href="https://github.com/reglet-dev/reglet/actions"><img src="https://github.com/reglet-dev/reglet/workflows/CI/badge.svg" alt="Build Status"></a>
-  <a href="https://goreportcard.com/report/github.com/reglet-dev/reglet"><img src="https://goreportcard.com/badge/github.com/reglet-dev/reglet" alt="Go Report Card"></a>
+  <a href="https://goreportcard.com/report/github.com/reglet-dev/reglet"><img src="https://goreportcard.com/badge/github.com/reglet-dev/reglet?style=flat" alt="Go Report Card"></a>
   <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License"></a>
   <img src="https://img.shields.io/github/v/release/reglet-dev/reglet?include_prereleases" alt="Latest Release">
 </p>
