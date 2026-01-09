@@ -162,7 +162,7 @@ kos:
     tags:
       - '{{.Tag}}'
       - '{{ if not .Prerelease }}{{.Major}}.{{.Minor}}{{ end }}'
-      - '{{ if not .Prerelease }}latest{{ end }}'
+      - '{{ if not .Prerelease }}latest{{ else }}edge{{ end }}'
     bare: true
     preserve_import_paths: false
     platforms:

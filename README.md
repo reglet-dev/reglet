@@ -14,9 +14,10 @@ Reglet is a compliance and infrastructure validation engine that runs security c
 ## Quick Start
 
 ```bash
-# Install (choose one)
+# brew not available for pre-release
 brew install reglet-dev/tap/reglet           # macOS/Linux
-docker pull ghcr.io/reglet-dev/reglet:latest # Docker
+# Install (choose one)
+docker pull ghcr.io/reglet-dev/reglet:v0.2.0-alpha # Docker
 curl -sSL https://raw.githubusercontent.com/reglet-dev/reglet/main/scripts/install.sh | sh  # Script
 
 # Get an example profile
@@ -27,7 +28,7 @@ reglet check quickstart.yaml
 
 # Or with Docker
 docker run --rm -v $(pwd)/quickstart.yaml:/quickstart.yaml \
-  ghcr.io/reglet-dev/reglet:latest check /quickstart.yaml
+  ghcr.io/reglet-dev/reglet:v0.2.0-alpha check /quickstart.yaml
 ```
 ![demo](.github/assets/demo.gif)
 
@@ -116,6 +117,8 @@ controls:
 
 ### Homebrew (macOS/Linux)
 
+> **Note:** pre-release is not available via Homebrew
+
 ```bash
 brew install reglet-dev/tap/reglet
 reglet version
@@ -125,10 +128,10 @@ reglet version
 
 ```bash
 # Pull image
-docker pull ghcr.io/reglet-dev/reglet:latest
+docker pull ghcr.io/reglet-dev/reglet:v0.2.0-alpha
 
 # Quick version check
-docker run --rm ghcr.io/reglet-dev/reglet:latest version
+docker run --rm ghcr.io/reglet-dev/reglet:v0.2.0-alpha version
 
 # Run with profile from host
 docker run --rm -v $(pwd)/profile.yaml:/profile.yaml \
