@@ -28,6 +28,23 @@ jobs:
           go-version: '1.25'
           cache: true
 
+      - name: Generate changelog
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --verbose
+        env:
+          OUTPUT: CHANGELOG.md
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Commit changelog
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          git diff --staged --quiet || git commit -m "docs: update CHANGELOG for ${{ github.ref_name }}"
+          git push origin HEAD:main || echo "Nothing to push"
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:

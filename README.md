@@ -4,10 +4,12 @@
 
 Reglet is a compliance and infrastructure validation engine that runs security checks in isolated WebAssembly sandboxes. Define policies as code, validate systems and services, and get standardized audit output ready for SOC2, ISO27001, and more.
 
-[![Build Status](https://github.com/whiskeyjimbo/reglet/workflows/CI/badge.svg)](https://github.com/whiskeyjimbo/reglet/actions)
-[![Go Report Card](https://goreportcard.com/badge/github.com/whiskeyjimbo/reglet)](https://goreportcard.com/report/github.com/whiskeyjimbo/reglet)
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-![Latest Release](https://img.shields.io/github/v/release/whiskeyjimbo/reglet?include_prereleases)
+<p align="center">
+  <a href="https://github.com/whiskeyjimbo/reglet/actions"><img src="https://github.com/whiskeyjimbo/reglet/workflows/CI/badge.svg" alt="Build Status"></a>
+  <a href="https://goreportcard.com/report/github.com/whiskeyjimbo/reglet"><img src="https://goreportcard.com/badge/github.com/whiskeyjimbo/reglet" alt="Go Report Card"></a>
+  <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License"></a>
+  <img src="https://img.shields.io/github/v/release/whiskeyjimbo/reglet?include_prereleases" alt="Latest Release">
+</p>
 
 ## Quick Start
 

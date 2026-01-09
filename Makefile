@@ -7,7 +7,7 @@
 #
 
 .PHONY: all build clean test test-race test-coverage lint fmt vet help install dev
-.PHONY: fuzz fuzz-extended profile-cpu profile-mem test-bench tidy
+.PHONY: fuzz fuzz-extended profile-cpu profile-mem test-bench tidy changelog
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Configuration
@@ -152,6 +152,15 @@ tidy:  ## Tidy go.mod dependencies
 	@$(GOMOD) tidy
 	$(SUCCESS)
 	@printf "$(GREEN)Dependencies tidied$(RESET)\n"
+
+changelog:  ## Generate CHANGELOG.md from git history
+	$(INFO)
+	@printf "Generating changelog...\n"
+	@which git-cliff > /dev/null || (printf "$(RED)git-cliff not found$(RESET)\n" && \
+		printf "Install: $(CYAN)cargo install git-cliff$(RESET)\n" && exit 1)
+	@git-cliff -o CHANGELOG.md
+	$(SUCCESS)
+	@printf "$(GREEN)CHANGELOG.md updated$(RESET)\n"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # PROFILING
