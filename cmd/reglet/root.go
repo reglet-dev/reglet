@@ -19,10 +19,10 @@ var (
 var rootCmd = &cobra.Command{
 	Use:   "reglet",
 	Short: "Compliance and infrastructure validation platform",
-	Long: `Reglet is a compliance and infrastructure validation platform built with 
-WebAssembly extensibility and OSCAL-compliant output. It allows engineering 
-teams to define policy as code, execute validation logic in sandboxed 
-environments, and generate standardized audit artifacts.`,
+	Long: `Reglet is a security-first compliance and infrastructure validation 
+platform built on WebAssembly (Wasm). It enables engineering teams to define 
+policy-as-code, execute validation checks in isolated sandboxed environments, 
+and generate standardized audit artifacts (OSCAL/SARIF).`,
 	PersistentPreRun: func(_ *cobra.Command, _ []string) {
 		setupLogging()
 	},

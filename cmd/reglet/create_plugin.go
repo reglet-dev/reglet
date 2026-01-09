@@ -51,11 +51,11 @@ Examples:
 	}
 
 	cmd.Flags().StringVarP(&opts.name, "name", "n", "", "Plugin name (required, e.g., 'my-check')")
-	cmd.Flags().StringVarP(&opts.lang, "lang", "l", "go", "Language: go (future: rust, tinygo)")
+	cmd.Flags().StringVarP(&opts.lang, "lang", "l", "go", "Language: go (future: rust)")
 	cmd.Flags().StringSliceVarP(&opts.capabilities, "capabilities", "c", nil, "Comma-separated capabilities (e.g., 'network:dns,fs:read')")
 	cmd.Flags().StringVarP(&opts.output, "output", "o", "", "Output directory (default: ./<name>)")
 	cmd.Flags().StringVar(&opts.sdkVersion, "sdk-version", "latest", "SDK version to use")
-	cmd.Flags().StringVar(&opts.modulePath, "module", "", "Go module path (default: github.com/<name>)")
+	cmd.Flags().StringVar(&opts.modulePath, "module", "", "Go module path (default: github.com/<name>, set for real projects)")
 	cmd.Flags().BoolVarP(&opts.force, "force", "f", false, "Overwrite existing files")
 
 	_ = cmd.MarkFlagRequired("name")

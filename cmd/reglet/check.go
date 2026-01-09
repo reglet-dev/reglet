@@ -53,6 +53,20 @@ Filtering:
   --exclude-tags slow           Exclude controls with 'slow' tag
   --filter "severity == 'high'" Advanced filtering expression
   --include-dependencies        Include dependencies of selected controls`,
+		Example: `  # Run all controls in a profile
+  reglet check profile.yaml
+
+  # Output results as JSON
+  reglet check profile.yaml --format json
+
+  # Run only critical and high severity controls
+  reglet check profile.yaml --severity critical,high
+
+  # Run controls with security tag, save to file
+  reglet check profile.yaml --tags security -o results.json --format json
+
+  # Auto-grant plugin capabilities (CI/CD pipelines)
+  reglet check profile.yaml --trust-plugins`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runCheckAction(cmd.Context(), args[0], opts)
