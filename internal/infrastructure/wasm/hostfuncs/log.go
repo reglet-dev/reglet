@@ -53,13 +53,13 @@ func readLogMessage(ctx context.Context, mod api.Module, messagePacked uint64) (
 
 	messageBytes, ok := mod.Memory().Read(ptr, length)
 	if !ok {
-		slog.Error("hostfuncs: failed to read log message from Guest memory")
+		slog.ErrorContext(ctx, "hostfuncs: failed to read log message from Guest memory")
 		return nil, false
 	}
 
 	var logMsg LogMessageWire
 	if err := json.Unmarshal(messageBytes, &logMsg); err != nil {
-		slog.Error("hostfuncs: failed to unmarshal log message", "error", err)
+		slog.ErrorContext(ctx, "hostfuncs: failed to unmarshal log message", "error", err)
 		return nil, false
 	}
 

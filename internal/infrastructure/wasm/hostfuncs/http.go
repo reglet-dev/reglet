@@ -86,7 +86,7 @@ func HTTPRequest(ctx context.Context, mod api.Module, stack []uint64, checker *C
 
 	pluginName := getPluginName(ctx, mod)
 
-	if err := checkHTTPCapability(ctx, checker, pluginName, request, mod); err != nil {
+	if err := checkHTTPCapability(ctx, checker, pluginName, request); err != nil {
 		stack[0] = hostWriteResponse(ctx, mod, HTTPResponseWire{Error: err})
 		return
 	}
@@ -123,7 +123,7 @@ func readHTTPRequest(ctx context.Context, mod api.Module, requestPacked uint64) 
 }
 
 // checkHTTPCapability validates URL and checks network capability.
-func checkHTTPCapability(ctx context.Context, checker *CapabilityChecker, pluginName string, request *HTTPRequestWire, mod api.Module) *ErrorDetail {
+func checkHTTPCapability(ctx context.Context, checker *CapabilityChecker, pluginName string, request *HTTPRequestWire) *ErrorDetail {
 	parsedURL, err := url.Parse(request.URL)
 	if err != nil {
 		errMsg := fmt.Sprintf("invalid URL: %v", err)

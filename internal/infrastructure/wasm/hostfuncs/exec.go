@@ -169,7 +169,7 @@ func executeCommand(ctx, execCtx context.Context, request *ExecRequestWire) Exec
 	err := cmd.Run()
 	duration := time.Since(start)
 
-	response := buildExecResponse(ctx, execCtx, err, stdout, stderr, duration, request.Command, request.Args)
+	response := buildExecResponse(execCtx, err, stdout, stderr, duration)
 
 	if stdout.Truncated || stderr.Truncated {
 		slog.WarnContext(ctx, "command output truncated",
@@ -189,8 +189,7 @@ func executeCommand(ctx, execCtx context.Context, request *ExecRequestWire) Exec
 }
 
 // buildExecResponse constructs the response from command execution results.
-func buildExecResponse(ctx, execCtx context.Context, err error, stdout, stderr *BoundedBuffer, duration time.Duration, command string, args []string) ExecResponseWire {
-	_ = ctx
+func buildExecResponse(execCtx context.Context, err error, stdout, stderr *BoundedBuffer, duration time.Duration) ExecResponseWire {
 	response := ExecResponseWire{
 		Stdout:     stdout.String(),
 		Stderr:     stderr.String(),
