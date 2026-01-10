@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-alpha] - 2026-01-10
+
+### Added
+- Profile inheritance
+- Implement lockfile for plugins
+- Add retry and backoff
+- Add secret resolution and sensitive data protection
+- Implement max evidence size limits.
+- Add global timeout with cancellation
+
+### Changed
+- Extract common cli options to reduce duplication
+- Extract formatter factory to infrastructure layer
+- Fix lint errors for struct orders
+
+### Documentation
+- Update CHANGELOG for v0.2.0-alpha
+- Update badge in README
+- Notes on homebrew not being available for pre-release
+- Update README
+
+### Fixed
+- Linting workflow
+- Fix codeql builds with a non-wasm stub
+- Lint/tests for lockfile were broken
+- Race condition in execute
+
+### Maintenance
+- Add ci workflow
+- Various linter issues, linter config fix
+- Comment cleanup
+- Cleanup comments
 ## [0.2.0-alpha] - 2026-01-09
 
 ### Added
@@ -266,4 +298,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Clean up lint errors
 ---
 
+[0.3.0-alpha]: https://github.com/reglet-dev/reglet/compare/v0.2.0-alpha...v0.3.0-alpha
 
