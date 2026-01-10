@@ -56,6 +56,7 @@ reglet check profile.yaml --severity critical,high
 - **Standardized Output** - JSON, YAML, JUnit, SARIF - ready for compliance platforms or OSCAL integration (coming soon)
 - **Secure Sandbox** - All validation logic runs inside a CGO-free WebAssembly runtime (wazero)
 - **Capability-Based Security** - Plugins can only access files, networks, or environment variables if explicitly allowed
+- **Secret Management** - Resolve secrets from environment variables, files, or local config with `{{ secret "name" }}` syntax
 - **Automatic Redaction** - Sensitive data (secrets, tokens) is automatically detected and redacted before reporting
 
 ## What Can It Validate?
@@ -89,6 +90,50 @@ security:
 ```
 
 See [docs/security.md](docs/security.md) for the full security architecture.
+
+## Secret Management
+
+Reglet supports secure secret resolution via `{{ secret "name" }}` syntax in profiles:
+
+```yaml
+# ~/.reglet/config.yaml
+sensitive_data:
+  secrets:
+    # Environment variable mapping
+    env:
+      api_token: API_TOKEN        # {{ secret "api_token" }} resolves from $API_TOKEN
+      db_password: DATABASE_PASS
+
+    # File-based secrets (admin-controlled paths)
+    files:
+      ssh_key: /etc/reglet/secrets/ssh.key
+
+    # Local secrets (development only - never commit!)
+    local:
+      dev_token: "local-dev-value"
+```
+
+Secrets are automatically:
+- **Tracked and redacted** from all output (evidence, logs, errors)
+- **Protected in memory** with zeroing when possible
+- **Never logged** in plaintext
+
+Example usage in a profile:
+
+```yaml
+controls:
+  items:
+    - id: api-health
+      name: API health check with authentication
+      observations:
+        - plugin: http
+          config:
+            url: https://api.example.com/health
+            headers:
+              Authorization: "Bearer {{ secret \"api_token\" }}"
+          expect: |
+            data.status_code == 200
+```
 
 ## Example Profile
 
@@ -203,12 +248,17 @@ Reglet is in active development. Core features work, but expect breaking changes
 - [x] Homebrew tap
 - [x] Automated releases with goreleaser
 
-**v0.3.0-alpha**
+**v0.3.0-alpha** (In Development)
+- [x] Profile inheritance (`extends:` field)
+- [x] Lockfile for reproducible plugin versions (`reglet.lock`)
+- [x] Retry and backoff for resilient execution
+- [x] Secret management (env/files/local resolution)
+- [ ] Tag and severity filtering
 - [ ] OCI-based plugin registry (version pinning, aliases)
 
 **v0.4.0-alpha**
-- [ ] Profile inheritance
 - [ ] OSCAL output
+- [ ] Evidence artifacts and size limits
 
 **v1.0**
 - [ ] Cloud provider plugins (AWS, GCP, Azure)
