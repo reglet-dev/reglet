@@ -77,7 +77,7 @@ func (uc *CheckProfileUseCase) Execute(ctx context.Context, req dto.CheckProfile
 
 	uc.logger.Info("profile compiled and validated", "controls", profile.ControlCount())
 
-	// 2b. Phase 2.5: Resolve/Lock plugins
+	// 2b. Resolve/Lock plugins
 	if err := uc.resolveAndLockPlugins(ctx, profile, req.ProfilePath); err != nil {
 		return nil, err
 	}

@@ -27,9 +27,8 @@ import (
 // This is different from Profile.CheckForCycles() which detects cycles
 // in CONTROL DEPENDENCIES (depends_on field within a single profile).
 //
-// Architecture:
-//   - Merge logic (business rules): domain/services/ProfileMerger
-//   - I/O and recursion (infrastructure): this loader
+// This is different from Profile.CheckForCycles() which detects cycles
+// in CONTROL DEPENDENCIES (depends_on field within a single profile).
 type ProfileLoader struct {
 	merger *services.ProfileMerger
 }

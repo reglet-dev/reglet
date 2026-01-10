@@ -109,17 +109,11 @@ func init() {
 	// will use our WASM-aware implementation.
 	stdnet.DefaultResolver = &stdnet.Resolver{
 		PreferGo: true, // Use Go's native resolver implementation
-		// We implement LookupIPAddr directly to handle A/AAAA lookups through hostfuncs.
-		// For other lookup types (MX, TXT, etc.), plugin authors will need to call specific
-		// SDK functions (e.g., sdknet.LookupMX) if we don't implement them here directly.
-
-		// NOTE: 'LookupIPAddr' is a method, not a field we can set on the struct literal.
-		// net.Resolver struct only has PreferGo (bool) and Dial (func).
-		// To customize LookupIPAddr behavior, we rely on PreferGo=true and the Dial function intercepting network traffic.
-		// BUT, since we cannot easily intercept the DNS protocol parsing inside net.Resolver via Dial without a full DNS server stub,
-		// we are removing the attempt to patch LookupIPAddr here.
-
-		// Plugins MUST use the sdk/net package directly for lookups if they want WASM host function support.
+		// We rely on PreferGo=true and the Dial function to intercept network traffic.
+		// Note: We cannot easily intercept standard DNS protocol parsing inside net.Resolver
+		// via Dial without a full DNS server stub.
+		// Therefore, plugins MUST use the sdk/net package directly for lookups if they want
+		// full WASM host function support (e.g. for CNAME, MX).
 		// Standard net.LookupHost will likely fail or try to dial on prohibited ports.
 
 		Dial: func(ctx context.Context, network, address string) (stdnet.Conn, error) {

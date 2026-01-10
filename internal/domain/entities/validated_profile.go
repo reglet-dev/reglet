@@ -12,7 +12,6 @@ type ValidatedProfile struct {
 	*Profile // Embedded raw profile (provides ProfileReader interface)
 
 	// Compiled state - computed at compilation time, immutable afterward
-	// Future: could add execution order, resolved variables, etc.
 }
 
 // NewValidatedProfile creates a new ValidatedProfile from a raw profile.

@@ -17,10 +17,8 @@ const (
 )
 
 // Profile represents the Reglet profile configuration.
-// Aggregate root in the Configuration context.
-//
-// Profile defines the validation configuration and ruleset.
-// It serves as the aggregate root for the configuration context.
+// It serves as the aggregate root for the configuration context, defining the
+// validation configuration and ruleset.
 //
 // Invariants enforced:
 // - Unique control IDs
@@ -84,7 +82,6 @@ type Control struct {
 
 // ObservationDefinition configuration for a specific plugin execution.
 // It is an immutable value object.
-// Renamed from Observation to ObservationDefinition to avoid confusion with ObservationResult.
 type ObservationDefinition struct {
 	Plugin string                 `yaml:"plugin"`
 	Config map[string]interface{} `yaml:"config,omitempty"`

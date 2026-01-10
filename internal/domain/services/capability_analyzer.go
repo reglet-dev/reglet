@@ -40,10 +40,8 @@ func (a *CapabilityAnalyzer) ExtractCapabilities(profile entities.ProfileReader)
 			// Look up extractor for this plugin
 			extractor, ok := a.registry.Get(pluginName)
 			if !ok {
-				// No specific extractor found, skip or maybe log warning?
-				// For now, if no extractor, we assume no *specific* additional capabilities needed
-				// beyond what the plugin declares in its manifest (which are static).
-				// But here we are extracting DYNAMIC capabilities.
+				// No specific extractor found. Assume no additional dynamic capabilities are needed
+				// beyond what the plugin declares in its manifest.
 				continue
 			}
 

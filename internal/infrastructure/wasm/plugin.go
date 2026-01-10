@@ -79,7 +79,7 @@ func extractMountPath(pattern string) string {
 	// This handles cases like "/etc/hosts" → "/etc"
 	dir := filepath.Dir(path)
 
-	// SECURITY FIX: Handle relative paths safely
+	// Handle relative paths safely
 	// CRITICAL: Never mount host root (/) for relative paths!
 	if dir == "." {
 		// Relative path detected - mount current working directory, NOT root

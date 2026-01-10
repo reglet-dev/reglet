@@ -23,11 +23,7 @@ type ControlLevel struct {
 // BuildControlDAG builds a dependency graph using Kahn's algorithm.
 // Returns controls grouped by level for parallel execution within levels.
 //
-// Algorithm:
-// 1. Build adjacency list and in-degree map
-// 2. Find all controls with no dependencies (in-degree 0)
-// 3. Process controls level by level, decrementing in-degrees
-// 4. Detect cycles (remaining controls with in-degree > 0)
+// Algorithm: Standard topological sort (Kahn's algorithm).
 func (r *DependencyResolver) BuildControlDAG(controls []entities.Control) ([]ControlLevel, error) {
 	// Build maps for efficient lookup
 	controlByID := make(map[string]entities.Control)

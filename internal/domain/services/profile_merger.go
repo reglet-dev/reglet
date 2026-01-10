@@ -15,19 +15,6 @@ import (
 //   - Controls.Defaults: deep merge, overlay wins (tags concatenate)
 //   - Controls.Items: merge by ID (same ID = replace, new ID = append)
 //   - Extends: NOT propagated (already resolved)
-//
-// SOLID Compliance:
-//   - S: Only handles merge logic, no I/O
-//   - O: Merge strategies could be extended via options
-//   - D: Operates on domain entities only
-//
-// Future Extension Point:
-// The API is designed to allow adding MergeOptions in the future for
-// partial control merging if needed:
-//
-//	type MergeOptions struct {
-//	    ControlMergeMode string // "replace" (default) or "partial"
-//	}
 type ProfileMerger struct{}
 
 // NewProfileMerger creates a new profile merger service.

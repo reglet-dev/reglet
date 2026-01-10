@@ -104,8 +104,8 @@ func (t *WasmTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return resp, nil
 }
 
-//
-// BREAKING CHANGE: Plugins must now explicitly use WasmTransport or SDK helper functions.
+// Plugins must explicitly use WasmTransport or SDK helper functions to ensure
+// correct routing through the host function.
 //
 // Option 1 - Use SDK helper functions (recommended):
 //     import sdknet "github.com/reglet-dev/reglet/sdk/net"
@@ -115,8 +115,7 @@ func (t *WasmTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 //     client := &http.Client{Transport: &net.WasmTransport{}}
 //     resp, err := client.Get("https://example.com")
 //
-// This change makes HTTP transport configuration explicit instead of implicit,
-// avoiding global state mutation and making test isolation easier.
+// This approach avoids global state mutation and facilitates test isolation.
 
 // defaultClient is a reusable HTTP client with WasmTransport.
 // Using a single client instance is more efficient than creating a new one for each request.
