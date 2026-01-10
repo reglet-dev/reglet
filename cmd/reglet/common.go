@@ -10,11 +10,11 @@ import (
 
 // CommonOptions contains flags shared across all commands.
 type CommonOptions struct {
-	// Execution
-	Timeout time.Duration
-
 	// Output
 	Format string
+
+	// Execution
+	Timeout time.Duration
 
 	// Flags (bools grouped for alignment)
 	Parallel bool

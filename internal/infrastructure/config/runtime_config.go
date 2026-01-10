@@ -10,6 +10,9 @@ import (
 // RuntimeConfig aggregates all runtime configuration.
 // This is a value object that flows through the system.
 type RuntimeConfig struct {
+	// Security
+	SecurityLevel string
+
 	// Evidence
 	MaxEvidenceSizeBytes int
 
@@ -19,9 +22,6 @@ type RuntimeConfig struct {
 	// Concurrency
 	MaxConcurrentControls     int
 	MaxConcurrentObservations int
-
-	// Security
-	SecurityLevel string
 }
 
 // FromSystemConfig creates RuntimeConfig from system config.

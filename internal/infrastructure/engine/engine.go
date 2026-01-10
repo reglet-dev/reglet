@@ -25,11 +25,11 @@ type ObservationExecutable interface {
 // Engine coordinates profile execution.
 type Engine struct {
 	repository repositories.ExecutionResultRepository
-	runtime    *wasm.Runtime
 	executor   ObservationExecutable
+	truncator  execution.TruncationStrategy
+	runtime    *wasm.Runtime
 	version    build.Info
 	config     ExecutionConfig
-	truncator  execution.TruncationStrategy
 }
 
 // CapabilityCollector collects required capabilities from plugins.

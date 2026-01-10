@@ -120,8 +120,8 @@ type OutputFormatter interface {
 
 // FormatterOptions configures formatter behavior.
 type FormatterOptions struct {
-	Indent      bool   // For JSON: pretty-print with indentation
 	ProfilePath string // For SARIF: reference to profile location
+	Indent      bool   // For JSON: pretty-print with indentation
 }
 
 // OutputFormatterFactory creates formatters by name.

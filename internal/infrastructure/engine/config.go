@@ -23,17 +23,19 @@ const (
 
 // ExecutionConfig controls execution behavior.
 type ExecutionConfig struct {
-	FilterProgram             *vm.Program
-	IncludeTags               []string
-	IncludeSeverities         []string
-	IncludeControlIDs         []string
-	ExcludeTags               []string
-	ExcludeControlIDs         []string
+	FilterProgram     *vm.Program
+	IncludeTags       []string
+	IncludeSeverities []string
+	IncludeControlIDs []string
+	ExcludeTags       []string
+	ExcludeControlIDs []string
+
 	MaxConcurrentControls     int
 	MaxConcurrentObservations int
-	Parallel                  bool
-	IncludeDependencies       bool
 	MaxEvidenceSizeBytes      int
+
+	Parallel            bool
+	IncludeDependencies bool
 }
 
 // DefaultExecutionConfig returns sensible defaults for parallel execution.

@@ -21,16 +21,17 @@ import (
 
 // CheckOptions holds the configuration for the check command.
 type CheckOptions struct {
-	CommonOptions // Embed common options
+	outFile           string
+	securityLevel     string
+	filterExpr        string
+	includeTags       []string
+	includeSeverities []string
+	includeControlIDs []string
+	excludeTags       []string
+	excludeControlIDs []string
 
-	outFile             string
-	securityLevel       string
-	filterExpr          string
-	includeTags         []string
-	includeSeverities   []string
-	includeControlIDs   []string
-	excludeTags         []string
-	excludeControlIDs   []string
+	CommonOptions // Embed common options (Starts with Ptr, ends with NonPtr)
+
 	trustPlugins        bool
 	includeDependencies bool
 }

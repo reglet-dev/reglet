@@ -232,8 +232,8 @@ const DefaultMaxEvidenceSize = 1 * 1024 * 1024
 
 // EvidenceMeta contains metadata about evidence truncation.
 type EvidenceMeta struct {
-	Truncated    bool   `json:"truncated" yaml:"truncated"`
+	Reason       string `json:"reason,omitempty" yaml:"reason,omitempty"`
 	OriginalSize int    `json:"original_size_bytes" yaml:"original_size_bytes"`
 	TruncatedAt  int    `json:"truncated_at_bytes" yaml:"truncated_at_bytes"`
-	Reason       string `json:"reason,omitempty" yaml:"reason,omitempty"`
+	Truncated    bool   `json:"truncated" yaml:"truncated"`
 }
