@@ -137,6 +137,9 @@ func NewEngineWithConfig(ctx context.Context, version build.Info, cfg ExecutionC
 func (e *Engine) Execute(ctx context.Context, profile entities.ProfileReader) (*execution.ExecutionResult, error) {
 	// Check context before starting
 	if ctx.Err() != nil {
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return nil, fmt.Errorf("execution timed out: %w", ctx.Err())
+		}
 		return nil, ctx.Err()
 	}
 
