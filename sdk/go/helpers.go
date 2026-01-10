@@ -4,8 +4,7 @@ import (
 	"fmt"
 )
 
-// GetString safely extracts a string value from Config.
-// Returns the value and true if found and is a string, otherwise returns empty string and false.
+// GetString extracts a string from config, returning (value, found).
 func GetString(config Config, key string) (string, bool) {
 	v, ok := config[key]
 	if !ok {
@@ -15,9 +14,7 @@ func GetString(config Config, key string) (string, bool) {
 	return s, ok
 }
 
-// GetInt safely extracts an int value from Config.
-// Returns the value and true if found and is a numeric type, otherwise returns 0 and false.
-// Handles both int and float64 (JSON numbers are often decoded as float64).
+// GetInt extracts an int from config, handling int, int64, and float64.
 func GetInt(config Config, key string) (int, bool) {
 	v, ok := config[key]
 	if !ok {
@@ -35,8 +32,7 @@ func GetInt(config Config, key string) (int, bool) {
 	}
 }
 
-// GetFloat safely extracts a float64 value from Config.
-// Returns the value and true if found and is a numeric type, otherwise returns 0 and false.
+// GetFloat extracts a float64 from config, handling float64, int, and int64.
 func GetFloat(config Config, key string) (float64, bool) {
 	v, ok := config[key]
 	if !ok {
@@ -54,8 +50,7 @@ func GetFloat(config Config, key string) (float64, bool) {
 	}
 }
 
-// GetBool safely extracts a bool value from Config.
-// Returns the value and true if found and is a bool, otherwise returns false and false.
+// GetBool extracts a bool from config, returning (value, found).
 func GetBool(config Config, key string) (bool, bool) {
 	v, ok := config[key]
 	if !ok {
@@ -65,8 +60,7 @@ func GetBool(config Config, key string) (bool, bool) {
 	return b, ok
 }
 
-// GetStringSlice safely extracts a []string value from Config.
-// Returns the value and true if found and is a slice of strings, otherwise returns nil and false.
+// GetStringSlice extracts a []string from config, returning (value, found).
 func GetStringSlice(config Config, key string) ([]string, bool) {
 	v, ok := config[key]
 	if !ok {
@@ -88,8 +82,7 @@ func GetStringSlice(config Config, key string) ([]string, bool) {
 	return result, true
 }
 
-// MustGetString extracts a string value from Config or returns an error.
-// Use this when the field is required.
+// MustGetString extracts a required string from config or returns error.
 func MustGetString(config Config, key string) (string, error) {
 	s, ok := GetString(config, key)
 	if !ok {
@@ -101,8 +94,7 @@ func MustGetString(config Config, key string) (string, error) {
 	return s, nil
 }
 
-// MustGetInt extracts an int value from Config or returns an error.
-// Use this when the field is required.
+// MustGetInt extracts a required int from config or returns error.
 func MustGetInt(config Config, key string) (int, error) {
 	i, ok := GetInt(config, key)
 	if !ok {
@@ -114,8 +106,7 @@ func MustGetInt(config Config, key string) (int, error) {
 	return i, nil
 }
 
-// MustGetBool extracts a bool value from Config or returns an error.
-// Use this when the field is required.
+// MustGetBool extracts a required bool from config or returns error.
 func MustGetBool(config Config, key string) (bool, error) {
 	b, ok := GetBool(config, key)
 	if !ok {
@@ -127,8 +118,7 @@ func MustGetBool(config Config, key string) (bool, error) {
 	return b, nil
 }
 
-// GetStringDefault extracts a string value from Config with a default.
-// Returns the value if found and is a string, otherwise returns the default.
+// GetStringDefault extracts a string from config or returns the default value.
 func GetStringDefault(config Config, key, defaultValue string) string {
 	s, ok := GetString(config, key)
 	if !ok {
@@ -137,8 +127,7 @@ func GetStringDefault(config Config, key, defaultValue string) string {
 	return s
 }
 
-// GetIntDefault extracts an int value from Config with a default.
-// Returns the value if found and is numeric, otherwise returns the default.
+// GetIntDefault extracts an int from config or returns the default value.
 func GetIntDefault(config Config, key string, defaultValue int) int {
 	i, ok := GetInt(config, key)
 	if !ok {
@@ -147,8 +136,7 @@ func GetIntDefault(config Config, key string, defaultValue int) int {
 	return i
 }
 
-// GetBoolDefault extracts a bool value from Config with a default.
-// Returns the value if found and is a bool, otherwise returns the default.
+// GetBoolDefault extracts a bool from config or returns the default value.
 func GetBoolDefault(config Config, key string, defaultValue bool) bool {
 	b, ok := GetBool(config, key)
 	if !ok {

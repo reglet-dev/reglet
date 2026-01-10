@@ -66,7 +66,6 @@ func DialSMTP(ctx context.Context, host, port string, timeoutMs int, useTLS bool
 		return nil, fmt.Errorf("failed to unmarshal SMTP response: %w", err)
 	}
 
-	// Check for error in response
 	if response.Error != nil {
 		return nil, fmt.Errorf("%s: %s", response.Error.Type, response.Error.Message)
 	}

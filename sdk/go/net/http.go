@@ -79,7 +79,6 @@ func (t *WasmTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		return nil, fmt.Errorf("sdk: HTTP response body exceeds maximum size (%d bytes). URL: %s", MaxHTTPBodySize, req.URL.String())
 	}
 
-	// Prepare native http.Response
 	resp := &http.Response{
 		StatusCode: response.StatusCode,
 		Header:     response.Headers,
@@ -105,7 +104,6 @@ func (t *WasmTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return resp, nil
 }
 
-// REMOVED: init() function that set http.DefaultTransport = &WasmTransport{}
 //
 // BREAKING CHANGE: Plugins must now explicitly use WasmTransport or SDK helper functions.
 //

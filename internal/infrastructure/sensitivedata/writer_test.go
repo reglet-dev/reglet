@@ -19,28 +19,22 @@ func TestWriter_WithRedactor(t *testing.T) {
 
 	writer := sensitivedata.NewWriter(&buf, redactor)
 
-	// Write sensitive data
 	n, err := writer.Write([]byte("This is a secret."))
 	require.NoError(t, err)
 
-	// Verify length returns original length
 	assert.Equal(t, len("This is a secret."), n)
 
-	// Verify buffer content is redacted
 	assert.Equal(t, "This is a [REDACTED].", buf.String())
 }
 
 func TestWriter_WithoutRedactor(t *testing.T) {
-	// Setup without redactor
 	var buf bytes.Buffer
 	writer := sensitivedata.NewWriter(&buf, nil)
 
-	// Write sensitive data
 	input := "This is a secret."
 	n, err := writer.Write([]byte(input))
 	require.NoError(t, err)
 
-	// Verify pass-through
 	assert.Equal(t, len(input), n)
 	assert.Equal(t, input, buf.String())
 }
@@ -55,7 +49,6 @@ func TestWriter_MultipleWrites(t *testing.T) {
 
 	writer := sensitivedata.NewWriter(&buf, redactor)
 
-	// Multiple writes
 	texts := []string{
 		"Part 1 with secret.\n",
 		"Part 2 is safe.\n",
