@@ -253,12 +253,17 @@ Reglet is in active development. Core features work, but expect breaking changes
 - [x] Lockfile for reproducible plugin versions (`reglet.lock`)
 - [x] Retry and backoff for resilient execution
 - [x] Secret management (env/files/local resolution)
-- [ ] Tag and severity filtering
-- [ ] OCI-based plugin registry (version pinning, aliases)
+- [x] Evidence artifacts and size limits (size, count)
+- [x] Global timeout
 
 **v0.4.0-alpha**
+- [ ] Tag and severity filtering
+
+**v0.5.0-alpha**
+- [ ] OCI-based plugin registry (version pinning, aliases)
+
+**v0.6.0-alpha**
 - [ ] OSCAL output
-- [ ] Evidence artifacts and size limits
 
 **v1.0**
 - [ ] Cloud provider plugins (AWS, GCP, Azure)
