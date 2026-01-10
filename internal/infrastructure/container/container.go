@@ -49,20 +49,8 @@ func New(opts Options) (*Container, error) {
 	// Initialize sensitive value provider first (needed for redactor and resolver)
 	sensitiveProvider := sensitivedata.NewProvider()
 
-	// Initialize secrets resolver
-	// Note: systemCfg isn't loaded yet, so we load it early or pass nil config initially?
-	// Wait, systemConfigAdapter.LoadConfig depends on nothing.
-	// We load system config at line 55. We should move that up or create resolver after.
-	// But ProfileLoader is created at line 49.
-	// ProfileLoader needs Resolver. Resolver needs Config. Config is loaded by SystemConfigAdapter.
-	// So we must reorder:
-	// 1. Create SystemConfigAdapter
-	// 2. Load Config
-	// 3. Create Resolver (with config)
-	// 4. Create ProfileLoader (with resolver)
-
 	systemConfigAdapter := adapters.NewSystemConfigAdapter()
-	systemCfg, err := systemConfigAdapter.LoadConfig(context.TODO(), opts.SystemConfigPath)
+	systemCfg, err := systemConfigAdapter.LoadConfig(context.Background(), opts.SystemConfigPath)
 	if err != nil {
 		opts.Logger.Debug("failed to load system config, using defaults", "error", err)
 		systemCfg = &system.Config{} // Use defaults

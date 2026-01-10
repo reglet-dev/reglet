@@ -92,8 +92,7 @@ Filtering:
 
 // runCheckAction encapsulates the logic for the check command.
 func runCheckAction(ctx context.Context, profilePath string, opts *CheckOptions) error {
-	// 1. Create dependency injection container
-	// cfgFile comes from the global --config flag in root.go
+	// 1. Initialize container (uses global cfgFile)
 	c, err := container.New(container.Options{
 		TrustPlugins:     opts.trustPlugins,
 		SecurityLevel:    opts.securityLevel,
@@ -104,21 +103,21 @@ func runCheckAction(ctx context.Context, profilePath string, opts *CheckOptions)
 		return fmt.Errorf("failed to initialize application: %w", err)
 	}
 
-	// 2. Build request from CLI flags
+	// 2. Build request
 	request := buildCheckProfileRequest(profilePath, opts)
 
-	// 3. Execute use case
+	// 3. Execute
 	response, err := c.CheckProfileUseCase().Execute(ctx, request)
 	if err != nil {
 		return fmt.Errorf("check failed: %w", err)
 	}
 
-	// 4. Format and write output
+	// 4. Write output
 	if err := writeOutput(response.ExecutionResult, profilePath, opts); err != nil {
 		return fmt.Errorf("failed to write output: %w", err)
 	}
 
-	// 5. Return error if checks failed
+	// 5. Verify results
 	if c.CheckProfileUseCase().CheckFailed(response.ExecutionResult) {
 		return fmt.Errorf("check failed: %d passed, %d failed, %d errors",
 			response.ExecutionResult.Summary.PassedControls,

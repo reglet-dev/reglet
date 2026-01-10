@@ -4,7 +4,9 @@ package secrets
 
 import (
 	"fmt"
+	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -83,7 +85,23 @@ func (r *Resolver) resolveFromSources(name string) (string, error) {
 
 	// 3. Check file mapping (admin-controlled paths only)
 	if filePath, ok := r.config.Files[name]; ok {
-		data, err := os.ReadFile(filePath)
+		// Security: Use os.OpenRoot to prevent path traversal
+		dir := filepath.Dir(filePath)
+		base := filepath.Base(filePath)
+
+		root, err := os.OpenRoot(dir)
+		if err != nil {
+			return "", fmt.Errorf("secret %q: failed to open directory %q: %w", name, dir, err)
+		}
+		defer func() { _ = root.Close() }()
+
+		f, err := root.Open(base)
+		if err != nil {
+			return "", fmt.Errorf("secret %q: failed to open file %q: %w", name, base, err)
+		}
+		defer func() { _ = f.Close() }()
+
+		data, err := io.ReadAll(f)
 		if err != nil {
 			return "", fmt.Errorf("secret %q: reading file %q: %w", name, filePath, err)
 		}

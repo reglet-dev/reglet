@@ -14,14 +14,14 @@ import (
 // Config represents the global configuration file (~/.reglet/config.yaml).
 // This is infrastructure-level configuration separate from profile configuration.
 type Config struct {
-	Redaction    RedactionConfig `yaml:"redaction"`
-	Security     SecurityConfig  `yaml:"security"`
-	Capabilities []struct {
+	SensitiveData SensitiveDataConfig `yaml:"sensitive_data"`
+	Redaction     RedactionConfig     `yaml:"redaction"`
+	Security      SecurityConfig      `yaml:"security"`
+	Capabilities  []struct {
 		Kind    string `yaml:"kind"`
 		Pattern string `yaml:"pattern"`
 	} `yaml:"capabilities"`
-	WasmMemoryLimitMB int                 `yaml:"wasm_memory_limit_mb"`
-	SensitiveData     SensitiveDataConfig `yaml:"sensitive_data"`
+	WasmMemoryLimitMB int `yaml:"wasm_memory_limit_mb"`
 }
 
 // SensitiveDataConfig configures secret resolution and protection.
