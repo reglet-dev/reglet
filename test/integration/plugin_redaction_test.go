@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/reglet-dev/reglet/internal/infrastructure/build"
-	"github.com/reglet-dev/reglet/internal/infrastructure/redaction"
+	"github.com/reglet-dev/reglet/internal/infrastructure/sensitivedata"
 	"github.com/reglet-dev/reglet/internal/infrastructure/wasm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,7 +19,7 @@ func TestPluginOutputRedaction_ManualVerification(t *testing.T) {
 	// a runtime WITH redactor differs from one WITHOUT redactor.
 
 	// Create redactor
-	redactor, err := redaction.New(redaction.Config{
+	redactor, err := sensitivedata.New(sensitivedata.Config{
 		Patterns: []string{`secret`},
 	})
 	require.NoError(t, err)
@@ -51,7 +51,7 @@ func TestPluginOutputRedaction_ManualVerification(t *testing.T) {
 // works end-to-end for plugin stdout/stderr redaction.
 func TestPluginOutputRedaction_GitleaksPatterns(t *testing.T) {
 	// Create redactor with gitleaks enabled (default)
-	redactor, err := redaction.New(redaction.Config{})
+	redactor, err := sensitivedata.New(sensitivedata.Config{})
 	require.NoError(t, err)
 	require.NotNil(t, redactor, "Redactor should be created")
 
@@ -59,7 +59,7 @@ func TestPluginOutputRedaction_GitleaksPatterns(t *testing.T) {
 	var buf bytes.Buffer
 
 	// Create a redacting writer (simulates plugin stderr/stdout)
-	writer := redaction.NewWriter(&buf, redactor)
+	writer := sensitivedata.NewWriter(&buf, redactor)
 
 	// Test cases: plugin output that should be redacted
 	testCases := []struct {
@@ -125,13 +125,13 @@ func TestPluginOutputRedaction_GitleaksPatterns(t *testing.T) {
 // coverage provided by gitleaks (222+ patterns) vs manual patterns (4).
 func TestPluginOutputRedaction_Gitleaks222Patterns(t *testing.T) {
 	// Redactor WITHOUT gitleaks (only 4 default patterns)
-	redactorWithout, err := redaction.New(redaction.Config{
+	redactorWithout, err := sensitivedata.New(sensitivedata.Config{
 		DisableGitleaks: true,
 	})
 	require.NoError(t, err)
 
 	// Redactor WITH gitleaks (222+ patterns)
-	redactorWith, err := redaction.New(redaction.Config{
+	redactorWith, err := sensitivedata.New(sensitivedata.Config{
 		DisableGitleaks: false,
 	})
 	require.NoError(t, err)
@@ -150,7 +150,7 @@ func TestPluginOutputRedaction_Gitleaks222Patterns(t *testing.T) {
 	for _, output := range pluginOutputs {
 		// Test WITHOUT gitleaks
 		var bufWithout bytes.Buffer
-		writerWithout := redaction.NewWriter(&bufWithout, redactorWithout)
+		writerWithout := sensitivedata.NewWriter(&bufWithout, redactorWithout)
 		writerWithout.Write([]byte(output))
 		if bufWithout.String() != output {
 			redactedWithout++
@@ -158,7 +158,7 @@ func TestPluginOutputRedaction_Gitleaks222Patterns(t *testing.T) {
 
 		// Test WITH gitleaks
 		var bufWith bytes.Buffer
-		writerWith := redaction.NewWriter(&bufWith, redactorWith)
+		writerWith := sensitivedata.NewWriter(&bufWith, redactorWith)
 		writerWith.Write([]byte(output))
 		if bufWith.String() != output {
 			redactedWith++

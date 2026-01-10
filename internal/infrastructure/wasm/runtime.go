@@ -10,7 +10,7 @@ import (
 
 	"github.com/reglet-dev/reglet/internal/domain/capabilities"
 	"github.com/reglet-dev/reglet/internal/infrastructure/build"
-	"github.com/reglet-dev/reglet/internal/infrastructure/redaction"
+	"github.com/reglet-dev/reglet/internal/infrastructure/sensitivedata"
 	"github.com/reglet-dev/reglet/internal/infrastructure/wasm/hostfuncs"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
@@ -35,7 +35,7 @@ func CloseGlobalCache(ctx context.Context) error {
 type Runtime struct {
 	runtime             wazero.Runtime
 	plugins             map[string]*Plugin
-	redactor            *redaction.Redactor
+	redactor            *sensitivedata.Redactor
 	grantedCapabilities map[string][]capabilities.Capability
 	version             build.Info
 	frozenEnv           []string
@@ -52,7 +52,7 @@ func NewRuntimeWithCapabilities(
 	ctx context.Context,
 	version build.Info,
 	caps map[string][]capabilities.Capability,
-	redactor *redaction.Redactor,
+	redactor *sensitivedata.Redactor,
 	memoryLimitMB int,
 ) (*Runtime, error) {
 	// Determine memory limit
@@ -138,8 +138,8 @@ func (r *Runtime) LoadPlugin(ctx context.Context, name string, wasmBytes []byte)
 	var stdout, stderr io.Writer = os.Stderr, os.Stderr
 	if r.redactor != nil {
 		// Wrap os.Stderr with redaction to prevent secret leakage
-		stdout = redaction.NewWriter(os.Stderr, r.redactor)
-		stderr = redaction.NewWriter(os.Stderr, r.redactor)
+		stdout = sensitivedata.NewWriter(os.Stderr, r.redactor)
+		stderr = sensitivedata.NewWriter(os.Stderr, r.redactor)
 	}
 
 	// Create plugin wrapper

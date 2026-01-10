@@ -14,7 +14,8 @@ import (
 	"github.com/reglet-dev/reglet/internal/infrastructure/adapters"
 	"github.com/reglet-dev/reglet/internal/infrastructure/filesystem"
 	"github.com/reglet-dev/reglet/internal/infrastructure/plugins"
-	"github.com/reglet-dev/reglet/internal/infrastructure/redaction"
+	"github.com/reglet-dev/reglet/internal/infrastructure/secrets"
+	"github.com/reglet-dev/reglet/internal/infrastructure/sensitivedata"
 	"github.com/reglet-dev/reglet/internal/infrastructure/system"
 )
 
@@ -45,26 +46,43 @@ func New(opts Options) (*Container, error) {
 		opts.Logger = slog.Default()
 	}
 
-	// Initialize adapters
-	profileLoader := adapters.NewProfileLoaderAdapter()
-	profileValidator := adapters.NewProfileValidatorAdapter()
-	systemConfigAdapter := adapters.NewSystemConfigAdapter()
-	pluginResolver := adapters.NewPluginDirectoryAdapter()
+	// Initialize sensitive value provider first (needed for redactor and resolver)
+	sensitiveProvider := sensitivedata.NewProvider()
 
-	// Load system config
+	// Initialize secrets resolver
+	// Note: systemCfg isn't loaded yet, so we load it early or pass nil config initially?
+	// Wait, systemConfigAdapter.LoadConfig depends on nothing.
+	// We load system config at line 55. We should move that up or create resolver after.
+	// But ProfileLoader is created at line 49.
+	// ProfileLoader needs Resolver. Resolver needs Config. Config is loaded by SystemConfigAdapter.
+	// So we must reorder:
+	// 1. Create SystemConfigAdapter
+	// 2. Load Config
+	// 3. Create Resolver (with config)
+	// 4. Create ProfileLoader (with resolver)
+
+	systemConfigAdapter := adapters.NewSystemConfigAdapter()
 	systemCfg, err := systemConfigAdapter.LoadConfig(context.TODO(), opts.SystemConfigPath)
 	if err != nil {
 		opts.Logger.Debug("failed to load system config, using defaults", "error", err)
 		systemCfg = &system.Config{} // Use defaults
 	}
 
-	// Initialize redactor
-	redactor, err := redaction.New(redaction.Config{
+	// Create resolver with config from system config
+	secretResolver := secrets.NewResolver(&systemCfg.SensitiveData.Secrets, sensitiveProvider)
+
+	// Initialize adapters
+	profileLoader := adapters.NewProfileLoaderAdapter(secretResolver)
+	profileValidator := adapters.NewProfileValidatorAdapter()
+	pluginResolver := adapters.NewPluginDirectoryAdapter()
+
+	// Initialize redactor with shared provider
+	redactor, err := sensitivedata.NewWithProvider(sensitivedata.Config{
 		Patterns: systemCfg.Redaction.Patterns,
 		Paths:    systemCfg.Redaction.Paths,
 		HashMode: systemCfg.Redaction.HashMode.Enabled,
 		Salt:     systemCfg.Redaction.HashMode.Salt,
-	})
+	}, sensitiveProvider)
 	if err != nil {
 		return nil, err
 	}

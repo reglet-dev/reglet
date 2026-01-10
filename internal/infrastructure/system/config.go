@@ -20,7 +20,26 @@ type Config struct {
 		Kind    string `yaml:"kind"`
 		Pattern string `yaml:"pattern"`
 	} `yaml:"capabilities"`
-	WasmMemoryLimitMB int `yaml:"wasm_memory_limit_mb"`
+	WasmMemoryLimitMB int                 `yaml:"wasm_memory_limit_mb"`
+	SensitiveData     SensitiveDataConfig `yaml:"sensitive_data"`
+}
+
+// SensitiveDataConfig configures secret resolution and protection.
+// This structure is forward-compatible with future phases (OIDC, Cloud).
+type SensitiveDataConfig struct {
+	Secrets SecretsConfig `yaml:"secrets"`
+}
+
+// SecretsConfig configures secret resolution sources.
+type SecretsConfig struct {
+	// Local defines static secrets for development (name -> value)
+	Local map[string]string `yaml:"local"`
+
+	// Env defines environment variable mappings (secret_name -> env_var_name)
+	Env map[string]string `yaml:"env"`
+
+	// Files defines file path mappings (secret_name -> file_path)
+	Files map[string]string `yaml:"files"`
 }
 
 // RedactionConfig configures how sensitive data is sanitized.

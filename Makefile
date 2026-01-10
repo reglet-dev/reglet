@@ -215,8 +215,8 @@ fuzz:  ## Run all fuzz tests (5s each, for CI)
 	@go test -fuzz=^FuzzVersionValidation$$ -fuzztime=5s ./internal/infrastructure/validation/
 	@go test -fuzz=^FuzzSchemaValidation$$ -fuzztime=5s ./internal/infrastructure/validation/
 	@printf "\n$(BOLD)$(BLUE)◆ Redaction$(RESET)\n"
-	@go test -fuzz=^FuzzRedactorScrubString$$ -fuzztime=5s ./internal/infrastructure/redaction/
-	@go test -fuzz=^FuzzRedactorWalker$$ -fuzztime=5s ./internal/infrastructure/redaction/
+	@go test -fuzz=^FuzzRedactorScrubString$$ -fuzztime=5s ./internal/infrastructure/sensitivedata/
+	@go test -fuzz=^FuzzRedactorWalker$$ -fuzztime=5s ./internal/infrastructure/sensitivedata/
 	@printf "\n$(BOLD)$(BLUE)◆ Output$(RESET)\n"
 	@go test -fuzz=^FuzzSARIFGeneration$$ -fuzztime=5s ./internal/infrastructure/output/
 	$(SUCCESS)
@@ -248,8 +248,8 @@ fuzz-extended:  ## Run extended fuzz tests (30m each)
 	@go test -fuzz=^FuzzVersionValidation$$ -fuzztime=30m ./internal/infrastructure/validation/
 	@go test -fuzz=^FuzzSchemaValidation$$ -fuzztime=30m ./internal/infrastructure/validation/
 	@printf "\n$(BOLD)$(BLUE)◆ Redaction$(RESET)\n"
-	@go test -fuzz=^FuzzRedactorScrubString$$ -fuzztime=30m ./internal/infrastructure/redaction/
-	@go test -fuzz=^FuzzRedactorWalker$$ -fuzztime=30m ./internal/infrastructure/redaction/
+	@go test -fuzz=^FuzzRedactorScrubString$$ -fuzztime=30m ./internal/infrastructure/sensitivedata/
+	@go test -fuzz=^FuzzRedactorWalker$$ -fuzztime=30m ./internal/infrastructure/sensitivedata/
 	@printf "\n$(BOLD)$(BLUE)◆ Output$(RESET)\n"
 	@go test -fuzz=^FuzzSARIFGeneration$$ -fuzztime=30m ./internal/infrastructure/output/
 	$(SUCCESS)
@@ -280,8 +280,8 @@ fuzz-nightly:  ## Run fuzz tests for nightly CI (1m each)
 	@go test -fuzz=^FuzzVersionValidation$$ -fuzztime=1m ./internal/infrastructure/validation/
 	@go test -fuzz=^FuzzSchemaValidation$$ -fuzztime=1m ./internal/infrastructure/validation/
 	@printf "\n$(BOLD)$(BLUE)◆ Redaction$(RESET)\n"
-	@go test -fuzz=^FuzzRedactorScrubString$$ -fuzztime=1m ./internal/infrastructure/redaction/
-	@go test -fuzz=^FuzzRedactorWalker$$ -fuzztime=1m ./internal/infrastructure/redaction/
+	@go test -fuzz=^FuzzRedactorScrubString$$ -fuzztime=1m ./internal/infrastructure/sensitivedata/
+	@go test -fuzz=^FuzzRedactorWalker$$ -fuzztime=1m ./internal/infrastructure/sensitivedata/
 	@printf "\n$(BOLD)$(BLUE)◆ Output$(RESET)\n"
 	@go test -fuzz=^FuzzSARIFGeneration$$ -fuzztime=1m ./internal/infrastructure/output/
 	$(SUCCESS)

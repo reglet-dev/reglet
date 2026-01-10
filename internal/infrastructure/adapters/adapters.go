@@ -18,7 +18,7 @@ import (
 	"github.com/reglet-dev/reglet/internal/infrastructure/build"
 	infraconfig "github.com/reglet-dev/reglet/internal/infrastructure/config"
 	"github.com/reglet-dev/reglet/internal/infrastructure/engine"
-	"github.com/reglet-dev/reglet/internal/infrastructure/redaction"
+	"github.com/reglet-dev/reglet/internal/infrastructure/sensitivedata"
 	"github.com/reglet-dev/reglet/internal/infrastructure/system"
 	"github.com/reglet-dev/reglet/internal/infrastructure/validation"
 	"github.com/reglet-dev/reglet/internal/infrastructure/wasm"
@@ -40,12 +40,12 @@ var (
 // PluginRuntimeFactoryAdapter creates PluginRuntime instances.
 // This adapter decouples the application layer from the concrete wasm.Runtime.
 type PluginRuntimeFactoryAdapter struct {
-	redactor *redaction.Redactor
+	redactor *sensitivedata.Redactor
 	version  build.Info
 }
 
 // NewPluginRuntimeFactoryAdapter creates a new runtime factory adapter.
-func NewPluginRuntimeFactoryAdapter(redactor *redaction.Redactor) *PluginRuntimeFactoryAdapter {
+func NewPluginRuntimeFactoryAdapter(redactor *sensitivedata.Redactor) *PluginRuntimeFactoryAdapter {
 	return &PluginRuntimeFactoryAdapter{
 		version:  build.Get(),
 		redactor: redactor,
@@ -125,10 +125,10 @@ type ProfileLoaderAdapter struct {
 }
 
 // NewProfileLoaderAdapter creates a new profile loader adapter.
-func NewProfileLoaderAdapter() *ProfileLoaderAdapter {
+func NewProfileLoaderAdapter(resolver ports.SecretResolver) *ProfileLoaderAdapter {
 	return &ProfileLoaderAdapter{
 		loader:      infraconfig.NewProfileLoader(),
-		substitutor: infraconfig.NewVariableSubstitutor(),
+		substitutor: infraconfig.NewVariableSubstitutor(resolver),
 	}
 }
 
@@ -253,12 +253,12 @@ func (a *EngineAdapter) Close(ctx context.Context) error {
 
 // EngineFactoryAdapter creates execution engines.
 type EngineFactoryAdapter struct {
-	redactor          *redaction.Redactor
+	redactor          *sensitivedata.Redactor
 	wasmMemoryLimitMB int
 }
 
 // NewEngineFactoryAdapter creates a new engine factory adapter.
-func NewEngineFactoryAdapter(redactor *redaction.Redactor, wasmMemoryLimitMB int) *EngineFactoryAdapter {
+func NewEngineFactoryAdapter(redactor *sensitivedata.Redactor, wasmMemoryLimitMB int) *EngineFactoryAdapter {
 	return &EngineFactoryAdapter{
 		redactor:          redactor,
 		wasmMemoryLimitMB: wasmMemoryLimitMB,

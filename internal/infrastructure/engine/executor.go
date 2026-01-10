@@ -11,20 +11,20 @@ import (
 	"github.com/reglet-dev/reglet/internal/domain/execution"
 	"github.com/reglet-dev/reglet/internal/domain/services"
 	"github.com/reglet-dev/reglet/internal/domain/values"
-	"github.com/reglet-dev/reglet/internal/infrastructure/redaction"
+	"github.com/reglet-dev/reglet/internal/infrastructure/sensitivedata"
 	"github.com/reglet-dev/reglet/internal/infrastructure/wasm"
 )
 
 // ObservationExecutor executes observations using WASM plugins.
 type ObservationExecutor struct {
 	runtime        *wasm.Runtime
-	redactor       *redaction.Redactor
+	redactor       *sensitivedata.Redactor
 	pluginRegistry *entities.PluginRegistry
 	pluginDir      string
 }
 
 // NewObservationExecutor creates a new observation executor with auto-detected plugin directory.
-func NewObservationExecutor(runtime *wasm.Runtime, redactor *redaction.Redactor) *ObservationExecutor {
+func NewObservationExecutor(runtime *wasm.Runtime, redactor *sensitivedata.Redactor) *ObservationExecutor {
 	var pluginDirPath string
 
 	// 1. Check Env Var (Best for production binaries)
@@ -44,7 +44,7 @@ func NewObservationExecutor(runtime *wasm.Runtime, redactor *redaction.Redactor)
 }
 
 // NewExecutor creates a new observation executor with explicit plugin directory.
-func NewExecutor(runtime *wasm.Runtime, pluginDir string, redactor *redaction.Redactor) *ObservationExecutor {
+func NewExecutor(runtime *wasm.Runtime, pluginDir string, redactor *sensitivedata.Redactor) *ObservationExecutor {
 	return &ObservationExecutor{
 		runtime:   runtime,
 		pluginDir: pluginDir,
@@ -53,7 +53,7 @@ func NewExecutor(runtime *wasm.Runtime, pluginDir string, redactor *redaction.Re
 }
 
 // NewExecutorWithRegistry creates an executor with plugin alias resolution support.
-func NewExecutorWithRegistry(runtime *wasm.Runtime, pluginDir string, redactor *redaction.Redactor, registry *entities.PluginRegistry) *ObservationExecutor {
+func NewExecutorWithRegistry(runtime *wasm.Runtime, pluginDir string, redactor *sensitivedata.Redactor, registry *entities.PluginRegistry) *ObservationExecutor {
 	return &ObservationExecutor{
 		runtime:        runtime,
 		pluginDir:      pluginDir,

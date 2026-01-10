@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/reglet-dev/reglet/internal/infrastructure/build"
-	"github.com/reglet-dev/reglet/internal/infrastructure/redaction"
+	"github.com/reglet-dev/reglet/internal/infrastructure/sensitivedata"
 	"github.com/reglet-dev/reglet/internal/infrastructure/wasm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -34,7 +34,7 @@ func TestObservationExecutor_Redaction(t *testing.T) {
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
-	redactor, err := redaction.New(redaction.Config{
+	redactor, err := sensitivedata.New(sensitivedata.Config{
 		Patterns: []string{"secret"},
 	})
 	require.NoError(t, err)
@@ -49,7 +49,7 @@ func TestRedactionInObservationResult(t *testing.T) {
 	// let's simulate the redaction step that happens inside Execute.
 	// We'll reproduce the logic here to verify it works as expected.
 
-	redactor, err := redaction.New(redaction.Config{
+	redactor, err := sensitivedata.New(sensitivedata.Config{
 		Patterns: []string{"password"},
 	})
 	require.NoError(t, err)

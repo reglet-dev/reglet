@@ -149,7 +149,7 @@ controls:
 			profile, err := loader.LoadProfileFromReader(strings.NewReader(tt.yaml))
 			require.NoError(t, err, "Profile should load successfully")
 
-			substitutor := NewVariableSubstitutor()
+			substitutor := NewVariableSubstitutor(nil)
 			err = substitutor.Substitute(profile)
 			require.NoError(t, err, "Substitution should succeed")
 
@@ -205,7 +205,7 @@ controls:
 	profile, err := loader.LoadProfileFromReader(strings.NewReader(yaml))
 	require.NoError(t, err)
 
-	substitutor := NewVariableSubstitutor()
+	substitutor := NewVariableSubstitutor(nil)
 	err = substitutor.Substitute(profile)
 	require.NoError(t, err)
 
@@ -274,7 +274,7 @@ controls:
 			profile, err := loader.LoadProfileFromReader(strings.NewReader(yaml))
 			require.NoError(t, err)
 
-			substitutor := NewVariableSubstitutor()
+			substitutor := NewVariableSubstitutor(nil)
 			err = substitutor.Substitute(profile)
 			require.NoError(t, err)
 

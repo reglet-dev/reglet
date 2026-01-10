@@ -6,18 +6,26 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/reglet-dev/reglet/internal/application/ports"
 	"github.com/reglet-dev/reglet/internal/domain/entities"
 )
 
-// Variable pattern: {{ .vars.key }} or {{ .vars.nested.key }}
+// Variable pattern: {{ .vars.key }}
 var varPattern = regexp.MustCompile(`\{\{\s*\.vars\.([a-zA-Z0-9_.]+)\s*\}\}`)
 
+// Secret pattern: {{ secret "key" }}
+var secretPattern = regexp.MustCompile(`\{\{\s*secret\s+"([a-zA-Z0-9_.-]+)"\s*\}\}`)
+
 // VariableSubstitutor performs variable substitution in profiles.
-type VariableSubstitutor struct{}
+type VariableSubstitutor struct {
+	resolver ports.SecretResolver
+}
 
 // NewVariableSubstitutor creates a new variable substitutor.
-func NewVariableSubstitutor() *VariableSubstitutor {
-	return &VariableSubstitutor{}
+func NewVariableSubstitutor(resolver ports.SecretResolver) *VariableSubstitutor {
+	return &VariableSubstitutor{
+		resolver: resolver,
+	}
 }
 
 // Substitute performs simple variable substitution in a profile.
@@ -26,10 +34,11 @@ func NewVariableSubstitutor() *VariableSubstitutor {
 // Returns an error if a referenced variable is not found.
 // Modifies the profile in place.
 func (s *VariableSubstitutor) Substitute(profile *entities.Profile) error {
-	if len(profile.Vars) == 0 {
-		// No variables defined, nothing to substitute
-		return nil
-	}
+	// Always substitute in controls, even if vars is empty, because we might have secrets
+	// However, the original logic checked for empty vars.
+	// For secrets, we don't need profile.Vars.
+	// So we should remove the 'if len(profile.Vars) == 0' check if we want secrets to work without vars.
+	// But let's check if existing logic relied on it.
 
 	// Substitute variables in each control
 	for i := range profile.Controls.Items {
@@ -37,18 +46,16 @@ func (s *VariableSubstitutor) Substitute(profile *entities.Profile) error {
 
 		// Substitute in control fields
 		var err error
-		ctrl.Description, err = substituteInString(ctrl.Description, profile.Vars)
+		ctrl.Description, err = s.substituteInString(ctrl.Description, profile.Vars)
 		if err != nil {
 			return fmt.Errorf("control %s: %w", ctrl.ID, err)
 		}
 
 		// Substitute in each observation config
-
 		for j := range ctrl.ObservationDefinitions {
-
 			obs := &ctrl.ObservationDefinitions[j]
 
-			if err := substituteInMap(obs.Config, profile.Vars); err != nil {
+			if err := s.substituteInMap(obs.Config, profile.Vars); err != nil {
 				return fmt.Errorf("control %s, observation %d: %w", ctrl.ID, j, err)
 			}
 		}
@@ -57,11 +64,12 @@ func (s *VariableSubstitutor) Substitute(profile *entities.Profile) error {
 	return nil
 }
 
-// substituteInString replaces {{ .vars.key }} patterns with values from vars map.
-func substituteInString(s string, vars map[string]interface{}) (string, error) {
+// substituteInString replaces patterns with values.
+func (s *VariableSubstitutor) substituteInString(str string, vars map[string]interface{}) (string, error) {
 	var lastErr error
 
-	result := varPattern.ReplaceAllStringFunc(s, func(match string) string {
+	// 1. Substitute variables: {{ .vars.key }}
+	result := varPattern.ReplaceAllStringFunc(str, func(match string) string {
 		// Extract the variable path (e.g., "config.path" from "{{ .vars.config.path }}")
 		submatches := varPattern.FindStringSubmatch(match)
 		if len(submatches) < 2 {
@@ -86,17 +94,42 @@ func substituteInString(s string, vars map[string]interface{}) (string, error) {
 		return "", lastErr
 	}
 
+	// 2. Substitute secrets: {{ secret "key" }}
+	// Only if a resolver is configured (to allow testing/usage without secrets)
+	if s.resolver != nil {
+		result = secretPattern.ReplaceAllStringFunc(result, func(match string) string {
+			submatches := secretPattern.FindStringSubmatch(match)
+			if len(submatches) < 2 {
+				lastErr = fmt.Errorf("invalid secret pattern: %s", match)
+				return match
+			}
+
+			secretName := submatches[1]
+			value, err := s.resolver.Resolve(secretName)
+			if err != nil {
+				lastErr = fmt.Errorf("resolving secret %s: %w", secretName, err)
+				return match
+			}
+
+			return value
+		})
+	}
+
+	if lastErr != nil {
+		return "", lastErr
+	}
+
 	return result, nil
 }
 
 // substituteInMap recursively substitutes variables in map values.
 // Modifies the map in place.
-func substituteInMap(m map[string]interface{}, vars map[string]interface{}) error {
+func (s *VariableSubstitutor) substituteInMap(m map[string]interface{}, vars map[string]interface{}) error {
 	for key, value := range m {
 		switch v := value.(type) {
 		case string:
 			// Substitute variables in string value
-			substituted, err := substituteInString(v, vars)
+			substituted, err := s.substituteInString(v, vars)
 			if err != nil {
 				return fmt.Errorf("key %s: %w", key, err)
 			}
@@ -104,21 +137,21 @@ func substituteInMap(m map[string]interface{}, vars map[string]interface{}) erro
 
 		case map[string]interface{}:
 			// Recursively substitute in nested map
-			if err := substituteInMap(v, vars); err != nil {
+			if err := s.substituteInMap(v, vars); err != nil {
 				return fmt.Errorf("key %s: %w", key, err)
 			}
 
 		case []interface{}:
 			// Substitute in array elements
 			for i, elem := range v {
-				if s, ok := elem.(string); ok {
-					substituted, err := substituteInString(s, vars)
+				if str, ok := elem.(string); ok {
+					substituted, err := s.substituteInString(str, vars)
 					if err != nil {
 						return fmt.Errorf("key %s[%d]: %w", key, i, err)
 					}
 					v[i] = substituted
 				} else if nested, ok := elem.(map[string]interface{}); ok {
-					if err := substituteInMap(nested, vars); err != nil {
+					if err := s.substituteInMap(nested, vars); err != nil {
 						return fmt.Errorf("key %s[%d]: %w", key, i, err)
 					}
 				}

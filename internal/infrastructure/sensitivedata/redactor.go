@@ -1,5 +1,5 @@
 // Package redaction handles secret redaction
-package redaction
+package sensitivedata
 
 import (
 	"crypto/hmac"
@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/reglet-dev/reglet/internal/application/ports"
 	"github.com/spf13/viper"
 	"github.com/zricethezav/gitleaks/v8/config"
 	"github.com/zricethezav/gitleaks/v8/detect"
@@ -17,11 +18,12 @@ import (
 // Redactor handles sanitization of sensitive data.
 // All fields are read-only after construction, making it safe for concurrent use.
 type Redactor struct {
-	gitleaksDetector *detect.Detector
-	salt             string
-	patterns         []*regexp.Regexp
-	paths            []string
-	hashMode         bool
+	gitleaksDetector  *detect.Detector
+	sensitiveProvider ports.SensitiveValueProvider
+	salt              string
+	patterns          []*regexp.Regexp
+	paths             []string
+	hashMode          bool
 }
 
 // Config holds the configuration for the Redactor.
@@ -35,11 +37,17 @@ type Config struct {
 
 // New creates a new Redactor with the given configuration.
 func New(cfg Config) (*Redactor, error) {
+	return NewWithProvider(cfg, nil)
+}
+
+// NewWithProvider creates a new Redactor with the given configuration and provider.
+func NewWithProvider(cfg Config, provider ports.SensitiveValueProvider) (*Redactor, error) {
 	r := &Redactor{
-		paths:    cfg.Paths,
-		hashMode: cfg.HashMode,
-		salt:     cfg.Salt,
-		patterns: make([]*regexp.Regexp, 0, len(cfg.Patterns)+len(defaultPatterns)),
+		sensitiveProvider: provider,
+		paths:             cfg.Paths,
+		hashMode:          cfg.HashMode,
+		salt:              cfg.Salt,
+		patterns:          make([]*regexp.Regexp, 0, len(cfg.Patterns)+len(defaultPatterns)),
 	}
 
 	// Initialize gitleaks detector (unless disabled)
@@ -126,7 +134,23 @@ func (r *Redactor) ScrubString(input string) string {
 		}
 	}
 
-	// Phase 2: Apply custom regex patterns (fallback + user-defined patterns)
+	// Phase 2: Known sensitive values (NEW)
+	if r.sensitiveProvider != nil {
+		// Note: This could be optimized for large numbers of secrets
+		// e.g., using Aho-Corasick algorithm if performance becomes an issue.
+		// For now, simple string replacement is sufficient.
+		for _, secret := range r.sensitiveProvider.AllValues() {
+			if secret != "" && strings.Contains(result, secret) {
+				replacement := "[REDACTED]"
+				if r.hashMode {
+					replacement = r.hash(secret)
+				}
+				result = strings.ReplaceAll(result, secret, replacement)
+			}
+		}
+	}
+
+	// Phase 3: Apply custom regex patterns (fallback + user-defined patterns)
 	for _, re := range r.patterns {
 		result = re.ReplaceAllStringFunc(result, func(match string) string {
 			if r.hashMode {

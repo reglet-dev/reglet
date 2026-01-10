@@ -12,7 +12,7 @@ import (
 	"github.com/reglet-dev/reglet/internal/domain/repositories"
 	"github.com/reglet-dev/reglet/internal/domain/services"
 	"github.com/reglet-dev/reglet/internal/infrastructure/build"
-	"github.com/reglet-dev/reglet/internal/infrastructure/redaction"
+	"github.com/reglet-dev/reglet/internal/infrastructure/sensitivedata"
 	"github.com/reglet-dev/reglet/internal/infrastructure/wasm"
 )
 
@@ -60,7 +60,7 @@ func NewEngineWithCapabilities(
 	pluginDir string,
 	profile entities.ProfileReader,
 	cfg ExecutionConfig,
-	redactor *redaction.Redactor,
+	redactor *sensitivedata.Redactor,
 	repo repositories.ExecutionResultRepository,
 	memoryLimitMB int,
 ) (*Engine, error) {

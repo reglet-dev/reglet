@@ -1,4 +1,4 @@
-package redaction
+package sensitivedata
 
 import (
 	"io"

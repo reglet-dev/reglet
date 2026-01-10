@@ -34,7 +34,7 @@ controls:
 	profile, err := loader.LoadProfileFromReader(strings.NewReader(yaml))
 	require.NoError(t, err)
 
-	substitutor := NewVariableSubstitutor()
+	substitutor := NewVariableSubstitutor(nil)
 	err = substitutor.Substitute(profile)
 	require.NoError(t, err)
 
@@ -70,7 +70,7 @@ controls:
 	profile, err := loader.LoadProfileFromReader(strings.NewReader(yaml))
 	require.NoError(t, err)
 
-	substitutor := NewVariableSubstitutor()
+	substitutor := NewVariableSubstitutor(nil)
 	err = substitutor.Substitute(profile)
 	require.NoError(t, err)
 
@@ -101,8 +101,61 @@ controls:
 	profile, err := loader.LoadProfileFromReader(strings.NewReader(yaml))
 	require.NoError(t, err)
 
-	substitutor := NewVariableSubstitutor()
+	substitutor := NewVariableSubstitutor(nil)
 	err = substitutor.Substitute(profile)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "variable not found: missing_var")
+}
+
+// MockSecretResolver for testing
+type MockSecretResolver struct {
+	secrets map[string]string
+}
+
+func (m *MockSecretResolver) Resolve(name string) (string, error) {
+	if val, ok := m.secrets[name]; ok {
+		return val, nil
+	}
+	return "", assert.AnError
+}
+
+func TestSubstituteVariables_Secrets(t *testing.T) {
+	yaml := `
+profile:
+  name: test-profile
+  version: 1.0.0
+
+controls:
+  items:
+    - id: test-control
+      name: Secret Control
+      observations:
+        - plugin: http
+          config:
+            token: '{{ secret "api_key" }}'
+            nested:
+              key: '{{ secret "db_pass" }}'
+`
+
+	loader := NewProfileLoader()
+	profile, err := loader.LoadProfileFromReader(strings.NewReader(yaml))
+	require.NoError(t, err)
+
+	resolver := &MockSecretResolver{
+		secrets: map[string]string{
+			"api_key": "super-secret-token",
+			"db_pass": "secure-password",
+		},
+	}
+
+	substitutor := NewVariableSubstitutor(resolver)
+	err = substitutor.Substitute(profile)
+	require.NoError(t, err)
+
+	// Verify secret substitution
+	assert.Equal(t, "super-secret-token", profile.Controls.Items[0].ObservationDefinitions[0].Config["token"])
+
+	// Verify nested substitution
+	nested := profile.Controls.Items[0].ObservationDefinitions[0].Config["nested"].(map[string]interface{})
+	assert.Equal(t, "secure-password", nested["key"])
 }

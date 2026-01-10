@@ -56,7 +56,8 @@ func FuzzVariableSubstitution(f *testing.F) {
 			}
 
 			// Call private function directly since we are in the same package
-			_, _ = substituteInString(template, vars)
+			sub := NewVariableSubstitutor(nil)
+			_, _ = sub.substituteInString(template, vars)
 			done <- true
 		}()
 
