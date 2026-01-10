@@ -28,6 +28,7 @@ type Engine struct {
 	executor   ObservationExecutable
 	version    build.Info
 	config     ExecutionConfig
+	truncator  execution.TruncationStrategy
 }
 
 // CapabilityCollector collects required capabilities from plugins.
@@ -63,6 +64,7 @@ func NewEngineWithCapabilities(
 	redactor *sensitivedata.Redactor,
 	repo repositories.ExecutionResultRepository,
 	memoryLimitMB int,
+	truncator execution.TruncationStrategy,
 ) (*Engine, error) {
 	// Create temporary runtime with no capabilities to load plugins and get requirements
 	tempRuntime, err := wasm.NewRuntime(ctx, version)
@@ -108,6 +110,7 @@ func NewEngineWithCapabilities(
 		config:     cfg,
 		repository: repo,
 		version:    version,
+		truncator:  truncator,
 	}, nil
 }
 
@@ -121,10 +124,11 @@ func NewEngineWithConfig(ctx context.Context, version build.Info, cfg ExecutionC
 	executor := NewObservationExecutor(runtime, nil)
 
 	return &Engine{
-		runtime:  runtime,
-		executor: executor,
-		config:   cfg,
-		version:  version,
+		runtime:   runtime,
+		executor:  executor,
+		config:    cfg,
+		version:   version,
+		truncator: &execution.GreedyTruncator{},
 	}, nil
 }
 

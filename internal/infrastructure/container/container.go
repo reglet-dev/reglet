@@ -12,6 +12,7 @@ import (
 	"github.com/reglet-dev/reglet/internal/domain/capabilities"
 	domainservices "github.com/reglet-dev/reglet/internal/domain/services"
 	"github.com/reglet-dev/reglet/internal/infrastructure/adapters"
+	infraconfig "github.com/reglet-dev/reglet/internal/infrastructure/config"
 	"github.com/reglet-dev/reglet/internal/infrastructure/filesystem"
 	"github.com/reglet-dev/reglet/internal/infrastructure/plugins"
 	"github.com/reglet-dev/reglet/internal/infrastructure/secrets"
@@ -75,8 +76,12 @@ func New(opts Options) (*Container, error) {
 		return nil, err
 	}
 
+	// Create and configure runtime config
+	runtimeCfg := infraconfig.FromSystemConfig(systemCfg)
+	runtimeCfg.ApplyDefaults()
+
 	// Create engine factory
-	engineFactory := adapters.NewEngineFactoryAdapter(redactor, systemCfg.WasmMemoryLimitMB)
+	engineFactory := adapters.NewEngineFactoryAdapter(redactor, runtimeCfg)
 
 	// Determine security level (command-line flag takes precedence over config file)
 	securityLevel := opts.SecurityLevel

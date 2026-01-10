@@ -144,7 +144,24 @@ func (e *Engine) runObservations(ctx context.Context, ctrl entities.Control) []e
 
 	results := make([]execution.ObservationResult, 0, len(ctrl.ObservationDefinitions))
 	for _, obs := range ctrl.ObservationDefinitions {
-		results = append(results, e.executor.Execute(ctx, obs))
+		obsResult := e.executor.Execute(ctx, obs)
+
+		limit := e.config.MaxEvidenceSizeBytes
+		if limit == 0 {
+			limit = execution.DefaultMaxEvidenceSize
+		}
+
+		if obsResult.Evidence != nil && obsResult.Evidence.Data != nil {
+			truncated, meta, err := e.truncator.Truncate(obsResult.Evidence.Data, limit)
+			if err != nil {
+				slog.ErrorContext(ctx, "failed to truncate evidence", "error", err, "plugin", obsResult.Plugin)
+			} else if meta != nil {
+				obsResult.Evidence.Data = truncated
+				obsResult.EvidenceMeta = meta
+			}
+		}
+
+		results = append(results, obsResult)
 	}
 	return results
 }
@@ -188,8 +205,25 @@ func (e *Engine) executeObservationsParallel(ctx context.Context, observations [
 	results := make([]execution.ObservationResult, len(observations))
 
 	for i, obs := range observations {
+		i, obs := i, obs // capture for closure
 		g.Go(func() error {
 			obsResult := e.executor.Execute(ctx, obs)
+
+			limit := e.config.MaxEvidenceSizeBytes
+			if limit == 0 {
+				limit = execution.DefaultMaxEvidenceSize
+			}
+
+			if obsResult.Evidence != nil && obsResult.Evidence.Data != nil {
+				truncated, meta, err := e.truncator.Truncate(obsResult.Evidence.Data, limit)
+				if err != nil {
+					slog.ErrorContext(ctx, "failed to truncate evidence", "error", err, "plugin", obsResult.Plugin)
+				} else if meta != nil {
+					obsResult.Evidence.Data = truncated
+					obsResult.EvidenceMeta = meta
+				}
+			}
+
 			results[i] = obsResult
 			return nil
 		})

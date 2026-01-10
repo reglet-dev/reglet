@@ -253,15 +253,15 @@ func (a *EngineAdapter) Close(ctx context.Context) error {
 
 // EngineFactoryAdapter creates execution engines.
 type EngineFactoryAdapter struct {
-	redactor          *sensitivedata.Redactor
-	wasmMemoryLimitMB int
+	redactor *sensitivedata.Redactor
+	runtime  *infraconfig.RuntimeConfig
 }
 
 // NewEngineFactoryAdapter creates a new engine factory adapter.
-func NewEngineFactoryAdapter(redactor *sensitivedata.Redactor, wasmMemoryLimitMB int) *EngineFactoryAdapter {
+func NewEngineFactoryAdapter(redactor *sensitivedata.Redactor, runtime *infraconfig.RuntimeConfig) *EngineFactoryAdapter {
 	return &EngineFactoryAdapter{
-		redactor:          redactor,
-		wasmMemoryLimitMB: wasmMemoryLimitMB,
+		redactor: redactor,
+		runtime:  runtime,
 	}
 }
 
@@ -272,14 +272,14 @@ func (a *EngineFactoryAdapter) CreateEngine(
 	grantedCaps map[string][]capabilities.Capability,
 	pluginDir string,
 	filters dto.FilterOptions,
-	execution dto.ExecutionOptions,
+	exec dto.ExecutionOptions,
 	_ bool, // skipSchemaValidation - reserved for future schema validation feature
 ) (ports.ExecutionEngine, error) {
 	// Create capability manager that uses the granted capabilities
 	capMgr := &staticCapabilityManager{granted: grantedCaps}
 
 	// Build execution config from filters and execution options
-	cfg := a.buildExecutionConfig(filters, execution)
+	cfg := a.buildExecutionConfig(filters, exec)
 
 	// Create engine
 	eng, err := engine.NewEngineWithCapabilities(
@@ -291,7 +291,8 @@ func (a *EngineFactoryAdapter) CreateEngine(
 		cfg,
 		a.redactor,
 		nil, // No persistence
-		a.wasmMemoryLimitMB,
+		a.runtime.WasmMemoryLimitMB,
+		&execution.GreedyTruncator{},
 	)
 	if err != nil {
 		return nil, err
@@ -304,7 +305,12 @@ func (a *EngineFactoryAdapter) CreateEngine(
 func (a *EngineFactoryAdapter) buildExecutionConfig(filters dto.FilterOptions, exec dto.ExecutionOptions) engine.ExecutionConfig {
 	cfg := engine.DefaultExecutionConfig()
 
-	// Apply execution options
+	// Apply runtime config defaults
+	cfg.MaxEvidenceSizeBytes = a.runtime.MaxEvidenceSizeBytes
+	cfg.MaxConcurrentControls = a.runtime.MaxConcurrentControls
+	cfg.MaxConcurrentObservations = a.runtime.MaxConcurrentObservations
+
+	// Apply execution options overrides if set
 	cfg.Parallel = exec.Parallel
 	if exec.MaxConcurrentControls > 0 {
 		cfg.MaxConcurrentControls = exec.MaxConcurrentControls

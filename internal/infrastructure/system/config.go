@@ -21,7 +21,8 @@ type Config struct {
 		Kind    string `yaml:"kind"`
 		Pattern string `yaml:"pattern"`
 	} `yaml:"capabilities"`
-	WasmMemoryLimitMB int `yaml:"wasm_memory_limit_mb"`
+	WasmMemoryLimitMB    int `yaml:"wasm_memory_limit_mb"`
+	MaxEvidenceSizeBytes int `yaml:"max_evidence_size_bytes"`
 }
 
 // SensitiveDataConfig configures secret resolution and protection.

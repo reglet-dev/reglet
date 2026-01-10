@@ -46,6 +46,7 @@ type ObservationResult struct {
 	RawError     error                  `json:"-" yaml:"-"`
 	Config       map[string]interface{} `json:"config" yaml:"config"`
 	Evidence     *Evidence              `json:"evidence,omitempty" yaml:"evidence,omitempty"`
+	EvidenceMeta *EvidenceMeta          `json:"evidence_meta,omitempty" yaml:"evidence_meta,omitempty"`
 	Error        *PluginError           `json:"error,omitempty" yaml:"error,omitempty"`
 	Plugin       string                 `json:"plugin" yaml:"plugin"`
 	Status       values.Status          `json:"status" yaml:"status"`
@@ -224,4 +225,15 @@ type PluginError struct {
 // Error implements the error interface
 func (e *PluginError) Error() string {
 	return e.Code + ": " + e.Message
+}
+
+// DefaultMaxEvidenceSize is the default limit for evidence size (1MB).
+const DefaultMaxEvidenceSize = 1 * 1024 * 1024
+
+// EvidenceMeta contains metadata about evidence truncation.
+type EvidenceMeta struct {
+	Truncated    bool   `json:"truncated" yaml:"truncated"`
+	OriginalSize int    `json:"original_size_bytes" yaml:"original_size_bytes"`
+	TruncatedAt  int    `json:"truncated_at_bytes" yaml:"truncated_at_bytes"`
+	Reason       string `json:"reason,omitempty" yaml:"reason,omitempty"`
 }

@@ -33,6 +33,7 @@ type ExecutionConfig struct {
 	MaxConcurrentObservations int
 	Parallel                  bool
 	IncludeDependencies       bool
+	MaxEvidenceSizeBytes      int
 }
 
 // DefaultExecutionConfig returns sensible defaults for parallel execution.
@@ -58,5 +59,6 @@ func DefaultExecutionConfig() ExecutionConfig {
 		MaxConcurrentControls:     maxControls,
 		MaxConcurrentObservations: maxObs,
 		Parallel:                  true,
+		MaxEvidenceSizeBytes:      0, // 0 = no limit (or use default from business logic)
 	}
 }

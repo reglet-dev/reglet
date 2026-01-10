@@ -120,7 +120,7 @@ func TestFiltering_EndToEnd(t *testing.T) {
 	capMgr := &testCapabilityManager{trustAll: true}
 
 	// Initialize Engine with Capabilities and Config
-	engine, err := NewEngineWithCapabilities(ctx, build.Get(), capMgr, pluginDir, profile, cfg, nil, nil, 0)
+	engine, err := NewEngineWithCapabilities(ctx, build.Get(), capMgr, pluginDir, profile, cfg, nil, nil, 0, &execution.GreedyTruncator{})
 	require.NoError(t, err)
 	defer engine.Close(ctx)
 
