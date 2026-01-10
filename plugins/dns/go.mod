@@ -8,9 +8,9 @@ replace (
 )
 
 require (
-	github.com/stretchr/testify v1.8.4
 	github.com/reglet-dev/reglet/sdk v0.0.0-00010101000000-000000000000
 	github.com/reglet-dev/reglet/wireformat v0.0.0
+	github.com/stretchr/testify v1.8.4
 )
 
 require (

@@ -24,6 +24,6 @@ type ProfileReader interface {
 	SelectControlsBySeverity(severities []string) []Control
 	ExcludeControlsByID(excludeIDs []string) []Control
 
-	// Validation
-	CheckForCycles() error
+	// Validation - control dependency cycle detection (NOT profile inheritance cycles)
+	CheckForControlDependencyCycles() error
 }

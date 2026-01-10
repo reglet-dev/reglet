@@ -71,6 +71,14 @@ func TestPolicy_IsGranted_Network(t *testing.T) {
 			requested: Capability{Kind: "network", Pattern: "outbound:7999"},
 			expected:  false,
 		},
+		{
+			name: "url with hyphen",
+			grants: []Capability{
+				{Kind: "network", Pattern: "outbound:https://api-prod.example.com"},
+			},
+			requested: Capability{Kind: "network", Pattern: "outbound:https://api-prod.example.com"},
+			expected:  true,
+		},
 	}
 
 	for _, tt := range tests {

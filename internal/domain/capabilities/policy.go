@@ -86,14 +86,14 @@ func matchNetworkPattern(requested, granted string) bool {
 	grantedPorts := strings.Split(grantPort, ",")
 	for _, p := range grantedPorts {
 		p = strings.TrimSpace(p)
+		if p == reqPort {
+			return true
+		}
 		if strings.Contains(p, "-") {
 			if matchPortRange(reqPort, p) {
 				return true
 			}
 			continue
-		}
-		if p == reqPort {
-			return true
 		}
 	}
 	return false

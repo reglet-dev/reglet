@@ -23,6 +23,11 @@ type Profile struct {
 	Plugins  []string               `yaml:"plugins,omitempty"`
 	Vars     map[string]interface{} `yaml:"vars,omitempty"`
 	Controls ControlsSection        `yaml:"controls"`
+
+	// Extends specifies parent profiles to inherit from.
+	// Multiple parents are merged left-to-right before applying current profile.
+	// This field is NOT propagated after merge resolution.
+	Extends []string `yaml:"extends,omitempty"`
 }
 
 // ProfileMetadata contains descriptive information about the profile.
@@ -143,7 +148,7 @@ func (p *Profile) Validate() error {
 		}
 	}
 
-	return p.CheckForCycles()
+	return p.CheckForControlDependencyCycles()
 }
 
 // AddControl safely adds a new control to the profile.
@@ -176,7 +181,7 @@ func (p *Profile) AddControl(ctrl Control) error {
 	p.Controls.Items = append(p.Controls.Items, ctrl)
 
 	// Check for cycles
-	if err := p.CheckForCycles(); err != nil {
+	if err := p.CheckForControlDependencyCycles(); err != nil {
 		// Rollback
 		p.Controls.Items = p.Controls.Items[:len(p.Controls.Items)-1]
 		return fmt.Errorf("adding control creates circular dependency: %w", err)
@@ -185,8 +190,16 @@ func (p *Profile) AddControl(ctrl Control) error {
 	return nil
 }
 
-// CheckForCycles checks if the control dependency graph contains any cycles.
-func (p *Profile) CheckForCycles() error {
+// CheckForControlDependencyCycles checks if the control dependency graph contains any cycles.
+// This validates the `depends_on` relationships between controls within a single profile.
+//
+// This is DIFFERENT from profile inheritance cycle detection:
+// - This method: Checks control A depends_on B depends_on A (within one profile)
+// - ProfileLoader: Checks profile A extends B extends A (across files)
+//
+// Algorithm: Standard DFS with recursion stack for cycle detection.
+// Time complexity: O(V + E) where V = controls, E = dependencies.
+func (p *Profile) CheckForControlDependencyCycles() error {
 	visited := make(map[string]bool)
 	recStack := make(map[string]bool)
 

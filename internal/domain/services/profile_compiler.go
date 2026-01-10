@@ -31,7 +31,7 @@ func (c *ProfileCompiler) Compile(raw *entities.Profile) (*entities.ValidatedPro
 	}
 
 	// Step 1: Deep copy to prevent mutation of the original
-	compiled := c.deepCopy(raw)
+	compiled := DeepCopyProfile(raw)
 
 	// Step 2: Apply defaults (business rule)
 	c.applyDefaults(compiled)
@@ -43,23 +43,6 @@ func (c *ProfileCompiler) Compile(raw *entities.Profile) (*entities.ValidatedPro
 
 	// Step 4: Create immutable ValidatedProfile
 	return entities.NewValidatedProfile(compiled), nil
-}
-
-// deepCopy creates a deep copy of the profile to prevent mutation.
-// This ensures the original raw profile remains unchanged.
-func (c *ProfileCompiler) deepCopy(original *entities.Profile) *entities.Profile {
-	// Copy top-level fields
-	profileCopy := &entities.Profile{
-		Metadata: original.Metadata, // ProfileMetadata is a value type (copied)
-		Plugins:  copyStringSlice(original.Plugins),
-		Vars:     copyVars(original.Vars),
-		Controls: entities.ControlsSection{
-			Defaults: copyDefaults(original.Controls.Defaults),
-			Items:    copyControls(original.Controls.Items),
-		},
-	}
-
-	return profileCopy
 }
 
 // applyDefaults propagates default values to all controls.
@@ -106,85 +89,4 @@ func (c *ProfileCompiler) applyDefaults(profile *entities.Profile) {
 			ctrl.Timeout = defaults.Timeout
 		}
 	}
-}
-
-// HELPER FUNCTIONS FOR DEEP COPY
-
-func copyStringSlice(src []string) []string {
-	if src == nil {
-		return nil
-	}
-	dst := make([]string, len(src))
-	copy(dst, src)
-	return dst
-}
-
-func copyVars(src map[string]interface{}) map[string]interface{} {
-	if src == nil {
-		return nil
-	}
-	dst := make(map[string]interface{}, len(src))
-	for k, v := range src {
-		dst[k] = v // Shallow copy of values (interface{} can't be deep copied generically)
-	}
-	return dst
-}
-
-func copyDefaults(src *entities.ControlDefaults) *entities.ControlDefaults {
-	if src == nil {
-		return nil
-	}
-	return &entities.ControlDefaults{
-		Severity: src.Severity,
-		Owner:    src.Owner,
-		Tags:     copyStringSlice(src.Tags),
-		Timeout:  src.Timeout,
-	}
-}
-
-func copyControls(src []entities.Control) []entities.Control {
-	if src == nil {
-		return nil
-	}
-	dst := make([]entities.Control, len(src))
-	for i, ctrl := range src {
-		dst[i] = entities.Control{
-			ID:                     ctrl.ID,
-			Name:                   ctrl.Name,
-			Description:            ctrl.Description,
-			Severity:               ctrl.Severity,
-			Owner:                  ctrl.Owner,
-			Tags:                   copyStringSlice(ctrl.Tags),
-			DependsOn:              copyStringSlice(ctrl.DependsOn),
-			Timeout:                ctrl.Timeout,
-			ObservationDefinitions: copyObservations(ctrl.ObservationDefinitions),
-		}
-	}
-	return dst
-}
-
-func copyObservations(src []entities.ObservationDefinition) []entities.ObservationDefinition {
-	if src == nil {
-		return nil
-	}
-	dst := make([]entities.ObservationDefinition, len(src))
-	for i, obs := range src {
-		dst[i] = entities.ObservationDefinition{
-			Plugin: obs.Plugin,
-			Config: copyConfig(obs.Config),
-			Expect: copyStringSlice(obs.Expect),
-		}
-	}
-	return dst
-}
-
-func copyConfig(src map[string]interface{}) map[string]interface{} {
-	if src == nil {
-		return nil
-	}
-	dst := make(map[string]interface{}, len(src))
-	for k, v := range src {
-		dst[k] = v // Shallow copy (can't deep copy interface{} generically)
-	}
-	return dst
 }

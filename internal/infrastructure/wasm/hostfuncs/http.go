@@ -131,6 +131,11 @@ func checkHTTPCapability(ctx context.Context, checker *CapabilityChecker, plugin
 		return &ErrorDetail{Message: errMsg, Type: "config"}
 	}
 
+	// Try checking the specific URL first (matches what Extractor produces)
+	if err := checker.Check(pluginName, "network", "outbound:"+request.URL); err == nil {
+		return nil
+	}
+
 	port := getPort(parsedURL)
 	capabilityPattern := fmt.Sprintf("outbound:%s", port)
 
