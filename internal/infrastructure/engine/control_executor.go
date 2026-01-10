@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/reglet-dev/reglet/internal/domain/entities"
@@ -23,11 +24,62 @@ func (e *Engine) executeControl(ctx context.Context, ctrl entities.Control, inde
 		return skipControl(result, skipReason, startTime)
 	}
 
-	// Execute observations
-	result.ObservationResults = e.runObservations(ctx, ctrl)
+	maxAttempts := ctrl.Retries + 1
+	var lastErr error
 
-	// Aggregate and finalize
-	return finalizeResult(result, startTime)
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		// Execute observations
+		result.ObservationResults = e.runObservations(ctx, ctrl)
+
+		// Aggregate and finalize
+		result = finalizeResult(result, startTime)
+
+		// If success or permanent failure, we are done
+		if result.Status != values.StatusError {
+			return result
+		}
+
+		// Check for transient failure
+		isTransient := false
+		for _, obs := range result.ObservationResults {
+			if obs.RawError != nil && isTransientError(obs.RawError) {
+				isTransient = true
+				lastErr = obs.RawError
+				break
+			}
+		}
+
+		if !isTransient {
+			return result
+		}
+
+		// If we are here, it is a transient error.
+		if attempt < maxAttempts {
+			delay := CalculateBackoff(
+				ctrl.RetryBackoff,
+				attempt,
+				ctrl.RetryDelay,
+				ctrl.RetryMaxDelay,
+			)
+
+			slog.InfoContext(ctx, "Retrying control",
+				"control", ctrl.ID,
+				"attempt", attempt,
+				"max_attempts", maxAttempts,
+				"delay", delay,
+				"error", lastErr,
+			)
+
+			select {
+			case <-ctx.Done():
+				return result // Context canceled, stop retrying
+			case <-time.After(delay):
+				// Continue to next attempt
+			}
+		}
+	}
+
+	return result
 }
 
 // newControlResult creates an initial ControlResult from a control definition.

@@ -110,6 +110,7 @@ func (e *ObservationExecutor) Execute(ctx context.Context, obs entities.Observat
 			Code:    "plugin_load_error",
 			Message: err.Error(),
 		}
+		result.RawError = err
 		result.Duration = time.Since(startTime)
 		return result
 	}
@@ -128,6 +129,7 @@ func (e *ObservationExecutor) Execute(ctx context.Context, obs entities.Observat
 			Code:    "plugin_execution_error",
 			Message: err.Error(),
 		}
+		result.RawError = err
 		result.Duration = time.Since(startTime)
 		return result
 	}
@@ -139,6 +141,7 @@ func (e *ObservationExecutor) Execute(ctx context.Context, obs entities.Observat
 	if wasmResult.Error != nil { // This error is a Go error, not from Evidence
 		result.Status = values.StatusError
 		result.Error = wasmResult.Error // Use the top-level error from wasmResult
+		result.RawError = wasmResult.Error
 		result.Duration = time.Since(startTime)
 		return result
 	}

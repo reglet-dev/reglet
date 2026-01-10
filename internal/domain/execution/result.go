@@ -43,11 +43,12 @@ type ControlResult struct {
 
 // ObservationResult represents the result of executing a single observation.
 type ObservationResult struct {
-	Plugin       string                 `json:"plugin" yaml:"plugin"`
+	RawError     error                  `json:"-" yaml:"-"`
 	Config       map[string]interface{} `json:"config" yaml:"config"`
-	Status       values.Status          `json:"status" yaml:"status"`
 	Evidence     *Evidence              `json:"evidence,omitempty" yaml:"evidence,omitempty"`
 	Error        *PluginError           `json:"error,omitempty" yaml:"error,omitempty"`
+	Plugin       string                 `json:"plugin" yaml:"plugin"`
+	Status       values.Status          `json:"status" yaml:"status"`
 	Expectations []ExpectationResult    `json:"expectations,omitempty" yaml:"expectations,omitempty"`
 	Duration     time.Duration          `json:"duration_ms" yaml:"duration_ms"`
 }

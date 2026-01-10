@@ -7,6 +7,15 @@ import (
 	"time"
 )
 
+// BackoffType defines the strategy for retry delays.
+type BackoffType string
+
+const (
+	BackoffNone        BackoffType = "none"
+	BackoffLinear      BackoffType = "linear"
+	BackoffExponential BackoffType = "exponential"
+)
+
 // Profile represents the Reglet profile configuration.
 // Aggregate root in the Configuration context.
 //
@@ -45,10 +54,14 @@ type ControlsSection struct {
 
 // ControlDefaults specifies values inherited by controls when not explicitly set.
 type ControlDefaults struct {
-	Severity string        `yaml:"severity,omitempty"`
-	Owner    string        `yaml:"owner,omitempty"`
-	Tags     []string      `yaml:"tags,omitempty"`
-	Timeout  time.Duration `yaml:"timeout,omitempty"`
+	Severity      string        `yaml:"severity,omitempty"`
+	Owner         string        `yaml:"owner,omitempty"`
+	RetryBackoff  BackoffType   `yaml:"retry_backoff,omitempty"`
+	Tags          []string      `yaml:"tags,omitempty"`
+	Timeout       time.Duration `yaml:"timeout,omitempty"`
+	Retries       int           `yaml:"retries,omitempty"`
+	RetryDelay    time.Duration `yaml:"retry_delay,omitempty"`
+	RetryMaxDelay time.Duration `yaml:"retry_max_delay,omitempty"`
 }
 
 // Control represents a specific compliance check or validation unit.
@@ -59,10 +72,14 @@ type Control struct {
 	Description            string                  `yaml:"description,omitempty"`
 	Severity               string                  `yaml:"severity,omitempty"`
 	Owner                  string                  `yaml:"owner,omitempty"`
-	Tags                   []string                `yaml:"tags,omitempty"`
+	RetryBackoff           BackoffType             `yaml:"retry_backoff,omitempty"`
 	DependsOn              []string                `yaml:"depends_on,omitempty"`
 	ObservationDefinitions []ObservationDefinition `yaml:"observations"`
+	Tags                   []string                `yaml:"tags,omitempty"`
 	Timeout                time.Duration           `yaml:"timeout,omitempty"`
+	Retries                int                     `yaml:"retries,omitempty"`
+	RetryDelay             time.Duration           `yaml:"retry_delay,omitempty"`
+	RetryMaxDelay          time.Duration           `yaml:"retry_max_delay,omitempty"`
 }
 
 // ObservationDefinition configuration for a specific plugin execution.
@@ -321,39 +338,64 @@ func (p *Profile) ApplyDefaults() {
 	defaults := p.Controls.Defaults
 
 	for i := range p.Controls.Items {
-		ctrl := &p.Controls.Items[i]
+		p.Controls.Items[i].ApplyDefaults(defaults)
+	}
+}
 
-		// Apply default severity if not set
-		if ctrl.Severity == "" && defaults.Severity != "" {
-			ctrl.Severity = defaults.Severity
-		}
+// ApplyDefaults applies the given defaults to the control if values are missing.
+func (c *Control) ApplyDefaults(defaults *ControlDefaults) {
+	if c.Severity == "" && defaults.Severity != "" {
+		c.Severity = defaults.Severity
+	}
 
-		// Apply default owner if not set
-		if ctrl.Owner == "" && defaults.Owner != "" {
-			ctrl.Owner = defaults.Owner
-		}
+	if c.Owner == "" && defaults.Owner != "" {
+		c.Owner = defaults.Owner
+	}
 
-		// Merge tags (defaults + control tags)
-		if len(defaults.Tags) > 0 {
-			tagMap := make(map[string]bool)
-			for _, tag := range defaults.Tags {
-				tagMap[tag] = true
-			}
-			for _, tag := range ctrl.Tags {
-				tagMap[tag] = true
-			}
+	c.applyTagDefaults(defaults.Tags)
 
-			mergedTags := make([]string, 0, len(tagMap))
-			for tag := range tagMap {
-				mergedTags = append(mergedTags, tag)
-			}
-			ctrl.Tags = mergedTags
-		}
+	if c.Timeout == 0 && defaults.Timeout > 0 {
+		c.Timeout = defaults.Timeout
+	}
 
-		// Apply default timeout if not set
-		if ctrl.Timeout == 0 && defaults.Timeout > 0 {
-			ctrl.Timeout = defaults.Timeout
-		}
+	c.applyRetryDefaults(defaults)
+}
+
+func (c *Control) applyTagDefaults(defaultTags []string) {
+	if len(defaultTags) == 0 {
+		return
+	}
+
+	tagMap := make(map[string]bool)
+	for _, tag := range defaultTags {
+		tagMap[tag] = true
+	}
+	for _, tag := range c.Tags {
+		tagMap[tag] = true
+	}
+
+	mergedTags := make([]string, 0, len(tagMap))
+	for tag := range tagMap {
+		mergedTags = append(mergedTags, tag)
+	}
+	c.Tags = mergedTags
+}
+
+func (c *Control) applyRetryDefaults(defaults *ControlDefaults) {
+	if c.Retries == 0 && defaults.Retries > 0 {
+		c.Retries = defaults.Retries
+	}
+
+	if c.RetryDelay == 0 && defaults.RetryDelay > 0 {
+		c.RetryDelay = defaults.RetryDelay
+	}
+
+	if c.RetryBackoff == "" && defaults.RetryBackoff != "" {
+		c.RetryBackoff = defaults.RetryBackoff
+	}
+
+	if c.RetryMaxDelay == 0 && defaults.RetryMaxDelay > 0 {
+		c.RetryMaxDelay = defaults.RetryMaxDelay
 	}
 }
 

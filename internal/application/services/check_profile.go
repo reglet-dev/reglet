@@ -69,57 +69,86 @@ func (uc *CheckProfileUseCase) Execute(ctx context.Context, req dto.CheckProfile
 
 	uc.logger.Info("loading profile", "path", req.ProfilePath)
 
-	// 1. Load raw profile from YAML
-	rawProfile, err := uc.profileLoader.LoadProfile(req.ProfilePath)
+	// 1-2. Load and compile (clean up imports, validation)
+	profile, err := uc.loadAndCompileProfile(req.ProfilePath)
+	if err != nil {
+		return nil, err
+	}
+
+	uc.logger.Info("profile compiled and validated", "controls", profile.ControlCount())
+
+	// 2b. Phase 2.5: Resolve/Lock plugins
+	if err := uc.resolveAndLockPlugins(ctx, profile, req.ProfilePath); err != nil {
+		return nil, err
+	}
+
+	// 3. Filters
+	if err := uc.validateFilters(profile, req.Filters); err != nil {
+		return nil, err
+	}
+
+	// 4. Plugin Dir
+	pluginDir, err := uc.resolvePluginDir(ctx, req.Options.PluginDir)
+	if err != nil {
+		uc.logger.Debug("failed to resolve plugin directory", "error", err)
+		pluginDir = ""
+	}
+
+	// 5. Validate Plugin Definitions
+	if err := uc.validateDeclaredPlugins(profile, pluginDir); err != nil {
+		return nil, err
+	}
+
+	// 6-8. Prepare Engine (Capabilities + Factory)
+	eng, requiredCaps, grantedCaps, err := uc.prepareEngine(ctx, profile, pluginDir, req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = eng.Close(ctx) }()
+
+	// 9. Execute
+	result, err := uc.executeProfile(ctx, eng, profile)
+	if err != nil {
+		return nil, err
+	}
+
+	// 10. Start Response
+	return uc.buildResponse(req, startTime, result, requiredCaps, grantedCaps), nil
+}
+
+func (uc *CheckProfileUseCase) loadAndCompileProfile(path string) (*entities.ValidatedProfile, error) {
+	rawProfile, err := uc.profileLoader.LoadProfile(path)
 	if err != nil {
 		return nil, apperrors.NewValidationError("profile", "failed to load profile", err.Error())
 	}
 
 	uc.logger.Info("profile loaded", "name", rawProfile.Metadata.Name, "version", rawProfile.Metadata.Version)
 
-	// 2. Compile profile (apply defaults + validate)
 	profile, err := uc.profileCompiler.Compile(rawProfile)
 	if err != nil {
 		return nil, apperrors.NewValidationError("profile", "compilation failed", err.Error())
 	}
+	return profile, nil
+}
 
-	uc.logger.Info("profile compiled and validated", "controls", profile.ControlCount())
-
-	// 2b. Resolve versions and lock plugins (Phase 2.5)
-	// We use the PROFILE directory for lockfile location
-	lockfilePath := filepath.Join(filepath.Dir(req.ProfilePath), "reglet.lock")
+func (uc *CheckProfileUseCase) resolveAndLockPlugins(
+	ctx context.Context,
+	profile *entities.ValidatedProfile,
+	profilePath string,
+) error {
+	lockfilePath := filepath.Join(filepath.Dir(profilePath), "reglet.lock")
 	lockfile, err := uc.lockfileService.ResolvePlugins(ctx, profile.Profile, lockfilePath)
 	if err != nil {
-		return nil, apperrors.NewConfigurationError("lockfile", "failed to resolve plugins", err)
+		return apperrors.NewConfigurationError("lockfile", "failed to resolve plugins", err)
 	}
 
-	// Update profile with strict versions from lockfile
-	// This ensures subsequent steps (verification, loading) use the pinned versions
 	var strictPlugins []string
 	for _, p := range profile.Plugins {
 		spec, _ := entities.ParsePluginDeclaration(p) // Error checked in ResolvePlugins
 		if locked := lockfile.GetPlugin(spec.Name); locked != nil {
-			// Replace with strict version: "source@version"
-			// If source has @digest, we preserve it?
-			// Lockfile stores "Resolved" (e.g., "1.0.2") and "Source" (e.g. "reglet/aws")
-			// We reconstruct the declaration.
-			// Ideally we want "source@resolved"
-			// But if Source is OCI path, it might be complicated.
-			// For now, let's use the format that works for loader:
-			// If we have "reglet/aws", resolved "1.0.2".
-			// New decl: "reglet/aws@1.0.2"
-
-			// We use locked.Source if it's correct?
-			// locked.Source comes from spec.Source.
-
-			// Let's assume standard behavior:
-			// If locked.Resolved is "1.0.2", we append it.
+			// Using simplified strict declaration: currently appending @resolved
 			strictDecl := fmt.Sprintf("%s@%s", spec.Name, locked.Resolved)
 			if spec.Name != spec.Source {
-				// If alias used, maybe different?
-				// For now simple append.
-				// In real OCI world, we might need full reference.
-				// Assuming simplified behavior for Phase 2.5 skeleton.
 				strictDecl = fmt.Sprintf("%s@%s", spec.Source, locked.Resolved)
 			}
 			strictPlugins = append(strictPlugins, strictDecl)
@@ -130,55 +159,61 @@ func (uc *CheckProfileUseCase) Execute(ctx context.Context, req dto.CheckProfile
 	profile.Plugins = strictPlugins
 
 	uc.logger.Info("plugins resolved", "lockfile", lockfilePath)
+	return nil
+}
 
-	// 3. Apply filters to profile (validate filter references)
-	if err := uc.validateFilters(profile, req.Filters); err != nil {
-		return nil, err
+func (uc *CheckProfileUseCase) resolvePluginDir(ctx context.Context, override string) (string, error) {
+	if override != "" {
+		return override, nil
 	}
+	return uc.pluginResolver.ResolvePluginDir(ctx)
+}
 
-	// 4. Determine plugin directory
-	pluginDir := req.Options.PluginDir
-	if pluginDir == "" {
-		pluginDir, err = uc.pluginResolver.ResolvePluginDir(ctx)
-		if err != nil {
-			uc.logger.Debug("failed to resolve plugin directory", "error", err)
-			// Continue with empty plugin dir - engine will use embedded plugins
-			pluginDir = ""
-		}
-	}
-
-	// 5. Validate declared plugins exist and match used plugins
-	if err := uc.validateDeclaredPlugins(profile, pluginDir); err != nil {
-		return nil, err
-	}
-
-	// 6. Collect required capabilities using capability orchestrator
+func (uc *CheckProfileUseCase) prepareEngine(
+	ctx context.Context,
+	profile *entities.ValidatedProfile,
+	pluginDir string,
+	req dto.CheckProfileRequest,
+) (
+	ports.ExecutionEngine,
+	map[string][]capabilities.Capability,
+	map[string][]capabilities.Capability,
+	error,
+) {
 	requiredCaps, tempRuntime, err := uc.capOrchestrator.CollectCapabilities(ctx, profile, pluginDir)
 	if err != nil {
-		return nil, apperrors.NewConfigurationError("capabilities", "failed to collect capabilities", err)
+		return nil, nil, nil, apperrors.NewConfigurationError("capabilities", "failed to collect capabilities", err)
 	}
-	defer func() {
-		if tempRuntime != nil {
-			_ = tempRuntime.Close(ctx)
-		}
-	}()
+	if tempRuntime != nil {
+		_ = tempRuntime.Close(ctx)
+	}
 
-	// 7. Grant capabilities (interactive or auto-grant)
 	grantedCaps, err := uc.capOrchestrator.GrantCapabilities(requiredCaps, req.Options.TrustPlugins)
 	if err != nil {
-		return nil, apperrors.NewCapabilityError("capability grant failed", flattenCapabilities(requiredCaps))
+		return nil, nil, nil, apperrors.NewCapabilityError("capability grant failed", flattenCapabilities(requiredCaps))
 	}
 
-	// 8. Create execution engine with granted capabilities and filters
-	eng, err := uc.engineFactory.CreateEngine(ctx, profile, grantedCaps, pluginDir, req.Filters, req.Execution, req.Options.SkipSchemaValidation)
+	eng, err := uc.engineFactory.CreateEngine(
+		ctx,
+		profile,
+		grantedCaps,
+		pluginDir,
+		req.Filters,
+		req.Execution,
+		req.Options.SkipSchemaValidation,
+	)
 	if err != nil {
-		return nil, apperrors.NewConfigurationError("engine", "failed to create engine", err)
+		return nil, nil, nil, apperrors.NewConfigurationError("engine", "failed to create engine", err)
 	}
-	defer func() {
-		_ = eng.Close(ctx)
-	}()
 
-	// 9. Execute profile
+	return eng, requiredCaps, grantedCaps, nil
+}
+
+func (uc *CheckProfileUseCase) executeProfile(
+	ctx context.Context,
+	eng ports.ExecutionEngine,
+	profile *entities.ValidatedProfile,
+) (*execution.ExecutionResult, error) {
 	uc.logger.Info("executing profile")
 	result, err := eng.Execute(ctx, profile)
 	if err != nil {
@@ -192,9 +227,16 @@ func (uc *CheckProfileUseCase) Execute(ctx context.Context, req dto.CheckProfile
 		"failed", result.Summary.FailedControls,
 		"errors", result.Summary.ErrorControls,
 		"skipped", result.Summary.SkippedControls)
+	return result, nil
+}
 
-	// 10. Build response
-	response := &dto.CheckProfileResponse{
+func (uc *CheckProfileUseCase) buildResponse(
+	req dto.CheckProfileRequest,
+	startTime time.Time,
+	result *execution.ExecutionResult,
+	reqCaps, grantedCaps map[string][]capabilities.Capability,
+) *dto.CheckProfileResponse {
+	return &dto.CheckProfileResponse{
 		ExecutionResult: result,
 		Metadata: dto.ResponseMetadata{
 			RequestID:   req.Metadata.RequestID,
@@ -203,13 +245,11 @@ func (uc *CheckProfileUseCase) Execute(ctx context.Context, req dto.CheckProfile
 		},
 		Diagnostics: dto.Diagnostics{
 			Capabilities: dto.CapabilityDiagnostics{
-				Required: requiredCaps,
+				Required: reqCaps,
 				Granted:  grantedCaps,
 			},
 		},
 	}
-
-	return response, nil
 }
 
 // validateFilters validates filter configuration and compiles filter expressions.
@@ -273,19 +313,38 @@ var builtInPlugins = map[string]bool{
 // This enforces explicit dependency declaration during development.
 func (uc *CheckProfileUseCase) validateDeclaredPlugins(profile entities.ProfileReader, pluginDir string) error {
 	declaredPlugins := profile.GetPlugins()
+	usedPlugins := uc.getUsedPlugins(profile)
 
-	// Build set of plugins used in observations
+	// Build set of declared plugin names for lookup
+	declaredSet := make(map[string]bool)
+	for _, declared := range declaredPlugins {
+		declaredSet[extractPluginName(declared)] = true
+	}
+
+	// 1. Check if used plugins are declared
+	if err := uc.checkMissingDeclarations(declaredPlugins, usedPlugins, declaredSet); err != nil {
+		return err
+	}
+
+	// 2. Verify existence of declared plugins
+	return uc.verifyPluginExistence(declaredPlugins, pluginDir)
+}
+
+func (uc *CheckProfileUseCase) getUsedPlugins(profile entities.ProfileReader) map[string]bool {
 	usedPlugins := make(map[string]bool)
 	for _, ctrl := range profile.GetAllControls() {
 		for _, obs := range ctrl.ObservationDefinitions {
 			usedPlugins[obs.Plugin] = true
 		}
 	}
+	return usedPlugins
+}
 
+func (uc *CheckProfileUseCase) checkMissingDeclarations(declared []string, used map[string]bool, declaredSet map[string]bool) error {
 	// Require plugins field if any observations use plugins
-	if len(declaredPlugins) == 0 && len(usedPlugins) > 0 {
+	if len(declared) == 0 && len(used) > 0 {
 		var pluginList []string
-		for p := range usedPlugins {
+		for p := range used {
 			pluginList = append(pluginList, p)
 		}
 		return apperrors.NewValidationError(
@@ -294,16 +353,22 @@ func (uc *CheckProfileUseCase) validateDeclaredPlugins(profile entities.ProfileR
 		)
 	}
 
-	// Build set of declared plugin names for lookup
-	declaredSet := make(map[string]bool)
-	for _, declared := range declaredPlugins {
-		declaredSet[extractPluginName(declared)] = true
+	// Error if plugins are used but not declared
+	for p := range used {
+		if !declaredSet[p] {
+			return apperrors.NewValidationError(
+				"plugins",
+				fmt.Sprintf("plugin %q used in observations but not declared in 'plugins:' section", p),
+			)
+		}
 	}
+	return nil
+}
 
-	// Validate each declared plugin exists
-	for _, declared := range declaredPlugins {
+func (uc *CheckProfileUseCase) verifyPluginExistence(declared []string, pluginDir string) error {
+	for _, rawDecl := range declared {
 		// Extract plugin name from path if it's a path (e.g., ./plugins/file/file.wasm -> file)
-		pluginName := extractPluginName(declared)
+		pluginName := extractPluginName(rawDecl)
 
 		// Check if it's a built-in plugin
 		if builtInPlugins[pluginName] {
@@ -319,28 +384,17 @@ func (uc *CheckProfileUseCase) validateDeclaredPlugins(profile entities.ProfileR
 		}
 
 		// Check if declared path exists directly (for ./plugins/... format)
-		if strings.HasPrefix(declared, "./") || strings.HasPrefix(declared, "/") {
-			if _, err := os.Stat(declared); err == nil {
+		if strings.HasPrefix(rawDecl, "./") || strings.HasPrefix(rawDecl, "/") {
+			if _, err := os.Stat(rawDecl); err == nil {
 				continue
 			}
 		}
 
 		return apperrors.NewValidationError(
 			"plugins",
-			fmt.Sprintf("declared plugin %q not found (not built-in and not found at %s)", declared, pluginDir),
+			fmt.Sprintf("declared plugin %q not found (not built-in and not found at %s)", rawDecl, pluginDir),
 		)
 	}
-
-	// Error if plugins are used but not declared
-	for used := range usedPlugins {
-		if !declaredSet[used] {
-			return apperrors.NewValidationError(
-				"plugins",
-				fmt.Sprintf("plugin %q used in observations but not declared in 'plugins:' section", used),
-			)
-		}
-	}
-
 	return nil
 }
 

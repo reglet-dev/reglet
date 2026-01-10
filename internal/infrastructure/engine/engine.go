@@ -16,11 +16,16 @@ import (
 	"github.com/reglet-dev/reglet/internal/infrastructure/wasm"
 )
 
+// ObservationExecutable defines the interface for executing observations.
+type ObservationExecutable interface {
+	Execute(ctx context.Context, obs entities.ObservationDefinition) execution.ObservationResult
+}
+
 // Engine coordinates profile execution.
 type Engine struct {
 	repository repositories.ExecutionResultRepository
 	runtime    *wasm.Runtime
-	executor   *ObservationExecutor
+	executor   ObservationExecutable
 	version    build.Info
 	config     ExecutionConfig
 }
