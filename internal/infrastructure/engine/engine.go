@@ -3,6 +3,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -134,6 +135,11 @@ func NewEngineWithConfig(ctx context.Context, version build.Info, cfg ExecutionC
 
 // Execute runs a complete profile and returns the result.
 func (e *Engine) Execute(ctx context.Context, profile entities.ProfileReader) (*execution.ExecutionResult, error) {
+	// Check context before starting
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+
 	metadata := profile.GetMetadata()
 	result := execution.NewExecutionResult(metadata.Name, metadata.Version)
 	result.RegletVersion = e.version.String()
@@ -150,12 +156,30 @@ func (e *Engine) Execute(ctx context.Context, profile entities.ProfileReader) (*
 	allControls := profile.GetAllControls()
 	if e.config.Parallel && len(allControls) > 1 {
 		if err := e.executeControlsWithWorkerPool(ctx, allControls, result, requiredControls); err != nil {
+			if errors.Is(err, context.DeadlineExceeded) {
+				return nil, fmt.Errorf("execution timed out: %w", err)
+			}
 			return nil, err
 		}
 	} else {
 		for i, ctrl := range allControls {
+			// Check context in loop
+			if ctx.Err() != nil {
+				if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+					return nil, fmt.Errorf("execution timed out: %w", ctx.Err())
+				}
+				return nil, ctx.Err()
+			}
+
 			controlResult := e.executeControl(ctx, ctrl, i, result, requiredControls)
 			result.AddControlResult(controlResult)
+		}
+
+		if ctx.Err() != nil {
+			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				return nil, fmt.Errorf("execution timed out: %w", ctx.Err())
+			}
+			return nil, ctx.Err()
 		}
 	}
 

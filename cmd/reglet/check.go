@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -30,6 +31,7 @@ type CheckOptions struct {
 	excludeControlIDs   []string
 	trustPlugins        bool
 	includeDependencies bool
+	timeout             time.Duration
 }
 
 func init() {
@@ -86,6 +88,7 @@ Filtering:
 	cmd.Flags().StringSliceVar(&opts.excludeControlIDs, "exclude-control", nil, "Exclude specific controls by ID (comma-separated)")
 	cmd.Flags().StringVar(&opts.filterExpr, "filter", "", "Advanced filter expression (e.g. \"severity == 'critical'\")")
 	cmd.Flags().BoolVar(&opts.includeDependencies, "include-dependencies", false, "Include dependencies of selected controls")
+	cmd.Flags().DurationVar(&opts.timeout, "timeout", 2*time.Minute, "Global timeout for entire execution (0 to disable)")
 
 	return cmd
 }
@@ -106,9 +109,19 @@ func runCheckAction(ctx context.Context, profilePath string, opts *CheckOptions)
 	// 2. Build request
 	request := buildCheckProfileRequest(profilePath, opts)
 
-	// 3. Execute
+	// 3. Apply timeout if set
+	if opts.timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, opts.timeout)
+		defer cancel()
+	}
+
+	// 4. Execute
 	response, err := c.CheckProfileUseCase().Execute(ctx, request)
 	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return fmt.Errorf("execution exceeded global timeout (%s)", opts.timeout)
+		}
 		return fmt.Errorf("check failed: %w", err)
 	}
 
