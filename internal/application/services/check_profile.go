@@ -29,6 +29,7 @@ type CheckProfileUseCase struct {
 	systemConfig     ports.SystemConfigProvider
 	pluginResolver   ports.PluginDirectoryResolver
 	capOrchestrator  *CapabilityOrchestrator
+	lockfileService  *LockfileService
 	engineFactory    ports.EngineFactory
 	logger           *slog.Logger
 }
@@ -41,6 +42,7 @@ func NewCheckProfileUseCase(
 	systemConfig ports.SystemConfigProvider,
 	pluginResolver ports.PluginDirectoryResolver,
 	capOrchestrator *CapabilityOrchestrator,
+	lockfileService *LockfileService,
 	engineFactory ports.EngineFactory,
 	logger *slog.Logger,
 ) *CheckProfileUseCase {
@@ -55,6 +57,7 @@ func NewCheckProfileUseCase(
 		systemConfig:     systemConfig,
 		pluginResolver:   pluginResolver,
 		capOrchestrator:  capOrchestrator,
+		lockfileService:  lockfileService,
 		engineFactory:    engineFactory,
 		logger:           logger,
 	}
@@ -81,6 +84,52 @@ func (uc *CheckProfileUseCase) Execute(ctx context.Context, req dto.CheckProfile
 	}
 
 	uc.logger.Info("profile compiled and validated", "controls", profile.ControlCount())
+
+	// 2b. Resolve versions and lock plugins (Phase 2.5)
+	// We use the PROFILE directory for lockfile location
+	lockfilePath := filepath.Join(filepath.Dir(req.ProfilePath), "reglet.lock")
+	lockfile, err := uc.lockfileService.ResolvePlugins(ctx, profile.Profile, lockfilePath)
+	if err != nil {
+		return nil, apperrors.NewConfigurationError("lockfile", "failed to resolve plugins", err)
+	}
+
+	// Update profile with strict versions from lockfile
+	// This ensures subsequent steps (verification, loading) use the pinned versions
+	var strictPlugins []string
+	for _, p := range profile.Plugins {
+		spec, _ := entities.ParsePluginDeclaration(p) // Error checked in ResolvePlugins
+		if locked := lockfile.GetPlugin(spec.Name); locked != nil {
+			// Replace with strict version: "source@version"
+			// If source has @digest, we preserve it?
+			// Lockfile stores "Resolved" (e.g., "1.0.2") and "Source" (e.g. "reglet/aws")
+			// We reconstruct the declaration.
+			// Ideally we want "source@resolved"
+			// But if Source is OCI path, it might be complicated.
+			// For now, let's use the format that works for loader:
+			// If we have "reglet/aws", resolved "1.0.2".
+			// New decl: "reglet/aws@1.0.2"
+
+			// We use locked.Source if it's correct?
+			// locked.Source comes from spec.Source.
+
+			// Let's assume standard behavior:
+			// If locked.Resolved is "1.0.2", we append it.
+			strictDecl := fmt.Sprintf("%s@%s", spec.Name, locked.Resolved)
+			if spec.Name != spec.Source {
+				// If alias used, maybe different?
+				// For now simple append.
+				// In real OCI world, we might need full reference.
+				// Assuming simplified behavior for Phase 2.5 skeleton.
+				strictDecl = fmt.Sprintf("%s@%s", spec.Source, locked.Resolved)
+			}
+			strictPlugins = append(strictPlugins, strictDecl)
+		} else {
+			strictPlugins = append(strictPlugins, p)
+		}
+	}
+	profile.Plugins = strictPlugins
+
+	uc.logger.Info("plugins resolved", "lockfile", lockfilePath)
 
 	// 3. Apply filters to profile (validate filter references)
 	if err := uc.validateFilters(profile, req.Filters); err != nil {

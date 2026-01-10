@@ -12,6 +12,7 @@ import (
 	"github.com/reglet-dev/reglet/internal/domain/capabilities"
 	domainservices "github.com/reglet-dev/reglet/internal/domain/services"
 	"github.com/reglet-dev/reglet/internal/infrastructure/adapters"
+	"github.com/reglet-dev/reglet/internal/infrastructure/filesystem"
 	"github.com/reglet-dev/reglet/internal/infrastructure/plugins"
 	"github.com/reglet-dev/reglet/internal/infrastructure/redaction"
 	"github.com/reglet-dev/reglet/internal/infrastructure/system"
@@ -110,6 +111,15 @@ func New(opts Options) (*Container, error) {
 		opts.TrustPlugins,
 	)
 
+	// Create lockfile infrastructure
+	lockfileRepo := filesystem.NewFileLockfileRepository()
+	versionResolver := plugins.NewSemverResolver()
+	// TODO: Add real digester when available
+	var pluginDigester ports.PluginDigester = nil
+
+	// Create application services
+	lockfileService := services.NewLockfileService(lockfileRepo, versionResolver, pluginDigester)
+
 	// Create domain services
 	profileCompiler := domainservices.NewProfileCompiler()
 
@@ -121,6 +131,7 @@ func New(opts Options) (*Container, error) {
 		systemConfigAdapter,
 		pluginResolver,
 		capOrchestrator,
+		lockfileService,
 		engineFactory,
 		opts.Logger,
 	)

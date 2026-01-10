@@ -3,17 +3,18 @@ module github.com/reglet-dev/reglet
 go 1.25.5
 
 require (
+	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/charmbracelet/huh v0.8.0
 	github.com/expr-lang/expr v1.17.7
 	github.com/goccy/go-yaml v1.19.2
 	github.com/google/uuid v1.6.0
 	github.com/owenrumney/go-sarif/v3 v3.3.0
+	github.com/reglet-dev/reglet/wireformat v0.0.0
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
 	github.com/tetratelabs/wazero v1.11.0
-	github.com/reglet-dev/reglet/wireformat v0.0.0
 	github.com/zricethezav/gitleaks/v8 v8.30.0
 	golang.org/x/sync v0.19.0
 )
@@ -24,7 +25,6 @@ require (
 	dario.cat/mergo v1.0.2 // indirect
 	github.com/BobuSumisu/aho-corasick v1.0.3 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
-	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/Masterminds/sprig/v3 v3.3.0 // indirect
 	github.com/STARRY-S/zip v0.2.3 // indirect
 	github.com/andybalholm/brotli v1.2.0 // indirect
@@ -86,6 +86,7 @@ require (
 	github.com/spf13/afero v1.15.0 // indirect
 	github.com/spf13/cast v1.10.0 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
+	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/ulikunitz/xz v0.5.15 // indirect
 	github.com/wasilibs/go-re2 v1.10.0 // indirect

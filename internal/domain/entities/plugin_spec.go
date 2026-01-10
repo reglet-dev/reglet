@@ -138,8 +138,9 @@ func ParsePluginDeclaration(declaration string) (*PluginSpec, error) {
 		spec.Source = declaration + "@" + spec.Digest
 	}
 
-	// Check for version suffix (simple name@version format)
-	if idx := strings.LastIndex(declaration, "@"); idx != -1 && !strings.Contains(declaration, "/") {
+	// Check for version suffix (simple name@version format or registry/name@version)
+	// We already handled @sha256 above, so other @ is likely version.
+	if idx := strings.LastIndex(declaration, "@"); idx != -1 {
 		spec.Version = declaration[idx+1:]
 		declaration = declaration[:idx]
 	}
