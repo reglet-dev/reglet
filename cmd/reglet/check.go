@@ -20,7 +20,8 @@ import (
 
 // CheckOptions holds the configuration for the check command.
 type CheckOptions struct {
-	format              string
+	CommonOptions // Embed common options
+
 	outFile             string
 	securityLevel       string
 	filterExpr          string
@@ -31,7 +32,6 @@ type CheckOptions struct {
 	excludeControlIDs   []string
 	trustPlugins        bool
 	includeDependencies bool
-	timeout             time.Duration
 }
 
 func init() {
@@ -39,7 +39,9 @@ func init() {
 }
 
 func newCheckCmd() *cobra.Command {
-	opts := &CheckOptions{}
+	opts := &CheckOptions{
+		CommonOptions: DefaultCommonOptions(),
+	}
 
 	cmd := &cobra.Command{
 		Use:   "check <profile.yaml>",
@@ -71,11 +73,27 @@ Filtering:
   reglet check profile.yaml --trust-plugins`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Validate common flags
+			if err := opts.ValidateFlags(); err != nil {
+				return err
+			}
+
+			// Apply logging overrides
+			if opts.Quiet {
+				quiet = true
+				setupLogging()
+			} else if opts.Verbose {
+				logLevel = "debug"
+				setupLogging()
+			}
+
 			return runCheckAction(cmd.Context(), args[0], opts)
 		},
 	}
 
-	cmd.Flags().StringVar(&opts.format, "format", "table", "Output format: table, json, yaml, junit, sarif")
+	// Register common flags
+	opts.RegisterFlags(cmd)
+
 	cmd.Flags().StringVarP(&opts.outFile, "output", "o", "", "Output file path (default: stdout)")
 	cmd.Flags().BoolVar(&opts.trustPlugins, "trust-plugins", false, "Auto-grant all plugin capabilities (use with caution)")
 	cmd.Flags().StringVar(&opts.securityLevel, "security", "", "Security level: strict, standard, permissive (default: standard or config file)")
@@ -88,7 +106,6 @@ Filtering:
 	cmd.Flags().StringSliceVar(&opts.excludeControlIDs, "exclude-control", nil, "Exclude specific controls by ID (comma-separated)")
 	cmd.Flags().StringVar(&opts.filterExpr, "filter", "", "Advanced filter expression (e.g. \"severity == 'critical'\")")
 	cmd.Flags().BoolVar(&opts.includeDependencies, "include-dependencies", false, "Include dependencies of selected controls")
-	cmd.Flags().DurationVar(&opts.timeout, "timeout", 2*time.Minute, "Global timeout for entire execution (0 to disable)")
 
 	return cmd
 }
@@ -109,18 +126,15 @@ func runCheckAction(ctx context.Context, profilePath string, opts *CheckOptions)
 	// 2. Build request
 	request := buildCheckProfileRequest(profilePath, opts)
 
-	// 3. Apply timeout if set
-	if opts.timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, opts.timeout)
-		defer cancel()
-	}
+	// 3. Apply timeout to context
+	ctx, cancel := opts.ApplyToContext(ctx)
+	defer cancel()
 
 	// 4. Execute
 	response, err := c.CheckProfileUseCase().Execute(ctx, request)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return fmt.Errorf("execution exceeded global timeout (%s)", opts.timeout)
+			return fmt.Errorf("execution exceeded global timeout (%s)", opts.Timeout)
 		}
 		return fmt.Errorf("check failed: %w", err)
 	}
@@ -155,7 +169,7 @@ func buildCheckProfileRequest(profilePath string, opts *CheckOptions) dto.CheckP
 			IncludeDependencies: opts.includeDependencies,
 		},
 		Execution: dto.ExecutionOptions{
-			Parallel: true, // Default to parallel execution for performance
+			Parallel: opts.Parallel, // Use common option
 			// MaxConcurrentControls and MaxConcurrentObservations will use defaults (0 = auto-detect)
 		},
 		Options: dto.CheckOptions{
@@ -180,10 +194,10 @@ func writeOutput(result *execution.ExecutionResult, profilePath string, opts *Ch
 			_ = file.Close()
 		}()
 		writer = file
-		slog.Info("writing output", "file", opts.outFile, "format", opts.format)
+		slog.Info("writing output", "file", opts.outFile, "format", opts.Format)
 	}
 
-	return formatOutput(writer, result, opts.format, profilePath)
+	return formatOutput(writer, result, opts.Format, profilePath)
 }
 
 // formatOutput applies the selected formatter to the execution result.
