@@ -7,14 +7,15 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"time"
 
 	"github.com/reglet-dev/reglet/internal/application/dto"
+	"github.com/reglet-dev/reglet/internal/application/ports"
 	"github.com/reglet-dev/reglet/internal/domain/execution"
 	"github.com/reglet-dev/reglet/internal/infrastructure/container"
-	"github.com/reglet-dev/reglet/internal/infrastructure/output"
 	"github.com/spf13/cobra"
 )
 
@@ -140,7 +141,7 @@ func runCheckAction(ctx context.Context, profilePath string, opts *CheckOptions)
 	}
 
 	// 4. Write output
-	if err := writeOutput(response.ExecutionResult, profilePath, opts); err != nil {
+	if err := writeOutput(c.OutputFormatterFactory(), response.ExecutionResult, profilePath, opts); err != nil {
 		return fmt.Errorf("failed to write output: %w", err)
 	}
 
@@ -182,8 +183,8 @@ func buildCheckProfileRequest(profilePath string, opts *CheckOptions) dto.CheckP
 }
 
 // writeOutput directs the execution result to the configured output destination.
-func writeOutput(result *execution.ExecutionResult, profilePath string, opts *CheckOptions) error {
-	writer := os.Stdout
+func writeOutput(factory ports.OutputFormatterFactory, result *execution.ExecutionResult, profilePath string, opts *CheckOptions) error {
+	var writer io.Writer = os.Stdout
 	if opts.outFile != "" {
 		//nolint:gosec // G304: User-controlled output file path is intentional
 		file, err := os.Create(opts.outFile)
@@ -197,30 +198,23 @@ func writeOutput(result *execution.ExecutionResult, profilePath string, opts *Ch
 		slog.Info("writing output", "file", opts.outFile, "format", opts.Format)
 	}
 
-	return formatOutput(writer, result, opts.Format, profilePath)
+	return formatOutput(factory, writer, result, opts.Format, profilePath)
 }
 
 // formatOutput applies the selected formatter to the execution result.
-func formatOutput(writer *os.File, result *execution.ExecutionResult, format string, profilePath string) error {
-	switch format {
-	case "table":
-		formatter := output.NewTableFormatter(writer)
-		return formatter.Format(result)
-	case "json":
-		formatter := output.NewJSONFormatter(writer, true) // Pretty-print JSON
-		return formatter.Format(result)
-	case "yaml":
-		formatter := output.NewYAMLFormatter(writer)
-		return formatter.Format(result)
-	case "junit":
-		formatter := output.NewJUnitFormatter(writer)
-		return formatter.Format(result)
-	case "sarif":
-		formatter := output.NewSARIFFormatter(writer, profilePath)
-		return formatter.Format(result)
-	default:
-		return fmt.Errorf("unknown format: %s (supported: table, json, yaml, junit, sarif)", format)
+func formatOutput(factory ports.OutputFormatterFactory, writer io.Writer, result *execution.ExecutionResult, format string, profilePath string) error {
+	formatter, err := factory.Create(
+		format,
+		writer,
+		ports.FormatterOptions{
+			Indent:      true,
+			ProfilePath: profilePath,
+		},
+	)
+	if err != nil {
+		return err
 	}
+	return formatter.Format(result)
 }
 
 // generateRequestID creates a unique identifier for request tracing.

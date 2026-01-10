@@ -14,6 +14,7 @@ import (
 	"github.com/reglet-dev/reglet/internal/infrastructure/adapters"
 	infraconfig "github.com/reglet-dev/reglet/internal/infrastructure/config"
 	"github.com/reglet-dev/reglet/internal/infrastructure/filesystem"
+	"github.com/reglet-dev/reglet/internal/infrastructure/output"
 	"github.com/reglet-dev/reglet/internal/infrastructure/plugins"
 	"github.com/reglet-dev/reglet/internal/infrastructure/secrets"
 	"github.com/reglet-dev/reglet/internal/infrastructure/sensitivedata"
@@ -178,6 +179,11 @@ func (c *Container) ProfileValidator() ports.ProfileValidator {
 // SystemConfig returns the system configuration.
 func (c *Container) SystemConfig() *system.Config {
 	return c.systemCfg
+}
+
+// OutputFormatterFactory returns the output formatter factory port.
+func (c *Container) OutputFormatterFactory() ports.OutputFormatterFactory {
+	return output.NewFormatterFactory()
 }
 
 // Logger returns the configured logger.
