@@ -350,12 +350,19 @@ func (uc *CheckProfileUseCase) validateDeclaredPlugins(profile entities.ProfileR
 //   - "file" -> "file"
 //   - "/path/to/custom.wasm" -> "custom"
 func extractPluginName(declared string) string {
+	name := declared
 	// If it's a path, extract the base name without extension
-	if strings.Contains(declared, "/") {
-		base := filepath.Base(declared)
-		return strings.TrimSuffix(base, ".wasm")
+	if strings.Contains(name, "/") {
+		base := filepath.Base(name)
+		name = strings.TrimSuffix(base, ".wasm")
 	}
-	return declared
+
+	// Strip version/digest suffix if present (e.g. name@1.0 or name@sha256:...)
+	if idx := strings.LastIndex(name, "@"); idx != -1 {
+		name = name[:idx]
+	}
+
+	return name
 }
 
 // flattenCapabilities converts map of capabilities to flat list.

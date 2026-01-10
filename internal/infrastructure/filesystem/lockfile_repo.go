@@ -1,3 +1,4 @@
+// Package filesystem provides file-based repositories for the infrastructure layer.
 package filesystem
 
 import (
@@ -34,7 +35,7 @@ func (r *FileLockfileRepository) Load(ctx context.Context, path string) (*entiti
 		}
 		return nil, fmt.Errorf("failed to open directory %q: %w", dir, err)
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 
 	file, err := root.Open(base)
 	if err != nil {
@@ -43,7 +44,7 @@ func (r *FileLockfileRepository) Load(ctx context.Context, path string) (*entiti
 		}
 		return nil, fmt.Errorf("failed to open lockfile %q: %w", base, err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	var lock entities.Lockfile
 	decoder := yaml.NewDecoder(file)
@@ -64,7 +65,7 @@ func (r *FileLockfileRepository) Save(ctx context.Context, lockfile *entities.Lo
 	dir := filepath.Dir(path)
 
 	// Ensure directory exists
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return fmt.Errorf("creating directory %q: %w", dir, err)
 	}
 
@@ -77,7 +78,7 @@ func (r *FileLockfileRepository) Save(ctx context.Context, lockfile *entities.Lo
 	if err != nil {
 		return fmt.Errorf("opening directory for write %q: %w", dir, err)
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 
 	base := filepath.Base(path)
 
@@ -86,10 +87,10 @@ func (r *FileLockfileRepository) Save(ctx context.Context, lockfile *entities.Lo
 	if err != nil {
 		return fmt.Errorf("creating lockfile %q: %w", base, err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	encoder := yaml.NewEncoder(file)
-	defer encoder.Close()
+	defer func() { _ = encoder.Close() }()
 
 	if err := encoder.Encode(lockfile); err != nil {
 		return fmt.Errorf("encoding lockfile: %w", err)

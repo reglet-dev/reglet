@@ -115,7 +115,7 @@ func New(opts Options) (*Container, error) {
 	lockfileRepo := filesystem.NewFileLockfileRepository()
 	versionResolver := plugins.NewSemverResolver()
 	// TODO: Add real digester when available
-	var pluginDigester ports.PluginDigester = nil
+	var pluginDigester ports.PluginDigester
 
 	// Create application services
 	lockfileService := services.NewLockfileService(lockfileRepo, versionResolver, pluginDigester)
