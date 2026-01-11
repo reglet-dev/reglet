@@ -233,10 +233,9 @@ func (r *Runtime) GetPluginSchema(ctx context.Context, pluginName string) ([]byt
 	r.mu.RUnlock()
 
 	if !ok {
-		// Plugin not loaded - need to load it first
-		// This requires finding the plugin WASM file
-		// For now, return an error indicating the plugin needs to be loaded
-		return nil, fmt.Errorf("plugin %s not loaded; call LoadPlugin first", pluginName)
+		// Plugin not found in the runtime's plugin registry.
+		// The caller can treat this as "plugin not found or not loaded".
+		return nil, fmt.Errorf("plugin %s not found or not loaded", pluginName)
 	}
 
 	// Get the schema from the plugin
