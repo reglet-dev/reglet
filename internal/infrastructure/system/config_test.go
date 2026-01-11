@@ -67,7 +67,7 @@ redaction:
     enabled: true
     salt: "test-salt"
 `
-	err := os.WriteFile(configPath, []byte(yaml), 0600)
+	err := os.WriteFile(configPath, []byte(yaml), 0644)
 	require.NoError(t, err)
 
 	loader := NewConfigLoader()
