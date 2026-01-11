@@ -1,4 +1,4 @@
-// Package redaction handles secret redaction
+// Package sensitivedata handles detection and redaction of sensitive data
 package sensitivedata
 
 import (
@@ -178,19 +178,18 @@ func (r *Redactor) walk(data interface{}, currentPath string) interface{} {
 		return r.ScrubString(v)
 
 	case map[string]interface{}:
-		// Copy map to avoid mutating original if we want immutability,
-		// but strictly speaking we can mutate in place for efficiency.
-		// Let's mutate in place for now, but we need to be careful about concurrency if data is shared.
-		// Given this is used in single-threaded execution context per control, it should be fine.
-		// Actually, map iteration order is random, but keys are stable.
+		// Copy-on-Write: Create a new map to avoid mutating the original
+		// This is critical for avoiding race conditions when shared configuration maps
+		// are used concurrently across plugins.
+		newMap := make(map[string]interface{}, len(v))
 		for k, val := range v {
 			nextPath := k
 			if currentPath != "" {
 				nextPath = currentPath + "." + k
 			}
-			v[k] = r.walk(val, nextPath)
+			newMap[k] = r.walk(val, nextPath)
 		}
-		return v
+		return newMap
 
 	case []interface{}:
 		for i, val := range v {
