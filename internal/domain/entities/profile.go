@@ -195,38 +195,54 @@ func (p *Profile) AddControl(ctrl Control) error {
 // Algorithm: Standard DFS with recursion stack for cycle detection.
 // Time complexity: O(V + E) where V = controls, E = dependencies.
 func (p *Profile) CheckForControlDependencyCycles() error {
-	visited := make(map[string]bool)
-	recStack := make(map[string]bool)
-
 	// Build a map for O(1) lookups of dependencies
 	controlDeps := make(map[string][]string)
 	for _, ctrl := range p.Controls.Items {
 		controlDeps[ctrl.ID] = ctrl.DependsOn
 	}
 
-	var dfs func(string) error
-	dfs = func(id string) error {
-		visited[id] = true
-		recStack[id] = true
+	visited := make(map[string]bool)
+	recStack := make(map[string]bool)
 
-		for _, dep := range controlDeps[id] {
-			if !visited[dep] {
-				if err := dfs(dep); err != nil {
-					return err
-				}
-			} else if recStack[dep] {
-				return fmt.Errorf("%s -> %s", id, dep)
-			}
-		}
-
-		recStack[id] = false
-		return nil
+	type stackFrame struct {
+		id       string
+		depIndex int
 	}
 
 	for _, ctrl := range p.Controls.Items {
-		if !visited[ctrl.ID] {
-			if err := dfs(ctrl.ID); err != nil {
-				return fmt.Errorf("circular dependency detected: %w", err)
+		if visited[ctrl.ID] {
+			continue
+		}
+
+		// Initialize stack with current control
+		// We use a slice as an explicit stack to avoid recursion depth limits
+		stack := []stackFrame{{id: ctrl.ID, depIndex: 0}}
+		visited[ctrl.ID] = true
+		recStack[ctrl.ID] = true
+
+		for len(stack) > 0 {
+			// Peek at the top frame
+			frame := &stack[len(stack)-1]
+			deps := controlDeps[frame.id]
+
+			if frame.depIndex < len(deps) {
+				// Process next dependency
+				dep := deps[frame.depIndex]
+				frame.depIndex++
+
+				if recStack[dep] {
+					return fmt.Errorf("circular dependency detected: %s -> %s", frame.id, dep)
+				}
+
+				if !visited[dep] {
+					visited[dep] = true
+					recStack[dep] = true
+					stack = append(stack, stackFrame{id: dep, depIndex: 0})
+				}
+			} else {
+				// All dependencies processed (or leaf node), pop stack
+				recStack[frame.id] = false
+				stack = stack[:len(stack)-1]
 			}
 		}
 	}
