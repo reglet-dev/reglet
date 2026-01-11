@@ -34,6 +34,9 @@ docker run --rm -v $(pwd)/quickstart.yaml:/quickstart.yaml \
 
 ## Usage
 ```bash
+# Run compliance checks
+reglet check profile.yaml
+
 # Output formats
 reglet check profile.yaml --format=json
 reglet check profile.yaml --format=sarif -o results.sarif
@@ -47,6 +50,12 @@ reglet check profile.yaml --log-level=debug
 # Filter controls
 reglet check profile.yaml --tags security
 reglet check profile.yaml --severity critical,high
+
+# Plugin management (OCI registries)
+reglet plugins pull ghcr.io/reglet-dev/plugins/aws:1.0.0
+reglet plugins list
+reglet plugins push my-plugin.wasm ghcr.io/myorg/my-plugin:1.0.0
+reglet plugins prune --keep 3
 ```
 
 ## Features
@@ -58,6 +67,8 @@ reglet check profile.yaml --severity critical,high
 - **Capability-Based Security** - Plugins can only access files, networks, or environment variables if explicitly allowed
 - **Secret Management** - Resolve secrets from environment variables, files, or local config with `{{ secret "name" }}` syntax
 - **Automatic Redaction** - Sensitive data (secrets, tokens) is automatically detected and redacted before reporting
+- **OCI Plugin Registry** - Distribute and version plugins via OCI-compliant registries (GHCR, DockerHub, Harbor)
+- **Reproducible Builds** - Lockfiles (`reglet.lock`) pin exact plugin versions and digests for consistent execution
 
 ## What Can It Validate?
 
@@ -134,6 +145,46 @@ controls:
           expect: |
             data.status_code == 200
 ```
+
+## Plugin Management
+
+Reglet supports distributing plugins via OCI-compliant registries (GHCR, DockerHub, Harbor, etc.):
+
+```bash
+# Pull a plugin from a registry
+reglet plugins pull ghcr.io/reglet-dev/plugins/aws:1.0.0
+
+# List cached plugins
+reglet plugins list
+
+# Push your own plugin
+reglet plugins push ./my-plugin.wasm ghcr.io/myorg/my-plugin:1.0.0
+
+# Clean up old versions
+reglet plugins prune --keep 3
+```
+
+Plugins can be referenced in profiles by:
+- **Built-in name**: `file`, `http`, `dns` (embedded in binary)
+- **Local path**: `./plugins/custom.wasm`
+- **OCI reference**: `ghcr.io/reglet-dev/plugins/aws:1.0.0`
+
+### Lockfile for Reproducible Builds
+
+Generate a lockfile to pin exact plugin versions and digests:
+
+```bash
+# Generate lockfile
+reglet check profile.yaml  # Creates reglet.lock
+
+# Verify plugins match lockfile
+reglet check profile.yaml  # Validates digests
+```
+
+The lockfile (`reglet.lock`) ensures:
+- **Reproducible builds** - Same plugin versions across environments
+- **Integrity verification** - Cryptographic digest validation
+- **Supply chain security** - Detect tampering or version drift
 
 ## Example Profile
 
@@ -230,13 +281,13 @@ make build
 - **[06-command-checks.yaml](docs/examples/06-command-checks.yaml)** - Command execution and output validation
 - **[07-vars-and-defaults.yaml](docs/examples/07-vars-and-defaults.yaml)** - Variables and control defaults
 
-## Status: Alpha (v0.2.0-alpha)
+## Status: Alpha (v0.3.5-alpha)
 
 Reglet is in active development. Core features work, but expect breaking changes before 1.0.
 
 ### Roadmap
 
-**v0.2.0-alpha** (Current)
+**v0.2.0-alpha** (Released)
 - [x] Core execution engine with parallel execution
 - [x] Plugins: File, HTTP, DNS, TCP, Command, SMTP
 - [x] Capability system with profile-based discovery
@@ -248,28 +299,35 @@ Reglet is in active development. Core features work, but expect breaking changes
 - [x] Homebrew tap
 - [x] Automated releases with goreleaser
 
-**v0.3.0-alpha** (In Development)
+**v0.3.0-alpha** (Released)
 - [x] Profile inheritance (`extends:` field)
-- [x] Lockfile for reproducible plugin versions (`reglet.lock`)
 - [x] Retry and backoff for resilient execution
 - [x] Secret management (env/files/local resolution)
 - [x] Evidence artifacts and size limits (size, count)
 - [x] Global timeout
 
-**v0.4.0-alpha**
+**v0.3.5-alpha** (Current - Phase 2.5 & 3)
+- [x] Lockfile for reproducible plugin versions (`reglet.lock`)
+- [x] OCI-based plugin registry (GHCR, DockerHub, Harbor)
+- [x] Plugin management commands (`pull`, `push`, `list`, `prune`)
+- [x] Hybrid plugin resolution (embedded → cache → registry)
+- [x] Digest verification for supply chain security
+- [ ] Signature verification (Cosign/Sigstore) - Infrastructure ready
+
+**v0.4.0-alpha** (Next)
 - [ ] Tag and severity filtering
+- [ ] Complete Cosign signature verification
+- [ ] Plugin catalog/discovery
 
 **v0.5.0-alpha**
-- [ ] OCI-based plugin registry (version pinning, aliases)
-
-**v0.6.0-alpha**
-- [ ] OSCAL output
+- [ ] OSCAL output (assessment results, POA&M)
+- [ ] Evidence collection and artifact management
 
 **v1.0**
 - [ ] Cloud provider plugins (AWS, GCP, Azure)
 - [ ] Compliance packs (SOC2, ISO27001, FedRAMP)
 - [ ] CI/CD integrations (GitHub Actions, GitLab CI)
-- [ ] Plugin SDK documentation
+- [ ] Plugin SDK documentation and authoring guide
 
 ## Community
 

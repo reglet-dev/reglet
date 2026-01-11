@@ -16,6 +16,10 @@ import (
 	"github.com/reglet-dev/reglet/internal/infrastructure/filesystem"
 	"github.com/reglet-dev/reglet/internal/infrastructure/output"
 	"github.com/reglet-dev/reglet/internal/infrastructure/plugins"
+	embeddedplugin "github.com/reglet-dev/reglet/internal/infrastructure/plugins/embedded"
+	ociplugin "github.com/reglet-dev/reglet/internal/infrastructure/plugins/oci"
+	pluginrepo "github.com/reglet-dev/reglet/internal/infrastructure/plugins/repository"
+	signingplugin "github.com/reglet-dev/reglet/internal/infrastructure/plugins/signing"
 	"github.com/reglet-dev/reglet/internal/infrastructure/secrets"
 	"github.com/reglet-dev/reglet/internal/infrastructure/sensitivedata"
 	"github.com/reglet-dev/reglet/internal/infrastructure/system"
@@ -29,6 +33,7 @@ type Container struct {
 	pluginResolver      ports.PluginDirectoryResolver
 	engineFactory       ports.EngineFactory
 	checkProfileUseCase *services.CheckProfileUseCase
+	pluginService       *services.PluginService
 	systemCfg           *system.Config
 	logger              *slog.Logger
 	trustPlugins        bool
@@ -123,6 +128,56 @@ func New(opts Options) (*Container, error) {
 		opts.TrustPlugins,
 	)
 
+	// --- Plugin Management Wiring ---
+
+	// 1. Auth Provider
+	authProvider := ociplugin.NewEnvAuthProvider()
+
+	// 2. Registry Adapter
+	registryAdapter := ociplugin.NewOCIRegistryAdapter(authProvider)
+
+	// 3. Plugin Repository (Plugin Cache)
+	homeDir, _ := os.UserHomeDir() // Ignore error for now, worst case cache dir logic handles it or fails
+	cacheDir := filepath.Join(homeDir, ".reglet", "plugins")
+	pluginRepository, err := pluginrepo.NewFSPluginRepository(cacheDir)
+	if err != nil {
+		return nil, err
+	}
+
+	// 4. Integrity Verifier
+	integrityVerifier := signingplugin.NewCosignVerifier(nil, nil)
+
+	// 5. Embedded Source
+	embeddedSource := embeddedplugin.NewEmbeddedSource()
+
+	// 6. Domain Services
+	// TODO: Get requireSigning from configuration
+	integrityService := domainservices.NewIntegrityService(false)
+
+	// 7. Resolvers (Chain of Responsibility)
+	// Resolution Order: Embedded -> Cache -> Registry
+	registryResolver := services.NewRegistryPluginResolver(
+		registryAdapter,
+		pluginRepository,
+		opts.Logger,
+	)
+
+	cachedResolver := services.NewCachedPluginResolver(pluginRepository)
+	cachedResolver.SetNext(registryResolver)
+
+	embeddedResolver := services.NewEmbeddedPluginResolver(embeddedSource)
+	embeddedResolver.SetNext(cachedResolver)
+
+	// 8. Plugin Service (Application Service)
+	pluginService := services.NewPluginService(
+		embeddedResolver, // Head of the chain
+		pluginRepository,
+		registryAdapter,
+		integrityVerifier,
+		integrityService,
+		opts.Logger,
+	)
+
 	// Create lockfile infrastructure
 	lockfileRepo := filesystem.NewFileLockfileRepository()
 	versionResolver := plugins.NewSemverResolver()
@@ -144,6 +199,7 @@ func New(opts Options) (*Container, error) {
 		pluginResolver,
 		capOrchestrator,
 		lockfileService,
+		pluginService,
 		engineFactory,
 		opts.Logger,
 	)
@@ -155,6 +211,7 @@ func New(opts Options) (*Container, error) {
 		pluginResolver:      pluginResolver,
 		engineFactory:       engineFactory,
 		checkProfileUseCase: checkProfileUseCase,
+		pluginService:       pluginService,
 		trustPlugins:        opts.TrustPlugins,
 		systemCfg:           systemCfg,
 		logger:              opts.Logger,
@@ -164,6 +221,11 @@ func New(opts Options) (*Container, error) {
 // CheckProfileUseCase returns the check profile use case.
 func (c *Container) CheckProfileUseCase() *services.CheckProfileUseCase {
 	return c.checkProfileUseCase
+}
+
+// PluginService returns the plugin service.
+func (c *Container) PluginService() *services.PluginService {
+	return c.pluginService
 }
 
 // ProfileLoader returns the profile loader port.

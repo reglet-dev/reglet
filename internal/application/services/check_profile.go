@@ -30,6 +30,7 @@ type CheckProfileUseCase struct {
 	pluginResolver   ports.PluginDirectoryResolver
 	capOrchestrator  *CapabilityOrchestrator
 	lockfileService  *LockfileService
+	pluginService    *PluginService
 	engineFactory    ports.EngineFactory
 	logger           *slog.Logger
 }
@@ -43,6 +44,7 @@ func NewCheckProfileUseCase(
 	pluginResolver ports.PluginDirectoryResolver,
 	capOrchestrator *CapabilityOrchestrator,
 	lockfileService *LockfileService,
+	pluginService *PluginService,
 	engineFactory ports.EngineFactory,
 	logger *slog.Logger,
 ) *CheckProfileUseCase {
@@ -58,6 +60,7 @@ func NewCheckProfileUseCase(
 		pluginResolver:   pluginResolver,
 		capOrchestrator:  capOrchestrator,
 		lockfileService:  lockfileService,
+		pluginService:    pluginService,
 		engineFactory:    engineFactory,
 		logger:           logger,
 	}
@@ -87,20 +90,28 @@ func (uc *CheckProfileUseCase) Execute(ctx context.Context, req dto.CheckProfile
 		return nil, err
 	}
 
-	// 4. Plugin Dir
-	pluginDir, err := uc.resolvePluginDir(ctx, req.Options.PluginDir)
+	// 4. Plugin Dir (Legacy/Local resolution)
+	localPluginDir, err := uc.resolvePluginDir(ctx, req.Options.PluginDir)
 	if err != nil {
-		uc.logger.Debug("failed to resolve plugin directory", "error", err)
-		pluginDir = ""
+		uc.logger.Debug("failed to resolve local plugin directory", "error", err)
+		localPluginDir = ""
 	}
 
-	// 5. Validate Plugin Definitions
-	if err := uc.validateDeclaredPlugins(profile, pluginDir); err != nil {
+	// 4b. Validate Declared Plugins
+	if err := uc.validateDeclaredPlugins(profile, localPluginDir); err != nil {
 		return nil, err
 	}
 
-	// 6-8. Prepare Engine (Capabilities + Factory)
-	eng, requiredCaps, grantedCaps, err := uc.prepareEngine(ctx, profile, pluginDir, req)
+	// 5. Prepare Plugin Runtime Environment (Hybrid Local/OCI)
+	// Creates a temporary directory with symlinks to all required plugins
+	runtimePluginDir, cleanup, err := uc.preparePluginEnvironment(ctx, profile.Plugins, localPluginDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare plugin environment: %w", err)
+	}
+	defer cleanup()
+
+	// 6-8. Prepare Engine using runtime dir
+	eng, requiredCaps, grantedCaps, err := uc.prepareEngine(ctx, profile, runtimePluginDir, req)
 	if err != nil {
 		return nil, err
 	}
@@ -431,4 +442,122 @@ func flattenCapabilities(caps map[string][]capabilities.Capability) []capabiliti
 // CheckFailed returns true if the execution result indicates failures.
 func (uc *CheckProfileUseCase) CheckFailed(result *execution.ExecutionResult) bool {
 	return result.Summary.FailedControls > 0 || result.Summary.ErrorControls > 0
+}
+
+// preparePluginEnvironment creates a temporary directory and populates it with
+// symlinks to all required plugins (both local and OCI).
+// Returns the path to the temp dir, a cleanup function, and any error.
+func (uc *CheckProfileUseCase) preparePluginEnvironment(
+	ctx context.Context,
+	declaredPlugins []string,
+	localPluginDir string,
+) (string, func(), error) {
+	// Create temporary directory
+	tempDir, err := os.MkdirTemp("", "reglet-runtime-plugins-*")
+	if err != nil {
+		return "", nil, fmt.Errorf("create temp dir: %w", err)
+	}
+
+	cleanup := func() {
+		_ = os.RemoveAll(tempDir)
+	}
+
+	for _, decl := range declaredPlugins {
+		if err := uc.prepareSinglePlugin(ctx, decl, localPluginDir, tempDir); err != nil {
+			cleanup()
+			return "", nil, err
+		}
+	}
+
+	return tempDir, cleanup, nil
+}
+
+func (uc *CheckProfileUseCase) prepareSinglePlugin(
+	ctx context.Context,
+	decl string,
+	localPluginDir string,
+	tempDir string,
+) error {
+	pluginName := extractPluginName(decl)
+	var sourcePath string
+
+	// 1. Try Local Source (Prioritize for tests/overrides)
+	if filepath.IsAbs(decl) || strings.HasPrefix(decl, "./") || strings.HasPrefix(decl, "../") {
+		sourcePath = decl
+	} else if localPluginDir != "" {
+		// Search in local plugin dir
+		candidates := []string{
+			filepath.Join(localPluginDir, pluginName, pluginName+".wasm"),
+			filepath.Join(localPluginDir, pluginName+".wasm"),
+		}
+		for _, c := range candidates {
+			if _, err := os.Stat(c); err == nil {
+				sourcePath = c
+				break
+			}
+		}
+	}
+
+	// 2. If locally found, use it (Link/Copy)
+	if sourcePath != "" {
+		// Resolve to absolute path to ensure valid symlink
+		absSource, err := filepath.Abs(sourcePath)
+		if err != nil {
+			return fmt.Errorf("resolve abs path %s: %w", sourcePath, err)
+		}
+		sourcePath = absSource
+
+		// Create subdirectory: tempDir/pluginName
+		pluginDir := filepath.Join(tempDir, pluginName)
+		if err := os.MkdirAll(pluginDir, 0o750); err != nil {
+			return fmt.Errorf("create plugin dir %s: %w", pluginDir, err)
+		}
+		destPath := filepath.Join(pluginDir, pluginName+".wasm")
+
+		// Always copy to avoid "path escapes from parent" errors in sandoxed runtimes
+		data, err := os.ReadFile(filepath.Clean(sourcePath))
+		if err != nil {
+			return fmt.Errorf("read plugin %s: %w", sourcePath, err)
+		}
+		if err := os.WriteFile(destPath, data, 0o600); err != nil {
+			return fmt.Errorf("write plugin to temp %s: %w", destPath, err)
+		}
+		return nil
+	}
+
+	// 3. Try OCI
+	spec := &dto.PluginSpecDTO{Name: decl}
+	if ref, err := spec.ToPluginReference(); err == nil && ref.Registry() != "" {
+		uc.logger.Debug("resolving OCI plugin", "ref", decl)
+		path, err := uc.pluginService.LoadPlugin(ctx, spec)
+		if err != nil {
+			return fmt.Errorf("load remote plugin %s: %w", decl, err)
+		}
+
+		pluginDir := filepath.Join(tempDir, pluginName)
+		if err := os.MkdirAll(pluginDir, 0o750); err != nil {
+			return fmt.Errorf("create plugin dir %s: %w", pluginDir, err)
+		}
+		destPath := filepath.Join(pluginDir, pluginName+".wasm")
+
+		// Always copy to avoid sandbox issues
+		data, err := os.ReadFile(filepath.Clean(path))
+		if err != nil {
+			return fmt.Errorf("read cached plugin %s: %w", path, err)
+		}
+		if err := os.WriteFile(destPath, data, 0o600); err != nil {
+			return fmt.Errorf("write plugin to temp %s: %w", destPath, err)
+		}
+		return nil
+	}
+
+	// 4. Built-in (Skip only if not found locally)
+	if builtInPlugins[pluginName] {
+		return nil
+	}
+
+	return apperrors.NewValidationError(
+		"plugins",
+		fmt.Sprintf("plugin %q not found locally or in registry, and is not built-in", decl),
+	)
 }
