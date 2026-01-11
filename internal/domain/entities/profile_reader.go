@@ -10,7 +10,6 @@ type ProfileReader interface {
 	// Metadata access
 	GetMetadata() ProfileMetadata
 	GetPlugins() []string
-	BuildPluginRegistry() (*PluginRegistry, error)
 	GetVars() map[string]interface{}
 
 	// Control queries
