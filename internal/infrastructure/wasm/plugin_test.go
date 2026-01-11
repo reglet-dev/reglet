@@ -25,7 +25,7 @@ func TestPlugin_Observe_Concurrent(t *testing.T) {
 		},
 	}
 
-	runtime, err := NewRuntimeWithCapabilities(ctx, build.Get(), caps, nil, 0)
+	runtime, err := NewRuntime(ctx, build.Get(), WithCapabilities(caps))
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -114,7 +114,7 @@ func TestPlugin_ConcurrentDifferentMethods(t *testing.T) {
 		},
 	}
 
-	runtime, err := NewRuntimeWithCapabilities(ctx, build.Get(), caps, nil, 0)
+	runtime, err := NewRuntime(ctx, build.Get(), WithCapabilities(caps))
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 

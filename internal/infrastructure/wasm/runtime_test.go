@@ -63,8 +63,8 @@ func TestNewRuntime_DefaultMemoryLimit(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	// 0 means default
-	runtime, err := NewRuntimeWithCapabilities(ctx, build.Get(), nil, nil, 0)
+	// 0 means default (no WithMemoryLimit option)
+	runtime, err := NewRuntime(ctx, build.Get())
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 	assert.NotNil(t, runtime)
@@ -75,7 +75,7 @@ func TestNewRuntime_ExplicitMemoryLimit(t *testing.T) {
 
 	ctx := context.Background()
 	// Explicit limit (100MB)
-	runtime, err := NewRuntimeWithCapabilities(ctx, build.Get(), nil, nil, 100)
+	runtime, err := NewRuntime(ctx, build.Get(), WithMemoryLimit(100))
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 	assert.NotNil(t, runtime)
@@ -86,7 +86,7 @@ func TestNewRuntime_UnlimitedMemoryLimit(t *testing.T) {
 
 	ctx := context.Background()
 	// -1 means unlimited
-	runtime, err := NewRuntimeWithCapabilities(ctx, build.Get(), nil, nil, -1)
+	runtime, err := NewRuntime(ctx, build.Get(), WithMemoryLimit(-1))
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 	assert.NotNil(t, runtime)
@@ -97,7 +97,7 @@ func TestNewRuntime_InvalidMemoryLimit(t *testing.T) {
 
 	ctx := context.Background()
 	// < -1 is invalid
-	runtime, err := NewRuntimeWithCapabilities(ctx, build.Get(), nil, nil, -2)
+	runtime, err := NewRuntime(ctx, build.Get(), WithMemoryLimit(-2))
 	assert.Error(t, err)
 	assert.Nil(t, runtime)
 	assert.Contains(t, err.Error(), "invalid WASM memory limit")

@@ -16,20 +16,14 @@ import (
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 )
 
-// globalCache speeds up compilation across runtimes within a single process.
+// defaultGlobalCache is the shared compilation cache used when no custom cache is provided.
+// This speeds up compilation across runtimes within a single process.
 //
 // Cleanup considerations:
 //   - CLI tools: No explicit cleanup needed - OS reclaims memory on exit.
-//   - Servers/Workers: Call CloseGlobalCache() during graceful shutdown to
-//     release resources before the process exits.
-var globalCache = wazero.NewCompilationCache()
-
-// CloseGlobalCache releases resources held by the global compilation cache.
-// This is only needed for long-running processes (servers, workers) that require
-// graceful shutdown. CLI tools can skip this - the OS handles cleanup on exit.
-func CloseGlobalCache(ctx context.Context) error {
-	return globalCache.Close(ctx)
-}
+//   - Servers/Workers: Manage your own cache with WithCompilationCache() option.
+//   - Tests: Use WithCompilationCache(wazero.NewCompilationCache()) for isolation.
+var defaultGlobalCache = wazero.NewCompilationCache()
 
 // Runtime manages WASM execution.
 type Runtime struct {
@@ -42,46 +36,109 @@ type Runtime struct {
 	mu                  sync.RWMutex
 }
 
-// NewRuntime creates a runtime with no capabilities and no redaction.
-func NewRuntime(ctx context.Context, version build.Info) (*Runtime, error) {
-	return NewRuntimeWithCapabilities(ctx, version, nil, nil, 0)
+// RuntimeOption configures a Runtime.
+type RuntimeOption func(*runtimeConfig)
+
+// runtimeConfig holds configuration for runtime creation.
+type runtimeConfig struct {
+	caps          map[string][]capabilities.Capability
+	redactor      *sensitivedata.Redactor
+	memoryLimitMB int
+	cache         wazero.CompilationCache
 }
 
-// NewRuntimeWithCapabilities initializes runtime with permissions and optional output redaction.
-func NewRuntimeWithCapabilities(
-	ctx context.Context,
-	version build.Info,
-	caps map[string][]capabilities.Capability,
-	redactor *sensitivedata.Redactor,
-	memoryLimitMB int,
-) (*Runtime, error) {
+// WithCapabilities sets the granted capabilities.
+func WithCapabilities(caps map[string][]capabilities.Capability) RuntimeOption {
+	return func(c *runtimeConfig) {
+		c.caps = caps
+	}
+}
+
+// WithRedactor enables secret redaction for plugin output.
+func WithRedactor(redactor *sensitivedata.Redactor) RuntimeOption {
+	return func(c *runtimeConfig) {
+		c.redactor = redactor
+	}
+}
+
+// WithMemoryLimit sets the WASM memory limit in MB.
+// 0 = default (256MB), -1 = unlimited, >0 = explicit limit.
+func WithMemoryLimit(mb int) RuntimeOption {
+	return func(c *runtimeConfig) {
+		c.memoryLimitMB = mb
+	}
+}
+
+// WithCompilationCache provides a custom compilation cache for this runtime.
+// This is useful for:
+//   - Tests: Isolate cache between tests to prevent interference
+//   - Servers: Multiple isolated runtime pools with separate caches
+//   - Advanced use cases: Custom cache lifecycle management
+//
+// If not provided, uses the default shared cache for the process.
+func WithCompilationCache(cache wazero.CompilationCache) RuntimeOption {
+	return func(c *runtimeConfig) {
+		c.cache = cache
+	}
+}
+
+// NewRuntime creates a runtime with optional configuration.
+// By default, creates a runtime with no capabilities, no redaction,
+// 256MB memory limit, and shared compilation cache.
+//
+// Example usage:
+//
+//	// Simple case (defaults)
+//	runtime, err := NewRuntime(ctx, version)
+//
+//	// With capabilities and redaction
+//	runtime, err := NewRuntime(ctx, version,
+//	    WithCapabilities(caps),
+//	    WithRedactor(redactor),
+//	    WithMemoryLimit(512),
+//	)
+//
+//	// Test isolation (separate cache)
+//	runtime, err := NewRuntime(ctx, version,
+//	    WithCompilationCache(wazero.NewCompilationCache()),
+//	)
+func NewRuntime(ctx context.Context, version build.Info, opts ...RuntimeOption) (*Runtime, error) {
+	// Apply options
+	cfg := &runtimeConfig{
+		memoryLimitMB: 0,               // 0 = default (256MB)
+		cache:         defaultGlobalCache, // Use shared cache by default
+	}
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
 	// Determine memory limit
 	// 0 = default (256MB)
 	// -1 = unlimited
 	// >0 = explicit limit in MB
 	switch {
-	case memoryLimitMB == 0:
-		memoryLimitMB = 256 // Default: 256MB
-		slog.Info("using default WASM memory limit", "mb", memoryLimitMB)
-	case memoryLimitMB == -1:
+	case cfg.memoryLimitMB == 0:
+		cfg.memoryLimitMB = 256 // Default: 256MB
+		slog.Info("using default WASM memory limit", "mb", cfg.memoryLimitMB)
+	case cfg.memoryLimitMB == -1:
 		slog.Warn("WASM memory limit disabled (unlimited memory)")
 		// Pass to wazero as is (unlimited)
-	case memoryLimitMB > 0:
-		if memoryLimitMB < 64 {
-			slog.Warn("WASM memory limit very low, plugins may fail", "mb", memoryLimitMB)
+	case cfg.memoryLimitMB > 0:
+		if cfg.memoryLimitMB < 64 {
+			slog.Warn("WASM memory limit very low, plugins may fail", "mb", cfg.memoryLimitMB)
 		}
 	default:
-		return nil, fmt.Errorf("invalid WASM memory limit: %d (must be >= -1)", memoryLimitMB)
+		return nil, fmt.Errorf("invalid WASM memory limit: %d (must be >= -1)", cfg.memoryLimitMB)
 	}
 
 	// Create pure Go WASM runtime with compilation cache.
-	config := wazero.NewRuntimeConfig().WithCompilationCache(globalCache)
+	config := wazero.NewRuntimeConfig().WithCompilationCache(cfg.cache)
 
 	// Apply memory limit if not unlimited
-	if memoryLimitMB > 0 {
+	if cfg.memoryLimitMB > 0 {
 		// Convert MB to pages (1 page = 64KB)
 		// 1 MB = 1024 KB = 16 * 64KB
-		pages := uint32(memoryLimitMB * 16) //nolint:gosec // G115: memoryLimitMB is validated (max ~134M pages, well under uint32)
+		pages := uint32(cfg.memoryLimitMB * 16) //nolint:gosec // G115: memoryLimitMB is validated (max ~134M pages, well under uint32)
 		config = config.WithMemoryLimitPages(pages)
 	}
 
@@ -94,7 +151,7 @@ func NewRuntimeWithCapabilities(
 	}
 
 	// Register host functions with capability enforcement.
-	if err := hostfuncs.RegisterHostFunctions(ctx, r, version, caps); err != nil {
+	if err := hostfuncs.RegisterHostFunctions(ctx, r, version, cfg.caps); err != nil {
 		_ = r.Close(ctx)
 		return nil, fmt.Errorf("failed to register host functions: %w", err)
 	}
@@ -103,8 +160,8 @@ func NewRuntimeWithCapabilities(
 		runtime:             r,
 		plugins:             make(map[string]*Plugin),
 		version:             version,
-		redactor:            redactor,
-		grantedCapabilities: caps,
+		redactor:            cfg.redactor,
+		grantedCapabilities: cfg.caps,
 		frozenEnv:           os.Environ(), // Freeze environment at startup for security
 	}, nil
 }

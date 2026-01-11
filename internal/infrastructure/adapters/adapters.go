@@ -52,24 +52,25 @@ func NewPluginRuntimeFactoryAdapter(redactor *sensitivedata.Redactor) *PluginRun
 	}
 }
 
-// NewRuntime creates a new plugin runtime for capability collection.
-func (f *PluginRuntimeFactoryAdapter) NewRuntime(ctx context.Context) (ports.PluginRuntime, error) {
-	runtime, err := wasm.NewRuntime(ctx, f.version)
+// NewRuntime creates a new plugin runtime with optional configuration.
+// Accepts functional options from wasm package (automatically adds redactor from factory).
+func (f *PluginRuntimeFactoryAdapter) NewRuntime(ctx context.Context, opts ...ports.RuntimeOption) (ports.PluginRuntime, error) {
+	// Convert ports.RuntimeOption to wasm.RuntimeOption
+	wasmOpts := make([]wasm.RuntimeOption, 0, len(opts)+1)
+	for _, opt := range opts {
+		if wasmOpt, ok := opt.(wasm.RuntimeOption); ok {
+			wasmOpts = append(wasmOpts, wasmOpt)
+		}
+	}
+
+	// Always add redactor if configured
+	if f.redactor != nil {
+		wasmOpts = append(wasmOpts, wasm.WithRedactor(f.redactor))
+	}
+
+	runtime, err := wasm.NewRuntime(ctx, f.version, wasmOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create runtime: %w", err)
-	}
-	return &PluginRuntimeAdapter{runtime: runtime}, nil
-}
-
-// NewRuntimeWithCapabilities creates a runtime with granted capabilities.
-func (f *PluginRuntimeFactoryAdapter) NewRuntimeWithCapabilities(
-	ctx context.Context,
-	caps map[string][]capabilities.Capability,
-	memoryLimitMB int,
-) (ports.PluginRuntime, error) {
-	runtime, err := wasm.NewRuntimeWithCapabilities(ctx, f.version, caps, f.redactor, memoryLimitMB)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create runtime with capabilities: %w", err)
 	}
 	return &PluginRuntimeAdapter{runtime: runtime}, nil
 }

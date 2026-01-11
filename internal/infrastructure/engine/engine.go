@@ -89,7 +89,11 @@ func NewEngineWithCapabilities(
 	}
 
 	// Create WASM runtime with granted capabilities and redactor
-	runtime, err := wasm.NewRuntimeWithCapabilities(ctx, version, granted, redactor, memoryLimitMB)
+	runtime, err := wasm.NewRuntime(ctx, version,
+		wasm.WithCapabilities(granted),
+		wasm.WithRedactor(redactor),
+		wasm.WithMemoryLimit(memoryLimitMB),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create WASM runtime: %w", err)
 	}

@@ -27,12 +27,12 @@ func TestPluginOutputRedaction_ManualVerification(t *testing.T) {
 	ctx := context.Background()
 
 	// Runtime WITH redactor
-	runtimeWithRedaction, err := wasm.NewRuntimeWithCapabilities(ctx, build.Get(), nil, redactor, 0)
+	runtimeWithRedaction, err := wasm.NewRuntime(ctx, build.Get(), wasm.WithRedactor(redactor))
 	require.NoError(t, err)
 	defer runtimeWithRedaction.Close(ctx)
 
 	// Runtime WITHOUT redactor
-	runtimeWithoutRedaction, err := wasm.NewRuntimeWithCapabilities(ctx, build.Get(), nil, nil, 0)
+	runtimeWithoutRedaction, err := wasm.NewRuntime(ctx, build.Get())
 	require.NoError(t, err)
 	defer runtimeWithoutRedaction.Close(ctx)
 

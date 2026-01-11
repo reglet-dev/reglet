@@ -38,7 +38,7 @@ func TestPluginFilesystemIsolation(t *testing.T) {
 		},
 	}
 
-	runtime, err := wasm.NewRuntimeWithCapabilities(ctx, build.Get(), caps, nil, 0)
+	runtime, err := wasm.NewRuntime(ctx, build.Get(), wasm.WithCapabilities(caps))
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -91,7 +91,7 @@ func TestPluginNoCapabilitiesNoAccess(t *testing.T) {
 		"file": {}, // Empty capabilities - no filesystem access
 	}
 
-	runtime, err := wasm.NewRuntimeWithCapabilities(ctx, build.Get(), caps, nil, 0)
+	runtime, err := wasm.NewRuntime(ctx, build.Get(), wasm.WithCapabilities(caps))
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -146,7 +146,7 @@ func TestPluginSpecificFileAccess(t *testing.T) {
 		},
 	}
 
-	runtime, err := wasm.NewRuntimeWithCapabilities(ctx, build.Get(), caps, nil, 0)
+	runtime, err := wasm.NewRuntime(ctx, build.Get(), wasm.WithCapabilities(caps))
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -197,7 +197,7 @@ func TestPluginRootAccess(t *testing.T) {
 		},
 	}
 
-	runtime, err := wasm.NewRuntimeWithCapabilities(ctx, build.Get(), caps, nil, 0)
+	runtime, err := wasm.NewRuntime(ctx, build.Get(), wasm.WithCapabilities(caps))
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
@@ -241,7 +241,7 @@ func TestPluginReadOnlyVsReadWrite(t *testing.T) {
 		},
 	}
 
-	runtime, err := wasm.NewRuntimeWithCapabilities(ctx, build.Get(), caps, nil, 0)
+	runtime, err := wasm.NewRuntime(ctx, build.Get(), wasm.WithCapabilities(caps))
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 

@@ -15,15 +15,7 @@ import (
 // mockPluginRuntimeFactory is a test double for PluginRuntimeFactory.
 type mockPluginRuntimeFactory struct{}
 
-func (m *mockPluginRuntimeFactory) NewRuntime(_ context.Context) (ports.PluginRuntime, error) {
-	return &mockPluginRuntime{}, nil
-}
-
-func (m *mockPluginRuntimeFactory) NewRuntimeWithCapabilities(
-	_ context.Context,
-	_ map[string][]capabilities.Capability,
-	_ int,
-) (ports.PluginRuntime, error) {
+func (m *mockPluginRuntimeFactory) NewRuntime(_ context.Context, _ ...ports.RuntimeOption) (ports.PluginRuntime, error) {
 	return &mockPluginRuntime{}, nil
 }
 

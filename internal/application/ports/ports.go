@@ -41,18 +41,16 @@ type PluginRuntime interface {
 	Close(ctx context.Context) error
 }
 
+// RuntimeOption configures runtime creation.
+// This type alias allows the application layer to pass options without importing infrastructure.
+type RuntimeOption any
+
 // PluginRuntimeFactory creates runtime instances.
 // This allows the application layer to create runtimes without importing infrastructure.
 type PluginRuntimeFactory interface {
-	// NewRuntime creates a new plugin runtime for capability collection.
-	NewRuntime(ctx context.Context) (PluginRuntime, error)
-
-	// NewRuntimeWithCapabilities creates a runtime with granted capabilities.
-	NewRuntimeWithCapabilities(
-		ctx context.Context,
-		caps map[string][]capabilities.Capability,
-		memoryLimitMB int,
-	) (PluginRuntime, error)
+	// NewRuntime creates a new plugin runtime with optional configuration.
+	// Accepts functional options for capabilities, redaction, memory limits, and caching.
+	NewRuntime(ctx context.Context, opts ...RuntimeOption) (PluginRuntime, error)
 }
 
 // ProfileLoader loads profiles from storage.
