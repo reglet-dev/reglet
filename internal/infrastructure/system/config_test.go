@@ -155,7 +155,7 @@ security:
     - "fs:write:/tmp/**"
     - "network:outbound:*"
 `
-	err := os.WriteFile(configPath, []byte(yaml), 0600)
+	err := os.WriteFile(configPath, []byte(yaml), 0644)
 	require.NoError(t, err)
 
 	loader := NewConfigLoader()
