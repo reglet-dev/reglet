@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/reglet-dev/reglet/internal/domain/entities"
 	"github.com/reglet-dev/reglet/internal/domain/values"
@@ -34,7 +35,10 @@ func NewFSPluginRepository(root string) (*FSPluginRepository, error) {
 
 // Find retrieves a plugin from cache.
 func (r *FSPluginRepository) Find(ctx context.Context, ref values.PluginReference) (*entities.Plugin, string, error) {
-	path := r.pluginPath(ref)
+	path, err := r.pluginPath(ref)
+	if err != nil {
+		return nil, "", err
+	}
 
 	// Check if WASM exists
 	wasmPath := filepath.Join(path, "plugin.wasm")
@@ -60,7 +64,10 @@ func (r *FSPluginRepository) Find(ctx context.Context, ref values.PluginReferenc
 
 // Store persists a plugin and its WASM binary.
 func (r *FSPluginRepository) Store(ctx context.Context, plugin *entities.Plugin, wasm io.Reader) (string, error) {
-	path := r.pluginPath(plugin.Reference())
+	path, err := r.pluginPath(plugin.Reference())
+	if err != nil {
+		return "", err
+	}
 
 	// Create directory
 	if err := os.MkdirAll(path, 0o750); err != nil {
@@ -130,18 +137,37 @@ func (r *FSPluginRepository) Prune(ctx context.Context, keepVersions int) error 
 
 // Delete removes a plugin.
 func (r *FSPluginRepository) Delete(ctx context.Context, ref values.PluginReference) error {
-	path := r.pluginPath(ref)
+	path, err := r.pluginPath(ref)
+	if err != nil {
+		return err
+	}
 	return os.RemoveAll(path)
 }
 
 // Helper methods
 
-func (r *FSPluginRepository) pluginPath(ref values.PluginReference) string {
+func (r *FSPluginRepository) pluginPath(ref values.PluginReference) (string, error) {
 	// Structure: ~/.reglet/plugins/ghcr.io/whiskeyjimbo/reglet-plugins/file/1.0.0
-	return filepath.Join(
-		r.root,
-		ref.String(),
-	)
+	refStr := ref.String()
+
+	// Security: Reject absolute paths before filepath.Join (which may ignore root on Unix)
+	if filepath.IsAbs(refStr) {
+		return "", fmt.Errorf("security violation: absolute paths not allowed in plugin reference %q", refStr)
+	}
+
+	fullPath := filepath.Join(r.root, refStr)
+
+	// Clean paths to resolve any ".." sequences
+	cleanRoot := filepath.Clean(r.root)
+	cleanPath := filepath.Clean(fullPath)
+
+	// Security: Verify the resolved path is still within the root directory
+	// This prevents path traversal attacks via malicious plugin references
+	if !strings.HasPrefix(cleanPath, cleanRoot+string(os.PathSeparator)) && cleanPath != cleanRoot {
+		return "", fmt.Errorf("security violation: path traversal detected for plugin reference %q", refStr)
+	}
+
+	return cleanPath, nil
 }
 
 func (r *FSPluginRepository) loadMetadata(path string) (values.PluginMetadata, error) {

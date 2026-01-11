@@ -5,10 +5,13 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/reglet-dev/reglet/internal/domain/entities"
 	"github.com/reglet-dev/reglet/internal/domain/values"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFSPluginRepository(t *testing.T) {
@@ -104,4 +107,100 @@ func TestFSPluginRepository(t *testing.T) {
 			t.Error("Find should fail after delete")
 		}
 	})
+}
+
+// TestFSPluginRepository_PathTraversalSecurity verifies protection against path traversal attacks.
+func TestFSPluginRepository_PathTraversalSecurity(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "reglet-security-test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	repo, err := NewFSPluginRepository(tmpDir)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name        string
+		ref         values.PluginReference
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name:        "PathTraversal_ParentDirectory",
+			ref:         values.NewPluginReference("", "", "", "../../../etc/passwd", "1.0.0"),
+			expectError: true,
+			errorMsg:    "security violation",
+		},
+		{
+			name:        "PathTraversal_AbsolutePath",
+			ref:         values.NewPluginReference("/etc", "passwd", "repo", "file", "1.0.0"),
+			expectError: true,
+			errorMsg:    "security violation",
+		},
+		{
+			name:        "PathTraversal_MixedDots",
+			ref:         values.NewPluginReference("reg", "..", "..", "passwd", "1.0.0"),
+			expectError: true,
+			errorMsg:    "security violation",
+		},
+		{
+			name:        "ValidPath_NoTraversal",
+			ref:         values.NewPluginReference("reg.io", "org", "repo", "valid-plugin", "1.0.0"),
+			expectError: false,
+		},
+		{
+			name:        "ValidPath_Embedded",
+			ref:         values.NewPluginReference("", "", "", "simple-plugin", ""),
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Test via pluginPath (internal method)
+			path, err := repo.pluginPath(tt.ref)
+
+			if tt.expectError {
+				require.Error(t, err, "Expected error for malicious path")
+				if tt.errorMsg != "" {
+					assert.Contains(t, strings.ToLower(err.Error()), strings.ToLower(tt.errorMsg),
+						"Error message should mention security violation")
+				}
+				assert.Empty(t, path, "Path should be empty on error")
+			} else {
+				require.NoError(t, err, "Valid paths should not error")
+				assert.NotEmpty(t, path, "Valid path should be returned")
+				// Verify path is within tmpDir
+				assert.True(t, strings.HasPrefix(path, tmpDir),
+					"Valid path should be within repository root")
+			}
+		})
+	}
+}
+
+// TestFSPluginRepository_Find_PathTraversal verifies Store/Find reject malicious paths.
+func TestFSPluginRepository_Find_PathTraversal(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "reglet-security-test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	repo, err := NewFSPluginRepository(tmpDir)
+	require.NoError(t, err)
+
+	// Attempt to store plugin with traversal in reference
+	maliciousRef := values.NewPluginReference("", "", "", "../../malicious", "1.0.0")
+	digest, _ := values.NewDigest("sha256", "abc123")
+	meta := values.NewPluginMetadata("malicious", "1.0.0", "bad", []string{})
+	plugin := entities.NewPlugin(maliciousRef, digest, meta)
+
+	wasmContent := []byte("fake wasm")
+	_, err = repo.Store(context.Background(), plugin, bytes.NewReader(wasmContent))
+
+	// Should reject the malicious path
+	require.Error(t, err, "Store should reject path traversal")
+	assert.Contains(t, strings.ToLower(err.Error()), "security violation",
+		"Error should indicate security violation detection")
+
+	// Find should also reject
+	_, _, err = repo.Find(context.Background(), maliciousRef)
+	require.Error(t, err, "Find should reject path traversal")
 }
