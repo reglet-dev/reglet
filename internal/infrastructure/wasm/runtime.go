@@ -192,10 +192,10 @@ func (r *Runtime) LoadPlugin(ctx context.Context, name string, wasmBytes []byte)
 	}
 
 	// Create output writers with optional redaction
-	var stdout, stderr io.Writer = os.Stderr, os.Stderr
+	var stdout, stderr io.Writer = os.Stdout, os.Stderr
 	if r.redactor != nil {
-		// Wrap os.Stderr with redaction to prevent secret leakage
-		stdout = sensitivedata.NewWriter(os.Stderr, r.redactor)
+		// Wrap OS streams with redaction to prevent secret leakage
+		stdout = sensitivedata.NewWriter(os.Stdout, r.redactor)
 		stderr = sensitivedata.NewWriter(os.Stderr, r.redactor)
 	}
 
