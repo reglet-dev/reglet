@@ -35,8 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Maintenance
 - Add ci workflow
 - Various linter issues, linter config fix
-- Comment cleanup
-- Cleanup comments
+- Comment cleanup across the codebase
 ## [0.2.0-alpha] - 2026-01-09
 
 ### Added
@@ -111,7 +110,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **cli:** Move from flags to cobra
 - **plugins:** Swap plugins to use go sdk
 - **engine:** Update engine values and add capabilities
-- **engine:** Failures take precendence over errors
+- **engine:** Failures take precedence over errors
 - **plugin:** Add maxbodysize exceeded, de-dupe types
 - Remove un-needed locking
 - Lint error fixes
@@ -133,7 +132,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Style (gofmt), move valueobjects to values, move status
 - Valueobjects to values
 - Move version to infrastructure/build and inject into runtime
-- Clean up ineffiecient loop for filters
+- Clean up inefficient loop for filters
 - **terminal:** Move to huh prompt library
 - Move to hmac hash
 - Move files around, create interfaces
@@ -143,7 +142,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Remove global state from check cmd
 - Add buffer limit to output.
 - Update worker pool to not wait on levels
-- Remove duplicat env methods
+- Remove duplicate env methods
 - Add prefix based pattern matching for interpreters
 - Rename observation to observationresult
 - Standardize observation terminology
