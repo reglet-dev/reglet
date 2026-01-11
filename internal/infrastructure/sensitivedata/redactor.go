@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"regexp"
 	"strings"
 
@@ -52,10 +53,12 @@ func NewWithProvider(cfg Config, provider ports.SensitiveValueProvider) (*Redact
 
 	// Initialize gitleaks detector (unless disabled)
 	if !cfg.DisableGitleaks {
-		if detector, err := newGitleaksDetector(); err == nil {
+		detector, err := newGitleaksDetector()
+		if err != nil {
+			log.Printf("sensitivedata: failed to initialize gitleaks detector, falling back to regex patterns: %v", err)
+		} else {
 			r.gitleaksDetector = detector
 		}
-		// If err != nil, fall back to regex patterns silently
 	}
 
 	// Compile built-in patterns (used as fallback or when gitleaks is disabled)
