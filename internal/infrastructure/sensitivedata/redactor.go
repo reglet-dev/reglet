@@ -237,12 +237,21 @@ func (r *Redactor) isPathMatch(path string) bool {
 // - Prevents rainbow table attacks while allowing correlation of identical secrets.
 // - Requires a high-entropy salt for security against offline brute-forcing.
 func (r *Redactor) hash(secret string) string {
-	mac := hmac.New(sha256.New, []byte(r.salt))
+	key := []byte(r.salt)
+	prefix := "[hmac:%s]"
+	if len(key) == 0 {
+		// Fallback to a non-empty key to avoid weakening HMAC security when salt is misconfigured.
+		// The different prefix makes it clear that the salt configuration is invalid.
+		key = []byte("default-hmac-key")
+		prefix = "[hmac-misconfigured:%s]"
+	}
+
+	mac := hmac.New(sha256.New, key)
 	mac.Write([]byte(secret))
 	sum := mac.Sum(nil)
 
 	// Use first 16 bytes (32 hex chars) for correlation - provides 128-bit security
-	return fmt.Sprintf("[hmac:%s]", hex.EncodeToString(sum)[:32])
+	return fmt.Sprintf(prefix, hex.EncodeToString(sum)[:32])
 }
 
 // defaultPatterns contains regexes for common secrets.
