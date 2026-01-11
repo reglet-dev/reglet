@@ -41,10 +41,10 @@ type RuntimeOption func(*runtimeConfig)
 
 // runtimeConfig holds configuration for runtime creation.
 type runtimeConfig struct {
+	cache         wazero.CompilationCache
 	caps          map[string][]capabilities.Capability
 	redactor      *sensitivedata.Redactor
 	memoryLimitMB int
-	cache         wazero.CompilationCache
 }
 
 // WithCapabilities sets the granted capabilities.
@@ -105,7 +105,7 @@ func WithCompilationCache(cache wazero.CompilationCache) RuntimeOption {
 func NewRuntime(ctx context.Context, version build.Info, opts ...RuntimeOption) (*Runtime, error) {
 	// Apply options
 	cfg := &runtimeConfig{
-		memoryLimitMB: 0,               // 0 = default (256MB)
+		memoryLimitMB: 0,                  // 0 = default (256MB)
 		cache:         defaultGlobalCache, // Use shared cache by default
 	}
 	for _, opt := range opts {

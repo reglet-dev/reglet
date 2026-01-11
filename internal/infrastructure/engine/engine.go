@@ -140,8 +140,8 @@ func NewEngineWithConfig(ctx context.Context, version build.Info, cfg ExecutionC
 	}, nil
 }
 
-// checkContextCancellation checks if the context has been cancelled or timed out.
-// Returns an appropriate error if cancelled, nil if still active.
+// checkContextCancellation checks if the context has been canceled or timed out.
+// Returns an appropriate error if canceled, nil if still active.
 func checkContextCancellation(ctx context.Context) error {
 	if ctx.Err() != nil {
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
