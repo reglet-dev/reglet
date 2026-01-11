@@ -193,10 +193,10 @@ func (r *Redactor) walk(data interface{}, currentPath string) interface{} {
 
 	case []interface{}:
 		for i, val := range v {
-			v[i] = r.walk(val, currentPath) // Lists don't extend the named path? Or use [index]?
-			// Usually paths target keys. "items[0].password" is hard to match with simple glob.
-			// Let's assume path stays same for array items for now (like "users.password" applies to all users)
-			// or we don't track array indices in path.
+			// Arrays intentionally do not extend the path with indices; all elements share the same path.
+			// This means a path like "users.password" applies to every element in the "users" list.
+			// Index-specific paths such as "users[0].password" are not supported by design.
+			v[i] = r.walk(val, currentPath)
 		}
 		return v
 
