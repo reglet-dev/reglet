@@ -128,7 +128,7 @@ func NewRuntime(ctx context.Context, version build.Info, opts ...RuntimeOption) 
 			slog.Warn("WASM memory limit very low, plugins may fail", "mb", cfg.memoryLimitMB)
 		}
 	default:
-		return nil, fmt.Errorf("invalid WASM memory limit: %d (must be >= -1)", cfg.memoryLimitMB)
+		return nil, fmt.Errorf("invalid WASM memory limit: %d (must be -1 or >= 0)", cfg.memoryLimitMB)
 	}
 
 	// Create pure Go WASM runtime with compilation cache.
