@@ -9,13 +9,40 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestDefaultConfig(t *testing.T) {
+	cfg := DefaultConfig()
+
+	require.NotNil(t, cfg)
+
+	// Verify all fields have sensible defaults
+	assert.Empty(t, cfg.Capabilities)
+	assert.Empty(t, cfg.Redaction.Patterns)
+	assert.Empty(t, cfg.Redaction.Paths)
+	assert.False(t, cfg.Redaction.HashMode.Enabled)
+	assert.Equal(t, string(SecurityLevelStandard), cfg.Security.Level)
+	assert.Empty(t, cfg.Security.CustomBroadPatterns)
+	assert.Equal(t, 0, cfg.WasmMemoryLimitMB)
+	assert.Equal(t, 0, cfg.MaxEvidenceSizeBytes)
+
+	// Verify maps are initialized (not nil)
+	assert.NotNil(t, cfg.SensitiveData.Secrets.Local)
+	assert.NotNil(t, cfg.SensitiveData.Secrets.Env)
+	assert.NotNil(t, cfg.SensitiveData.Secrets.Files)
+}
+
 func TestConfigLoader_Load_FileNotExists(t *testing.T) {
 	loader := NewConfigLoader()
 	cfg, err := loader.Load("/nonexistent/config.yaml")
 
 	require.NoError(t, err)
 	assert.NotNil(t, cfg)
+
+	// Verify it returns DefaultConfig()
 	assert.Empty(t, cfg.Capabilities)
+	assert.Equal(t, string(SecurityLevelStandard), cfg.Security.Level)
+
+	// Verify maps are initialized (can be used immediately)
+	assert.NotNil(t, cfg.SensitiveData.Secrets.Local)
 }
 
 func TestConfigLoader_Load_ValidConfig(t *testing.T) {
@@ -59,10 +86,7 @@ redaction:
 
 func TestConfig_ToHostFuncsCapabilities(t *testing.T) {
 	cfg := &Config{
-		Capabilities: []struct {
-			Kind    string `yaml:"kind"`
-			Pattern string `yaml:"pattern"`
-		}{
+		Capabilities: []CapabilityConfig{
 			{Kind: "fs:read", Pattern: "/etc/hosts"},
 			{Kind: "network:outbound", Pattern: "*.example.com:443"},
 		},

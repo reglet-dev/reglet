@@ -14,15 +14,18 @@ import (
 // Config represents the global configuration file (~/.reglet/config.yaml).
 // This is infrastructure-level configuration separate from profile configuration.
 type Config struct {
-	SensitiveData SensitiveDataConfig `yaml:"sensitive_data"`
-	Redaction     RedactionConfig     `yaml:"redaction"`
-	Security      SecurityConfig      `yaml:"security"`
-	Capabilities  []struct {
-		Kind    string `yaml:"kind"`
-		Pattern string `yaml:"pattern"`
-	} `yaml:"capabilities"`
-	WasmMemoryLimitMB    int `yaml:"wasm_memory_limit_mb"`
-	MaxEvidenceSizeBytes int `yaml:"max_evidence_size_bytes"`
+	SensitiveData        SensitiveDataConfig `yaml:"sensitive_data"`
+	Redaction            RedactionConfig     `yaml:"redaction"`
+	Security             SecurityConfig      `yaml:"security"`
+	Capabilities         []CapabilityConfig  `yaml:"capabilities"`
+	WasmMemoryLimitMB    int                 `yaml:"wasm_memory_limit_mb"`
+	MaxEvidenceSizeBytes int                 `yaml:"max_evidence_size_bytes"`
+}
+
+// CapabilityConfig represents a capability grant in the system configuration.
+type CapabilityConfig struct {
+	Kind    string `yaml:"kind"`
+	Pattern string `yaml:"pattern"`
 }
 
 // SensitiveDataConfig configures secret resolution and protection.
@@ -106,12 +109,41 @@ func NewConfigLoader() *ConfigLoader {
 	return &ConfigLoader{}
 }
 
+// DefaultConfig returns a Config with safe defaults for all fields.
+// This is used when no system config file exists.
+func DefaultConfig() *Config {
+	return &Config{
+		SensitiveData: SensitiveDataConfig{
+			Secrets: SecretsConfig{
+				Local: make(map[string]string),
+				Env:   make(map[string]string),
+				Files: make(map[string]string),
+			},
+		},
+		Redaction: RedactionConfig{
+			HashMode: HashModeConfig{
+				Enabled: false,
+			},
+			Patterns: []string{},
+			Paths:    []string{},
+		},
+		Security: SecurityConfig{
+			Level:               string(SecurityLevelStandard),
+			CustomBroadPatterns: []string{},
+		},
+		Capabilities:         []CapabilityConfig{},
+		WasmMemoryLimitMB:    0, // 0 means use runtime default
+		MaxEvidenceSizeBytes: 0, // 0 means no limit
+	}
+}
+
 // Load loads the system configuration from the specified path.
-// If the file does not exist, it returns an empty config without error.
+// If the file does not exist, returns DefaultConfig() with safe defaults.
+// This allows reglet to work out-of-the-box without configuration.
 func (l *ConfigLoader) Load(path string) (*Config, error) {
 	// Check if file exists
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return &Config{}, nil
+		return DefaultConfig(), nil
 	}
 
 	// Read config file

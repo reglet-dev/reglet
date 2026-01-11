@@ -136,14 +136,23 @@ func NewEngineWithConfig(ctx context.Context, version build.Info, cfg ExecutionC
 	}, nil
 }
 
+// checkContextCancellation checks if the context has been cancelled or timed out.
+// Returns an appropriate error if cancelled, nil if still active.
+func checkContextCancellation(ctx context.Context) error {
+	if ctx.Err() != nil {
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return fmt.Errorf("execution timed out: %w", ctx.Err())
+		}
+		return ctx.Err()
+	}
+	return nil
+}
+
 // Execute runs a complete profile and returns the result.
 func (e *Engine) Execute(ctx context.Context, profile entities.ProfileReader) (*execution.ExecutionResult, error) {
 	// Check context before starting
-	if ctx.Err() != nil {
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return nil, fmt.Errorf("execution timed out: %w", ctx.Err())
-		}
-		return nil, ctx.Err()
+	if err := checkContextCancellation(ctx); err != nil {
+		return nil, err
 	}
 
 	metadata := profile.GetMetadata()
@@ -170,22 +179,16 @@ func (e *Engine) Execute(ctx context.Context, profile entities.ProfileReader) (*
 	} else {
 		for i, ctrl := range allControls {
 			// Check context in loop
-			if ctx.Err() != nil {
-				if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-					return nil, fmt.Errorf("execution timed out: %w", ctx.Err())
-				}
-				return nil, ctx.Err()
+			if err := checkContextCancellation(ctx); err != nil {
+				return nil, err
 			}
 
 			controlResult := e.executeControl(ctx, ctrl, i, result, requiredControls)
 			result.AddControlResult(controlResult)
 		}
 
-		if ctx.Err() != nil {
-			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-				return nil, fmt.Errorf("execution timed out: %w", ctx.Err())
-			}
-			return nil, ctx.Err()
+		if err := checkContextCancellation(ctx); err != nil {
+			return nil, err
 		}
 	}
 
@@ -193,7 +196,10 @@ func (e *Engine) Execute(ctx context.Context, profile entities.ProfileReader) (*
 
 	if e.repository != nil {
 		if err := e.repository.Save(ctx, result); err != nil {
-			slog.Warn("failed to persist execution result", "error", err, "execution_id", result.GetID())
+			slog.Warn("failed to persist execution result (execution completed successfully, but audit trail may be incomplete)",
+				"error", err,
+				"execution_id", result.GetID(),
+				"note", "results were not saved to repository - this does not affect execution correctness")
 		}
 	}
 
@@ -212,6 +218,8 @@ func (e *Engine) resolveDependencies(profile entities.ProfileReader) (map[string
 	required := make(map[string]bool)
 
 	for _, ctrl := range allControls {
+		// shouldRun returns (bool, skipReason string). We only need the boolean decision
+		// for dependency resolution - the skip reason is not relevant here.
 		if should, _ := e.shouldRun(ctrl); should {
 			if deps, ok := allDependencies[ctrl.ID]; ok {
 				for depID := range deps {
