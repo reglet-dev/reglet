@@ -128,7 +128,7 @@ func NewRuntime(ctx context.Context, version build.Info, opts ...RuntimeOption) 
 			slog.Warn("WASM memory limit very low, plugins may fail", "mb", cfg.memoryLimitMB)
 		}
 	default:
-		return nil, fmt.Errorf("invalid WASM memory limit: %d (must be >= -1)", cfg.memoryLimitMB)
+		return nil, fmt.Errorf("invalid WASM memory limit: %d (must be -1 or >= 0)", cfg.memoryLimitMB)
 	}
 
 	// Create pure Go WASM runtime with compilation cache.
@@ -166,7 +166,19 @@ func NewRuntime(ctx context.Context, version build.Info, opts ...RuntimeOption) 
 	}, nil
 }
 
-// LoadPlugin compiles and caches a plugin.
+// LoadPlugin compiles and caches a plugin, and is safe for concurrent use.
+//
+// The first call for a given plugin name compiles the provided WASM bytes,
+// creates a Plugin, and stores it in an internal cache keyed by name. Subsequent
+// calls with the same name return the previously cached Plugin instance; the
+// WASM module is not recompiled.
+//
+// To reduce contention while remaining thread-safe, LoadPlugin uses a
+// double-checked locking pattern around the plugin cache: it first checks the
+// cache under a read lock, and only acquires a write lock if the plugin is
+// not yet present, re-checking the cache under the write lock before compiling.
+// Callers do not need to provide additional synchronization when calling
+// LoadPlugin from multiple goroutines.
 func (r *Runtime) LoadPlugin(ctx context.Context, name string, wasmBytes []byte) (*Plugin, error) {
 	// Fast path: Check if plugin is already loaded
 	r.mu.RLock()
@@ -233,10 +245,9 @@ func (r *Runtime) GetPluginSchema(ctx context.Context, pluginName string) ([]byt
 	r.mu.RUnlock()
 
 	if !ok {
-		// Plugin not loaded - need to load it first
-		// This requires finding the plugin WASM file
-		// For now, return an error indicating the plugin needs to be loaded
-		return nil, fmt.Errorf("plugin %s not loaded; call LoadPlugin first", pluginName)
+		// Plugin not found in the runtime's plugin registry.
+		// The caller can treat this as "plugin not found or not loaded".
+		return nil, fmt.Errorf("plugin %s not found or not loaded", pluginName)
 	}
 
 	// Get the schema from the plugin
