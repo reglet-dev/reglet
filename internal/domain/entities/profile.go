@@ -26,66 +26,66 @@ const (
 // - Name and version are mandatory
 // - At least one observation per control
 type Profile struct {
-	Metadata ProfileMetadata        `yaml:"profile"`
-	Plugins  []string               `yaml:"plugins,omitempty"`
-	Vars     map[string]interface{} `yaml:"vars,omitempty"`
-	Controls ControlsSection        `yaml:"controls"`
+	Metadata ProfileMetadata
+	Plugins  []string
+	Vars     map[string]interface{}
+	Controls ControlsSection
 
 	// Extends specifies parent profiles to inherit from.
 	// Multiple parents are merged left-to-right before applying current profile.
 	// This field is NOT propagated after merge resolution.
-	Extends []string `yaml:"extends,omitempty"`
+	Extends []string
 }
 
 // ProfileMetadata contains descriptive information about the profile.
 type ProfileMetadata struct {
-	Name        string `yaml:"name"`
-	Version     string `yaml:"version"`
-	Description string `yaml:"description,omitempty"`
+	Name        string
+	Version     string
+	Description string
 }
 
 // ControlsSection groups validation controls and their default settings.
 type ControlsSection struct {
-	Defaults *ControlDefaults `yaml:"defaults,omitempty"`
-	Items    []Control        `yaml:"items"`
+	Defaults *ControlDefaults
+	Items    []Control
 }
 
 // ControlDefaults specifies values inherited by controls when not explicitly set.
 type ControlDefaults struct {
-	Severity      string        `yaml:"severity,omitempty"`
-	Owner         string        `yaml:"owner,omitempty"`
-	RetryBackoff  BackoffType   `yaml:"retry_backoff,omitempty"`
-	Tags          []string      `yaml:"tags,omitempty"`
-	Timeout       time.Duration `yaml:"timeout,omitempty"`
-	Retries       int           `yaml:"retries,omitempty"`
-	RetryDelay    time.Duration `yaml:"retry_delay,omitempty"`
-	RetryMaxDelay time.Duration `yaml:"retry_max_delay,omitempty"`
+	Severity      string
+	Owner         string
+	RetryBackoff  BackoffType
+	Tags          []string
+	Timeout       time.Duration
+	Retries       int
+	RetryDelay    time.Duration
+	RetryMaxDelay time.Duration
 }
 
 // Control represents a specific compliance check or validation unit.
 // It is uniquely identified by its ID.
 type Control struct {
-	ID                     string                  `yaml:"id"`
-	Name                   string                  `yaml:"name"`
-	Description            string                  `yaml:"description,omitempty"`
-	Severity               string                  `yaml:"severity,omitempty"`
-	Owner                  string                  `yaml:"owner,omitempty"`
-	RetryBackoff           BackoffType             `yaml:"retry_backoff,omitempty"`
-	DependsOn              []string                `yaml:"depends_on,omitempty"`
-	ObservationDefinitions []ObservationDefinition `yaml:"observations"`
-	Tags                   []string                `yaml:"tags,omitempty"`
-	Timeout                time.Duration           `yaml:"timeout,omitempty"`
-	Retries                int                     `yaml:"retries,omitempty"`
-	RetryDelay             time.Duration           `yaml:"retry_delay,omitempty"`
-	RetryMaxDelay          time.Duration           `yaml:"retry_max_delay,omitempty"`
+	ID                     string
+	Name                   string
+	Description            string
+	Severity               string
+	Owner                  string
+	RetryBackoff           BackoffType
+	DependsOn              []string
+	ObservationDefinitions []ObservationDefinition
+	Tags                   []string
+	Timeout                time.Duration
+	Retries                int
+	RetryDelay             time.Duration
+	RetryMaxDelay          time.Duration
 }
 
 // ObservationDefinition configuration for a specific plugin execution.
 // It is an immutable value object.
 type ObservationDefinition struct {
-	Plugin string                 `yaml:"plugin"`
-	Config map[string]interface{} `yaml:"config,omitempty"`
-	Expect []string               `yaml:"expect,omitempty"`
+	Plugin string
+	Config map[string]interface{}
+	Expect []string
 }
 
 // ===== PROFILE AGGREGATE ROOT METHODS =====

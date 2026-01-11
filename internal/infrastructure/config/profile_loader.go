@@ -119,13 +119,14 @@ func (l *ProfileLoader) loadSingleProfile(path string) (*entities.Profile, error
 // LoadProfileFromReader loads a profile from an io.Reader.
 // Note: This does NOT resolve inheritance, only parses YAML.
 func (l *ProfileLoader) LoadProfileFromReader(r io.Reader) (*entities.Profile, error) {
-	var profile entities.Profile
+	var cfg Profile
 
 	decoder := yaml.NewDecoder(r)
-	if err := decoder.Decode(&profile); err != nil {
+	if err := decoder.Decode(&cfg); err != nil {
 		return nil, fmt.Errorf("failed to decode profile YAML: %w", err)
 	}
 
+	profile := cfg.ToEntity()
 	return &profile, nil
 }
 
