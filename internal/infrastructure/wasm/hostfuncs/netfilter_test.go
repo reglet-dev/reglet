@@ -18,6 +18,10 @@ func TestIsPrivateOrReservedIP(t *testing.T) {
 		ip        string
 		isPrivate bool
 	}{
+		// Current network (often localhost)
+		{"0.0.0.0 (Current network)", "0.0.0.0", true},
+		{"0.0.0.1", "0.0.0.1", true},
+
 		// Loopback addresses
 		{"IPv4 loopback", "127.0.0.1", true},
 		{"IPv4 loopback network", "127.255.255.255", true},
