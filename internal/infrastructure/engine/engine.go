@@ -94,7 +94,10 @@ func NewEngineWithCapabilities(
 		return nil, fmt.Errorf("failed to create WASM runtime: %w", err)
 	}
 
-	executor := NewExecutor(runtime, pluginDir, redactor)
+	executor := NewExecutor(runtime,
+		WithPluginDir(pluginDir),
+		WithRedactor(redactor),
+	)
 
 	// Preload plugins for schema validation
 	for _, ctrl := range profile.GetAllControls() {
@@ -122,7 +125,7 @@ func NewEngineWithConfig(ctx context.Context, version build.Info, cfg ExecutionC
 		return nil, fmt.Errorf("failed to create WASM runtime: %w", err)
 	}
 
-	executor := NewObservationExecutor(runtime, nil)
+	executor := NewExecutor(runtime) // Auto-detect plugin dir, no redactor
 
 	return &Engine{
 		runtime:   runtime,

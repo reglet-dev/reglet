@@ -39,7 +39,7 @@ func TestObservationExecutor_Redaction(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	executor := NewExecutor(runtime, "/tmp", redactor)
+	executor := NewExecutor(runtime, WithPluginDir("/tmp"), WithRedactor(redactor))
 	assert.NotNil(t, executor)
 	// We can't easily inspect the private redactor field, but successful creation is a start.
 }

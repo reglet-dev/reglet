@@ -23,43 +23,74 @@ type ObservationExecutor struct {
 	pluginDir      string
 }
 
-// NewObservationExecutor creates a new observation executor with auto-detected plugin directory.
-func NewObservationExecutor(runtime *wasm.Runtime, redactor *sensitivedata.Redactor) *ObservationExecutor {
-	var pluginDirPath string
+// ExecutorOption configures an ObservationExecutor.
+type ExecutorOption func(*ObservationExecutor)
 
+// NewExecutor creates a new observation executor with optional configuration.
+// By default, plugin directory is auto-detected and no redactor is used.
+//
+// Example usage:
+//
+//	// Simple case (auto-detect plugin dir, no redactor)
+//	executor := NewExecutor(runtime)
+//
+//	// With explicit plugin dir
+//	executor := NewExecutor(runtime, WithPluginDir(pluginDir))
+//
+//	// With everything
+//	executor := NewExecutor(runtime,
+//	    WithPluginDir(pluginDir),
+//	    WithRedactor(redactor),
+//	    WithPluginRegistry(registry),
+//	)
+func NewExecutor(runtime *wasm.Runtime, opts ...ExecutorOption) *ObservationExecutor {
+	e := &ObservationExecutor{
+		runtime: runtime,
+	}
+
+	// Apply options
+	for _, opt := range opts {
+		opt(e)
+	}
+
+	// Auto-detect plugin dir if not provided
+	if e.pluginDir == "" {
+		e.pluginDir = autoDetectPluginDir()
+	}
+
+	return e
+}
+
+// WithPluginDir sets the plugin directory explicitly.
+func WithPluginDir(dir string) ExecutorOption {
+	return func(e *ObservationExecutor) {
+		e.pluginDir = dir
+	}
+}
+
+// WithRedactor enables secret redaction.
+func WithRedactor(redactor *sensitivedata.Redactor) ExecutorOption {
+	return func(e *ObservationExecutor) {
+		e.redactor = redactor
+	}
+}
+
+// WithPluginRegistry enables plugin alias resolution.
+func WithPluginRegistry(registry *entities.PluginRegistry) ExecutorOption {
+	return func(e *ObservationExecutor) {
+		e.pluginRegistry = registry
+	}
+}
+
+// autoDetectPluginDir attempts to find the plugin directory.
+func autoDetectPluginDir() string {
 	// 1. Check Env Var (Best for production binaries)
 	if envPath := os.Getenv("REGLET_PLUGIN_DIR"); envPath != "" {
-		pluginDirPath = envPath
-	} else {
-		// 2. Fallback to dev mode logic
-		projectRoot := findProjectRoot()
-		pluginDirPath = filepath.Join(projectRoot, "plugins")
+		return envPath
 	}
-
-	return &ObservationExecutor{
-		runtime:   runtime,
-		pluginDir: pluginDirPath,
-		redactor:  redactor,
-	}
-}
-
-// NewExecutor creates a new observation executor with explicit plugin directory.
-func NewExecutor(runtime *wasm.Runtime, pluginDir string, redactor *sensitivedata.Redactor) *ObservationExecutor {
-	return &ObservationExecutor{
-		runtime:   runtime,
-		pluginDir: pluginDir,
-		redactor:  redactor,
-	}
-}
-
-// NewExecutorWithRegistry creates an executor with plugin alias resolution support.
-func NewExecutorWithRegistry(runtime *wasm.Runtime, pluginDir string, redactor *sensitivedata.Redactor, registry *entities.PluginRegistry) *ObservationExecutor {
-	return &ObservationExecutor{
-		runtime:        runtime,
-		pluginDir:      pluginDir,
-		redactor:       redactor,
-		pluginRegistry: registry,
-	}
+	// 2. Fallback to dev mode logic
+	projectRoot := findProjectRoot()
+	return filepath.Join(projectRoot, "plugins")
 }
 
 // SetPluginRegistry sets the plugin registry for alias resolution.
