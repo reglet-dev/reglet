@@ -143,7 +143,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Remove global state from check cmd
 - Add buffer limit to output.
 - Update worker pool to not wait on levels
-- Remove duplicat env methods
+- Remove duplicate env methods
 - Add prefix based pattern matching for interpreters
 - Rename observation to observationresult
 - Standardize observation terminology
