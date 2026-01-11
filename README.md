@@ -281,7 +281,7 @@ make build
 - **[06-command-checks.yaml](docs/examples/06-command-checks.yaml)** - Command execution and output validation
 - **[07-vars-and-defaults.yaml](docs/examples/07-vars-and-defaults.yaml)** - Variables and control defaults
 
-## Status: Alpha (v0.3.5-alpha)
+## Status: Alpha (Released: v0.3.0-alpha Development: v0.3.5-alpha)
 
 Reglet is in active development. Core features work, but expect breaking changes before 1.0.
 
@@ -306,14 +306,14 @@ Reglet is in active development. Core features work, but expect breaking changes
 - [x] Evidence artifacts and size limits (size, count)
 - [x] Global timeout
 
-**v0.3.5-alpha** (Current - Phase 2.5 & 3)
+**v0.3.5-alpha** (Current)
 - [x] Lockfile for reproducible plugin versions (`reglet.lock`)
 - [x] OCI-based plugin registry (GHCR, DockerHub, Harbor)
 - [x] Plugin management commands (`pull`, `push`, `list`, `prune`)
 - [x] Hybrid plugin resolution (embedded → cache → registry)
 - [x] Digest verification for supply chain security
-- [ ] Signature verification (Cosign/Sigstore) - Infrastructure ready
-
+- [ ] Signature verification (Cosign/Sigstore)
+      
 **v0.4.0-alpha** (Next)
 - [ ] Tag and severity filtering
 - [ ] Complete Cosign signature verification
