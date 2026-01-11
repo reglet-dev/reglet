@@ -111,7 +111,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **cli:** Move from flags to cobra
 - **plugins:** Swap plugins to use go sdk
 - **engine:** Update engine values and add capabilities
-- **engine:** Failures take precendence over errors
+- **engine:** Failures take precedence over errors
 - **plugin:** Add maxbodysize exceeded, de-dupe types
 - Remove un-needed locking
 - Lint error fixes
