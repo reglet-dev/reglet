@@ -133,7 +133,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Style (gofmt), move valueobjects to values, move status
 - Valueobjects to values
 - Move version to infrastructure/build and inject into runtime
-- Clean up ineffiecient loop for filters
+- Clean up inefficient loop for filters
 - **terminal:** Move to huh prompt library
 - Move to hmac hash
 - Move files around, create interfaces
