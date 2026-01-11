@@ -131,6 +131,13 @@ func NewRuntime(ctx context.Context, version build.Info, opts ...RuntimeOption) 
 		return nil, fmt.Errorf("invalid WASM memory limit: %d (must be -1 or >= 0)", cfg.memoryLimitMB)
 	}
 
+	// Ensure the configured memory limit cannot overflow when converted to pages.
+	// Each page is 64KB, i.e. 16 pages per MB, so we require memoryLimitMB*16 <= math.MaxUint32.
+	// 268435455 = math.MaxUint32 / 16.
+	if cfg.memoryLimitMB > 268435455 {
+		return nil, fmt.Errorf("invalid WASM memory limit: %d MB (too large)", cfg.memoryLimitMB)
+	}
+
 	// Create pure Go WASM runtime with compilation cache.
 	config := wazero.NewRuntimeConfig().WithCompilationCache(cfg.cache)
 
@@ -138,7 +145,7 @@ func NewRuntime(ctx context.Context, version build.Info, opts ...RuntimeOption) 
 	if cfg.memoryLimitMB > 0 {
 		// Convert MB to pages (1 page = 64KB)
 		// 1 MB = 1024 KB = 16 * 64KB
-		pages := uint32(cfg.memoryLimitMB * 16) //nolint:gosec // G115: memoryLimitMB is validated (max ~134M pages, well under uint32)
+		pages := uint32(cfg.memoryLimitMB * 16) //nolint:gosec // G115: memoryLimitMB is validated to avoid overflow
 		config = config.WithMemoryLimitPages(pages)
 	}
 
