@@ -179,7 +179,7 @@ func TestJSONFormatter_Format_Indented(t *testing.T) {
 	output := buf.String()
 
 	// Verify it's valid JSON
-	var decoded execution.ExecutionResult
+	var decoded ExecutionResult
 	err = json.Unmarshal([]byte(output), &decoded)
 	require.NoError(t, err)
 
@@ -207,7 +207,7 @@ func TestJSONFormatter_Format_Compact(t *testing.T) {
 	output := buf.String()
 
 	// Verify it's valid JSON
-	var decoded execution.ExecutionResult
+	var decoded ExecutionResult
 	err = json.Unmarshal([]byte(output), &decoded)
 	require.NoError(t, err)
 
@@ -234,7 +234,7 @@ func TestYAMLFormatter_Format(t *testing.T) {
 	output := buf.String()
 
 	// Verify it's valid YAML
-	var decoded execution.ExecutionResult
+	var decoded ExecutionResult
 	err = yaml.Unmarshal([]byte(output), &decoded)
 	require.NoError(t, err)
 
@@ -331,14 +331,14 @@ func TestJSONFormatter_PreservesTypes(t *testing.T) {
 	require.NoError(t, err)
 
 	// Decode and verify types are preserved
-	var decoded execution.ExecutionResult
+	var decoded ExecutionResult
 	err = json.Unmarshal(buf.Bytes(), &decoded)
 	require.NoError(t, err)
 
 	// Verify durations are preserved
 	assert.Greater(t, decoded.Duration, time.Duration(0))
 	assert.Greater(t, decoded.Controls[0].Duration, time.Duration(0))
-	assert.Greater(t, decoded.Controls[0].ObservationResults[0].Duration, time.Duration(0))
+	assert.Greater(t, decoded.Controls[0].Observations[0].Duration, time.Duration(0))
 
 	// Verify status types
 	assert.Equal(t, values.StatusPass, decoded.Controls[0].Status)
@@ -356,7 +356,7 @@ func TestYAMLFormatter_PreservesTypes(t *testing.T) {
 	require.NoError(t, err)
 
 	// Decode and verify types are preserved
-	var decoded execution.ExecutionResult
+	var decoded ExecutionResult
 	err = yaml.Unmarshal(buf.Bytes(), &decoded)
 	require.NoError(t, err)
 

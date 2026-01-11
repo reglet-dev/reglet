@@ -19,9 +19,12 @@ func NewYAMLFormatter(w io.Writer) *YAMLFormatter {
 
 // Format writes the execution result as YAML.
 func (f *YAMLFormatter) Format(result *execution.ExecutionResult) error {
+	// Convert domain entity to output representation
+	out := FromDomain(result)
+
 	encoder := yaml.NewEncoder(f.writer, yaml.Indent(2))
 
-	if err := encoder.Encode(result); err != nil {
+	if err := encoder.Encode(out); err != nil {
 		return err
 	}
 

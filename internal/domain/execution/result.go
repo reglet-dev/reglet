@@ -13,67 +13,67 @@ import (
 //
 //nolint:revive // ST1003: Name is intentional - "Result" alone lacks context in imports
 type ExecutionResult struct {
-	StartTime      time.Time       `json:"start_time" yaml:"start_time"`
-	EndTime        time.Time       `json:"end_time" yaml:"end_time"`
-	RegletVersion  string          `json:"reglet_version,omitempty" yaml:"reglet_version,omitempty"`
-	ProfileName    string          `json:"profile_name" yaml:"profile_name"`
-	ProfileVersion string          `json:"profile_version" yaml:"profile_version"`
-	Controls       []ControlResult `json:"controls" yaml:"controls"`
-	Summary        ResultSummary   `json:"summary" yaml:"summary"`
-	Version        int             `json:"version" yaml:"version"`
-	Duration       time.Duration   `json:"duration_ms" yaml:"duration_ms"`
+	StartTime      time.Time
+	EndTime        time.Time
+	RegletVersion  string
+	ProfileName    string
+	ProfileVersion string
+	Controls       []ControlResult
+	Summary        ResultSummary
+	Version        int
+	Duration       time.Duration
 	mu             sync.Mutex
-	ExecutionID    values.ExecutionID `json:"execution_id" yaml:"execution_id"`
+	ExecutionID    values.ExecutionID
 }
 
 // ControlResult represents the result of executing a single control.
 type ControlResult struct {
-	ID                 string              `json:"id" yaml:"id"`
-	Name               string              `json:"name" yaml:"name"`
-	Description        string              `json:"description,omitempty" yaml:"description,omitempty"`
-	Severity           string              `json:"severity,omitempty" yaml:"severity,omitempty"`
-	Status             values.Status       `json:"status" yaml:"status"`
-	Message            string              `json:"message,omitempty" yaml:"message,omitempty"`
-	SkipReason         string              `json:"skip_reason,omitempty" yaml:"skip_reason,omitempty"`
-	Tags               []string            `json:"tags,omitempty" yaml:"tags,omitempty"`
-	ObservationResults []ObservationResult `json:"observations" yaml:"observations"`
-	Index              int                 `json:"index" yaml:"index"`
-	Duration           time.Duration       `json:"duration_ms" yaml:"duration_ms"`
+	ID                 string
+	Name               string
+	Description        string
+	Severity           string
+	Status             values.Status
+	Message            string
+	SkipReason         string
+	Tags               []string
+	ObservationResults []ObservationResult
+	Index              int
+	Duration           time.Duration
 }
 
 // ObservationResult represents the result of executing a single observation.
 type ObservationResult struct {
-	RawError     error                  `json:"-" yaml:"-"`
-	Config       map[string]interface{} `json:"config" yaml:"config"`
-	Evidence     *Evidence              `json:"evidence,omitempty" yaml:"evidence,omitempty"`
-	EvidenceMeta *EvidenceMeta          `json:"evidence_meta,omitempty" yaml:"evidence_meta,omitempty"`
-	Error        *PluginError           `json:"error,omitempty" yaml:"error,omitempty"`
-	Plugin       string                 `json:"plugin" yaml:"plugin"`
-	Status       values.Status          `json:"status" yaml:"status"`
-	Expectations []ExpectationResult    `json:"expectations,omitempty" yaml:"expectations,omitempty"`
-	Duration     time.Duration          `json:"duration_ms" yaml:"duration_ms"`
+	RawError     error
+	Config       map[string]interface{}
+	Evidence     *Evidence
+	EvidenceMeta *EvidenceMeta
+	Error        *PluginError
+	Plugin       string
+	Status       values.Status
+	Expectations []ExpectationResult
+	Duration     time.Duration
 }
 
 // ExpectationResult represents the result of evaluating a single expectation expression.
 // The Message field provides human-readable context about failures, constructed by the
 // StatusAggregator which has full access to the evidence and expression evaluation context.
 type ExpectationResult struct {
-	Expression string `json:"expression" yaml:"expression"`
-	Message    string `json:"message,omitempty" yaml:"message,omitempty"`
-	Passed     bool   `json:"passed" yaml:"passed"`
+	Expression string
+	Message    string
+	Passed     bool
 }
 
 // ResultSummary provides aggregate statistics about the execution.
 type ResultSummary struct {
-	TotalControls      int `json:"total_controls" yaml:"total_controls"`
-	PassedControls     int `json:"passed_controls" yaml:"passed_controls"`
-	FailedControls     int `json:"failed_controls" yaml:"failed_controls"`
-	ErrorControls      int `json:"error_controls" yaml:"error_controls"`
-	SkippedControls    int `json:"skipped_controls" yaml:"skipped_controls"`
-	TotalObservations  int `json:"total_observations" yaml:"total_observations"`
-	PassedObservations int `json:"passed_observations" yaml:"passed_observations"`
-	FailedObservations int `json:"failed_observations" yaml:"failed_observations"`
-	ErrorObservations  int `json:"error_observations" yaml:"error_observations"`
+	TotalControls      int
+	PassedControls     int
+	FailedControls     int
+	ErrorControls      int
+	SkippedControls    int
+	TotalObservations  int
+	PassedObservations int
+	FailedObservations int
+	ErrorObservations  int
 }
 
 // NewExecutionResult creates a new execution result.
@@ -232,8 +232,8 @@ const DefaultMaxEvidenceSize = 1 * 1024 * 1024
 
 // EvidenceMeta contains metadata about evidence truncation.
 type EvidenceMeta struct {
-	Reason       string `json:"reason,omitempty" yaml:"reason,omitempty"`
-	OriginalSize int    `json:"original_size_bytes" yaml:"original_size_bytes"`
-	TruncatedAt  int    `json:"truncated_at_bytes" yaml:"truncated_at_bytes"`
-	Truncated    bool   `json:"truncated" yaml:"truncated"`
+	Reason       string
+	OriginalSize int
+	TruncatedAt  int
+	Truncated    bool
 }

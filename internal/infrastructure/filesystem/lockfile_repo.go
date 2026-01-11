@@ -46,18 +46,21 @@ func (r *FileLockfileRepository) Load(ctx context.Context, path string) (*entiti
 	}
 	defer func() { _ = file.Close() }()
 
-	var lock entities.Lockfile
+	var out Lockfile
 	decoder := yaml.NewDecoder(file)
-	if err := decoder.Decode(&lock); err != nil {
+	if err := decoder.Decode(&out); err != nil {
 		return nil, fmt.Errorf("decoding lockfile YAML: %w", err)
 	}
+
+	// Convert to domain entity
+	lock := out.ToEntity()
 
 	// Validate loaded lockfile
 	if err := lock.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid lockfile: %w", err)
 	}
 
-	return &lock, nil
+	return lock, nil
 }
 
 // Save writes a lockfile to the given path.
@@ -89,10 +92,13 @@ func (r *FileLockfileRepository) Save(ctx context.Context, lockfile *entities.Lo
 	}
 	defer func() { _ = file.Close() }()
 
+	// Convert domain entity to YAML representation
+	out := FromEntity(lockfile)
+
 	encoder := yaml.NewEncoder(file)
 	defer func() { _ = encoder.Close() }()
 
-	if err := encoder.Encode(lockfile); err != nil {
+	if err := encoder.Encode(out); err != nil {
 		return fmt.Errorf("encoding lockfile: %w", err)
 	}
 

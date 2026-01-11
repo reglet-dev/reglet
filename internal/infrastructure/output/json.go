@@ -25,13 +25,16 @@ func NewJSONFormatter(w io.Writer, indent bool) *JSONFormatter {
 
 // Format writes the execution result as JSON.
 func (f *JSONFormatter) Format(result *execution.ExecutionResult) error {
+	// Convert domain entity to output representation
+	out := FromDomain(result)
+
 	var data []byte
 	var err error
 
 	if f.indent {
-		data, err = json.MarshalIndent(result, "", "  ")
+		data, err = json.MarshalIndent(out, "", "  ")
 	} else {
-		data, err = json.Marshal(result)
+		data, err = json.Marshal(out)
 	}
 
 	if err != nil {

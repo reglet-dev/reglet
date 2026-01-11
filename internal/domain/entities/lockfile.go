@@ -13,20 +13,20 @@ import (
 // - Each plugin entry must have a digest
 // - Generated timestamp must be set
 type Lockfile struct {
-	Generated time.Time             `yaml:"generated"`
-	Plugins   map[string]PluginLock `yaml:"plugins"`
-	Version   int                   `yaml:"lockfile_version"`
+	Generated time.Time
+	Plugins   map[string]PluginLock
+	Version   int
 }
 
 // PluginLock is a value object representing a pinned plugin version.
 // Immutable after creation.
 type PluginLock struct {
-	Fetched   time.Time `yaml:"fetched,omitempty"`
-	Modified  time.Time `yaml:"modified,omitempty"`
-	Requested string    `yaml:"requested"`
-	Resolved  string    `yaml:"resolved"`
-	Source    string    `yaml:"source"`
-	Digest    string    `yaml:"sha256"`
+	Fetched   time.Time
+	Modified  time.Time
+	Requested string
+	Resolved  string
+	Source    string
+	Digest    string
 }
 
 // NewLockfile creates a new lockfile with the current version.
