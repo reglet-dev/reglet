@@ -136,17 +136,24 @@ func (r *Redactor) ScrubString(input string) string {
 
 	// Phase 2: Known sensitive values (NEW)
 	if r.sensitiveProvider != nil {
-		// Note: This could be optimized for large numbers of secrets
-		// e.g., using Aho-Corasick algorithm if performance becomes an issue.
-		// For now, simple string replacement is sufficient.
-		for _, secret := range r.sensitiveProvider.AllValues() {
-			if secret != "" && strings.Contains(result, secret) {
-				replacement := "[REDACTED]"
-				if r.hashMode {
-					replacement = r.hash(secret)
-				}
-				result = strings.ReplaceAll(result, secret, replacement)
+		secrets := r.sensitiveProvider.AllValues()
+		// Build a single combined regexp to match any known secret in one pass.
+		patternParts := make([]string, 0, len(secrets))
+		for _, secret := range secrets {
+			if secret == "" {
+				continue
 			}
+			patternParts = append(patternParts, regexp.QuoteMeta(secret))
+		}
+		if len(patternParts) > 0 {
+			combinedPattern := strings.Join(patternParts, "|")
+			re := regexp.MustCompile(combinedPattern)
+			result = re.ReplaceAllStringFunc(result, func(match string) string {
+				if r.hashMode {
+					return r.hash(match)
+				}
+				return "[REDACTED]"
+			})
 		}
 	}
 
