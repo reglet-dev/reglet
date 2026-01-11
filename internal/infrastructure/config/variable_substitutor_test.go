@@ -159,3 +159,164 @@ controls:
 	nested := profile.Controls.Items[0].ObservationDefinitions[0].Config["nested"].(map[string]interface{})
 	assert.Equal(t, "secure-password", nested["key"])
 }
+
+// TestLookupVar_AllNumericTypes verifies robust handling of all numeric types.
+// This tests the fix for incomplete reflection logic that only handled int, int64, float64.
+func TestLookupVar_AllNumericTypes(t *testing.T) {
+	tests := []struct {
+		name     string
+		vars     map[string]interface{}
+		path     string
+		expected interface{}
+	}{
+		{
+			name:     "int",
+			vars:     map[string]interface{}{"value": int(42)},
+			path:     "value",
+			expected: int64(42),
+		},
+		{
+			name:     "int8",
+			vars:     map[string]interface{}{"value": int8(127)},
+			path:     "value",
+			expected: int64(127),
+		},
+		{
+			name:     "int16",
+			vars:     map[string]interface{}{"value": int16(32767)},
+			path:     "value",
+			expected: int64(32767),
+		},
+		{
+			name:     "int32",
+			vars:     map[string]interface{}{"value": int32(2147483647)},
+			path:     "value",
+			expected: int64(2147483647),
+		},
+		{
+			name:     "int64",
+			vars:     map[string]interface{}{"value": int64(9223372036854775807)},
+			path:     "value",
+			expected: int64(9223372036854775807),
+		},
+		{
+			name:     "uint",
+			vars:     map[string]interface{}{"value": uint(42)},
+			path:     "value",
+			expected: uint64(42),
+		},
+		{
+			name:     "uint8",
+			vars:     map[string]interface{}{"value": uint8(255)},
+			path:     "value",
+			expected: uint64(255),
+		},
+		{
+			name:     "uint16",
+			vars:     map[string]interface{}{"value": uint16(65535)},
+			path:     "value",
+			expected: uint64(65535),
+		},
+		{
+			name:     "uint32",
+			vars:     map[string]interface{}{"value": uint32(4294967295)},
+			path:     "value",
+			expected: uint64(4294967295),
+		},
+		{
+			name:     "uint64",
+			vars:     map[string]interface{}{"value": uint64(18446744073709551615)},
+			path:     "value",
+			expected: uint64(18446744073709551615),
+		},
+		{
+			name:     "float32",
+			vars:     map[string]interface{}{"value": float32(3.14)},
+			path:     "value",
+			expected: float64(3.140000104904175), // float32 precision loss
+		},
+		{
+			name:     "float64",
+			vars:     map[string]interface{}{"value": float64(3.14159265359)},
+			path:     "value",
+			expected: float64(3.14159265359),
+		},
+		{
+			name:     "bool",
+			vars:     map[string]interface{}{"value": true},
+			path:     "value",
+			expected: true,
+		},
+		{
+			name:     "string",
+			vars:     map[string]interface{}{"value": "hello"},
+			path:     "value",
+			expected: "hello",
+		},
+		{
+			name: "nested_numeric",
+			vars: map[string]interface{}{
+				"config": map[string]interface{}{
+					"port": int16(8080),
+				},
+			},
+			path:     "config.port",
+			expected: int64(8080),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := lookupVar(tt.vars, tt.path)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestSubstituteVariables_NumericTypes verifies numeric types work in real substitution.
+func TestSubstituteVariables_NumericTypes(t *testing.T) {
+	yaml := `
+profile:
+  name: test-profile
+  version: 1.0.0
+
+vars:
+  port: 8080
+  timeout_ms: 5000
+  retry_count: 3
+  enabled: true
+
+controls:
+  items:
+    - id: test-control
+      name: Test Control
+      description: "Port {{ .vars.port }}, timeout {{ .vars.timeout_ms }}ms"
+      observations:
+        - plugin: tcp
+          config:
+            port: "{{ .vars.port }}"
+            timeout: "{{ .vars.timeout_ms }}"
+            retries: "{{ .vars.retry_count }}"
+            enabled: "{{ .vars.enabled }}"
+`
+
+	loader := NewProfileLoader()
+	profile, err := loader.LoadProfileFromReader(strings.NewReader(yaml))
+	require.NoError(t, err)
+
+	substitutor := NewVariableSubstitutor(nil)
+	err = substitutor.Substitute(profile)
+	require.NoError(t, err)
+
+	// Verify numeric substitution in description (converts to string)
+	assert.Contains(t, profile.Controls.Items[0].Description, "8080")
+	assert.Contains(t, profile.Controls.Items[0].Description, "5000")
+
+	// Verify numeric values are substituted as strings (template syntax always produces strings)
+	config := profile.Controls.Items[0].ObservationDefinitions[0].Config
+	assert.Equal(t, "8080", config["port"])
+	assert.Equal(t, "5000", config["timeout"])
+	assert.Equal(t, "3", config["retries"])
+	assert.Equal(t, "true", config["enabled"])
+}

@@ -2,12 +2,12 @@ package config
 
 import (
 	"fmt"
-	"reflect"
 	"regexp"
 	"strings"
 
 	"github.com/reglet-dev/reglet/internal/application/ports"
 	"github.com/reglet-dev/reglet/internal/domain/entities"
+	"github.com/spf13/cast"
 )
 
 // Variable pattern: {{ .vars.key }}
@@ -166,6 +166,7 @@ func (s *VariableSubstitutor) substituteInMap(m map[string]interface{}, vars map
 
 // lookupVar looks up a variable value by path (e.g., "config.path").
 // Supports nested paths using dot notation.
+// Handles all numeric types robustly using spf13/cast.
 func lookupVar(vars map[string]interface{}, path string) (interface{}, error) {
 	parts := strings.Split(path, ".")
 	current := interface{}(vars)
@@ -186,22 +187,39 @@ func lookupVar(vars map[string]interface{}, path string) (interface{}, error) {
 		current = value
 	}
 
-	// Convert to string-friendly type if possible
+	// Normalize numeric types using cast library for robust handling.
+	// This handles int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64,
+	// float32, float64, and other edge cases automatically.
 	switch v := current.(type) {
-	case string, int, int64, float64, bool:
+	case string:
+		return v, nil
+	case bool:
 		return v, nil
 	case map[string]interface{}:
 		// For nested maps, allow them (might be used in complex configs)
 		return v, nil
+	case []interface{}:
+		// Arrays are allowed
+		return v, nil
+	case int, int8, int16, int32, int64:
+		// Normalize all signed integers to int64
+		return cast.ToInt64(v), nil
+	case uint, uint8, uint16, uint32, uint64:
+		// Normalize all unsigned integers to uint64
+		return cast.ToUint64(v), nil
+	case float32, float64:
+		// Normalize all floats to float64
+		return cast.ToFloat64(v), nil
 	default:
-		// Use reflection to try to convert to a basic type
-		val := reflect.ValueOf(v)
-		if val.Kind() == reflect.Int || val.Kind() == reflect.Int64 {
-			return val.Int(), nil
+		// For any other type, try cast library as fallback
+		// This handles custom numeric types, etc.
+		if num, err := cast.ToInt64E(v); err == nil {
+			return num, nil
 		}
-		if val.Kind() == reflect.Float64 {
-			return val.Float(), nil
+		if num, err := cast.ToFloat64E(v); err == nil {
+			return num, nil
 		}
+		// Return as-is if we can't convert
 		return v, nil
 	}
 }
