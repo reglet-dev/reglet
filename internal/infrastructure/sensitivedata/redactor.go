@@ -192,13 +192,12 @@ func (r *Redactor) walk(data interface{}, currentPath string) interface{} {
 		return newMap
 
 	case []interface{}:
+		// Copy-on-Write: Create a new slice to avoid mutating the original
+		newSlice := make([]interface{}, len(v))
 		for i, val := range v {
-			v[i] = r.walk(val, currentPath) // Lists don't extend the named path? Or use [index]?
-			// Usually paths target keys. "items[0].password" is hard to match with simple glob.
-			// Let's assume path stays same for array items for now (like "users.password" applies to all users)
-			// or we don't track array indices in path.
+			newSlice[i] = r.walk(val, currentPath)
 		}
-		return v
+		return newSlice
 
 	// Handle other primitives that might be sensitive? usually secrets are strings.
 	default:
