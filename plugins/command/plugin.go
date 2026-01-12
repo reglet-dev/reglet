@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	regletsdk "github.com/reglet-dev/reglet/sdk"
-	"github.com/reglet-dev/reglet/sdk/exec"
+	regletsdk "github.com/reglet-dev/reglet-sdk/go"
+	"github.com/reglet-dev/reglet-sdk/go/exec"
 )
 
 // commandPlugin implements the sdk.Plugin interface.

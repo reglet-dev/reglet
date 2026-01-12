@@ -8,7 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	regletsdk "github.com/reglet-dev/reglet/sdk"
+	regletsdk "github.com/reglet-dev/reglet-sdk/go"
 )
 
 func TestHTTPPlugin_Check_Success(t *testing.T) {

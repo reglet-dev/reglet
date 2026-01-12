@@ -6,7 +6,7 @@ import (
 	"context"
 	"testing"
 
-	regletsdk "github.com/reglet-dev/reglet/sdk"
+	regletsdk "github.com/reglet-dev/reglet-sdk/go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

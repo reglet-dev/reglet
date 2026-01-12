@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"time"
 
-	regletsdk "github.com/reglet-dev/reglet/sdk"
-	regletnet "github.com/reglet-dev/reglet/sdk/net"
+	regletsdk "github.com/reglet-dev/reglet-sdk/go"
+	regletnet "github.com/reglet-dev/reglet-sdk/go/net"
 )
 
 // tcpPlugin implements the sdk.Plugin interface.

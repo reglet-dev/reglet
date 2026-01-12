@@ -9,7 +9,7 @@ import (
 	"net" // New import
 	"time"
 
-	"github.com/reglet-dev/reglet/wireformat"
+	"github.com/reglet-dev/reglet-sdk/go/wireformat"
 	"github.com/tetratelabs/wazero/api"
 )
 

@@ -10,7 +10,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/owenrumney/go-sarif/v3 v3.3.0
-	github.com/reglet-dev/reglet/wireformat v0.0.0
+	github.com/reglet-dev/reglet-sdk/go v0.1.1
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
 	github.com/sigstore/cosign/v2 v2.6.2
 	github.com/spf13/cast v1.10.0
@@ -22,8 +22,6 @@ require (
 	golang.org/x/sync v0.19.0
 	oras.land/oras-go/v2 v2.6.0
 )
-
-replace github.com/reglet-dev/reglet/wireformat => ./wireformat
 
 require (
 	dario.cat/mergo v1.0.2 // indirect

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	regletsdk "github.com/reglet-dev/reglet/sdk"
+	regletsdk "github.com/reglet-dev/reglet-sdk/go"
 )
 
 func TestFilePlugin_Check_Exists(t *testing.T) {

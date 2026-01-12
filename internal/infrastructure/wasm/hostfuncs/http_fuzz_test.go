@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/reglet-dev/reglet/wireformat"
+	"github.com/reglet-dev/reglet-sdk/go/wireformat"
 )
 
 // FuzzHTTPRequestParsing fuzzes HTTP request wire format parsing

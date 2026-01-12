@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	regletsdk "github.com/reglet-dev/reglet/sdk"
+	regletsdk "github.com/reglet-dev/reglet-sdk/go"
 )
 
 // filePlugin implements the sdk.Plugin interface for file system operations.

@@ -1,15 +1,9 @@
 module github.com/reglet-dev/reglet/plugins/dns
 
-go 1.25.4
-
-replace (
-	github.com/reglet-dev/reglet/sdk => ../../sdk/go
-	github.com/reglet-dev/reglet/wireformat => ../../wireformat
-)
+go 1.25.5
 
 require (
-	github.com/reglet-dev/reglet/sdk v0.0.0-00010101000000-000000000000
-	github.com/reglet-dev/reglet/wireformat v0.0.0
+	github.com/reglet-dev/reglet-sdk/go v0.1.1
 	github.com/stretchr/testify v1.8.4
 )
 
