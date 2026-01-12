@@ -283,17 +283,16 @@ func (a *EngineFactoryAdapter) CreateEngine(
 	cfg := a.buildExecutionConfig(filters, exec)
 
 	// Create engine
-	eng, err := engine.NewEngineWithCapabilities(
+	eng, err := engine.NewEngine(
 		ctx,
 		build.Get(),
-		capMgr,
-		pluginDir,
-		profile,
-		cfg,
-		a.redactor,
-		nil, // No persistence
-		a.runtime.WasmMemoryLimitMB,
-		&execution.GreedyTruncator{},
+		engine.WithCapabilityManager(capMgr),
+		engine.WithPluginDir(pluginDir),
+		engine.WithProfile(profile),
+		engine.WithExecutionConfig(cfg),
+		engine.WithRedactor(a.redactor),
+		engine.WithMemoryLimit(a.runtime.WasmMemoryLimitMB),
+		engine.WithTruncator(&execution.GreedyTruncator{}),
 	)
 	if err != nil {
 		return nil, err

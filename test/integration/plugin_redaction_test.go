@@ -19,9 +19,9 @@ func TestPluginOutputRedaction_ManualVerification(t *testing.T) {
 	// a runtime WITH redactor differs from one WITHOUT redactor.
 
 	// Create redactor
-	redactor, err := sensitivedata.New(sensitivedata.Config{
-		Patterns: []string{`secret`},
-	})
+	redactor, err := sensitivedata.NewRedactor(
+		sensitivedata.WithPatterns([]string{`secret`}),
+	)
 	require.NoError(t, err)
 
 	ctx := context.Background()
@@ -51,7 +51,7 @@ func TestPluginOutputRedaction_ManualVerification(t *testing.T) {
 // works end-to-end for plugin stdout/stderr redaction.
 func TestPluginOutputRedaction_GitleaksPatterns(t *testing.T) {
 	// Create redactor with gitleaks enabled (default)
-	redactor, err := sensitivedata.New(sensitivedata.Config{})
+	redactor, err := sensitivedata.NewRedactor()
 	require.NoError(t, err)
 	require.NotNil(t, redactor, "Redactor should be created")
 
@@ -125,15 +125,15 @@ func TestPluginOutputRedaction_GitleaksPatterns(t *testing.T) {
 // coverage provided by gitleaks (222+ patterns) vs manual patterns (4).
 func TestPluginOutputRedaction_Gitleaks222Patterns(t *testing.T) {
 	// Redactor WITHOUT gitleaks (only 4 default patterns)
-	redactorWithout, err := sensitivedata.New(sensitivedata.Config{
-		DisableGitleaks: true,
-	})
+	redactorWithout, err := sensitivedata.NewRedactor(
+		sensitivedata.WithGitleaksDisabled(true),
+	)
 	require.NoError(t, err)
 
 	// Redactor WITH gitleaks (222+ patterns)
-	redactorWith, err := sensitivedata.New(sensitivedata.Config{
-		DisableGitleaks: false,
-	})
+	redactorWith, err := sensitivedata.NewRedactor(
+		sensitivedata.WithGitleaksDisabled(false),
+	)
 	require.NoError(t, err)
 
 	// Simulate plugin output with various secret types (realistic formats that pass gitleaks entropy checks)

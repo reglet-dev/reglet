@@ -13,9 +13,9 @@ import (
 
 func TestRedactor_AWSKeyDetection(t *testing.T) {
 	// Setup redactor with defaults
-	redactor, err := sensitivedata.New(sensitivedata.Config{
-		DisableGitleaks: true, // Use internal regex fallback
-	})
+	redactor, err := sensitivedata.NewRedactor(
+		sensitivedata.WithGitleaksDisabled(true), // Use internal regex fallback
+	)
 	require.NoError(t, err)
 
 	// Test case: AWS Access Key
@@ -28,9 +28,9 @@ func TestRedactor_AWSKeyDetection(t *testing.T) {
 
 func TestRedactor_GitHubTokenDetection(t *testing.T) {
 	// Setup redactor with defaults
-	redactor, err := sensitivedata.New(sensitivedata.Config{
-		DisableGitleaks: true, // Use internal regex fallback
-	})
+	redactor, err := sensitivedata.NewRedactor(
+		sensitivedata.WithGitleaksDisabled(true), // Use internal regex fallback
+	)
 	require.NoError(t, err)
 
 	// Test case: GitHub Token
@@ -45,12 +45,12 @@ func TestRedactor_GitHubTokenDetection(t *testing.T) {
 
 func TestRedactor_HashMode(t *testing.T) {
 	// Setup redactor with hash mode
-	redactor, err := sensitivedata.New(sensitivedata.Config{
-		DisableGitleaks: true,
-		HashMode:        true,
-		Salt:            "test-salt-123",
-		Patterns:        []string{"secret"},
-	})
+	redactor, err := sensitivedata.NewRedactor(
+		sensitivedata.WithGitleaksDisabled(true),
+		sensitivedata.WithHashMode(true),
+		sensitivedata.WithSalt("test-salt-123"),
+		sensitivedata.WithPatterns([]string{"secret"}),
+	)
 	require.NoError(t, err)
 
 	// Test case: Hashing
@@ -77,9 +77,9 @@ func TestRedactor_RaceOnSliceMutation(t *testing.T) {
 		"list": sharedSlice,
 	}
 
-	redactor, err := sensitivedata.New(sensitivedata.Config{
-		Patterns: []string{"sensitive"},
-	})
+	redactor, err := sensitivedata.NewRedactor(
+		sensitivedata.WithPatterns([]string{"sensitive"}),
+	)
 	require.NoError(t, err)
 
 	// 2. Run concurrent redactions

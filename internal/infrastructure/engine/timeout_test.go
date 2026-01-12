@@ -40,7 +40,7 @@ func TestExecute_CompletesBeforeTimeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	engine, err := NewEngineWithConfig(context.Background(), build.Get(), DefaultExecutionConfig())
+	engine, err := NewEngine(context.Background(), build.Get(), WithExecutionConfig(DefaultExecutionConfig()))
 	require.NoError(t, err)
 	// Inject mock executor
 	engine.executor = &mockSlowExecutor{delay: delay}
@@ -62,7 +62,7 @@ func TestExecute_ExceedsTimeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	engine, err := NewEngineWithConfig(context.Background(), build.Get(), DefaultExecutionConfig())
+	engine, err := NewEngine(context.Background(), build.Get(), WithExecutionConfig(DefaultExecutionConfig()))
 	require.NoError(t, err)
 	engine.executor = &mockSlowExecutor{delay: delay}
 
@@ -87,7 +87,7 @@ func TestExecute_ZeroTimeout(t *testing.T) {
 	// Pass background context (no timeout)
 	ctx := context.Background()
 
-	engine, err := NewEngineWithConfig(ctx, build.Get(), DefaultExecutionConfig())
+	engine, err := NewEngine(ctx, build.Get(), WithExecutionConfig(DefaultExecutionConfig()))
 	require.NoError(t, err)
 	engine.executor = &mockSlowExecutor{delay: delay}
 

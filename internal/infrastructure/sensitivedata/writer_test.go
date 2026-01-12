@@ -12,9 +12,9 @@ import (
 func TestWriter_WithRedactor(t *testing.T) {
 	// Setup
 	var buf bytes.Buffer
-	redactor, err := sensitivedata.New(sensitivedata.Config{
-		Patterns: []string{"secret"},
-	})
+	redactor, err := sensitivedata.NewRedactor(
+		sensitivedata.WithPatterns([]string{"secret"}),
+	)
 	require.NoError(t, err)
 
 	writer := sensitivedata.NewWriter(&buf, redactor)
@@ -42,9 +42,9 @@ func TestWriter_WithoutRedactor(t *testing.T) {
 func TestWriter_MultipleWrites(t *testing.T) {
 	// Setup
 	var buf bytes.Buffer
-	redactor, err := sensitivedata.New(sensitivedata.Config{
-		Patterns: []string{"secret"},
-	})
+	redactor, err := sensitivedata.NewRedactor(
+		sensitivedata.WithPatterns([]string{"secret"}),
+	)
 	require.NoError(t, err)
 
 	writer := sensitivedata.NewWriter(&buf, redactor)

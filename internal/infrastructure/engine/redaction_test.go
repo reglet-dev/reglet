@@ -34,12 +34,12 @@ func TestObservationExecutor_Redaction(t *testing.T) {
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
-	redactor, err := sensitivedata.New(sensitivedata.Config{
-		Patterns: []string{"secret"},
-	})
+	redactor, err := sensitivedata.NewRedactor(
+		sensitivedata.WithPatterns([]string{"secret"}),
+	)
 	require.NoError(t, err)
 
-	executor := NewExecutor(runtime, WithPluginDir("/tmp"), WithRedactor(redactor))
+	executor := NewExecutor(runtime, WithExecutorPluginDir("/tmp"), WithExecutorRedactor(redactor))
 	assert.NotNil(t, executor)
 	// We can't easily inspect the private redactor field, but successful creation is a start.
 }
@@ -49,9 +49,9 @@ func TestRedactionInObservationResult(t *testing.T) {
 	// let's simulate the redaction step that happens inside Execute.
 	// We'll reproduce the logic here to verify it works as expected.
 
-	redactor, err := sensitivedata.New(sensitivedata.Config{
-		Patterns: []string{"password"},
-	})
+	redactor, err := sensitivedata.NewRedactor(
+		sensitivedata.WithPatterns([]string{"password"}),
+	)
 	require.NoError(t, err)
 
 	// Simulate raw evidence data

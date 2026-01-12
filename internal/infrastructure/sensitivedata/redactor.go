@@ -26,32 +26,77 @@ type Redactor struct {
 	hashMode          bool
 }
 
-// Config holds the configuration for the Redactor.
-type Config struct {
-	Salt            string
-	Patterns        []string
-	Paths           []string
-	HashMode        bool
-	DisableGitleaks bool
+// RedactorOption configures a Redactor.
+type RedactorOption func(*options)
+
+type options struct {
+	sensitiveProvider ports.SensitiveValueProvider
+	salt              string
+	patterns          []string
+	paths             []string
+	hashMode          bool
+	disableGitleaks   bool
 }
 
-// New creates a new Redactor with the given configuration.
-func New(cfg Config) (*Redactor, error) {
-	return NewWithProvider(cfg, nil)
+// WithSalt sets the salt used for hashing in HashMode.
+func WithSalt(salt string) RedactorOption {
+	return func(o *options) {
+		o.salt = salt
+	}
 }
 
-// NewWithProvider creates a new Redactor with the given configuration and provider.
-func NewWithProvider(cfg Config, provider ports.SensitiveValueProvider) (*Redactor, error) {
+// WithPatterns adds custom regex patterns for redaction.
+func WithPatterns(patterns []string) RedactorOption {
+	return func(o *options) {
+		o.patterns = patterns
+	}
+}
+
+// WithPaths adds specific JSON paths to redact (e.g. "config.password").
+func WithPaths(paths []string) RedactorOption {
+	return func(o *options) {
+		o.paths = paths
+	}
+}
+
+// WithHashMode enables or disables replacing secrets with a hash instead of [REDACTED].
+func WithHashMode(enabled bool) RedactorOption {
+	return func(o *options) {
+		o.hashMode = enabled
+	}
+}
+
+// WithGitleaksDisabled disables the Gitleaks detector.
+func WithGitleaksDisabled(disabled bool) RedactorOption {
+	return func(o *options) {
+		o.disableGitleaks = disabled
+	}
+}
+
+// WithSensitiveValueProvider sets a provider for known sensitive values to redact.
+func WithSensitiveValueProvider(provider ports.SensitiveValueProvider) RedactorOption {
+	return func(o *options) {
+		o.sensitiveProvider = provider
+	}
+}
+
+// NewRedactor creates a new Redactor with the given options.
+func NewRedactor(opts ...RedactorOption) (*Redactor, error) {
+	o := &options{}
+	for _, opt := range opts {
+		opt(o)
+	}
+
 	r := &Redactor{
-		sensitiveProvider: provider,
-		paths:             cfg.Paths,
-		hashMode:          cfg.HashMode,
-		salt:              cfg.Salt,
-		patterns:          make([]*regexp.Regexp, 0, len(cfg.Patterns)+len(defaultPatterns)),
+		sensitiveProvider: o.sensitiveProvider,
+		paths:             o.paths,
+		hashMode:          o.hashMode,
+		salt:              o.salt,
+		patterns:          make([]*regexp.Regexp, 0, len(o.patterns)+len(defaultPatterns)),
 	}
 
 	// Initialize gitleaks detector (unless disabled)
-	if !cfg.DisableGitleaks {
+	if !o.disableGitleaks {
 		if detector, err := newGitleaksDetector(); err == nil {
 			r.gitleaksDetector = detector
 		}
@@ -68,7 +113,7 @@ func NewWithProvider(cfg Config, provider ports.SensitiveValueProvider) (*Redact
 	}
 
 	// Compile custom patterns
-	for _, p := range cfg.Patterns {
+	for _, p := range o.patterns {
 		re, err := regexp.Compile(p)
 		if err != nil {
 			return nil, fmt.Errorf("failed to compile custom pattern %s: %w", p, err)

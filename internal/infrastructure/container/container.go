@@ -72,12 +72,13 @@ func New(opts Options) (*Container, error) {
 	pluginResolver := adapters.NewPluginDirectoryAdapter()
 
 	// Initialize redactor with shared provider
-	redactor, err := sensitivedata.NewWithProvider(sensitivedata.Config{
-		Patterns: systemCfg.Redaction.Patterns,
-		Paths:    systemCfg.Redaction.Paths,
-		HashMode: systemCfg.Redaction.HashMode.Enabled,
-		Salt:     systemCfg.Redaction.HashMode.Salt,
-	}, sensitiveProvider)
+	redactor, err := sensitivedata.NewRedactor(
+		sensitivedata.WithPatterns(systemCfg.Redaction.Patterns),
+		sensitivedata.WithPaths(systemCfg.Redaction.Paths),
+		sensitivedata.WithHashMode(systemCfg.Redaction.HashMode.Enabled),
+		sensitivedata.WithSalt(systemCfg.Redaction.HashMode.Salt),
+		sensitivedata.WithSensitiveValueProvider(sensitiveProvider),
+	)
 	if err != nil {
 		return nil, err
 	}

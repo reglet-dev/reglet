@@ -32,12 +32,12 @@ func FuzzRedactorScrubString(f *testing.F) {
 		}()
 
 		// Initialize redactor with default patterns
-		r, err := New(Config{
-			DisableGitleaks: true, // Disable gitleaks for speed in fuzzing loop, testing regexes primarily
-			Patterns: []string{
+		r, err := NewRedactor(
+			WithGitleaksDisabled(true), // Disable gitleaks for speed in fuzzing loop, testing regexes primarily
+			WithPatterns([]string{
 				`\b((?:AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16})\b`,
-			},
-		})
+			}),
+		)
 		if err != nil {
 			return // Config error, not interesting for fuzzing input
 		}
@@ -87,7 +87,7 @@ func FuzzRedactorWalker(f *testing.F) {
 			return // Invalid JSON, not interesting
 		}
 
-		r, _ := New(Config{DisableGitleaks: true})
+		r, _ := NewRedactor(WithGitleaksDisabled(true))
 
 		// Walk the structure
 		_ = r.Redact(input)

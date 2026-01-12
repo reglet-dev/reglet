@@ -15,10 +15,11 @@ func TestRedactor_WithSensitiveProvider(t *testing.T) {
 	provider.Track(secret)
 
 	// 2. Setup Redactor with provider
-	cfg := sensitivedata.Config{
-		DisableGitleaks: true, // Focus on our custom provider
-	}
-	redactor, err := sensitivedata.NewWithProvider(cfg, provider)
+	// 2. Setup Redactor with provider
+	redactor, err := sensitivedata.NewRedactor(
+		sensitivedata.WithGitleaksDisabled(true), // Focus on our custom provider
+		sensitivedata.WithSensitiveValueProvider(provider),
+	)
 	require.NoError(t, err)
 
 	// 3. Test redaction
@@ -32,8 +33,10 @@ func TestRedactor_WithSensitiveProvider(t *testing.T) {
 func TestRedactor_DynamicTracking(t *testing.T) {
 	// 1. Setup
 	provider := sensitivedata.NewProvider()
-	cfg := sensitivedata.Config{DisableGitleaks: true}
-	redactor, err := sensitivedata.NewWithProvider(cfg, provider)
+	redactor, err := sensitivedata.NewRedactor(
+		sensitivedata.WithGitleaksDisabled(true),
+		sensitivedata.WithSensitiveValueProvider(provider),
+	)
 	require.NoError(t, err)
 
 	// 2. Initial check - no secrets yet

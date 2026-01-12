@@ -33,6 +33,77 @@ func TestNewEngine(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestEngineOptions_Defaults(t *testing.T) {
+	t.Parallel()
+	opts := defaultEngineOptions()
+	assert.NotNil(t, opts)
+	assert.NotNil(t, opts.executionConfig)
+	assert.IsType(t, &execution.GreedyTruncator{}, opts.truncator)
+	assert.Equal(t, 0, opts.memoryLimitMB)
+	assert.Equal(t, "", opts.pluginDir)
+}
+
+func TestEngineOptions_WithExecutionConfig(t *testing.T) {
+	t.Parallel()
+	cfg := ExecutionConfig{
+		Parallel:    true,
+		IncludeTags: []string{"test"},
+	}
+
+	opts := defaultEngineOptions()
+	WithExecutionConfig(cfg)(opts)
+
+	assert.Equal(t, cfg, opts.executionConfig)
+}
+
+func TestEngineOptions_WithCapabilityManager(t *testing.T) {
+	t.Parallel()
+	mockCapMgr := &struct{ CapabilityManager }{}
+	mockProfile := &entities.Profile{}
+
+	// Should fail creation if Profile is missing
+	eng, err := NewEngine(context.Background(), build.Get(),
+		WithCapabilityManager(mockCapMgr),
+	)
+	assert.Error(t, err)
+	assert.Nil(t, eng)
+	assert.Contains(t, err.Error(), "requires WithProfile")
+
+	// Should succeed if Profile is present
+	// We need to be careful: NewEngine will try to run the capability flow which calls methods on mockCapMgr
+	// So we can't test NewEngine success easily without a working mock.
+	// But we can check if the option sets the field on the options struct manually.
+
+	opts := defaultEngineOptions()
+	WithCapabilityManager(mockCapMgr)(opts)
+	assert.NotNil(t, opts.capabilityManager)
+
+	opts = defaultEngineOptions()
+	WithProfile(mockProfile)(opts)
+	assert.NotNil(t, opts.profile)
+}
+
+func TestEngineOptions_WithMemoryLimit(t *testing.T) {
+	t.Parallel()
+	opts := defaultEngineOptions()
+	WithMemoryLimit(512)(opts)
+	assert.Equal(t, 512, opts.memoryLimitMB)
+}
+
+func TestEngineOptions_WithPluginDir(t *testing.T) {
+	t.Parallel()
+	opts := defaultEngineOptions()
+	WithPluginDir("/tmp/plugins")(opts)
+	assert.Equal(t, "/tmp/plugins", opts.pluginDir)
+}
+
+/*
+   We skip full integration tests of WithCapabilityManager in NewEngine here
+   because it requires mocking the entire capability flow which is covered in
+   TestFiltering_EndToEnd (using the real flow) or requires mocks.
+   The validation logic (require WithProfile) is tested above.
+*/
+
 func TestGenerateControlMessage_SinglePass(t *testing.T) {
 	t.Parallel()
 	observations := []execution.ObservationResult{

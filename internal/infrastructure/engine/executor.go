@@ -35,12 +35,12 @@ type ExecutorOption func(*ObservationExecutor)
 //	executor := NewExecutor(runtime)
 //
 //	// With explicit plugin dir
-//	executor := NewExecutor(runtime, WithPluginDir(pluginDir))
+//	executor := NewExecutor(runtime, WithExecutorPluginDir(pluginDir))
 //
 //	// With everything
 //	executor := NewExecutor(runtime,
-//	    WithPluginDir(pluginDir),
-//	    WithRedactor(redactor),
+//	    WithExecutorPluginDir(pluginDir),
+//	    WithExecutorRedactor(redactor),
 //	    WithPluginRegistry(registry),
 //	)
 func NewExecutor(runtime *wasm.Runtime, opts ...ExecutorOption) *ObservationExecutor {
@@ -61,15 +61,15 @@ func NewExecutor(runtime *wasm.Runtime, opts ...ExecutorOption) *ObservationExec
 	return e
 }
 
-// WithPluginDir sets the plugin directory explicitly.
-func WithPluginDir(dir string) ExecutorOption {
+// WithExecutorPluginDir sets the plugin directory explicitly.
+func WithExecutorPluginDir(dir string) ExecutorOption {
 	return func(e *ObservationExecutor) {
 		e.pluginDir = dir
 	}
 }
 
-// WithRedactor enables secret redaction.
-func WithRedactor(redactor *sensitivedata.Redactor) ExecutorOption {
+// WithExecutorRedactor enables secret redaction.
+func WithExecutorRedactor(redactor *sensitivedata.Redactor) ExecutorOption {
 	return func(e *ObservationExecutor) {
 		e.redactor = redactor
 	}

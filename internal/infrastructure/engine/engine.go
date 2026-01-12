@@ -22,6 +22,91 @@ type ObservationExecutable interface {
 	Execute(ctx context.Context, obs entities.ObservationDefinition) execution.ObservationResult
 }
 
+// EngineOption configures an Engine during construction.
+type EngineOption func(*engineOptions)
+
+// engineOptions holds all configurable engine parameters.
+type engineOptions struct {
+	capabilityManager CapabilityManager
+	profile           entities.ProfileReader
+	repository        repositories.ExecutionResultRepository
+	truncator         execution.TruncationStrategy
+	redactor          *sensitivedata.Redactor
+	pluginDir         string
+	executionConfig   ExecutionConfig
+	memoryLimitMB     int
+}
+
+// defaultEngineOptions returns options with sensible defaults.
+func defaultEngineOptions() *engineOptions {
+	return &engineOptions{
+		executionConfig: DefaultExecutionConfig(),
+		truncator:       &execution.GreedyTruncator{},
+		memoryLimitMB:   0,  // 0 = unlimited
+		pluginDir:       "", // empty = auto-detect
+	}
+}
+
+// WithExecutionConfig sets custom execution configuration.
+func WithExecutionConfig(cfg ExecutionConfig) EngineOption {
+	return func(o *engineOptions) {
+		o.executionConfig = cfg
+	}
+}
+
+// WithCapabilityManager enables interactive capability prompts.
+// Requires WithProfile to also be set.
+func WithCapabilityManager(mgr CapabilityManager) EngineOption {
+	return func(o *engineOptions) {
+		o.capabilityManager = mgr
+	}
+}
+
+// WithPluginDir sets the directory to search for external plugins.
+// If empty, auto-detection is used.
+func WithPluginDir(dir string) EngineOption {
+	return func(o *engineOptions) {
+		o.pluginDir = dir
+	}
+}
+
+// WithProfile sets the profile for capability collection.
+// Required when using WithCapabilityManager.
+func WithProfile(p entities.ProfileReader) EngineOption {
+	return func(o *engineOptions) {
+		o.profile = p
+	}
+}
+
+// WithRedactor enables sensitive data redaction in evidence.
+func WithRedactor(r *sensitivedata.Redactor) EngineOption {
+	return func(o *engineOptions) {
+		o.redactor = r
+	}
+}
+
+// WithRepository enables execution result persistence.
+func WithRepository(repo repositories.ExecutionResultRepository) EngineOption {
+	return func(o *engineOptions) {
+		o.repository = repo
+	}
+}
+
+// WithMemoryLimit sets the WASM memory limit in megabytes.
+// Use 0 for unlimited (default).
+func WithMemoryLimit(mb int) EngineOption {
+	return func(o *engineOptions) {
+		o.memoryLimitMB = mb
+	}
+}
+
+// WithTruncator sets the evidence truncation strategy.
+func WithTruncator(t execution.TruncationStrategy) EngineOption {
+	return func(o *engineOptions) {
+		o.truncator = t
+	}
+}
+
 // Engine coordinates profile execution.
 type Engine struct {
 	repository repositories.ExecutionResultRepository
@@ -48,24 +133,67 @@ type CapabilityManager interface {
 	CapabilityGranter
 }
 
-// NewEngine creates a new execution engine with default configuration.
-func NewEngine(ctx context.Context, version build.Info) (*Engine, error) {
-	return NewEngineWithConfig(ctx, version, DefaultExecutionConfig())
+// NewEngine creates a new execution engine with optional configuration.
+//
+// Required parameters:
+//   - ctx: execution context
+//   - version: build version information
+//
+// Optional configuration via EngineOption functions:
+//   - WithExecutionConfig: custom execution settings
+//   - WithCapabilityManager: enable interactive capability prompts (requires WithProfile)
+//   - WithPluginDir: custom plugin directory (defaults to auto-detect)
+//   - WithProfile: profile for capability collection
+//   - WithRedactor: enable sensitive data redaction
+//   - WithRepository: enable execution result persistence
+//   - WithMemoryLimit: WASM memory limit in MB (0 = unlimited)
+//   - WithTruncator: evidence truncation strategy
+//
+// Examples:
+//
+//	# Simple engine with defaults
+//	engine, err := NewEngine(ctx, version)
+//
+//	# Engine with custom config
+//	engine, err := NewEngine(ctx, version,
+//	    WithExecutionConfig(cfg),
+//	    WithMemoryLimit(512),
+//	)
+//
+//	# Full-featured engine with capabilities
+//	engine, err := NewEngine(ctx, version,
+//	    WithCapabilityManager(capMgr),
+//	    WithProfile(profile),
+//	    WithPluginDir("/custom/plugins"),
+//	    WithRedactor(redactor),
+//	    WithRepository(repo),
+//	)
+func NewEngine(ctx context.Context, version build.Info, opts ...EngineOption) (*Engine, error) {
+	cfg := defaultEngineOptions()
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
+	// Validate required combinations
+	if cfg.capabilityManager != nil && cfg.profile == nil {
+		return nil, fmt.Errorf("WithCapabilityManager requires WithProfile to be set")
+	}
+
+	// If capability manager is provided, use the capability flow
+	if cfg.capabilityManager != nil && cfg.profile != nil {
+		return newEngineWithCapabilities(ctx, version, cfg)
+	}
+
+	// Otherwise, create simple engine
+	return newEngineSimple(ctx, version, cfg)
 }
 
-// NewEngineWithCapabilities creates an engine with interactive capability prompts
-// and optional repository support.
-func NewEngineWithCapabilities(
+// newEngineWithCapabilities creates an engine with capability prompting.
+// This is the internal implementation of the capability flow.
+func newEngineWithCapabilities(
 	ctx context.Context,
 	version build.Info,
-	capMgr CapabilityManager,
-	pluginDir string,
-	profile entities.ProfileReader,
-	cfg ExecutionConfig,
-	redactor *sensitivedata.Redactor,
-	repo repositories.ExecutionResultRepository,
-	memoryLimitMB int,
-	truncator execution.TruncationStrategy,
+	cfg *engineOptions,
 ) (*Engine, error) {
 	// Create temporary runtime with no capabilities to load plugins and get requirements
 	tempRuntime, err := wasm.NewRuntime(ctx, version)
@@ -74,7 +202,7 @@ func NewEngineWithCapabilities(
 	}
 
 	// Collect required capabilities from all plugins
-	required, err := capMgr.CollectRequiredCapabilities(ctx, profile, tempRuntime, pluginDir)
+	required, err := cfg.capabilityManager.CollectRequiredCapabilities(ctx, cfg.profile, tempRuntime, cfg.pluginDir)
 	if err != nil {
 		_ = tempRuntime.Close(ctx)
 		return nil, fmt.Errorf("failed to collect capabilities: %w", err)
@@ -83,28 +211,39 @@ func NewEngineWithCapabilities(
 	_ = tempRuntime.Close(ctx)
 
 	// Get granted capabilities (will prompt user if needed)
-	granted, err := capMgr.GrantCapabilities(required)
+	granted, err := cfg.capabilityManager.GrantCapabilities(required)
 	if err != nil {
 		return nil, fmt.Errorf("failed to grant capabilities: %w", err)
 	}
 
 	// Create WASM runtime with granted capabilities and redactor
-	runtime, err := wasm.NewRuntime(ctx, version,
+	runtimeOpts := []wasm.RuntimeOption{
 		wasm.WithCapabilities(granted),
-		wasm.WithRedactor(redactor),
-		wasm.WithMemoryLimit(memoryLimitMB),
-	)
+	}
+	if cfg.redactor != nil {
+		runtimeOpts = append(runtimeOpts, wasm.WithRedactor(cfg.redactor))
+	}
+	if cfg.memoryLimitMB > 0 {
+		runtimeOpts = append(runtimeOpts, wasm.WithMemoryLimit(cfg.memoryLimitMB))
+	}
+
+	runtime, err := wasm.NewRuntime(ctx, version, runtimeOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create WASM runtime: %w", err)
 	}
 
-	executor := NewExecutor(runtime,
-		WithPluginDir(pluginDir),
-		WithRedactor(redactor),
-	)
+	executorOpts := []ExecutorOption{}
+	if cfg.pluginDir != "" {
+		executorOpts = append(executorOpts, WithExecutorPluginDir(cfg.pluginDir))
+	}
+	if cfg.redactor != nil {
+		executorOpts = append(executorOpts, WithExecutorRedactor(cfg.redactor))
+	}
+
+	executor := NewExecutor(runtime, executorOpts...)
 
 	// Preload plugins for schema validation
-	for _, ctrl := range profile.GetAllControls() {
+	for _, ctrl := range cfg.profile.GetAllControls() {
 		for _, obs := range ctrl.ObservationDefinitions {
 			if _, err := executor.LoadPlugin(ctx, obs.Plugin); err != nil {
 				return nil, fmt.Errorf("failed to preload plugin %s: %w", obs.Plugin, err)
@@ -115,28 +254,50 @@ func NewEngineWithCapabilities(
 	return &Engine{
 		runtime:    runtime,
 		executor:   executor,
-		config:     cfg,
-		repository: repo,
+		config:     cfg.executionConfig,
+		repository: cfg.repository,
 		version:    version,
-		truncator:  truncator,
+		truncator:  cfg.truncator,
 	}, nil
 }
 
-// NewEngineWithConfig creates a new execution engine with custom configuration.
-func NewEngineWithConfig(ctx context.Context, version build.Info, cfg ExecutionConfig) (*Engine, error) {
-	runtime, err := wasm.NewRuntime(ctx, version)
+// newEngineSimple creates a basic engine without capability prompting.
+// This is the internal implementation of the simple flow.
+func newEngineSimple(
+	ctx context.Context,
+	version build.Info,
+	cfg *engineOptions,
+) (*Engine, error) {
+	runtimeOpts := []wasm.RuntimeOption{}
+	if cfg.redactor != nil {
+		runtimeOpts = append(runtimeOpts, wasm.WithRedactor(cfg.redactor))
+	}
+	if cfg.memoryLimitMB > 0 {
+		runtimeOpts = append(runtimeOpts, wasm.WithMemoryLimit(cfg.memoryLimitMB))
+	}
+
+	runtime, err := wasm.NewRuntime(ctx, version, runtimeOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create WASM runtime: %w", err)
 	}
 
-	executor := NewExecutor(runtime) // Auto-detect plugin dir, no redactor
+	executorOpts := []ExecutorOption{}
+	if cfg.pluginDir != "" {
+		executorOpts = append(executorOpts, WithExecutorPluginDir(cfg.pluginDir))
+	}
+	if cfg.redactor != nil {
+		executorOpts = append(executorOpts, WithExecutorRedactor(cfg.redactor))
+	}
+
+	executor := NewExecutor(runtime, executorOpts...)
 
 	return &Engine{
-		runtime:   runtime,
-		executor:  executor,
-		config:    cfg,
-		version:   version,
-		truncator: &execution.GreedyTruncator{},
+		runtime:    runtime,
+		executor:   executor,
+		config:     cfg.executionConfig,
+		repository: cfg.repository,
+		version:    version,
+		truncator:  cfg.truncator,
 	}, nil
 }
 
