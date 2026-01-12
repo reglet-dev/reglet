@@ -121,7 +121,7 @@ func (p *commandPlugin) Check(ctx context.Context, config regletsdk.Config) (reg
 
 		// Execution results
 		"exit_code":   resp.ExitCode,
-		"duration_ms": resp.DurationMs,
+		"duration_ms": resp.Duration,
 		"is_timeout":  resp.IsTimeout,
 
 		// Command metadata (for debugging and auditing)

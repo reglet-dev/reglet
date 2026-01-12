@@ -3,8 +3,8 @@ module github.com/reglet-dev/reglet/plugins/command
 go 1.25.5
 
 require (
-	github.com/stretchr/testify v1.8.4
 	github.com/reglet-dev/reglet-sdk/go v0.1.1
+	github.com/stretchr/testify v1.8.4
 )
 
 require (
