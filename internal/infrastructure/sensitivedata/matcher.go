@@ -3,6 +3,9 @@
 package sensitivedata
 
 import (
+	"hash/crc64"
+	"io"
+	"sort"
 	"sync"
 
 	ahocorasick "github.com/BobuSumisu/aho-corasick"
@@ -26,10 +29,10 @@ type SensitiveStringMatcher interface {
 //
 // The trie is lazily rebuilt when the number of tracked secrets changes.
 type ahocorasickMatcher struct {
-	provider  ports.SensitiveValueProvider
-	trie      *ahocorasick.Trie
-	lastCount int
-	mu        sync.RWMutex
+	provider ports.SensitiveValueProvider
+	trie     *ahocorasick.Trie
+	lastHash uint64
+	mu       sync.RWMutex
 }
 
 // NewAhoCorasickMatcher creates a new matcher backed by a SensitiveValueProvider.
@@ -87,9 +90,9 @@ func (m *ahocorasickMatcher) getTrie() *ahocorasick.Trie {
 	// Fast path: read lock to check if rebuild is needed
 	m.mu.RLock()
 	secrets := m.provider.AllValues()
-	currentCount := len(secrets)
+	currentHash := computeHash(secrets)
 
-	if m.trie != nil && currentCount == m.lastCount {
+	if m.trie != nil && currentHash == m.lastHash {
 		trie := m.trie
 		m.mu.RUnlock()
 		return trie
@@ -102,16 +105,16 @@ func (m *ahocorasickMatcher) getTrie() *ahocorasick.Trie {
 
 	// Double-check after acquiring write lock
 	secrets = m.provider.AllValues()
-	currentCount = len(secrets)
+	currentHash = computeHash(secrets)
 
-	if m.trie != nil && currentCount == m.lastCount {
+	if m.trie != nil && currentHash == m.lastHash {
 		return m.trie
 	}
 
 	// Rebuild trie
-	if currentCount == 0 {
+	if len(secrets) == 0 {
 		m.trie = nil
-		m.lastCount = 0
+		m.lastHash = 0
 		return nil
 	}
 
@@ -125,11 +128,45 @@ func (m *ahocorasickMatcher) getTrie() *ahocorasick.Trie {
 
 	if len(filtered) == 0 {
 		m.trie = nil
-		m.lastCount = 0
+		m.lastHash = 0 // Invalidate hash essentially
 		return nil
 	}
 
 	m.trie = ahocorasick.NewTrieBuilder().AddStrings(filtered).Build()
-	m.lastCount = currentCount
+	m.lastHash = currentHash
 	return m.trie
+}
+
+// computeHash calculates a checksum of the secrets list.
+// The order matters, ensuring that if secrets are reordered it is considered a change
+// unless we sorted them first. However, since we want to respond to any change in the provider's
+// returned slice, we'll hash them as returned.
+func computeHash(secrets []string) uint64 {
+	if len(secrets) == 0 {
+		return 0
+	}
+
+	// Use ECMA polynomial
+	table := crc64.MakeTable(crc64.ECMA)
+	h := crc64.New(table)
+
+	// Sort to ensure consistent hash regardless of provider order,
+	// assuming the matcher doesn't care about order (Aho-Corasick doesn't).
+	// This prevents unnecessary rebuilds if the provider returns randomized order but same set.
+	// But first, let's copy to avoid modifying the input slice which might be owned by provider.
+	// Wait, provider.AllValues() returns a copy or a fresh slice ideally.
+	// The provider contract says "Return a copy".
+	// Let's optimize: sorting secrets is good practice for the hash stability.
+
+	sorted := make([]string, len(secrets))
+	copy(sorted, secrets)
+	sort.Strings(sorted)
+
+	for _, s := range sorted {
+		_, _ = io.WriteString(h, s)
+		// Add a separator to distinguish ["ab", "c"] from ["a", "bc"]
+		_, _ = io.WriteString(h, "\x00")
+	}
+
+	return h.Sum64()
 }
