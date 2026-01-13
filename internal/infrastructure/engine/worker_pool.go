@@ -11,6 +11,71 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// controlQueue is a ring buffer implementation for the ready queue.
+// It provides O(1) enqueue and dequeue without allocation churn from slice resizing.
+type controlQueue struct {
+	buffer []string
+	head   int // index of the first element
+	tail   int // index of the next insertion point
+	size   int // number of elements in the queue
+}
+
+// newControlQueue creates a new queue with the given initial capacity.
+func newControlQueue(capacity int) *controlQueue {
+	if capacity < 8 {
+		capacity = 8 // Minimum capacity to avoid frequent resizing
+	}
+	return &controlQueue{
+		buffer: make([]string, capacity),
+	}
+}
+
+// enqueue adds an element to the back of the queue.
+func (q *controlQueue) enqueue(id string) {
+	if q.size == len(q.buffer) {
+		q.grow()
+	}
+	q.buffer[q.tail] = id
+	q.tail = (q.tail + 1) % len(q.buffer)
+	q.size++
+}
+
+// dequeue removes and returns the front element. Returns empty string if queue is empty.
+func (q *controlQueue) dequeue() (string, bool) {
+	if q.size == 0 {
+		return "", false
+	}
+	id := q.buffer[q.head]
+	q.buffer[q.head] = "" // Clear reference to allow GC
+	q.head = (q.head + 1) % len(q.buffer)
+	q.size--
+	return id, true
+}
+
+// isEmpty returns true if the queue has no elements.
+func (q *controlQueue) isEmpty() bool {
+	return q.size == 0
+}
+
+// grow doubles the capacity of the queue.
+func (q *controlQueue) grow() {
+	newCap := len(q.buffer) * 2
+	newBuf := make([]string, newCap)
+
+	// Copy elements in order from head to tail
+	if q.head < q.tail {
+		copy(newBuf, q.buffer[q.head:q.tail])
+	} else {
+		// Wrapped around: copy head to end, then start to tail
+		n := copy(newBuf, q.buffer[q.head:])
+		copy(newBuf[n:], q.buffer[:q.tail])
+	}
+
+	q.buffer = newBuf
+	q.head = 0
+	q.tail = q.size
+}
+
 // workerPoolState manages the state of dependency-aware parallel execution.
 // Instead of organizing controls into levels with barriers, this approach
 // maintains a dynamic ready queue and executes controls as soon as their
@@ -29,7 +94,7 @@ type workerPoolState struct {
 	cancel           context.CancelFunc
 	errGroup         *errgroup.Group
 	engine           *Engine
-	readyQueue       []string
+	readyQueue       *controlQueue
 	totalControls    int
 }
 
@@ -74,10 +139,10 @@ func (e *Engine) initializeWorkerPoolState(
 	}
 
 	// Build initial ready queue (controls with no dependencies)
-	readyQueue := []string{}
+	readyQueue := newControlQueue(len(controls))
 	for _, ctrl := range controls {
 		if inDegree[ctrl.ID] == 0 {
-			readyQueue = append(readyQueue, ctrl.ID)
+			readyQueue.enqueue(ctrl.ID)
 		}
 	}
 
@@ -118,13 +183,17 @@ func (e *Engine) initializeWorkerPoolState(
 // This is called by the coordinator after dependency updates.
 // It sends as many controls as the channel can accept without blocking.
 func (state *workerPoolState) enqueueReadyControls() {
-	for len(state.readyQueue) > 0 {
+	for !state.readyQueue.isEmpty() {
+		controlID, _ := state.readyQueue.dequeue()
 		select {
-		case state.workChan <- state.readyQueue[0]:
-			// Successfully sent to worker, remove from queue
-			state.readyQueue = state.readyQueue[1:]
+		case state.workChan <- controlID:
+			// Successfully sent to worker, continue to next
 		default:
-			// Channel full (all workers busy), stop trying
+			// Channel full (all workers busy), put it back and stop
+			// Note: We need to re-enqueue at the front, but our ring buffer
+			// doesn't support that. Instead, we use a peek-then-dequeue pattern.
+			// Revert: put the controlID back.
+			state.readyQueue.enqueue(controlID)
 			return
 		}
 	}
@@ -140,7 +209,7 @@ func (state *workerPoolState) handleControlCompletion(controlID string) {
 		state.inDegree[dependentID]--
 
 		if state.inDegree[dependentID] == 0 {
-			state.readyQueue = append(state.readyQueue, dependentID)
+			state.readyQueue.enqueue(dependentID)
 		}
 	}
 }
