@@ -433,45 +433,45 @@ func Test_Profile_AddControl(t *testing.T) {
 	assert.Contains(t, err.Error(), "circular dependency")
 
 	// Ensure rollback happened (B should not be in Items)
-	assert.Len(t, profileWithCycle.Controls.Items, 1)
-	assert.Equal(t, "a", profileWithCycle.Controls.Items[0].ID)
+	assert.Len(t, profileWithCycle.GetControls(), 1)
+	assert.Equal(t, "a", profileWithCycle.GetControls().Get("a").ID)
 }
 
 func Test_Profile_GetControl(t *testing.T) {
 	profile := Profile{
 		Controls: ControlsSection{
-			Items: []Control{
+			Items: ControlSet{
 				{ID: "ctrl-001", Name: "First"},
 				{ID: "ctrl-002", Name: "Second"},
 			},
 		},
 	}
 
-	ctrl := profile.GetControl("ctrl-001")
+	ctrl := profile.GetControls().Get("ctrl-001")
 	require.NotNil(t, ctrl)
 	assert.Equal(t, "First", ctrl.Name)
 
-	ctrl = profile.GetControl("ctrl-nonexistent")
+	ctrl = profile.GetControls().Get("ctrl-nonexistent")
 	assert.Nil(t, ctrl)
 }
 
 func Test_Profile_HasControl(t *testing.T) {
 	profile := Profile{
 		Controls: ControlsSection{
-			Items: []Control{
+			Items: ControlSet{
 				{ID: "ctrl-001"},
 			},
 		},
 	}
 
-	assert.True(t, profile.HasControl("ctrl-001"))
-	assert.False(t, profile.HasControl("ctrl-002"))
+	assert.True(t, profile.GetControls().Has("ctrl-001"))
+	assert.False(t, profile.GetControls().Has("ctrl-002"))
 }
 
 func Test_Profile_ControlCount(t *testing.T) {
 	profile := Profile{
 		Controls: ControlsSection{
-			Items: []Control{
+			Items: ControlSet{
 				{ID: "ctrl-001"},
 				{ID: "ctrl-002"},
 				{ID: "ctrl-003"},
@@ -479,13 +479,13 @@ func Test_Profile_ControlCount(t *testing.T) {
 		},
 	}
 
-	assert.Equal(t, 3, profile.ControlCount())
+	assert.Equal(t, 3, profile.GetControls().Count())
 }
 
 func Test_Profile_SelectControlsByTags(t *testing.T) {
 	profile := Profile{
 		Controls: ControlsSection{
-			Items: []Control{
+			Items: ControlSet{
 				{ID: "ctrl-001", Tags: []string{"production", "security"}},
 				{ID: "ctrl-002", Tags: []string{"development"}},
 				{ID: "ctrl-003", Tags: []string{"production", "compliance"}},
@@ -493,17 +493,17 @@ func Test_Profile_SelectControlsByTags(t *testing.T) {
 		},
 	}
 
-	selected := profile.SelectControlsByTags([]string{"production"})
+	selected := profile.GetControls().SelectByTags([]string{"production"})
 	assert.Len(t, selected, 2)
 
-	selected = profile.SelectControlsByTags([]string{})
+	selected = profile.GetControls().SelectByTags([]string{})
 	assert.Len(t, selected, 3)
 }
 
 func Test_Profile_SelectControlsBySeverity(t *testing.T) {
 	profile := Profile{
 		Controls: ControlsSection{
-			Items: []Control{
+			Items: ControlSet{
 				{ID: "ctrl-001", Severity: "high"},
 				{ID: "ctrl-002", Severity: "low"},
 				{ID: "ctrl-003", Severity: "critical"},
@@ -511,17 +511,17 @@ func Test_Profile_SelectControlsBySeverity(t *testing.T) {
 		},
 	}
 
-	selected := profile.SelectControlsBySeverity([]string{"high", "critical"})
+	selected := profile.GetControls().SelectBySeverity([]string{"high", "critical"})
 	assert.Len(t, selected, 2)
 
-	selected = profile.SelectControlsBySeverity([]string{})
+	selected = profile.GetControls().SelectBySeverity([]string{})
 	assert.Len(t, selected, 3)
 }
 
 func Test_Profile_ExcludeControlsByID(t *testing.T) {
 	profile := Profile{
 		Controls: ControlsSection{
-			Items: []Control{
+			Items: ControlSet{
 				{ID: "ctrl-001"},
 				{ID: "ctrl-002"},
 				{ID: "ctrl-003"},
@@ -529,7 +529,7 @@ func Test_Profile_ExcludeControlsByID(t *testing.T) {
 		},
 	}
 
-	selected := profile.ExcludeControlsByID([]string{"ctrl-002"})
+	selected := profile.GetControls().ExcludeByID([]string{"ctrl-002"})
 	assert.Len(t, selected, 2)
 	assert.Equal(t, "ctrl-001", selected[0].ID)
 	assert.Equal(t, "ctrl-003", selected[1].ID)
@@ -561,7 +561,9 @@ func Test_Profile_ApplyDefaults(t *testing.T) {
 		},
 	}
 
-	profile.ApplyDefaults()
+	if profile.Controls.Defaults != nil {
+		profile.GetControls().ApplyDefaults(profile.Controls.Defaults)
+	}
 
 	// First control keeps its overrides
 	ctrl1 := profile.Controls.Items[0]

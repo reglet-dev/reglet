@@ -57,7 +57,7 @@ func Test_ProfileCompiler_Compile_Success(t *testing.T) {
 	assert.True(t, validated.IsValidated())
 
 	// Verify defaults were applied to C-001
-	ctrl1 := validated.GetControl("C-001")
+	ctrl1 := validated.GetControls().Get("C-001")
 	require.NotNil(t, ctrl1)
 	assert.Equal(t, "medium", ctrl1.Severity, "Should inherit default severity")
 	assert.Equal(t, "security-team", ctrl1.Owner, "Should inherit default owner")
@@ -65,14 +65,14 @@ func Test_ProfileCompiler_Compile_Success(t *testing.T) {
 	assert.Equal(t, 30*time.Second, ctrl1.Timeout, "Should inherit default timeout")
 
 	// Verify C-002 kept its overrides but merged tags
-	ctrl2 := validated.GetControl("C-002")
+	ctrl2 := validated.GetControls().Get("C-002")
 	require.NotNil(t, ctrl2)
 	assert.Equal(t, "high", ctrl2.Severity, "Should keep explicit severity")
 	assert.Contains(t, ctrl2.Tags, "compliance", "Should have default tag")
 	assert.Contains(t, ctrl2.Tags, "config", "Should have explicit tag")
 
 	// Verify original profile was NOT mutated
-	origCtrl1 := raw.GetControl("C-001")
+	origCtrl1 := raw.GetControls().Get("C-001")
 	assert.Empty(t, origCtrl1.Severity, "Original should not have defaults applied")
 	assert.Empty(t, origCtrl1.Owner, "Original should not have defaults applied")
 	assert.Empty(t, origCtrl1.Tags, "Original should not have defaults applied")
@@ -240,7 +240,7 @@ func Test_ProfileCompiler_DeepCopyPreventsMutation(t *testing.T) {
 
 	// Modify the validated profile's underlying data (if we could - this tests deep copy)
 	// The compiler should have created a copy, so modifying validated shouldn't affect raw
-	validatedCtrl := validated.GetControl("C-001")
+	validatedCtrl := validated.GetControls().Get("C-001")
 	require.NotNil(t, validatedCtrl)
 
 	// Verify original is unchanged
@@ -282,7 +282,7 @@ func Test_ProfileCompiler_ApplyDefaults_NoDefaults(t *testing.T) {
 	require.NotNil(t, validated)
 
 	// Control should remain unchanged
-	ctrl := validated.GetControl("C-001")
+	ctrl := validated.GetControls().Get("C-001")
 	require.NotNil(t, ctrl)
 	assert.Empty(t, ctrl.Severity)
 	assert.Empty(t, ctrl.Owner)
@@ -333,14 +333,14 @@ func Test_ProfileCompiler_ImplementsProfileReader(t *testing.T) {
 	assert.Equal(t, "test-profile", reader.GetMetadata().Name)
 	assert.Equal(t, []string{"file", "http"}, reader.GetPlugins())
 	assert.Equal(t, "test", reader.GetVars()["env"])
-	assert.Equal(t, 2, reader.ControlCount())
-	assert.NotNil(t, reader.GetControl("C-001"))
-	assert.True(t, reader.HasControl("C-001"))
-	assert.False(t, reader.HasControl("C-999"))
-	assert.Len(t, reader.GetAllControls(), 2)
+	assert.Equal(t, 2, reader.GetControls().Count())
+	assert.NotNil(t, reader.GetControls().Get("C-001"))
+	assert.True(t, reader.GetControls().Has("C-001"))
+	assert.False(t, reader.GetControls().Has("C-999"))
+	assert.Len(t, reader.GetControls(), 2)
 
 	// Test filtering methods
-	selected := reader.SelectControlsByTags([]string{"tag1"})
+	selected := reader.GetControls().SelectByTags([]string{"tag1"})
 	assert.Len(t, selected, 1)
 	assert.Equal(t, "C-001", selected[0].ID)
 }

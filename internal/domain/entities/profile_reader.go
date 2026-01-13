@@ -12,17 +12,6 @@ type ProfileReader interface {
 	GetPlugins() []string
 	GetVars() map[string]interface{}
 
-	// Control queries
-	GetControl(id string) *Control
-	HasControl(id string) bool
-	ControlCount() int
-	GetAllControls() []Control
-
-	// Filtering
-	SelectControlsByTags(tags []string) []Control
-	SelectControlsBySeverity(severities []string) []Control
-	ExcludeControlsByID(excludeIDs []string) []Control
-
-	// Validation - control dependency cycle detection (NOT profile inheritance cycles)
-	CheckForControlDependencyCycles() error
+	// Access to controls
+	GetControls() ControlSet
 }

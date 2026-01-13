@@ -243,7 +243,7 @@ func newEngineWithCapabilities(
 	executor := NewExecutor(runtime, executorOpts...)
 
 	// Preload plugins for schema validation
-	for _, ctrl := range cfg.profile.GetAllControls() {
+	for _, ctrl := range cfg.profile.GetControls() {
 		for _, obs := range ctrl.ObservationDefinitions {
 			if _, err := executor.LoadPlugin(ctx, obs.Plugin); err != nil {
 				return nil, fmt.Errorf("failed to preload plugin %s: %w", obs.Plugin, err)
@@ -333,7 +333,7 @@ func (e *Engine) Execute(ctx context.Context, profile entities.ProfileReader) (*
 		}
 	}
 
-	allControls := profile.GetAllControls()
+	allControls := profile.GetControls()
 	if e.config.Parallel && len(allControls) > 1 {
 		if err := e.executeControlsWithWorkerPool(ctx, allControls, result, requiredControls); err != nil {
 			if errors.Is(err, context.DeadlineExceeded) {
@@ -374,7 +374,7 @@ func (e *Engine) Execute(ctx context.Context, profile entities.ProfileReader) (*
 // resolveDependencies calculates the transitive closure of dependencies for matched controls.
 func (e *Engine) resolveDependencies(profile entities.ProfileReader) (map[string]bool, error) {
 	resolver := services.NewDependencyResolver()
-	allControls := profile.GetAllControls()
+	allControls := profile.GetControls()
 	allDependencies, err := resolver.ResolveDependencies(allControls)
 	if err != nil {
 		return nil, err

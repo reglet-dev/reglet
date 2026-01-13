@@ -28,7 +28,7 @@ func (a *CapabilityAnalyzer) ExtractCapabilities(profile entities.ProfileReader)
 	profileCaps := make(map[string]map[string]capabilities.Capability)
 
 	// Analyze each control's observations
-	for _, ctrl := range profile.GetAllControls() {
+	for _, ctrl := range profile.GetControls() {
 		for _, obs := range ctrl.ObservationDefinitions {
 			pluginName := obs.Plugin
 

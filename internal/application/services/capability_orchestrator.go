@@ -107,7 +107,7 @@ func (o *CapabilityOrchestrator) CollectRequiredCapabilities(ctx context.Context
 // extractPluginNames gets unique plugin names from all profile controls.
 func extractPluginNames(profile entities.ProfileReader) map[string]bool {
 	pluginNames := make(map[string]bool)
-	for _, ctrl := range profile.GetAllControls() {
+	for _, ctrl := range profile.GetControls() {
 		for _, obs := range ctrl.ObservationDefinitions {
 			pluginNames[obs.Plugin] = true
 		}

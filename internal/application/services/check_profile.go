@@ -78,7 +78,7 @@ func (uc *CheckProfileUseCase) Execute(ctx context.Context, req dto.CheckProfile
 		return nil, err
 	}
 
-	uc.logger.Info("profile compiled and validated", "controls", profile.ControlCount())
+	uc.logger.Info("profile compiled and validated", "controls", profile.GetControls().Count())
 
 	// 2b. Resolve/Lock plugins
 	if err := uc.resolveAndLockPlugins(ctx, profile, req.ProfilePath); err != nil {
@@ -267,7 +267,7 @@ func (uc *CheckProfileUseCase) buildResponse(
 func (uc *CheckProfileUseCase) validateFilters(profile entities.ProfileReader, filters dto.FilterOptions) error {
 	// If either include or exclude IDs are provided, build a map once
 	if len(filters.IncludeControlIDs) > 0 || len(filters.ExcludeControlIDs) > 0 {
-		controls := profile.GetAllControls()
+		controls := profile.GetControls()
 		controlMap := make(map[string]bool, len(controls))
 		for _, ctrl := range controls {
 			controlMap[ctrl.ID] = true
@@ -343,7 +343,7 @@ func (uc *CheckProfileUseCase) validateDeclaredPlugins(profile entities.ProfileR
 
 func (uc *CheckProfileUseCase) getUsedPlugins(profile entities.ProfileReader) map[string]bool {
 	usedPlugins := make(map[string]bool)
-	for _, ctrl := range profile.GetAllControls() {
+	for _, ctrl := range profile.GetControls() {
 		for _, obs := range ctrl.ObservationDefinitions {
 			usedPlugins[obs.Plugin] = true
 		}
