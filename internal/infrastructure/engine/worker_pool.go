@@ -173,31 +173,53 @@ func (state *workerPoolState) coordinateExecution() error {
 // executeWorker runs in a goroutine, pulling controls from workChan and executing them.
 // Workers are stateless - all state is in workerPoolState.
 // Workers exit when workChan is closed by the coordinator.
-func (state *workerPoolState) executeWorker() {
+// The function returns an error if a panic occurs to propagate it through errgroup.
+func (state *workerPoolState) executeWorker() (workerErr error) {
 	for controlID := range state.workChan {
-		ctrl, exists := state.controlByID[controlID]
-		if !exists {
-			continue
-		}
+		// Recover from panics to prevent coordinator from hanging.
+		// If a panic occurs, we still signal completion so the coordinator
+		// doesn't wait indefinitely for this control.
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					workerErr = fmt.Errorf("worker panic while executing control %s: %v", controlID, r)
+					// Cancel context to signal other workers and coordinator to stop
+					state.cancel()
+				}
+			}()
 
-		index := state.controlIndexByID[controlID]
+			ctrl, exists := state.controlByID[controlID]
+			if !exists {
+				return
+			}
 
-		controlResult := state.engine.executeControl(
-			state.ctx,
-			ctrl,
-			index,
-			state.execResult,
-			state.requiredDeps,
-		)
+			index := state.controlIndexByID[controlID]
 
-		state.execResult.AddControlResult(controlResult)
+			controlResult := state.engine.executeControl(
+				state.ctx,
+				ctrl,
+				index,
+				state.execResult,
+				state.requiredDeps,
+			)
 
+			state.execResult.AddControlResult(controlResult)
+		}()
+
+		// Always signal completion, even on panic, to prevent coordinator deadlock.
+		// The context cancellation from panic recovery will stop the coordinator.
 		select {
 		case state.doneChan <- controlID:
 		case <-state.ctx.Done():
-			return
+			return workerErr
+		}
+
+		// Exit early if we hit a panic
+		if workerErr != nil {
+			return workerErr
 		}
 	}
+	return nil
 }
 
 // executeControlsWithWorkerPool executes controls in parallel using a dependency-aware worker pool.
@@ -224,8 +246,7 @@ func (e *Engine) executeControlsWithWorkerPool(
 
 	for i := 0; i < numWorkers; i++ {
 		state.errGroup.Go(func() error {
-			state.executeWorker()
-			return nil
+			return state.executeWorker()
 		})
 	}
 
