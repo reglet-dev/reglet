@@ -164,52 +164,69 @@ func (r *Redactor) Redact(data interface{}) interface{} {
 }
 
 // ScrubString replaces sensitive patterns in a string.
-// Uses gitleaks detector (222+ patterns) first, then falls back to regex patterns.
+//
+// Uses a single-pass collection strategy to avoid multi-pass mutation vulnerabilities:
+// 1. Collect all matches from: gitleaks, known sensitive values, and regex patterns
+// 2. Deduplicate overlapping matches (prefer longer/more specific matches)
+// 3. Apply all replacements in a single pass
 func (r *Redactor) ScrubString(input string) string {
 	if input == "" {
 		return ""
 	}
 
-	result := input
+	var allMatches []Match
 
-	// Phase 1: Use gitleaks detector if available (comprehensive detection)
+	// Phase 1: Collect matches from gitleaks detector
 	if r.gitleaksDetector != nil {
 		//nolint:staticcheck // SA1019: detect.Fragment deprecated, will update when gitleaks v9 releases
 		fragment := detect.Fragment{
-			Raw: result,
+			Raw: input,
 		}
 
 		findings := r.gitleaksDetector.Detect(fragment)
 		for _, finding := range findings {
-			replacement := "[REDACTED]"
-			if r.hashMode {
-				replacement = r.hash(finding.Secret)
+			// Find the position of this secret in the input
+			start := strings.Index(input, finding.Secret)
+			if start >= 0 {
+				allMatches = append(allMatches, Match{
+					Start:  start,
+					End:    start + len(finding.Secret),
+					Secret: finding.Secret,
+				})
 			}
-			result = strings.ReplaceAll(result, finding.Secret, replacement)
 		}
 	}
 
-	// Phase 2: Known sensitive values using Aho-Corasick algorithm (O(n) multi-pattern matching)
+	// Phase 2: Collect matches from known sensitive values (Aho-Corasick)
 	if r.sensitiveMatcher != nil {
-		result = r.sensitiveMatcher.ReplaceAll(result, func(secret string) string {
-			if r.hashMode {
-				return r.hash(secret)
-			}
-			return "[REDACTED]"
-		})
+		sensitiveMatches := r.sensitiveMatcher.FindAll(input)
+		allMatches = append(allMatches, sensitiveMatches...)
 	}
 
-	// Phase 3: Apply custom regex patterns (fallback + user-defined patterns)
+	// Phase 3: Collect matches from regex patterns
 	for _, re := range r.patterns {
-		result = re.ReplaceAllStringFunc(result, func(match string) string {
-			if r.hashMode {
-				return r.hash(match)
-			}
-			return "[REDACTED]"
-		})
+		locs := re.FindAllStringIndex(input, -1)
+		for _, loc := range locs {
+			allMatches = append(allMatches, Match{
+				Start:  loc[0],
+				End:    loc[1],
+				Secret: input[loc[0]:loc[1]],
+			})
+		}
 	}
 
-	return result
+	// Deduplicate and apply replacements
+	if len(allMatches) == 0 {
+		return input
+	}
+
+	deduped := SortAndDeduplicateMatches(allMatches)
+	return ApplyReplacements(input, deduped, func(secret string) string {
+		if r.hashMode {
+			return r.hash(secret)
+		}
+		return "[REDACTED]"
+	})
 }
 
 // walk recursively traverses the data structure.

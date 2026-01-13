@@ -3,7 +3,6 @@
 package sensitivedata
 
 import (
-	"sort"
 	"sync"
 
 	ahocorasick "github.com/BobuSumisu/aho-corasick"
@@ -13,6 +12,10 @@ import (
 // SensitiveStringMatcher finds and replaces multiple sensitive values in a string.
 // Implementations should be safe for concurrent use.
 type SensitiveStringMatcher interface {
+	// FindAll returns all match positions without performing replacement.
+	// Matches may overlap and are not sorted.
+	FindAll(input string) []Match
+
 	// ReplaceAll finds all occurrences of sensitive values in input and replaces them.
 	// The replacement function is called for each match to get the replacement string.
 	ReplaceAll(input string, replacement func(secret string) string) string
@@ -36,63 +39,47 @@ func NewAhoCorasickMatcher(provider ports.SensitiveValueProvider) SensitiveStrin
 	}
 }
 
-// ReplaceAll finds all occurrences of sensitive values and replaces them in a single pass.
-//
-// Algorithm:
-// 1. Check if trie needs rebuilding (secret count changed)
-// 2. Find all matches using Aho-Corasick (O(n + m) where n=input length, m=matches)
-// 3. Sort matches by position and handle overlaps
-// 4. Build result by replacing matched regions
-func (m *ahocorasickMatcher) ReplaceAll(input string, replacement func(secret string) string) string {
+// FindAll returns all match positions for sensitive values in the input.
+// Matches may overlap and are not sorted - use SortAndDeduplicateMatches to process them.
+func (m *ahocorasickMatcher) FindAll(input string) []Match {
 	if input == "" {
-		return ""
+		return nil
 	}
 
 	trie := m.getTrie()
 	if trie == nil {
-		return input // No secrets to match
+		return nil
 	}
 
-	matches := trie.MatchString(input)
+	acMatches := trie.MatchString(input)
+	if len(acMatches) == 0 {
+		return nil
+	}
+
+	result := make([]Match, 0, len(acMatches))
+	for _, acm := range acMatches {
+		pos := int(acm.Pos())
+		secret := acm.MatchString()
+		result = append(result, Match{
+			Start:  pos,
+			End:    pos + len(secret),
+			Secret: secret,
+		})
+	}
+
+	return result
+}
+
+// ReplaceAll finds all occurrences of sensitive values and replaces them in a single pass.
+// Uses FindAll internally, then deduplicates and applies replacements.
+func (m *ahocorasickMatcher) ReplaceAll(input string, replacement func(secret string) string) string {
+	matches := m.FindAll(input)
 	if len(matches) == 0 {
 		return input
 	}
 
-	// Sort matches by position for proper processing
-	sort.Slice(matches, func(i, j int) bool {
-		return matches[i].Pos() < matches[j].Pos()
-	})
-
-	// Build result, handling overlapping matches
-	var result []byte
-	lastEnd := int64(0)
-
-	for _, match := range matches {
-		pos := match.Pos()
-		secret := match.MatchString()
-		end := pos + int64(len(secret))
-
-		// Skip if this match overlaps with a previous replacement
-		if pos < lastEnd {
-			continue
-		}
-
-		// Append text before this match
-		if pos > lastEnd {
-			result = append(result, input[lastEnd:pos]...)
-		}
-
-		// Append replacement
-		result = append(result, replacement(secret)...)
-		lastEnd = end
-	}
-
-	// Append remaining text after last match
-	if lastEnd < int64(len(input)) {
-		result = append(result, input[lastEnd:]...)
-	}
-
-	return string(result)
+	deduped := SortAndDeduplicateMatches(matches)
+	return ApplyReplacements(input, deduped, replacement)
 }
 
 // getTrie returns the current Aho-Corasick trie, rebuilding if necessary.

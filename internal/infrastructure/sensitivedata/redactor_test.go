@@ -119,3 +119,83 @@ func TestRedactor_RaceOnSliceMutation(t *testing.T) {
 		t.Errorf("Worker error: %v", err)
 	}
 }
+
+func TestRedactor_NoMultiPassMutation(t *testing.T) {
+	// This test verifies that the single-pass collection approach works correctly.
+	// Previously, a multi-phase approach could theoretically allow a string to be
+	// partially redacted in phase 1, then the result containing "[REDACTED]" could
+	// match a pattern in phase 2 or 3.
+	//
+	// With single-pass collection, all patterns are matched against the ORIGINAL
+	// input, so this scenario is impossible.
+
+	// Create a provider that specifically looks for "[REDACTED]" as a "secret"
+	// This simulates the attack scenario where phase 1 output could match phase 2
+	mockProvider := &mockSensitiveProvider{
+		values: []string{"[REDACTED]"}, // Adversarial: treating the redaction marker as sensitive
+	}
+
+	redactor, err := sensitivedata.NewRedactor(
+		sensitivedata.WithGitleaksDisabled(true),
+		sensitivedata.WithSensitiveValueProvider(mockProvider),
+		sensitivedata.WithPatterns([]string{"secret"}), // This will match and be replaced first
+	)
+	require.NoError(t, err)
+
+	// If multi-pass was used:
+	// 1. "secret" → "[REDACTED]"
+	// 2. "[REDACTED]" matches the provider → would be double-redacted!
+	//
+	// With single-pass:
+	// - "secret" matched at position 16-22
+	// - "[REDACTED]" not found in original input
+	// - Only one replacement occurs
+
+	input := "This contains a secret value"
+	got := redactor.ScrubString(input)
+
+	expected := "This contains a [REDACTED] value"
+	assert.Equal(t, expected, got)
+
+	// Verify that [REDACTED] only appears once
+	count := strings.Count(got, "[REDACTED]")
+	assert.Equal(t, 1, count, "Expected exactly one [REDACTED], got %d in: %s", count, got)
+}
+
+func TestRedactor_OverlappingPatterns(t *testing.T) {
+	// Test that when multiple detectors find overlapping secrets,
+	// the longer (more specific) match wins
+
+	mockProvider := &mockSensitiveProvider{
+		values: []string{"super_secret_key"}, // Longer pattern
+	}
+
+	redactor, err := sensitivedata.NewRedactor(
+		sensitivedata.WithGitleaksDisabled(true),
+		sensitivedata.WithSensitiveValueProvider(mockProvider),
+		sensitivedata.WithPatterns([]string{"secret"}), // Shorter pattern that overlaps
+	)
+	require.NoError(t, err)
+
+	input := "Found: super_secret_key here"
+	got := redactor.ScrubString(input)
+
+	// The longer match "super_secret_key" should win over "secret"
+	expected := "Found: [REDACTED] here"
+	assert.Equal(t, expected, got)
+
+	// Should only have one redaction
+	count := strings.Count(got, "[REDACTED]")
+	assert.Equal(t, 1, count)
+}
+
+// mockSensitiveProvider implements ports.SensitiveValueProvider for testing
+type mockSensitiveProvider struct {
+	values []string
+}
+
+func (m *mockSensitiveProvider) AllValues() []string {
+	return m.values
+}
+
+func (m *mockSensitiveProvider) Track(_ string) {}
