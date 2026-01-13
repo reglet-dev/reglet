@@ -15,21 +15,12 @@ func WithIndent(enabled bool) BaseOutputOption {
 	}
 }
 
-// applyBaseOptions applies common options to a config.
-func applyBaseOptions(opts []BaseOutputOption) baseOutputConfig {
-	cfg := baseOutputConfig{indent: true} // Default: indented
-	for _, opt := range opts {
-		opt(&cfg)
-	}
-	return cfg
-}
-
 // FactoryOptions holds CLI-provided options for formatter creation.
 // This is an infrastructure concern, not exposed through ports.
 type FactoryOptions struct {
 	ProfilePath string
+	EvidenceDir string
 	Indent      bool
 	Verbose     bool
 	NoColor     bool
-	EvidenceDir string // For OSCAL (Phase 4)
 }
