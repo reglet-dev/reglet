@@ -16,22 +16,42 @@ func NewFormatterFactory() *FormatterFactory {
 }
 
 // Create returns a formatter for the given format name.
+// options should be of type FactoryOptions or nil.
 func (f *FormatterFactory) Create(
 	format string,
 	writer io.Writer,
-	options ports.FormatterOptions,
+	options interface{},
 ) (ports.OutputFormatter, error) {
+	// Type assert options (default to empty if nil)
+	opts := FactoryOptions{}
+	if options != nil {
+		if o, ok := options.(FactoryOptions); ok {
+			opts = o
+		}
+	}
+
 	switch format {
 	case "table":
-		return NewTableFormatter(writer), nil
+		return NewTableFormatter(writer,
+			WithNoColor(opts.NoColor),
+		), nil
+
 	case "json":
-		return NewJSONFormatter(writer, options.Indent), nil
+		return NewJSONFormatter(writer,
+			WithJSONIndent(opts.Indent),
+		), nil
+
 	case "yaml":
 		return NewYAMLFormatter(writer), nil
+
 	case "junit":
 		return NewJUnitFormatter(writer), nil
+
 	case "sarif":
-		return NewSARIFFormatter(writer, options.ProfilePath), nil
+		return NewSARIFFormatter(writer,
+			WithProfilePath(opts.ProfilePath),
+		), nil
+
 	default:
 		return nil, fmt.Errorf(
 			"unknown format: %s (supported: %v)",

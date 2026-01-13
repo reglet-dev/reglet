@@ -26,17 +26,13 @@ type OutputFormatter interface {
 	Format(result *execution.ExecutionResult) error
 }
 
-// FormatterOptions configures formatter behavior.
-type FormatterOptions struct {
-	ProfilePath string // For SARIF: reference to profile location
-	Indent      bool   // For JSON: pretty-print with indentation
-}
-
 // OutputFormatterFactory creates formatters by name.
+// The options parameter is implementation-specific (e.g., output.FactoryOptions).
 type OutputFormatterFactory interface {
 	// Create returns a formatter for the given format name.
+	// options is implementation-specific (typically output.FactoryOptions).
 	// Returns error if format is unknown.
-	Create(format string, writer io.Writer, options FormatterOptions) (OutputFormatter, error)
+	Create(format string, writer io.Writer, options interface{}) (OutputFormatter, error)
 
 	// SupportedFormats returns list of available format names.
 	SupportedFormats() []string

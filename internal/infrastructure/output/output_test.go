@@ -172,7 +172,7 @@ func TestJSONFormatter_Format_Indented(t *testing.T) {
 	result := createTestResult()
 	var buf bytes.Buffer
 
-	formatter := NewJSONFormatter(&buf, true)
+	formatter := NewJSONFormatter(&buf, WithJSONIndent(true))
 	err := formatter.Format(result)
 	require.NoError(t, err)
 
@@ -200,7 +200,7 @@ func TestJSONFormatter_Format_Compact(t *testing.T) {
 	result := createTestResult()
 	var buf bytes.Buffer
 
-	formatter := NewJSONFormatter(&buf, false)
+	formatter := NewJSONFormatter(&buf, WithJSONIndent(false))
 	err := formatter.Format(result)
 	require.NoError(t, err)
 
@@ -275,7 +275,7 @@ func TestAllFormatters_WithSameData(t *testing.T) {
 			name: "JSON",
 			test: func(t *testing.T) {
 				var buf bytes.Buffer
-				formatter := NewJSONFormatter(&buf, true)
+				formatter := NewJSONFormatter(&buf, WithJSONIndent(true))
 				err := formatter.Format(result)
 				assert.NoError(t, err)
 				assert.NotEmpty(t, buf.String())
@@ -326,7 +326,7 @@ func TestJSONFormatter_PreservesTypes(t *testing.T) {
 	result := createTestResult()
 	var buf bytes.Buffer
 
-	formatter := NewJSONFormatter(&buf, true)
+	formatter := NewJSONFormatter(&buf, WithJSONIndent(true))
 	err := formatter.Format(result)
 	require.NoError(t, err)
 

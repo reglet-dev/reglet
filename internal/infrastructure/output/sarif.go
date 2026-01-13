@@ -14,7 +14,7 @@ import (
 //
 // Usage:
 //
-//	formatter := output.NewSARIFFormatter(os.Stdout, "profile.yaml")
+//	formatter := output.NewSARIFFormatter(os.Stdout, WithProfilePath("profile.yaml"))
 //	if err := formatter.Format(result); err != nil {
 //	    log.Fatal(err)
 //	}
@@ -23,12 +23,22 @@ type SARIFFormatter struct {
 	profilePath string
 }
 
+// SARIFOption configures the SARIF formatter.
+type SARIFOption func(*SARIFFormatter)
+
 // NewSARIFFormatter creates a new SARIF formatter.
-// profilePath is used to resolve relative paths for file locations.
-func NewSARIFFormatter(writer io.Writer, profilePath string) *SARIFFormatter {
-	return &SARIFFormatter{
-		writer:      writer,
-		profilePath: profilePath,
+func NewSARIFFormatter(w io.Writer, opts ...SARIFOption) *SARIFFormatter {
+	f := &SARIFFormatter{writer: w}
+	for _, opt := range opts {
+		opt(f)
+	}
+	return f
+}
+
+// WithProfilePath sets the profile path for SARIF location resolution.
+func WithProfilePath(path string) SARIFOption {
+	return func(f *SARIFFormatter) {
+		f.profilePath = path
 	}
 }
 

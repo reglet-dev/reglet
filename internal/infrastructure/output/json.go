@@ -11,15 +11,29 @@ import (
 // JSONFormatter formats execution results as JSON.
 type JSONFormatter struct {
 	writer io.Writer
-	indent bool
+	config baseOutputConfig
 }
 
+// JSONOption configures the JSON formatter.
+type JSONOption func(*JSONFormatter)
+
 // NewJSONFormatter creates a new JSON formatter.
-// If indent is true, the output will be pretty-printed with indentation.
-func NewJSONFormatter(w io.Writer, indent bool) *JSONFormatter {
-	return &JSONFormatter{
+// If no options are provided, defaults to indented output.
+func NewJSONFormatter(w io.Writer, opts ...JSONOption) *JSONFormatter {
+	f := &JSONFormatter{
 		writer: w,
-		indent: indent,
+		config: baseOutputConfig{indent: true}, // Default: indented
+	}
+	for _, opt := range opts {
+		opt(f)
+	}
+	return f
+}
+
+// WithJSONIndent sets indentation for JSON output.
+func WithJSONIndent(enabled bool) JSONOption {
+	return func(f *JSONFormatter) {
+		f.config.indent = enabled
 	}
 }
 
@@ -31,7 +45,7 @@ func (f *JSONFormatter) Format(result *execution.ExecutionResult) error {
 	var data []byte
 	var err error
 
-	if f.indent {
+	if f.config.indent {
 		data, err = json.MarshalIndent(out, "", "  ")
 	} else {
 		data, err = json.Marshal(out)

@@ -28,11 +28,25 @@ type TableFormatter struct {
 	EnableColor bool
 }
 
+// TableOption configures the table formatter.
+type TableOption func(*TableFormatter)
+
 // NewTableFormatter creates a new table formatter.
-func NewTableFormatter(w io.Writer) *TableFormatter {
-	return &TableFormatter{
+func NewTableFormatter(w io.Writer, opts ...TableOption) *TableFormatter {
+	f := &TableFormatter{
 		writer:      w,
-		EnableColor: true, // Default to true, caller can disable
+		EnableColor: true, // Default to true
+	}
+	for _, opt := range opts {
+		opt(f)
+	}
+	return f
+}
+
+// WithNoColor disables color output in the table formatter.
+func WithNoColor(disabled bool) TableOption {
+	return func(f *TableFormatter) {
+		f.EnableColor = !disabled
 	}
 }
 

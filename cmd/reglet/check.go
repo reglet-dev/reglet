@@ -16,6 +16,7 @@ import (
 	"github.com/reglet-dev/reglet/internal/application/ports"
 	"github.com/reglet-dev/reglet/internal/domain/execution"
 	"github.com/reglet-dev/reglet/internal/infrastructure/container"
+	"github.com/reglet-dev/reglet/internal/infrastructure/output"
 	"github.com/spf13/cobra"
 )
 
@@ -207,7 +208,7 @@ func formatOutput(factory ports.OutputFormatterFactory, writer io.Writer, result
 	formatter, err := factory.Create(
 		format,
 		writer,
-		ports.FormatterOptions{
+		output.FactoryOptions{
 			Indent:      true,
 			ProfilePath: profilePath,
 		},

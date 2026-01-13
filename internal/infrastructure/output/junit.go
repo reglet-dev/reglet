@@ -14,11 +14,16 @@ type JUnitFormatter struct {
 	writer io.Writer
 }
 
+// JUnitOption configures the JUnit formatter.
+type JUnitOption func(*JUnitFormatter)
+
 // NewJUnitFormatter creates a new JUnit formatter.
-func NewJUnitFormatter(w io.Writer) *JUnitFormatter {
-	return &JUnitFormatter{
-		writer: w,
+func NewJUnitFormatter(w io.Writer, opts ...JUnitOption) *JUnitFormatter {
+	f := &JUnitFormatter{writer: w}
+	for _, opt := range opts {
+		opt(f)
 	}
+	return f
 }
 
 // JUnitTestSuites JUnit XML structures

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/reglet-dev/reglet/internal/application/ports"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -16,7 +15,7 @@ func TestFormatterFactory_Create(t *testing.T) {
 	tests := []struct {
 		name        string
 		format      string
-		options     ports.FormatterOptions
+		options     FactoryOptions
 		wantErr     bool
 		wantType    interface{}
 		errContains string
@@ -29,7 +28,7 @@ func TestFormatterFactory_Create(t *testing.T) {
 		{
 			name:     "json format",
 			format:   "json",
-			options:  ports.FormatterOptions{Indent: true},
+			options:  FactoryOptions{Indent: true},
 			wantType: &JSONFormatter{},
 		},
 		{
@@ -45,7 +44,7 @@ func TestFormatterFactory_Create(t *testing.T) {
 		{
 			name:     "sarif format",
 			format:   "sarif",
-			options:  ports.FormatterOptions{ProfilePath: "test.yaml"},
+			options:  FactoryOptions{ProfilePath: "test.yaml"},
 			wantType: &SARIFFormatter{},
 		},
 		{

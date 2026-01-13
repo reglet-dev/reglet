@@ -20,7 +20,7 @@ func TestSARIFFormatter_Format(t *testing.T) {
 	result := createSARIFTestResult()
 	var buf bytes.Buffer
 
-	formatter := NewSARIFFormatter(&buf, "test-profile.yaml")
+	formatter := NewSARIFFormatter(&buf, WithProfilePath("test-profile.yaml"))
 	err := formatter.Format(result)
 	require.NoError(t, err)
 
@@ -50,7 +50,7 @@ func TestSARIFFormatter_ValidatesAgainstSchema(t *testing.T) {
 	result := createSARIFTestResult()
 	var buf bytes.Buffer
 
-	formatter := NewSARIFFormatter(&buf, "test-profile.yaml")
+	formatter := NewSARIFFormatter(&buf, WithProfilePath("test-profile.yaml"))
 	err := formatter.Format(result)
 	require.NoError(t, err)
 
@@ -69,7 +69,7 @@ func TestSARIFFormatter_ToolMetadata(t *testing.T) {
 	result.RegletVersion = "1.2.3"
 	var buf bytes.Buffer
 
-	formatter := NewSARIFFormatter(&buf, "")
+	formatter := NewSARIFFormatter(&buf)
 	err := formatter.Format(result)
 	require.NoError(t, err)
 
@@ -115,7 +115,7 @@ func TestSARIFFormatter_StatusLevelMapping(t *testing.T) {
 			result.Finalize()
 
 			var buf bytes.Buffer
-			formatter := NewSARIFFormatter(&buf, "")
+			formatter := NewSARIFFormatter(&buf)
 			err := formatter.Format(result)
 			require.NoError(t, err)
 
@@ -339,7 +339,7 @@ func TestSARIFMapper_PropertiesPreservation(t *testing.T) {
 // Helper to format result to Report
 func formatToReport(t *testing.T, result *execution.ExecutionResult) *sarif.Report {
 	var buf bytes.Buffer
-	formatter := NewSARIFFormatter(&buf, "")
+	formatter := NewSARIFFormatter(&buf)
 	err := formatter.Format(result)
 	require.NoError(t, err)
 

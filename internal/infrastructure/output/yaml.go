@@ -12,9 +12,16 @@ type YAMLFormatter struct {
 	writer io.Writer
 }
 
+// YAMLOption configures the YAML formatter.
+type YAMLOption func(*YAMLFormatter)
+
 // NewYAMLFormatter creates a new YAML formatter.
-func NewYAMLFormatter(w io.Writer) *YAMLFormatter {
-	return &YAMLFormatter{writer: w}
+func NewYAMLFormatter(w io.Writer, opts ...YAMLOption) *YAMLFormatter {
+	f := &YAMLFormatter{writer: w}
+	for _, opt := range opts {
+		opt(f)
+	}
+	return f
 }
 
 // Format writes the execution result as YAML.

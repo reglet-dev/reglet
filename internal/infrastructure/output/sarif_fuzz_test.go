@@ -42,7 +42,7 @@ func FuzzSARIFGeneration(f *testing.F) {
 
 		// Format as SARIF
 		buf := &bytes.Buffer{}
-		formatter := NewSARIFFormatter(buf, "profile.yaml")
+		formatter := NewSARIFFormatter(buf, WithProfilePath("profile.yaml"))
 		_ = formatter.Format(res)
 	})
 }
