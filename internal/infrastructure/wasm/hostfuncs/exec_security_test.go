@@ -1,10 +1,208 @@
 package hostfuncs
 
 import (
+	"context"
 	"testing"
 
+	"github.com/reglet-dev/reglet/internal/domain/capabilities"
 	"github.com/stretchr/testify/assert"
 )
+
+// TestIsAlwaysBlockedEnv verifies always-blocked environment variable detection
+func TestIsAlwaysBlockedEnv(t *testing.T) {
+	tests := []struct {
+		name     string
+		key      string
+		expected bool
+	}{
+		// Linux linker injection
+		{"LD_PRELOAD", "LD_PRELOAD", true},
+		{"LD_LIBRARY_PATH", "LD_LIBRARY_PATH", true},
+		{"LD_AUDIT", "LD_AUDIT", true},
+		{"LD_DEBUG", "LD_DEBUG", true},
+		{"LD_BIND_NOW", "LD_BIND_NOW", true},
+
+		// macOS linker injection
+		{"DYLD_INSERT_LIBRARIES", "DYLD_INSERT_LIBRARIES", true},
+		{"DYLD_LIBRARY_PATH", "DYLD_LIBRARY_PATH", true},
+		{"DYLD_FRAMEWORK_PATH", "DYLD_FRAMEWORK_PATH", true},
+
+		// Shell behavior modifiers
+		{"IFS", "IFS", true},
+		{"BASH_ENV", "BASH_ENV", true},
+		{"ENV", "ENV", true},
+		{"LOCPATH", "LOCPATH", true},
+
+		// Safe variables (not blocked)
+		{"HOME", "HOME", false},
+		{"PATH", "PATH", false}, // This is capability-gated, not blocked
+		{"USER", "USER", false},
+		{"LANG", "LANG", false},
+		{"TERM", "TERM", false},
+		{"MY_CUSTOM_VAR", "MY_CUSTOM_VAR", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isAlwaysBlockedEnv(tt.key)
+			assert.Equal(t, tt.expected, result, "key: %s", tt.key)
+		})
+	}
+}
+
+// TestSanitizeEnv_AlwaysBlocked tests that always-blocked vars are filtered
+func TestSanitizeEnv_AlwaysBlocked(t *testing.T) {
+	ctx := context.Background()
+	// Empty capability map - no grants
+	checker := NewCapabilityChecker(map[string][]capabilities.Capability{})
+
+	tests := []struct {
+		name     string
+		input    []string
+		expected []string
+	}{
+		{
+			"LD_PRELOAD blocked",
+			[]string{"SAFE=value", "LD_PRELOAD=/evil.so", "OTHER=ok"},
+			[]string{"SAFE=value", "OTHER=ok"},
+		},
+		{
+			"Multiple LD_ vars blocked",
+			[]string{"LD_PRELOAD=/evil.so", "LD_LIBRARY_PATH=/evil", "SAFE=ok"},
+			[]string{"SAFE=ok"},
+		},
+		{
+			"DYLD vars blocked",
+			[]string{"DYLD_INSERT_LIBRARIES=/evil.dylib", "KEEP=this"},
+			[]string{"KEEP=this"},
+		},
+		{
+			"IFS blocked",
+			[]string{"IFS=;", "VALID=yes"},
+			[]string{"VALID=yes"},
+		},
+		{
+			"Case insensitive blocking",
+			[]string{"ld_preload=/evil.so", "Ld_Library_Path=/bad"},
+			[]string{},
+		},
+		{
+			"All safe vars pass through",
+			[]string{"FOO=bar", "BAZ=qux", "TERM=xterm"},
+			[]string{"FOO=bar", "BAZ=qux", "TERM=xterm"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := sanitizeEnv(ctx, tt.input, "test-plugin", checker)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestSanitizeEnv_CapabilityGated tests capability-gated variables
+func TestSanitizeEnv_CapabilityGated(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("PATH blocked without capability", func(t *testing.T) {
+		// No grants
+		checker := NewCapabilityChecker(map[string][]capabilities.Capability{})
+		input := []string{"PATH=/usr/bin", "SAFE=value"}
+		result := sanitizeEnv(ctx, input, "test-plugin", checker)
+		assert.Equal(t, []string{"SAFE=value"}, result)
+	})
+
+	t.Run("PATH allowed with exec:env:PATH capability", func(t *testing.T) {
+		checker := NewCapabilityChecker(map[string][]capabilities.Capability{
+			"test-plugin": {
+				{Kind: "exec", Pattern: "env:PATH"},
+			},
+		})
+
+		input := []string{"PATH=/usr/bin", "SAFE=value"}
+		result := sanitizeEnv(ctx, input, "test-plugin", checker)
+		assert.Equal(t, []string{"PATH=/usr/bin", "SAFE=value"}, result)
+	})
+
+	t.Run("PYTHONPATH blocked without capability", func(t *testing.T) {
+		checker := NewCapabilityChecker(map[string][]capabilities.Capability{})
+		input := []string{"PYTHONPATH=/evil", "OK=yes"}
+		result := sanitizeEnv(ctx, input, "test-plugin", checker)
+		assert.Equal(t, []string{"OK=yes"}, result)
+	})
+
+	t.Run("PYTHONPATH allowed with capability", func(t *testing.T) {
+		checker := NewCapabilityChecker(map[string][]capabilities.Capability{
+			"test-plugin": {
+				{Kind: "exec", Pattern: "env:PYTHONPATH"},
+			},
+		})
+
+		input := []string{"PYTHONPATH=/custom/lib", "FOO=bar"}
+		result := sanitizeEnv(ctx, input, "test-plugin", checker)
+		assert.Equal(t, []string{"PYTHONPATH=/custom/lib", "FOO=bar"}, result)
+	})
+
+	t.Run("Multiple gated vars with partial grants", func(t *testing.T) {
+		// Only PATH granted
+		checker := NewCapabilityChecker(map[string][]capabilities.Capability{
+			"test-plugin": {
+				{Kind: "exec", Pattern: "env:PATH"},
+			},
+		})
+
+		input := []string{"PATH=/bin", "NODE_OPTIONS=--debug", "HOME=/root"}
+		result := sanitizeEnv(ctx, input, "test-plugin", checker)
+		// PATH allowed (granted), NODE_OPTIONS blocked (not granted), HOME blocked (not granted)
+		assert.Equal(t, []string{"PATH=/bin"}, result)
+	})
+}
+
+// TestSanitizeEnv_MalformedVars tests handling of malformed/edge cases
+func TestSanitizeEnv_MalformedVars(t *testing.T) {
+	ctx := context.Background()
+	checker := NewCapabilityChecker(map[string][]capabilities.Capability{})
+
+	tests := []struct {
+		name     string
+		input    []string
+		expected []string
+	}{
+		{
+			"Malformed var without equals",
+			[]string{"NOEQUALSSIGN", "VALID=yes"},
+			[]string{"VALID=yes"},
+		},
+		{
+			"Empty value is valid",
+			[]string{"EMPTY=", "ANOTHER=value"},
+			[]string{"EMPTY=", "ANOTHER=value"},
+		},
+		{
+			"Value with equals sign",
+			[]string{"COMPLEX=foo=bar=baz"},
+			[]string{"COMPLEX=foo=bar=baz"},
+		},
+		{
+			"Empty input",
+			[]string{},
+			[]string{},
+		},
+		{
+			"Nil input",
+			nil,
+			nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := sanitizeEnv(ctx, tt.input, "test-plugin", checker)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
 
 // TestGetBasename verifies basename extraction from paths
 func TestGetBasename(t *testing.T) {

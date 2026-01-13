@@ -8,11 +8,117 @@ import (
 	"fmt"
 	"log/slog"
 	"os/exec"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/tetratelabs/wazero/api"
 )
+
+// Environment variable security tiers
+// Tier 1: Always blocked - no capability can grant these (linker injection vectors)
+// Tier 2: Capability-gated - require explicit exec:env:<VAR> capability
+var (
+	// alwaysBlockedEnvPrefixes are prefixes for variables that are NEVER allowed.
+	// These are primarily used for shared library injection attacks.
+	alwaysBlockedEnvPrefixes = []string{
+		"LD_",   // Linux dynamic linker (LD_PRELOAD, LD_LIBRARY_PATH, LD_AUDIT, etc.)
+		"DYLD_", // macOS dynamic linker (DYLD_INSERT_LIBRARIES, etc.)
+	}
+
+	// alwaysBlockedEnvExact are exact variable names that are NEVER allowed.
+	alwaysBlockedEnvExact = []string{
+		"IFS",      // Shell internal field separator - can alter parsing
+		"LOCPATH",  // Custom locale path - can execute code via locale files
+		"BASH_ENV", // Executed by non-interactive bash shells
+		"ENV",      // Executed by POSIX sh
+	}
+
+	// capabilityGatedEnv are variables that require explicit capability grant.
+	// A plugin needs exec:env:<VARNAME> capability to set these.
+	capabilityGatedEnv = []string{
+		"PATH",          // Command resolution path
+		"HOME",          // User home directory
+		"PYTHONPATH",    // Python module search path
+		"PYTHONSTARTUP", // Python startup script
+		"PYTHONHOME",    // Python installation path
+		"NODE_OPTIONS",  // Node.js CLI options
+		"NODE_PATH",     // Node.js module search path
+		"RUBYLIB",       // Ruby library path
+		"PERL5LIB",      // Perl library path
+		"LUA_PATH",      // Lua module search path
+		"LUA_CPATH",     // Lua C module search path
+		"CDPATH",        // Shell cd search path
+		"PS4",           // Shell debug prompt (can execute code in some shells)
+	}
+)
+
+// sanitizeEnv filters environment variables according to security tiers.
+// Tier 1 (always blocked): Variables like LD_PRELOAD that are never allowed.
+// Tier 2 (capability-gated): Variables like PATH that require exec:env:<VAR> capability.
+// Returns the sanitized environment slice.
+func sanitizeEnv(ctx context.Context, env []string, pluginName string, checker *CapabilityChecker) []string {
+	if len(env) == 0 {
+		return env
+	}
+
+	sanitized := make([]string, 0, len(env))
+
+	for _, e := range env {
+		// Parse "KEY=value" format
+		eqIdx := strings.Index(e, "=")
+		if eqIdx == -1 {
+			// Malformed env var (no =), skip it
+			slog.WarnContext(ctx, "malformed environment variable skipped",
+				"env", e,
+				"plugin", pluginName)
+			continue
+		}
+
+		key := e[:eqIdx]
+		upperKey := strings.ToUpper(key)
+
+		// Tier 1: Check always-blocked prefixes
+		if isAlwaysBlockedEnv(upperKey) {
+			slog.WarnContext(ctx, "blocked dangerous environment variable",
+				"env_var", key,
+				"plugin", pluginName,
+				"reason", "always_blocked")
+			continue
+		}
+
+		// Tier 2: Check capability-gated variables
+		if slices.Contains(capabilityGatedEnv, upperKey) {
+			if err := checker.Check(pluginName, "exec", "env:"+upperKey); err != nil {
+				slog.WarnContext(ctx, "blocked environment variable (missing capability)",
+					"env_var", key,
+					"plugin", pluginName,
+					"required_capability", "exec:env:"+upperKey)
+				continue
+			}
+			slog.DebugContext(ctx, "capability-gated environment variable allowed",
+				"env_var", key,
+				"plugin", pluginName)
+		}
+
+		sanitized = append(sanitized, e)
+	}
+
+	return sanitized
+}
+
+// isAlwaysBlockedEnv checks if an environment variable key is always blocked.
+func isAlwaysBlockedEnv(upperKey string) bool {
+	// Check prefixes (LD_*, DYLD_*)
+	for _, prefix := range alwaysBlockedEnvPrefixes {
+		if strings.HasPrefix(upperKey, prefix) {
+			return true
+		}
+	}
+
+	// Check exact matches
+	return slices.Contains(alwaysBlockedEnvExact, upperKey)
+}
 
 // ExecCommand executes a command on the host
 // signature: exec_command(reqPtr, reqLen) -> resPtr
@@ -35,6 +141,9 @@ func ExecCommand(ctx context.Context, mod api.Module, stack []uint64, checker *C
 	if err := checkExecCapability(ctx, checker, pluginName, request, stack, mod); err != nil {
 		return // Response already written
 	}
+
+	// SECURITY: Sanitize environment variables before execution
+	request.Env = sanitizeEnv(ctx, request.Env, pluginName, checker)
 
 	// Execute and write response
 	response := executeCommand(ctx, execCtx, request)
@@ -151,7 +260,8 @@ func executeCommand(ctx, execCtx context.Context, request *ExecRequestWire) Exec
 		cmd.Dir = request.Dir
 	}
 
-	// SECURITY: Always set cmd.Env explicitly to prevent host environment leakage
+	// SECURITY: Always set cmd.Env explicitly to prevent host environment leakage.
+	// Note: request.Env is pre-sanitized by sanitizeEnv() to block dangerous variables.
 	if len(request.Env) > 0 {
 		cmd.Env = request.Env
 	} else {
