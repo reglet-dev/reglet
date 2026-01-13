@@ -44,7 +44,10 @@ func (m *mockPlugin) Describe(_ context.Context) (*ports.PluginInfo, error) {
 // TestCapabilityOrchestrator_UsesAnalyzer verifies that the orchestrator
 // delegates capability extraction to the domain service.
 func TestCapabilityOrchestrator_UsesAnalyzer(t *testing.T) {
-	orchestrator := NewCapabilityOrchestrator("", false, capabilities.NewRegistry(), &mockPluginRuntimeFactory{})
+	orchestrator := NewCapabilityOrchestrator(
+		&mockPluginRuntimeFactory{},
+		WithCapabilityRegistry(capabilities.NewRegistry()),
+	)
 
 	// Verify analyzer is injected
 	require.NotNil(t, orchestrator.analyzer)
@@ -54,7 +57,10 @@ func TestCapabilityOrchestrator_UsesAnalyzer(t *testing.T) {
 // TestCapabilityOrchestrator_UsesGatekeeper verifies that the orchestrator
 // delegates granting to the gatekeeper.
 func TestCapabilityOrchestrator_UsesGatekeeper(t *testing.T) {
-	orchestrator := NewCapabilityOrchestrator("", false, capabilities.NewRegistry(), &mockPluginRuntimeFactory{})
+	orchestrator := NewCapabilityOrchestrator(
+		&mockPluginRuntimeFactory{},
+		WithCapabilityRegistry(capabilities.NewRegistry()),
+	)
 
 	// Verify gatekeeper is injected
 	require.NotNil(t, orchestrator.gatekeeper)
@@ -95,7 +101,11 @@ func TestCapabilityOrchestrator_WithMockGatekeeper(t *testing.T) {
 	mockGK.grantResult.Add(capabilities.Capability{Kind: "fs", Pattern: "read:/etc/passwd"})
 
 	// Create orchestrator with injected dependencies
-	orchestrator := NewCapabilityOrchestratorWithDeps(analyzer, mockGK, &mockPluginRuntimeFactory{}, false)
+	orchestrator := NewCapabilityOrchestrator(
+		&mockPluginRuntimeFactory{},
+		WithAnalyzer(analyzer),
+		WithGatekeeper(mockGK),
+	)
 
 	// Test GrantCapabilities delegates to the mock
 	required := map[string][]capabilities.Capability{
@@ -118,7 +128,11 @@ func TestCapabilityOrchestrator_ErrorPropagation(t *testing.T) {
 		grantError: assert.AnError, // Use testify's standard error
 	}
 
-	orchestrator := NewCapabilityOrchestratorWithDeps(analyzer, mockGK, &mockPluginRuntimeFactory{}, false)
+	orchestrator := NewCapabilityOrchestrator(
+		&mockPluginRuntimeFactory{},
+		WithAnalyzer(analyzer),
+		WithGatekeeper(mockGK),
+	)
 
 	required := map[string][]capabilities.Capability{
 		"file": {{Kind: "fs", Pattern: "read:/etc/passwd"}},
@@ -171,7 +185,12 @@ func TestCapabilityOrchestrator_TrustAllFlagPropagation(t *testing.T) {
 				grantResult: capabilities.NewGrant(),
 			}
 
-			orchestrator := NewCapabilityOrchestratorWithDeps(analyzer, mockGK, &mockPluginRuntimeFactory{}, tt.orchestratorTrust)
+			orchestrator := NewCapabilityOrchestrator(
+				&mockPluginRuntimeFactory{},
+				WithAnalyzer(analyzer),
+				WithGatekeeper(mockGK),
+				WithTrustAll(tt.orchestratorTrust),
+			)
 
 			required := map[string][]capabilities.Capability{
 				"file": {{Kind: "fs", Pattern: "read:/etc/passwd"}},
@@ -210,7 +229,11 @@ func TestCapabilityOrchestrator_WithMockAnalyzer(t *testing.T) {
 	}
 	mockGK.grantResult.Add(capabilities.Capability{Kind: "fs", Pattern: "read:/etc/passwd"})
 
-	orchestrator := NewCapabilityOrchestratorWithDeps(mockAnalyzer, mockGK, &mockPluginRuntimeFactory{}, false)
+	orchestrator := NewCapabilityOrchestrator(
+		&mockPluginRuntimeFactory{},
+		WithAnalyzer(mockAnalyzer),
+		WithGatekeeper(mockGK),
+	)
 
 	// GrantCapabilities doesn't call the analyzer directly (it's called in CollectRequiredCapabilities)
 	// but we can verify the orchestrator was constructed with the mock

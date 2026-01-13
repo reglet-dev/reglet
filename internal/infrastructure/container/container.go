@@ -122,11 +122,11 @@ func New(opts Options) (*Container, error) {
 
 	// Create capability orchestrator with all dependencies injected
 	// This makes the full dependency graph visible at the composition root
-	capOrchestrator := services.NewCapabilityOrchestratorWithDeps(
-		capAnalyzer,
-		capGatekeeper,
+	capOrchestrator := services.NewCapabilityOrchestrator(
 		runtimeFactory,
-		opts.TrustPlugins,
+		services.WithAnalyzer(capAnalyzer),
+		services.WithGatekeeper(capGatekeeper),
+		services.WithTrustAll(opts.TrustPlugins),
 	)
 
 	// --- Plugin Management Wiring ---
@@ -171,12 +171,12 @@ func New(opts Options) (*Container, error) {
 
 	// 8. Plugin Service (Application Service)
 	pluginService := services.NewPluginService(
-		embeddedResolver, // Head of the chain
 		pluginRepository,
 		registryAdapter,
-		integrityVerifier,
-		integrityService,
-		opts.Logger,
+		services.WithResolver(embeddedResolver), // Head of the chain
+		services.WithIntegrityVerifier(integrityVerifier),
+		services.WithIntegrityService(integrityService),
+		services.WithLogger(opts.Logger),
 	)
 
 	// Create lockfile infrastructure
@@ -195,14 +195,14 @@ func New(opts Options) (*Container, error) {
 	checkProfileUseCase := services.NewCheckProfileUseCase(
 		profileLoader,
 		profileCompiler,
-		profileValidator,
-		systemConfigAdapter,
-		pluginResolver,
-		capOrchestrator,
-		lockfileService,
-		pluginService,
-		engineFactory,
-		opts.Logger,
+		services.WithProfileValidator(profileValidator),
+		services.WithSystemConfig(systemConfigAdapter),
+		services.WithPluginResolver(pluginResolver),
+		services.WithCapabilityOrchestrator(capOrchestrator),
+		services.WithLockfileService(lockfileService),
+		services.WithPluginService(pluginService),
+		services.WithEngineFactory(engineFactory),
+		services.WithUseCaseLogger(opts.Logger),
 	)
 
 	return &Container{

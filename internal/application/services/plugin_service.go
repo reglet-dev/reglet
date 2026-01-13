@@ -23,23 +23,46 @@ type PluginService struct {
 	logger            *slog.Logger
 }
 
-// NewPluginService creates a plugin service.
+// PluginServiceOption configures a PluginService.
+type PluginServiceOption func(*PluginService)
+
+// NewPluginService creates a plugin service with the given options.
+// Repository and registry are required dependencies.
 func NewPluginService(
-	resolver services.PluginResolutionStrategy,
 	repository ports.PluginRepository,
 	registry ports.PluginRegistry,
-	integrityVerifier ports.IntegrityVerifier,
-	integrityService *services.IntegrityService,
-	logger *slog.Logger,
+	opts ...PluginServiceOption,
 ) *PluginService {
-	return &PluginService{
-		resolver:          resolver,
-		repository:        repository,
-		registry:          registry,
-		integrityVerifier: integrityVerifier,
-		integrityService:  integrityService,
-		logger:            logger,
+	s := &PluginService{
+		repository:       repository,
+		registry:         registry,
+		logger:           slog.Default(),
+		integrityService: services.NewIntegrityService(false),
 	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
+}
+
+// WithResolver sets the plugin resolution strategy.
+func WithResolver(r services.PluginResolutionStrategy) PluginServiceOption {
+	return func(s *PluginService) { s.resolver = r }
+}
+
+// WithIntegrityVerifier sets the integrity verifier.
+func WithIntegrityVerifier(iv ports.IntegrityVerifier) PluginServiceOption {
+	return func(s *PluginService) { s.integrityVerifier = iv }
+}
+
+// WithIntegrityService sets the integrity service.
+func WithIntegrityService(is *services.IntegrityService) PluginServiceOption {
+	return func(s *PluginService) { s.integrityService = is }
+}
+
+// WithLogger sets the logger.
+func WithLogger(l *slog.Logger) PluginServiceOption {
+	return func(s *PluginService) { s.logger = l }
 }
 
 // LoadPlugin is the main use case for loading a plugin.

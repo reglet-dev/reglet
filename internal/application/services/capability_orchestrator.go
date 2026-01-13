@@ -29,40 +29,55 @@ type CapabilityOrchestrator struct {
 	trustAll       bool
 }
 
-// NewCapabilityOrchestrator creates a capability orchestrator with default security level (standard).
-// configPath specifies the path to the system config file (e.g., ~/.reglet/config.yaml).
-func NewCapabilityOrchestrator(configPath string, trustAll bool, registry *capabilities.Registry, runtimeFactory ports.PluginRuntimeFactory) *CapabilityOrchestrator {
-	return NewCapabilityOrchestratorWithSecurity(configPath, trustAll, "standard", registry, runtimeFactory)
-}
+// CapabilityOrchestratorOption configures a CapabilityOrchestrator.
+type CapabilityOrchestratorOption func(*CapabilityOrchestrator)
 
-// NewCapabilityOrchestratorWithSecurity creates a capability orchestrator with specified security level.
-// configPath specifies the path to the system config file (e.g., ~/.reglet/config.yaml).
-// securityLevel can be: "strict", "standard", or "permissive"
-func NewCapabilityOrchestratorWithSecurity(configPath string, trustAll bool, securityLevel string, registry *capabilities.Registry, runtimeFactory ports.PluginRuntimeFactory) *CapabilityOrchestrator {
-	return &CapabilityOrchestrator{
-		analyzer:       domainServices.NewCapabilityAnalyzer(registry),
-		gatekeeper:     NewCapabilityGatekeeper(configPath, securityLevel),
-		runtimeFactory: runtimeFactory,
-		trustAll:       trustAll,
-		capabilityInfo: make(map[string]ports.CapabilityInfo),
-	}
-}
-
-// NewCapabilityOrchestratorWithDeps creates an orchestrator with injected dependencies.
-// This constructor is primarily for testing, allowing mock implementations.
-func NewCapabilityOrchestratorWithDeps(
-	analyzer ports.CapabilityAnalyzer,
-	gatekeeper ports.CapabilityGatekeeperPort,
+// NewCapabilityOrchestrator creates a capability orchestrator with the given options.
+// RuntimeFactory is required for creating plugin runtimes.
+func NewCapabilityOrchestrator(
 	runtimeFactory ports.PluginRuntimeFactory,
-	trustAll bool,
+	opts ...CapabilityOrchestratorOption,
 ) *CapabilityOrchestrator {
-	return &CapabilityOrchestrator{
-		analyzer:       analyzer,
-		gatekeeper:     gatekeeper,
+	o := &CapabilityOrchestrator{
 		runtimeFactory: runtimeFactory,
-		trustAll:       trustAll,
 		capabilityInfo: make(map[string]ports.CapabilityInfo),
+		// Defaults
+		analyzer:   domainServices.NewCapabilityAnalyzer(capabilities.NewRegistry()),
+		gatekeeper: NewCapabilityGatekeeper("", "standard"),
 	}
+	for _, opt := range opts {
+		opt(o)
+	}
+	return o
+}
+
+// WithAnalyzer sets a custom capability analyzer.
+func WithAnalyzer(a ports.CapabilityAnalyzer) CapabilityOrchestratorOption {
+	return func(o *CapabilityOrchestrator) { o.analyzer = a }
+}
+
+// WithGatekeeper sets a custom capability gatekeeper.
+func WithGatekeeper(g ports.CapabilityGatekeeperPort) CapabilityOrchestratorOption {
+	return func(o *CapabilityOrchestrator) { o.gatekeeper = g }
+}
+
+// WithCapabilityRegistry sets a capability registry to use for the analyzer.
+func WithCapabilityRegistry(r *capabilities.Registry) CapabilityOrchestratorOption {
+	return func(o *CapabilityOrchestrator) {
+		o.analyzer = domainServices.NewCapabilityAnalyzer(r)
+	}
+}
+
+// WithSecurityConfig sets the config path and security level for the gatekeeper.
+func WithSecurityConfig(configPath, securityLevel string) CapabilityOrchestratorOption {
+	return func(o *CapabilityOrchestrator) {
+		o.gatekeeper = NewCapabilityGatekeeper(configPath, securityLevel)
+	}
+}
+
+// WithTrustAll sets the trust-all flag for capability granting.
+func WithTrustAll(trust bool) CapabilityOrchestratorOption {
+	return func(o *CapabilityOrchestrator) { o.trustAll = trust }
 }
 
 // CollectCapabilities creates a temporary runtime and collects required capabilities.

@@ -25,12 +25,9 @@ func TestPluginService_LoadPlugin(t *testing.T) {
 	t.Run("Success_NoVerification", func(t *testing.T) {
 		repo := &MockRepository{FindPath: "/path/to/wasm"}
 		svc := NewPluginService(
-			resolver,
 			repo,
-			nil,
-			nil,
-			services.NewIntegrityService(false),
-			nil,
+			nil, // no registry needed
+			WithResolver(resolver),
 		)
 
 		spec := &dto.PluginSpecDTO{Name: "reg/org/repo/name:1.0"}
@@ -46,12 +43,9 @@ func TestPluginService_LoadPlugin(t *testing.T) {
 	t.Run("Success_WithDigestVerification", func(t *testing.T) {
 		repo := &MockRepository{FindPath: "/path/to/wasm"}
 		svc := NewPluginService(
-			resolver,
 			repo,
-			nil,
-			nil,
-			services.NewIntegrityService(false),
-			nil,
+			nil, // no registry needed
+			WithResolver(resolver),
 		)
 
 		spec := &dto.PluginSpecDTO{Name: "reg/org/repo/name:1.0", Digest: "sha256:abc"}
@@ -64,12 +58,9 @@ func TestPluginService_LoadPlugin(t *testing.T) {
 	t.Run("Fail_DigestMismatch", func(t *testing.T) {
 		repo := &MockRepository{FindPath: "/path/to/wasm"}
 		svc := NewPluginService(
-			resolver,
 			repo,
-			nil,
-			nil,
-			services.NewIntegrityService(false),
-			nil,
+			nil, // no registry needed
+			WithResolver(resolver),
 		)
 
 		spec := &dto.PluginSpecDTO{Name: "reg/org/repo/name:1.0", Digest: "sha256:bad"}
@@ -83,12 +74,12 @@ func TestPluginService_LoadPlugin(t *testing.T) {
 		repo := &MockRepository{FindPath: "/path/to/wasm"}
 		verifier := &MockVerifier{}
 		svc := NewPluginService(
-			resolver,
 			repo,
-			nil,
-			verifier,
-			services.NewIntegrityService(true), // Require signing
-			NewTestLogger(),
+			nil, // no registry needed
+			WithResolver(resolver),
+			WithIntegrityVerifier(verifier),
+			WithIntegrityService(services.NewIntegrityService(true)), // Require signing
+			WithLogger(NewTestLogger()),
 		)
 
 		spec := &dto.PluginSpecDTO{Name: "reg/org/repo/name:1.0"}
@@ -102,12 +93,12 @@ func TestPluginService_LoadPlugin(t *testing.T) {
 		repo := &MockRepository{FindPath: "/path/to/wasm"}
 		verifier := &MockVerifier{VerifyErr: errors.New("sig fail")}
 		svc := NewPluginService(
-			resolver,
 			repo,
-			nil,
-			verifier,
-			services.NewIntegrityService(true),
-			NewTestLogger(),
+			nil, // no registry needed
+			WithResolver(resolver),
+			WithIntegrityVerifier(verifier),
+			WithIntegrityService(services.NewIntegrityService(true)),
+			WithLogger(NewTestLogger()),
 		)
 
 		spec := &dto.PluginSpecDTO{Name: "reg/org/repo/name:1.0"}
@@ -121,12 +112,9 @@ func TestPluginService_LoadPlugin(t *testing.T) {
 		// Here we want to use the type mockResolver to create a NEW instance
 		badResolver := &mockResolver{err: errors.New("not found")}
 		svc := NewPluginService(
-			badResolver,
 			&MockRepository{},
-			nil,
-			nil,
-			services.NewIntegrityService(false),
-			nil,
+			nil, // no registry needed
+			WithResolver(badResolver),
 		)
 		spec := &dto.PluginSpecDTO{Name: "reg/org/repo/name:1.0"}
 		_, err := svc.LoadPlugin(context.Background(), spec)
@@ -144,7 +132,7 @@ func TestPluginService_PublishPlugin(t *testing.T) {
 
 	t.Run("Success_PushOnly", func(t *testing.T) {
 		registry := &MockRegistry{}
-		svc := NewPluginService(nil, nil, registry, nil, nil, NewTestLogger())
+		svc := NewPluginService(nil, registry, WithLogger(NewTestLogger()))
 
 		err := svc.PublishPlugin(context.Background(), plugin, io.LimitReader(&mockReader{}, 0), false)
 		if err != nil {
@@ -155,7 +143,12 @@ func TestPluginService_PublishPlugin(t *testing.T) {
 	t.Run("Success_PushAndSign", func(t *testing.T) {
 		registry := &MockRegistry{}
 		verifier := &MockVerifier{}
-		svc := NewPluginService(nil, nil, registry, verifier, nil, NewTestLogger())
+		svc := NewPluginService(
+			nil,
+			registry,
+			WithIntegrityVerifier(verifier),
+			WithLogger(NewTestLogger()),
+		)
 
 		err := svc.PublishPlugin(context.Background(), plugin, io.LimitReader(&mockReader{}, 0), true)
 		if err != nil {

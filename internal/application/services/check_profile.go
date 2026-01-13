@@ -35,35 +35,65 @@ type CheckProfileUseCase struct {
 	logger           *slog.Logger
 }
 
+// CheckProfileUseCaseOption configures a CheckProfileUseCase.
+type CheckProfileUseCaseOption func(*CheckProfileUseCase)
+
 // NewCheckProfileUseCase creates a new check profile use case.
+// ProfileLoader and ProfileCompiler are required dependencies.
 func NewCheckProfileUseCase(
 	profileLoader ports.ProfileLoader,
 	profileCompiler *services.ProfileCompiler,
-	profileValidator ports.ProfileValidator,
-	systemConfig ports.SystemConfigProvider,
-	pluginResolver ports.PluginDirectoryResolver,
-	capOrchestrator *CapabilityOrchestrator,
-	lockfileService *LockfileService,
-	pluginService *PluginService,
-	engineFactory ports.EngineFactory,
-	logger *slog.Logger,
+	opts ...CheckProfileUseCaseOption,
 ) *CheckProfileUseCase {
-	if logger == nil {
-		logger = slog.Default()
+	uc := &CheckProfileUseCase{
+		profileLoader:   profileLoader,
+		profileCompiler: profileCompiler,
+		logger:          slog.Default(),
 	}
+	for _, opt := range opts {
+		opt(uc)
+	}
+	return uc
+}
 
-	return &CheckProfileUseCase{
-		profileLoader:    profileLoader,
-		profileCompiler:  profileCompiler,
-		profileValidator: profileValidator,
-		systemConfig:     systemConfig,
-		pluginResolver:   pluginResolver,
-		capOrchestrator:  capOrchestrator,
-		lockfileService:  lockfileService,
-		pluginService:    pluginService,
-		engineFactory:    engineFactory,
-		logger:           logger,
-	}
+// WithProfileValidator sets the profile validator.
+func WithProfileValidator(v ports.ProfileValidator) CheckProfileUseCaseOption {
+	return func(uc *CheckProfileUseCase) { uc.profileValidator = v }
+}
+
+// WithSystemConfig sets the system config provider.
+func WithSystemConfig(c ports.SystemConfigProvider) CheckProfileUseCaseOption {
+	return func(uc *CheckProfileUseCase) { uc.systemConfig = c }
+}
+
+// WithPluginResolver sets the plugin directory resolver.
+func WithPluginResolver(r ports.PluginDirectoryResolver) CheckProfileUseCaseOption {
+	return func(uc *CheckProfileUseCase) { uc.pluginResolver = r }
+}
+
+// WithCapabilityOrchestrator sets the capability orchestrator.
+func WithCapabilityOrchestrator(o *CapabilityOrchestrator) CheckProfileUseCaseOption {
+	return func(uc *CheckProfileUseCase) { uc.capOrchestrator = o }
+}
+
+// WithLockfileService sets the lockfile service.
+func WithLockfileService(s *LockfileService) CheckProfileUseCaseOption {
+	return func(uc *CheckProfileUseCase) { uc.lockfileService = s }
+}
+
+// WithPluginService sets the plugin service.
+func WithPluginService(s *PluginService) CheckProfileUseCaseOption {
+	return func(uc *CheckProfileUseCase) { uc.pluginService = s }
+}
+
+// WithEngineFactory sets the engine factory.
+func WithEngineFactory(f ports.EngineFactory) CheckProfileUseCaseOption {
+	return func(uc *CheckProfileUseCase) { uc.engineFactory = f }
+}
+
+// WithUseCaseLogger sets the logger.
+func WithUseCaseLogger(l *slog.Logger) CheckProfileUseCaseOption {
+	return func(uc *CheckProfileUseCase) { uc.logger = l }
 }
 
 // Execute runs the complete check profile workflow.
