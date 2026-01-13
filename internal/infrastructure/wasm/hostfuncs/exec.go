@@ -150,9 +150,20 @@ func ExecCommand(ctx context.Context, mod api.Module, stack []uint64, checker *C
 	stack[0] = hostWriteResponse(ctx, mod, response)
 }
 
+// MaxRequestSize limits the size of incoming requests from guest memory (1MB).
+// This prevents malicious WASM modules from triggering OOM by claiming huge request sizes.
+const MaxRequestSize = 1 * 1024 * 1024
+
 // readExecRequest reads and unmarshals the exec request from guest memory.
 func readExecRequest(ctx context.Context, mod api.Module, requestPacked uint64) (*ExecRequestWire, error) {
 	ptr, length := unpackPtrLen(requestPacked)
+
+	// SECURITY: Enforce request size limit before allocating memory
+	if length > MaxRequestSize {
+		errMsg := fmt.Sprintf("hostfuncs: request size %d exceeds maximum allowed %d bytes", length, MaxRequestSize)
+		slog.ErrorContext(ctx, errMsg)
+		return nil, errors.New(errMsg)
+	}
 
 	requestBytes, ok := mod.Memory().Read(ptr, length)
 	if !ok {
