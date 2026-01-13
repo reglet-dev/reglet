@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -427,4 +428,40 @@ controls:
 	require.NoError(t, err)
 	assert.Equal(t, "simple", profile.Metadata.Name)
 	assert.Len(t, profile.Controls.Items, 1)
+}
+
+func TestLoadProfile_WithFilesystem(t *testing.T) {
+	t.Parallel()
+
+	// Define the path we want to load.
+	// Since LoadProfile calls filepath.Abs, we use an absolute path here to have predictable behavior
+	// regarding what key to expect in the MapFS.
+	// /mock/config.yaml -> Abs -> /mock/config.yaml
+	// loadSingleProfile strips leading / -> mock/config.yaml
+	absPath := "/mock/config.yaml"
+	relKey := "mock/config.yaml"
+
+	mockFS := fstest.MapFS{
+		relKey: {
+			Data: []byte(`
+profile:
+  name: mock-fs-profile
+  version: 1.0.0
+controls:
+  items:
+    - id: mock-ctrl
+      name: Mock Control
+      observations:
+        - plugin: mock
+`),
+		},
+	}
+
+	loader := NewProfileLoader(WithFilesystem(mockFS))
+	profile, err := loader.LoadProfile(absPath)
+
+	require.NoError(t, err)
+	assert.Equal(t, "mock-fs-profile", profile.Metadata.Name)
+	assert.Len(t, profile.Controls.Items, 1)
+	assert.Equal(t, "mock-ctrl", profile.Controls.Items[0].ID)
 }

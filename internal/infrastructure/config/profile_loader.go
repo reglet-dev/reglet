@@ -5,6 +5,7 @@ package config
 import (
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -31,13 +32,32 @@ import (
 // in CONTROL DEPENDENCIES (depends_on field within a single profile).
 type ProfileLoader struct {
 	merger *services.ProfileMerger
+	fs     fs.FS
 }
 
-// NewProfileLoader creates a new profile loader.
-func NewProfileLoader() *ProfileLoader {
-	return &ProfileLoader{
+// ProfileLoaderOption defines a functional option for configuring ProfileLoader.
+type ProfileLoaderOption func(*ProfileLoader)
+
+// WithFilesystem configures the loader to use the provided filesystem.
+// This is primarily used for testing or when loading profiles from
+// non-standard locations (e.g., embedded files).
+func WithFilesystem(fs fs.FS) ProfileLoaderOption {
+	return func(l *ProfileLoader) {
+		l.fs = fs
+	}
+}
+
+// NewProfileLoader creates a new profile loader with optional configuration.
+func NewProfileLoader(opts ...ProfileLoaderOption) *ProfileLoader {
+	l := &ProfileLoader{
 		merger: services.NewProfileMerger(),
 	}
+
+	for _, opt := range opts {
+		opt(l)
+	}
+
+	return l
 }
 
 // LoadProfile loads a profile and resolves all inheritance.
@@ -93,6 +113,33 @@ func (l *ProfileLoader) loadProfileRecursive(
 
 // loadSingleProfile loads a single profile from disk without resolving inheritance.
 func (l *ProfileLoader) loadSingleProfile(path string) (*entities.Profile, error) {
+	if l.fs != nil {
+		// When using a custom filesystem, we bypass os.OpenRoot.
+		// NOTE: paths passed here are already absolute from loadProfileRecursive.
+		// fs.FS implementation must handle this or we need to relativize logic
+		// if we want to support standard fs implementations like os.DirFS.
+		// For now, we assume the fs implementation can handle the path as given
+		// or that we simply pass it through.
+		// However, standard fs.Open usually rejects leading slashes.
+		// Let's strip the volume name/leading slash to be safe for MapFS/DirFS compatibility.
+		// This is a heuristic; consistent usage in tests is expected.
+		relPath := path
+		if filepath.IsAbs(path) {
+			// On unix this strips leading /. On windows stripping volume might be trickier but fs.FS is unix-style paths.
+			// simplified: just remove leading separator if present to satisfy fs.Open validity checks.
+			if len(path) > 0 && path[0] == filepath.Separator {
+				relPath = path[1:]
+			}
+		}
+
+		file, err := l.fs.Open(relPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open profile from fs: %w", err)
+		}
+		defer func() { _ = file.Close() }()
+		return l.LoadProfileFromReader(file)
+	}
+
 	// Security: Use os.OpenRoot to prevent path traversal attacks
 	dir := filepath.Dir(path)
 	base := filepath.Base(path)
