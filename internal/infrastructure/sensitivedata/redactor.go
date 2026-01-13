@@ -20,6 +20,7 @@ import (
 type Redactor struct {
 	gitleaksDetector  *detect.Detector
 	sensitiveProvider ports.SensitiveValueProvider
+	sensitiveMatcher  SensitiveStringMatcher // Aho-Corasick matcher for O(n) multi-pattern matching
 	salt              string
 	patterns          []*regexp.Regexp
 	paths             []string
@@ -93,6 +94,11 @@ func NewRedactor(opts ...RedactorOption) (*Redactor, error) {
 		hashMode:          o.hashMode,
 		salt:              o.salt,
 		patterns:          make([]*regexp.Regexp, 0, len(o.patterns)+len(defaultPatterns)),
+	}
+
+	// Initialize Aho-Corasick matcher for efficient multi-pattern matching
+	if o.sensitiveProvider != nil {
+		r.sensitiveMatcher = NewAhoCorasickMatcher(o.sensitiveProvider)
 	}
 
 	// Initialize gitleaks detector (unless disabled)
@@ -179,20 +185,14 @@ func (r *Redactor) ScrubString(input string) string {
 		}
 	}
 
-	// Phase 2: Known sensitive values (NEW)
-	if r.sensitiveProvider != nil {
-		// Note: This could be optimized for large numbers of secrets
-		// e.g., using Aho-Corasick algorithm if performance becomes an issue.
-		// For now, simple string replacement is sufficient.
-		for _, secret := range r.sensitiveProvider.AllValues() {
-			if secret != "" && strings.Contains(result, secret) {
-				replacement := "[REDACTED]"
-				if r.hashMode {
-					replacement = r.hash(secret)
-				}
-				result = strings.ReplaceAll(result, secret, replacement)
+	// Phase 2: Known sensitive values using Aho-Corasick algorithm (O(n) multi-pattern matching)
+	if r.sensitiveMatcher != nil {
+		result = r.sensitiveMatcher.ReplaceAll(result, func(secret string) string {
+			if r.hashMode {
+				return r.hash(secret)
 			}
-		}
+			return "[REDACTED]"
+		})
 	}
 
 	// Phase 3: Apply custom regex patterns (fallback + user-defined patterns)
