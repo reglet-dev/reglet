@@ -178,7 +178,7 @@ func TestFiltering_EndToEnd(t *testing.T) {
 		} else {
 			// Should be skipped
 			assert.Equal(t, values.StatusSkipped, ctrl.Status, "Control %s should be skipped", id)
-			assert.Contains(t, ctrl.SkipReason, "excluded by --tags filter", "Control %s skip reason incorrect", id)
+			assert.Contains(t, ctrl.SkipReason, "excluded by filter", "Control %s skip reason incorrect", id)
 			assert.Empty(t, ctrl.ObservationResults) // No observations should run
 		}
 	}

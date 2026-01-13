@@ -333,9 +333,24 @@ func (e *Engine) Execute(ctx context.Context, profile entities.ProfileReader) (*
 		}
 	}
 
+	// Calculate runnable controls using static filters (ControlSet.Select)
+	// This replaces the per-control static checks in shouldRun
+	filteredControls := profile.GetControls().Select(
+		entities.WithTags(e.config.IncludeTags...),
+		entities.WithSeverities(e.config.IncludeSeverities...),
+		entities.WithIDs(e.config.IncludeControlIDs...),
+		entities.ExcludeTags(e.config.ExcludeTags...),
+		entities.ExcludeIDs(e.config.ExcludeControlIDs...),
+	)
+
+	runnableIDs := make(map[string]bool)
+	for _, ctrl := range filteredControls {
+		runnableIDs[ctrl.ID] = true
+	}
+
 	allControls := profile.GetControls()
 	if e.config.Parallel && len(allControls) > 1 {
-		if err := e.executeControlsWithWorkerPool(ctx, allControls, result, requiredControls); err != nil {
+		if err := e.executeControlsWithWorkerPool(ctx, allControls, result, requiredControls, runnableIDs); err != nil {
 			if errors.Is(err, context.DeadlineExceeded) {
 				return nil, fmt.Errorf("execution timed out: %w", err)
 			}
@@ -348,7 +363,7 @@ func (e *Engine) Execute(ctx context.Context, profile entities.ProfileReader) (*
 				return nil, err
 			}
 
-			controlResult := e.executeControl(ctx, ctrl, i, result, requiredControls)
+			controlResult := e.executeControl(ctx, ctrl, i, result, requiredControls, runnableIDs)
 			result.AddControlResult(controlResult)
 		}
 
@@ -383,9 +398,22 @@ func (e *Engine) resolveDependencies(profile entities.ProfileReader) (map[string
 	required := make(map[string]bool)
 
 	for _, ctrl := range allControls {
-		// shouldRun returns (bool, skipReason string). We only need the boolean decision
-		// for dependency resolution - the skip reason is not relevant here.
-		if should, _ := e.shouldRun(ctrl); should {
+		// Used pre-calculated decision if possible, but for dependency resolution we just need
+		// to know if it matches the filters. We can use the same logic or reuse `shouldRun` if updated.
+		// Since we haven't calculated runnableIDs here yet (this runs before), we can
+		// temporarily build the filter or just replicate the Select logic efficiently.
+		// Actually, creating a filter here is fine as it runs once.
+		// NOTE: We'll update shouldRun to support being called with nil runnableIDs to mean "check standard logic"
+		// or better: just use the new Select here too!
+
+		// Optimization: Reuse Select here
+		// But Select is on ControlSet. We have allControls (ControlSet).
+		// We can just check if ID is in the "Selected" set.
+		// However, we need to iterate ALL controls to check if dependencies on THEM are required.
+		// Wait, resolveDependencies walks dependencies OF matched controls.
+		// So we primarily need to know which controls ARE matched.
+
+		if should, _ := e.shouldRun(ctrl, nil); should {
 			if deps, ok := allDependencies[ctrl.ID]; ok {
 				for depID := range deps {
 					required[depID] = true

@@ -82,19 +82,20 @@ func (q *controlQueue) grow() {
 // dependencies are satisfied.
 type workerPoolState struct {
 	ctx              context.Context
-	inDegree         map[string]int
-	doneChan         chan string
+	reverseDeps      map[string][]string
+	errGroup         *errgroup.Group
 	controlByID      map[string]entities.Control
 	requiredDeps     map[string]bool
 	completed        map[string]bool
 	execResult       *execution.ExecutionResult
-	workChan         chan string
-	reverseDeps      map[string][]string
+	doneChan         chan string
 	controlIndexByID map[string]int
+	workChan         chan string
 	cancel           context.CancelFunc
-	errGroup         *errgroup.Group
+	inDegree         map[string]int
 	engine           *Engine
 	readyQueue       *controlQueue
+	runnableIDs      map[string]bool
 	totalControls    int
 }
 
@@ -105,6 +106,7 @@ func (e *Engine) initializeWorkerPoolState(
 	controls []entities.Control,
 	result *execution.ExecutionResult,
 	requiredDeps map[string]bool,
+	runnableIDs map[string]bool,
 ) (*workerPoolState, error) {
 	// Build dependency graph structures
 	controlByID := make(map[string]entities.Control)
@@ -176,6 +178,7 @@ func (e *Engine) initializeWorkerPoolState(
 		engine:           e,
 		execResult:       result,
 		requiredDeps:     requiredDeps,
+		runnableIDs:      runnableIDs,
 	}, nil
 }
 
@@ -270,6 +273,7 @@ func (state *workerPoolState) executeWorker() (workerErr error) {
 				index,
 				state.execResult,
 				state.requiredDeps,
+				state.runnableIDs,
 			)
 
 			state.execResult.AddControlResult(controlResult)
@@ -298,8 +302,9 @@ func (e *Engine) executeControlsWithWorkerPool(
 	controls []entities.Control,
 	result *execution.ExecutionResult,
 	requiredDeps map[string]bool,
+	runnableIDs map[string]bool,
 ) error {
-	state, err := e.initializeWorkerPoolState(ctx, controls, result, requiredDeps)
+	state, err := e.initializeWorkerPoolState(ctx, controls, result, requiredDeps, runnableIDs)
 	if err != nil {
 		return fmt.Errorf("failed to initialize worker pool: %w", err)
 	}

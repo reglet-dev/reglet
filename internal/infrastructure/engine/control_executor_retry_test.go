@@ -64,7 +64,7 @@ func TestExecuteControl_RetrySuccess(t *testing.T) {
 	mockExec.On("Execute", mock.Anything, mock.Anything).Return(passResult).Once()
 
 	// Run
-	result := engine.executeControl(context.Background(), ctrl, 0, nil, nil)
+	result := engine.executeControl(context.Background(), ctrl, 0, nil, nil, nil)
 
 	// Assert
 	assert.Equal(t, values.StatusPass, result.Status)
@@ -100,7 +100,7 @@ func TestExecuteControl_RetryExhausted(t *testing.T) {
 	// Expect 3 calls: Fail -> Fail -> Fail
 	mockExec.On("Execute", mock.Anything, mock.Anything).Return(failResult).Times(3)
 
-	result := engine.executeControl(context.Background(), ctrl, 0, nil, nil)
+	result := engine.executeControl(context.Background(), ctrl, 0, nil, nil, nil)
 
 	assert.Equal(t, values.StatusError, result.Status)
 	mockExec.AssertNumberOfCalls(t, "Execute", 3)
@@ -132,7 +132,7 @@ func TestExecuteControl_NonTransientError(t *testing.T) {
 	// Expect 1 call (no retry on permanent error)
 	mockExec.On("Execute", mock.Anything, mock.Anything).Return(permResult).Once()
 
-	result := engine.executeControl(context.Background(), ctrl, 0, nil, nil)
+	result := engine.executeControl(context.Background(), ctrl, 0, nil, nil, nil)
 
 	assert.Equal(t, values.StatusError, result.Status)
 	mockExec.AssertNumberOfCalls(t, "Execute", 1)

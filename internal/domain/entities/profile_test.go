@@ -493,10 +493,10 @@ func Test_Profile_SelectControlsByTags(t *testing.T) {
 		},
 	}
 
-	selected := profile.GetControls().SelectByTags([]string{"production"})
+	selected := profile.GetControls().Select(WithTags("production"))
 	assert.Len(t, selected, 2)
 
-	selected = profile.GetControls().SelectByTags([]string{})
+	selected = profile.GetControls().Select(WithTags())
 	assert.Len(t, selected, 3)
 }
 
@@ -511,10 +511,10 @@ func Test_Profile_SelectControlsBySeverity(t *testing.T) {
 		},
 	}
 
-	selected := profile.GetControls().SelectBySeverity([]string{"high", "critical"})
+	selected := profile.GetControls().Select(WithSeverities("high", "critical"))
 	assert.Len(t, selected, 2)
 
-	selected = profile.GetControls().SelectBySeverity([]string{})
+	selected = profile.GetControls().Select(WithSeverities())
 	assert.Len(t, selected, 3)
 }
 
@@ -529,7 +529,7 @@ func Test_Profile_ExcludeControlsByID(t *testing.T) {
 		},
 	}
 
-	selected := profile.GetControls().ExcludeByID([]string{"ctrl-002"})
+	selected := profile.GetControls().Select(ExcludeIDs("ctrl-002"))
 	assert.Len(t, selected, 2)
 	assert.Equal(t, "ctrl-001", selected[0].ID)
 	assert.Equal(t, "ctrl-003", selected[1].ID)

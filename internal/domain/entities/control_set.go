@@ -148,52 +148,110 @@ func (cs ControlSet) CheckForControlDependencyCycles() error {
 	return nil
 }
 
-// SelectByTags returns a subset of controls matching any of the specified tags.
-func (cs ControlSet) SelectByTags(tags []string) ControlSet {
-	if len(tags) == 0 {
-		return cs
-	}
-
-	var selected ControlSet
-	for _, ctrl := range cs {
-		if ctrl.HasAnyTag(tags) {
-			selected = append(selected, ctrl)
-		}
-	}
-	return selected
+// FilterConfig holds the configuration for filtering controls.
+type FilterConfig struct {
+	IncludeTags       []string
+	IncludeSeverities []string
+	IncludeIDs        []string
+	ExcludeTags       []string
+	ExcludeIDs        []string
 }
 
-// SelectBySeverity returns a subset of controls matching any of the specified severities.
-func (cs ControlSet) SelectBySeverity(severities []string) ControlSet {
-	if len(severities) == 0 {
-		return cs
-	}
+// FilterOption is a functional option for configuring the filter.
+type FilterOption func(*FilterConfig)
 
-	var selected ControlSet
-	for _, ctrl := range cs {
-		if ctrl.MatchesAnySeverity(severities) {
-			selected = append(selected, ctrl)
-		}
+// WithTags filters controls to include only those with any of the specified tags.
+func WithTags(tags ...string) FilterOption {
+	return func(c *FilterConfig) {
+		c.IncludeTags = append(c.IncludeTags, tags...)
 	}
-	return selected
 }
 
-// ExcludeByID returns a subset of controls excluding the specified IDs.
-func (cs ControlSet) ExcludeByID(excludeIDs []string) ControlSet {
-	if len(excludeIDs) == 0 {
-		return cs
+// WithSeverities filters controls to include only those with any of the specified severities.
+func WithSeverities(severities ...string) FilterOption {
+	return func(c *FilterConfig) {
+		c.IncludeSeverities = append(c.IncludeSeverities, severities...)
+	}
+}
+
+// WithIDs filters controls to include only those with the specified IDs.
+func WithIDs(ids ...string) FilterOption {
+	return func(c *FilterConfig) {
+		c.IncludeIDs = append(c.IncludeIDs, ids...)
+	}
+}
+
+// ExcludeTags filters controls to exclude those with any of the specified tags.
+func ExcludeTags(tags ...string) FilterOption {
+	return func(c *FilterConfig) {
+		c.ExcludeTags = append(c.ExcludeTags, tags...)
+	}
+}
+
+// ExcludeIDs filters controls to exclude those with the specified IDs.
+func ExcludeIDs(ids ...string) FilterOption {
+	return func(c *FilterConfig) {
+		c.ExcludeIDs = append(c.ExcludeIDs, ids...)
+	}
+}
+
+// Select returns a subset of controls that match the filtering criteria.
+// Filters are applied as an intersection (AND) of valid conditions.
+// Within a condition (e.g., Tags), it's a union (OR).
+// If "Include" filters are empty, they are ignored (match all).
+func (cs ControlSet) Select(opts ...FilterOption) ControlSet {
+	config := &FilterConfig{}
+	for _, opt := range opts {
+		opt(config)
 	}
 
-	excludeMap := make(map[string]bool)
-	for _, id := range excludeIDs {
-		excludeMap[id] = true
+	// Pre-process for faster lookup
+	excludeIDMap := make(map[string]bool)
+	for _, id := range config.ExcludeIDs {
+		excludeIDMap[id] = true
+	}
+
+	includeIDMap := make(map[string]bool)
+	for _, id := range config.IncludeIDs {
+		includeIDMap[id] = true
+	}
+
+	excludeTagMap := make(map[string]bool)
+	for _, tag := range config.ExcludeTags {
+		excludeTagMap[tag] = true
 	}
 
 	var selected ControlSet
 	for _, ctrl := range cs {
-		if !excludeMap[ctrl.ID] {
-			selected = append(selected, ctrl)
+		// 1. Check Exclusions (Priority)
+		if excludeIDMap[ctrl.ID] {
+			continue
 		}
+		if len(excludeTagMap) > 0 && ctrl.HasAnyTag(config.ExcludeTags) {
+			continue
+		}
+
+		// 2. Check Inclusions
+		// ID Match
+		if len(includeIDMap) > 0 && !includeIDMap[ctrl.ID] {
+			// If IDs are specified, we generally expect *only* these IDs.
+			// However, if we also have tags, standard behavior is usually AND.
+			// But for ID selection, usually it means "these specific controls".
+			// Let's stick to standard AND: if IDs list is present, ctrl.ID MUST be in it.
+			continue
+		}
+
+		// Tag Match
+		if len(config.IncludeTags) > 0 && !ctrl.HasAnyTag(config.IncludeTags) {
+			continue
+		}
+
+		// Severity Match
+		if len(config.IncludeSeverities) > 0 && !ctrl.MatchesAnySeverity(config.IncludeSeverities) {
+			continue
+		}
+
+		selected = append(selected, ctrl)
 	}
 	return selected
 }

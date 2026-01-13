@@ -15,12 +15,12 @@ import (
 
 // executeControl executes a single control and returns its result.
 // The index parameter tracks the control's original definition order for deterministic output.
-func (e *Engine) executeControl(ctx context.Context, ctrl entities.Control, index int, execResult *execution.ExecutionResult, requiredDeps map[string]bool) execution.ControlResult {
+func (e *Engine) executeControl(ctx context.Context, ctrl entities.Control, index int, execResult *execution.ExecutionResult, requiredDeps map[string]bool, runnableIDs map[string]bool) execution.ControlResult {
 	startTime := time.Now()
 	result := newControlResult(ctrl, index)
 
 	// Check skip conditions
-	if skipReason := e.checkSkipConditions(ctrl, execResult, requiredDeps); skipReason != "" {
+	if skipReason := e.checkSkipConditions(ctrl, execResult, requiredDeps, runnableIDs); skipReason != "" {
 		return skipControl(result, skipReason, startTime)
 	}
 
@@ -96,8 +96,8 @@ func newControlResult(ctrl entities.Control, index int) execution.ControlResult 
 }
 
 // checkSkipConditions returns a skip reason if the control should be skipped.
-func (e *Engine) checkSkipConditions(ctrl entities.Control, execResult *execution.ExecutionResult, requiredDeps map[string]bool) string {
-	shouldRun, skipReason := e.shouldRun(ctrl)
+func (e *Engine) checkSkipConditions(ctrl entities.Control, execResult *execution.ExecutionResult, requiredDeps map[string]bool, runnableIDs map[string]bool) string {
+	shouldRun, skipReason := e.shouldRun(ctrl, runnableIDs)
 
 	// If filtering says skip, check if it's required as a dependency
 	if !shouldRun && e.config.IncludeDependencies && requiredDeps[ctrl.ID] {
@@ -182,16 +182,21 @@ func finalizeResult(result execution.ControlResult, startTime time.Time) executi
 }
 
 // shouldRun determines if a control should run based on the configuration filters.
-func (e *Engine) shouldRun(ctrl entities.Control) (bool, string) {
-	filter := services.NewControlFilter().
-		WithExclusiveControls(e.config.IncludeControlIDs).
-		WithExcludedControls(e.config.ExcludeControlIDs).
-		WithExcludedTags(e.config.ExcludeTags).
-		WithIncludedTags(e.config.IncludeTags).
-		WithIncludedSeverities(e.config.IncludeSeverities).
-		WithFilterExpression(e.config.FilterProgram)
+// It checks the pre-calculated runnableIDs map and evaluates any dynamic filter expressions.
+// If runnableIDs is nil, it assumes all controls are runnable (except for dynamic expression check).
+func (e *Engine) shouldRun(ctrl entities.Control, runnableIDs map[string]bool) (bool, string) {
+	// 1. Check static filtering (Tags, Severity, IDs)
+	if runnableIDs != nil && !runnableIDs[ctrl.ID] {
+		return false, "excluded by filter"
+	}
 
-	return filter.ShouldRun(ctrl)
+	// 2. Check dynamic filtering (Expression)
+	if e.config.FilterProgram != nil {
+		spec := services.NewExpressionSpecification(e.config.FilterProgram)
+		return spec.IsSatisfiedBy(ctrl)
+	}
+
+	return true, ""
 }
 
 // executeObservationsParallel executes observations in parallel with concurrency limits.

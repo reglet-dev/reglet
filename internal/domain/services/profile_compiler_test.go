@@ -340,7 +340,7 @@ func Test_ProfileCompiler_ImplementsProfileReader(t *testing.T) {
 	assert.Len(t, reader.GetControls(), 2)
 
 	// Test filtering methods
-	selected := reader.GetControls().SelectByTags([]string{"tag1"})
+	selected := reader.GetControls().Select(entities.WithTags("tag1"))
 	assert.Len(t, selected, 1)
 	assert.Equal(t, "C-001", selected[0].ID)
 }

@@ -214,7 +214,7 @@ func TestExecuteControl_SingleObservation(t *testing.T) {
 
 	// Create empty execution result for dependency checking
 	execResult := execution.NewExecutionResult("test", "1.0.0")
-	result := engine.executeControl(ctx, ctrl, 0, execResult, nil)
+	result := engine.executeControl(ctx, ctrl, 0, execResult, nil, nil)
 
 	assert.Equal(t, "test-control", result.ID)
 	assert.Equal(t, "Test Control", result.Name)
@@ -256,7 +256,7 @@ func TestExecuteControl_MultipleObservations(t *testing.T) {
 
 	// Create empty execution result for dependency checking
 	execResult := execution.NewExecutionResult("test", "1.0.0")
-	result := engine.executeControl(ctx, ctrl, 0, execResult, nil)
+	result := engine.executeControl(ctx, ctrl, 0, execResult, nil, nil)
 
 	assert.Equal(t, "multi-test", result.ID)
 	assert.Len(t, result.ObservationResults, 2)
@@ -493,140 +493,6 @@ func TestExecute_InvalidPlugin(t *testing.T) {
 
 // --- Filtering Tests ---
 
-func TestShouldRun_IncludeTags(t *testing.T) {
-	cfg := DefaultExecutionConfig()
-	cfg.IncludeTags = []string{"security", "prod"}
-
-	e := &Engine{config: cfg}
-
-	tests := []struct {
-		name string
-		tags []string
-		want bool
-	}{
-		{"match-security", []string{"security"}, true},
-		{"match-prod", []string{"prod"}, true},
-		{"match-both", []string{"security", "prod"}, true},
-		{"match-mixed", []string{"security", "other"}, true},
-		{"no-match", []string{"dev"}, false},
-		{"no-tags", []string{}, false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctrl := entities.Control{Tags: tt.tags}
-			got, _ := e.shouldRun(ctrl)
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
-func TestShouldRun_ExcludeTags(t *testing.T) {
-	cfg := DefaultExecutionConfig()
-	cfg.ExcludeTags = []string{"slow", "experimental"}
-
-	e := &Engine{config: cfg}
-
-	tests := []struct {
-		name string
-		tags []string
-		want bool
-	}{
-		{"no-exclude", []string{"security"}, true},
-		{"exclude-slow", []string{"slow"}, false},
-		{"exclude-experimental", []string{"experimental"}, false},
-		{"exclude-mixed", []string{"security", "slow"}, false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctrl := entities.Control{Tags: tt.tags}
-			got, _ := e.shouldRun(ctrl)
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
-func TestShouldRun_IncludeSeverity(t *testing.T) {
-	cfg := DefaultExecutionConfig()
-	cfg.IncludeSeverities = []string{"critical", "high"}
-
-	e := &Engine{config: cfg}
-
-	tests := []struct {
-		name     string
-		severity string
-		want     bool
-	}{
-		{"match-critical", "critical", true},
-		{"match-high", "high", true},
-		{"no-match-low", "low", false},
-		{"no-match-medium", "medium", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctrl := entities.Control{Severity: tt.severity}
-			got, _ := e.shouldRun(ctrl)
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
-func TestShouldRun_IncludeControlIDs(t *testing.T) {
-	cfg := DefaultExecutionConfig()
-	cfg.IncludeControlIDs = []string{"c1", "c2"}
-	// Other filters should be ignored when ControlIDs are present (exclusive mode)
-	cfg.IncludeTags = []string{"ignored"}
-
-	e := &Engine{config: cfg}
-
-	tests := []struct {
-		name string
-		id   string
-		tags []string
-		want bool
-	}{
-		{"match-c1", "c1", []string{}, true},
-		{"match-c2", "c2", []string{}, true},
-		{"no-match-c3", "c3", []string{}, false},
-		{"ignore-tags-match", "c1", []string{"ignored"}, true},
-		{"ignore-tags-no-match", "c3", []string{"ignored"}, false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctrl := entities.Control{ID: tt.id, Tags: tt.tags}
-			got, _ := e.shouldRun(ctrl)
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
-func TestShouldRun_ExcludeControlIDs(t *testing.T) {
-	cfg := DefaultExecutionConfig()
-	cfg.ExcludeControlIDs = []string{"c1"}
-
-	e := &Engine{config: cfg}
-
-	tests := []struct {
-		name string
-		id   string
-		want bool
-	}{
-		{"no-exclude", "c2", true},
-		{"exclude-c1", "c1", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctrl := entities.Control{ID: tt.id}
-			got, _ := e.shouldRun(ctrl)
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
 func TestShouldRun_AdvancedFilter(t *testing.T) {
 	// Expression: severity == 'critical' && 'prod' in tags
 	program, err := expr.Compile("severity == 'critical' && 'prod' in tags", expr.Env(services.ControlEnv{}), expr.AsBool())
@@ -657,7 +523,7 @@ func TestShouldRun_AdvancedFilter(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			e.config.FilterProgram = tt.program
 			ctrl := entities.Control{Severity: tt.severity, Tags: tt.tags, Owner: tt.owner}
-			got, _ := e.shouldRun(ctrl)
+			got, _ := e.shouldRun(ctrl, nil)
 			assert.Equal(t, tt.want, got)
 		})
 	}
