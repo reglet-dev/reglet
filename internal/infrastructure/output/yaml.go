@@ -10,14 +10,25 @@ import (
 // YAMLFormatter formats execution results as YAML.
 type YAMLFormatter struct {
 	writer io.Writer
+	indent int
 }
 
 // YAMLOption configures the YAML formatter.
 type YAMLOption func(*YAMLFormatter)
 
+// WithYAMLIndent sets the indentation level for the YAML formatter.
+func WithYAMLIndent(indent int) YAMLOption {
+	return func(f *YAMLFormatter) {
+		f.indent = indent
+	}
+}
+
 // NewYAMLFormatter creates a new YAML formatter.
 func NewYAMLFormatter(w io.Writer, opts ...YAMLOption) *YAMLFormatter {
-	f := &YAMLFormatter{writer: w}
+	f := &YAMLFormatter{
+		writer: w,
+		indent: 2, // default indentation
+	}
 	for _, opt := range opts {
 		opt(f)
 	}
@@ -29,7 +40,7 @@ func (f *YAMLFormatter) Format(result *execution.ExecutionResult) error {
 	// Convert domain entity to output representation
 	out := FromDomain(result)
 
-	encoder := yaml.NewEncoder(f.writer, yaml.Indent(2))
+	encoder := yaml.NewEncoder(f.writer, yaml.Indent(f.indent))
 
 	if err := encoder.Encode(out); err != nil {
 		return err
