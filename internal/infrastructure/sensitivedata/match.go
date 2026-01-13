@@ -2,7 +2,10 @@
 // such as secrets, passwords, and tokens.
 package sensitivedata
 
-import "sort"
+import (
+	"math"
+	"sort"
+)
 
 // Match represents a sensitive value found at a specific position in an input string.
 // Used for collecting matches from multiple detectors before applying replacements.
@@ -67,8 +70,26 @@ func ApplyReplacements(input string, matches []Match, replacement func(secret st
 		m := matches[i]
 		repl := replacement(m.Secret)
 
+		// Check for potential integer overflow before allocation
+		// calculatedCap = len(result) - len(m.Secret) + len(repl)
+		currentLen := len(result)
+		removedLen := len(m.Secret)
+		addedLen := len(repl)
+
+		// currentLen - removedLen is safe because the match is within the string
+		baseLen := currentLen - removedLen
+
+		// Check if adding addedLen would overflow int
+		// efficient check: if baseLen > math.MaxInt - addedLen
+		if baseLen > math.MaxInt-addedLen {
+			// Fallback to safe append which might panic nicely or handle it,
+			// checking specifically for this prevents undefined behavior or wrap-around allocation
+			// Since we can't return an error here, and we can't allocate, we panic with a clear message.
+			panic("sensitivedata: string length overflow")
+		}
+
 		// Replace [Start:End] with replacement
-		newResult := make([]byte, 0, len(result)-len(m.Secret)+len(repl))
+		newResult := make([]byte, 0, baseLen+addedLen)
 		newResult = append(newResult, result[:m.Start]...)
 		newResult = append(newResult, repl...)
 		newResult = append(newResult, result[m.End:]...)
