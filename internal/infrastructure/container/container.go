@@ -83,9 +83,9 @@ func New(opts Options) (*Container, error) {
 		return nil, err
 	}
 
-	// Create and configure runtime config
+	// Initialize RuntimeConfig from system config
 	runtimeCfg := infraconfig.FromSystemConfig(systemCfg)
-	runtimeCfg.ApplyDefaults()
+	// Note: Limits are already properly initialized via BuildLimits in FromSystemConfig
 
 	// Create engine factory
 	engineFactory := adapters.NewEngineFactoryAdapter(redactor, runtimeCfg)

@@ -5,20 +5,19 @@ import (
 	"runtime"
 
 	"github.com/expr-lang/expr/vm"
+	"github.com/reglet-dev/reglet/internal/domain/constants"
 )
 
-// Concurrency constants for parallel execution.
+// Concurrency constants for parallel execution (re-exported from constants package).
 const (
-	// MinConcurrentControls is the minimum number of concurrent control executions,
-	// ensuring reasonable parallelism even on single-core systems.
-	MinConcurrentControls = 4
+	// MinConcurrentControls is the minimum number of concurrent control executions.
+	MinConcurrentControls = constants.DefaultMinConcurrentControls
 
-	// MaxConcurrentObservations caps the per-control observation parallelism
-	// to avoid excessive goroutine nesting.
-	MaxConcurrentObservations = 10
+	// MaxConcurrentObservations caps the per-control observation parallelism.
+	MaxConcurrentObservations = constants.DefaultMaxConcurrentObservations
 
 	// MinConcurrentObservations ensures reasonable parallelism for observations.
-	MinConcurrentObservations = 2
+	MinConcurrentObservations = constants.DefaultMinConcurrentObservations
 )
 
 // ExecutionConfig controls execution behavior.

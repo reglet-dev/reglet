@@ -312,22 +312,42 @@ Reglet is in active development. Core features work, but expect breaking changes
 - [x] Plugin management commands (`pull`, `push`, `list`, `prune`)
 - [x] Hybrid plugin resolution (embedded → cache → registry)
 - [x] Digest verification for supply chain security
-- [ ] Signature verification (Cosign/Sigstore)
+- [x] Signature verification scaffolding (Cosign/Sigstore)
       
-**v0.4.0-alpha** (Next)
-- [ ] Tag and severity filtering
-- [ ] Complete Cosign signature verification
-- [ ] Plugin catalog/discovery
+**v0.4.0-alpha** (Next - CI/CD & OIDC)
+- [x] Tag and severity filtering
+- [ ] GitHub Action
+- [ ] GitLab CI template
+- [ ] OIDC authentication
+- [ ] CLI vars (`--set key=value`)
+- [ ] Remote profiles (`reglet check https://...`)
 
-**v0.5.0-alpha**
-- [ ] OSCAL output (assessment results, POA&M)
+**v0.5.0-alpha** (Developer Experience)
+- [ ] `reglet init` (interactive wizard)
+- [ ] `reglet plan` (dry-run validation)
+- [ ] `reglet validate` (schema-only check)
+- [ ] `--watch` mode (live feedback on file changes)
+- [ ] Looping (`loop: [item1, item2]`)
+- [ ] Plugin SDK (Go) Enhanced
+
+**v0.6.0-alpha** (Cloud & IaC Plugins)
+- [ ] AWS plugin
+- [ ] GCP plugin
+- [ ] Azure plugin
+- [ ] Terraform plugin
+- [ ] Kubernetes plugin
+
+**v0.7.0-alpha** (OSCAL & Evidence)
+- [ ] OSCAL output (assessment results)
 - [ ] Evidence collection and artifact management
+- [ ] POA&M generation
 
-**v1.0**
-- [ ] Cloud provider plugins (AWS, GCP, Azure)
-- [ ] Compliance packs (SOC2, ISO27001, FedRAMP)
-- [ ] CI/CD integrations (GitHub Actions, GitLab CI)
-- [ ] Plugin SDK documentation and authoring guide
+**v1.0 GA** (Compliance Packs)
+- [ ] Remote pack registry (reglet.io/packs)
+- [ ] SOC2 pack
+- [ ] ISO27001 pack
+- [ ] CIS Linux pack
+- [ ] Complete Cosign signature verification
 
 ## Community
 

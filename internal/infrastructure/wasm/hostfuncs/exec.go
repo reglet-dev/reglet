@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/reglet-dev/reglet/internal/domain/constants"
 	"github.com/tetratelabs/wazero/api"
 )
 
@@ -152,7 +153,8 @@ func ExecCommand(ctx context.Context, mod api.Module, stack []uint64, checker *C
 
 // MaxRequestSize limits the size of incoming requests from guest memory (1MB).
 // This prevents malicious WASM modules from triggering OOM by claiming huge request sizes.
-const MaxRequestSize = 1 * 1024 * 1024
+// This is a NON-CONFIGURABLE security limit (same as constants.MaxRequestSize).
+const MaxRequestSize = constants.MaxRequestSize
 
 // readExecRequest reads and unmarshals the exec request from guest memory.
 func readExecRequest(ctx context.Context, mod api.Module, requestPacked uint64) (*ExecRequestWire, error) {
@@ -279,8 +281,9 @@ func executeCommand(ctx, execCtx context.Context, request *ExecRequestWire) Exec
 		cmd.Env = []string{}
 	}
 
-	// 10MB limit for stdout/stderr to prevent OOM DoS
-	const MaxOutputSize = 10 * 1024 * 1024
+	// Limit stdout/stderr to prevent OOM DoS
+	// Uses constants.DefaultMaxCommandOutputSize - configurable via RuntimeConfig in future
+	const MaxOutputSize = constants.DefaultMaxCommandOutputSize
 	stdout := NewBoundedBuffer(MaxOutputSize)
 	stderr := NewBoundedBuffer(MaxOutputSize)
 	cmd.Stdout = stdout

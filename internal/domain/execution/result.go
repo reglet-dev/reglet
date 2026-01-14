@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/reglet-dev/reglet/internal/domain/constants"
 	"github.com/reglet-dev/reglet/internal/domain/values"
 )
 
@@ -228,7 +229,8 @@ func (e *PluginError) Error() string {
 }
 
 // DefaultMaxEvidenceSize is the default limit for evidence size (1MB).
-const DefaultMaxEvidenceSize = 1 * 1024 * 1024
+// Re-exported from constants.DefaultMaxEvidenceSize for backward compatibility.
+const DefaultMaxEvidenceSize = constants.DefaultMaxEvidenceSize
 
 // EvidenceMeta contains metadata about evidence truncation.
 type EvidenceMeta struct {

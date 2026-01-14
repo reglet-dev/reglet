@@ -12,6 +12,7 @@ import (
 
 	"github.com/expr-lang/expr"
 	"github.com/expr-lang/expr/vm"
+	"github.com/reglet-dev/reglet/internal/domain/constants"
 	"github.com/reglet-dev/reglet/internal/domain/execution"
 	"github.com/reglet-dev/reglet/internal/domain/values"
 )
@@ -21,13 +22,38 @@ import (
 type StatusAggregator struct {
 	programCache map[string]*vm.Program // Cache of compiled expressions (thread-safe with mutex)
 	cacheMu      sync.RWMutex           // Protects programCache
+
+	// Configurable limits for expression evaluation
+	maxExpressionLength int // Maximum expression length in characters
+	maxASTNodes         int // Maximum AST node complexity
+}
+
+// StatusAggregatorOption defines functional options for StatusAggregator.
+type StatusAggregatorOption func(*StatusAggregator)
+
+// WithExpressionLimits sets custom expression evaluation limits.
+func WithExpressionLimits(maxLength, maxNodes int) StatusAggregatorOption {
+	return func(sa *StatusAggregator) {
+		sa.maxExpressionLength = maxLength
+		sa.maxASTNodes = maxNodes
+	}
 }
 
 // NewStatusAggregator creates a new status aggregator service with initialized cache.
-func NewStatusAggregator() *StatusAggregator {
-	return &StatusAggregator{
-		programCache: make(map[string]*vm.Program),
+// Defaults to standard limits; use WithExpressionLimits to customize.
+func NewStatusAggregator(opts ...StatusAggregatorOption) *StatusAggregator {
+	// Import constants package for defaults
+	sa := &StatusAggregator{
+		programCache:        make(map[string]*vm.Program),
+		maxExpressionLength: constants.DefaultMaxExpressionLength, // Default from constants.DefaultMaxExpressionLength
+		maxASTNodes:         constants.DefaultMaxASTNodes,         // Default from constants.DefaultMaxASTNodes
 	}
+
+	for _, opt := range opts {
+		opt(sa)
+	}
+
+	return sa
 }
 
 // AggregateControlStatus determines control status from observation statuses.
@@ -159,14 +185,17 @@ func (s *StatusAggregator) DetermineObservationStatus(
 		"error":     evidence.Error,     // Top-level error
 	}
 
-	// Security: Complexity limits to prevent DoS attacks
-	const maxExpressionLength = 1000 // Character limit for readability
-	const maxASTNodes = 100          // AST node limit prevents deeply nested expressions
+	// Use configured limits for expression evaluation (prevents DoS attacks)
+	// Convert maxASTNodes to uint with overflow check
+	maxNodes := uint(s.maxASTNodes)
+	if s.maxASTNodes < 0 || uint(s.maxASTNodes) > ^uint(0)>>1 {
+		maxNodes = uint(constants.DefaultMaxASTNodes) // Fallback to safe default on overflow
+	}
 
 	options := []expr.Option{
 		expr.Env(env),
 		expr.AsBool(),
-		expr.MaxNodes(maxASTNodes), // Security: Limit expression complexity (prevents DoS via nested operations)
+		expr.MaxNodes(maxNodes), // Security: Limit expression complexity (prevents DoS via nested operations)
 
 		expr.Function("isIPv4", func(params ...interface{}) (interface{}, error) {
 			if len(params) != 1 {
@@ -189,11 +218,11 @@ func (s *StatusAggregator) DetermineObservationStatus(
 	for _, expectExpr := range expects {
 		// Security: Reject overly long expressions for readability and DoS prevention
 		// MaxNodes provides the primary DoS protection via AST complexity limiting
-		if len(expectExpr) > maxExpressionLength {
+		if len(expectExpr) > s.maxExpressionLength {
 			results = append(results, execution.ExpectationResult{
 				Expression: expectExpr,
 				Passed:     false,
-				Message:    fmt.Sprintf("Expression too long (max %d chars): %d chars", maxExpressionLength, len(expectExpr)),
+				Message:    fmt.Sprintf("Expression too long (max %d chars): %d chars", s.maxExpressionLength, len(expectExpr)),
 			})
 			finalStatus = values.StatusError
 			continue

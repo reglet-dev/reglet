@@ -2,6 +2,7 @@ package config
 
 import (
 	"github.com/reglet-dev/reglet/internal/domain/entities"
+	"github.com/reglet-dev/reglet/internal/infrastructure/system"
 )
 
 // Profile represents the YAML structure of a profile.
@@ -9,8 +10,14 @@ type Profile struct {
 	Metadata Metadata               `yaml:"profile"`
 	Plugins  []string               `yaml:"plugins,omitempty"`
 	Vars     map[string]interface{} `yaml:"vars,omitempty"`
+	Config   *ProfileConfig         `yaml:"config,omitempty"` // NEW: Profile-level configuration
 	Controls Controls               `yaml:"controls"`
 	Extends  []string               `yaml:"extends,omitempty"`
+}
+
+// ProfileConfig represents profile-level configuration that can override system defaults.
+type ProfileConfig struct {
+	Limits *system.LimitsConfig `yaml:"limits,omitempty"` // Profile-specific limit overrides
 }
 
 // Metadata represents the metadata section in YAML.

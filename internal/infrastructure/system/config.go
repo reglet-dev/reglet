@@ -15,6 +15,7 @@ import (
 // This is infrastructure-level configuration separate from profile configuration.
 type Config struct {
 	SensitiveData        SensitiveDataConfig `yaml:"sensitive_data"`
+	Limits               *LimitsConfig       `yaml:"limits,omitempty"`
 	Redaction            RedactionConfig     `yaml:"redaction"`
 	Security             SecurityConfig      `yaml:"security"`
 	Capabilities         []CapabilityConfig  `yaml:"capabilities"`

@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/reglet-dev/reglet/internal/domain/constants"
 	"github.com/reglet-dev/reglet/internal/infrastructure/build"
 	"github.com/tetratelabs/wazero/api"
 )
@@ -218,7 +219,9 @@ func executeHTTPRequest(ctx context.Context, req *http.Request, pluginName strin
 
 // readHTTPResponse reads and encodes the HTTP response.
 func readHTTPResponse(ctx context.Context, resp *http.Response, requestURL string) HTTPResponseWire {
-	const maxBodySize = 10 * 1024 * 1024 // 10MB limit
+	// Limit HTTP response bodies to prevent OOM
+	// Uses constants.DefaultMaxHTTPResponseSize - configurable via RuntimeConfig in future
+	const maxBodySize = constants.DefaultMaxHTTPResponseSize
 
 	limitedReader := io.LimitReader(resp.Body, maxBodySize+1)
 	respBodyBytes, err := io.ReadAll(limitedReader)

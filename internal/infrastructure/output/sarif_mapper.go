@@ -7,24 +7,27 @@ import (
 	"strings"
 
 	"github.com/owenrumney/go-sarif/v3/pkg/report/v210/sarif"
+	"github.com/reglet-dev/reglet/internal/domain/constants"
 	"github.com/reglet-dev/reglet/internal/domain/execution"
 	"github.com/reglet-dev/reglet/internal/domain/values"
 )
 
 type sarifMapper struct {
-	result      *execution.ExecutionResult
-	artifacts   map[string]*sarif.Artifact
-	profilePath string
-	cwd         string
+	result          *execution.ExecutionResult
+	artifacts       map[string]*sarif.Artifact
+	profilePath     string
+	cwd             string
+	maxArtifactSize int64 // Maximum file size to embed in SARIF output
 }
 
 func newSARIFMapper(result *execution.ExecutionResult, profilePath string) *sarifMapper {
 	cwd, _ := os.Getwd() // Best effort, ignore error
 	return &sarifMapper{
-		result:      result,
-		profilePath: profilePath,
-		cwd:         cwd,
-		artifacts:   make(map[string]*sarif.Artifact),
+		result:          result,
+		profilePath:     profilePath,
+		cwd:             cwd,
+		artifacts:       make(map[string]*sarif.Artifact),
+		maxArtifactSize: int64(constants.DefaultMaxSARIFArtifactSize),
 	}
 }
 
@@ -285,12 +288,10 @@ func (m *sarifMapper) registerArtifact(path string, data map[string]interface{})
 	// This allows viewers to show the code context
 	absPath, err := filepath.Abs(path)
 	if err == nil {
-		// Limit content size to prevents massive SARIF files
-		const maxContentSize = 512 * 1024 // 512KB limit
-
+		// Limit content size to prevent massive SARIF files
 		// Use os.Stat to check size first
 		if info, err := os.Stat(absPath); err == nil && !info.IsDir() {
-			if info.Size() < maxContentSize {
+			if info.Size() < m.maxArtifactSize {
 				//nolint:gosec // G304: absPath is from evidence data, bounded by size check above
 				content, err := os.ReadFile(absPath)
 				if err == nil {
