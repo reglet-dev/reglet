@@ -314,15 +314,8 @@ Reglet is in active development. Core features work, but expect breaking changes
 - [x] Digest verification for supply chain security
 - [x] Signature verification scaffolding (Cosign/Sigstore)
       
-**v0.4.0-alpha** (Next - CI/CD & OIDC)
+**v0.4.0-alpha** (Next - Developer Experience)
 - [x] Tag and severity filtering
-- [ ] GitHub Action
-- [ ] GitLab CI template
-- [ ] OIDC authentication
-- [ ] CLI vars (`--set key=value`)
-- [ ] Remote profiles (`reglet check https://...`)
-
-**v0.5.0-alpha** (Developer Experience)
 - [ ] `reglet init` (interactive wizard)
 - [ ] `reglet plan` (dry-run validation)
 - [ ] `reglet validate` (schema-only check)
@@ -330,12 +323,19 @@ Reglet is in active development. Core features work, but expect breaking changes
 - [ ] Looping (`loop: [item1, item2]`)
 - [ ] Plugin SDK (Go) Enhanced
 
-**v0.6.0-alpha** (Cloud & IaC Plugins)
+**v0.5.0-alpha** (Infrastructure & IaC Plugins)
 - [ ] AWS plugin
 - [ ] GCP plugin
 - [ ] Azure plugin
 - [ ] Terraform plugin
 - [ ] Kubernetes plugin
+
+**v0.6.0-alpha** (GitHub Action & CI/CD)
+- [ ] GitHub Action (validates all 3 pillars!)
+- [ ] GitLab CI template
+- [ ] OIDC authentication
+- [ ] CLI vars (`--set key=value`)
+- [ ] Remote profiles (`reglet check https://...`)
 
 **v0.7.0-alpha** (OSCAL & Evidence)
 - [ ] OSCAL output (assessment results)
