@@ -5,6 +5,57 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Enable remote plugin distribution using OCI registries
+- Add env variable security tiers and capability grants
+
+### Changed
+- Consolidate executor using functional opts
+- Engine add checkcancellation, default configs
+- Add errors.Is
+- Improve robustness of VariableSubstitutor
+- Move runtime to func opt pattern and remove namedruntimes
+- Remove unused plugin alias code to prep for alias implementation
+- Split out monolith ports.go file
+- Remove YAML tags from Profile entities
+- Remove serialization tags and move to infra
+- Extract SDK to separate repository
+- Replace sdk imports to new repo
+- Clean up plugins with sdk repo move
+- Move engine and redactor to functional options
+- Scrubstring collect all matches first then apply replacement in single pass.
+- Add panic recover to work pool
+- Switch worker q to ring buffer q
+- Move output to func options patter in prep for oscal
+- Extract controls out of profile and create control set
+- Clean up filtering with func opt
+- Add func options to profile loader for fs
+- More func options updates
+- Consolidate constants into package
+
+### Documentation
+- Update CHANGELOG for v0.3.0-alpha
+
+### Fixed
+- Prevent path traversal in plugin config
+- Fix race condition in redactor.go walkthrough
+- Fix another race condition in redactor
+- Stack overflow risk in cycle detection
+- Ssrf vulnerabilty 0.0.0.0
+- Enforce max request size before mem allocation
+- Ensure correct cache invalidation for secret matcher
+- Address integer overlow issue in secret matching
+
+### Maintenance
+- Fix Changelog
+
+### Performance
+- Optimize redactor performance with aho-corasick
+
+### Testing
+- Add plugin registry test.
 ## [0.3.0-alpha] - 2026-01-10
 
 ### Added
@@ -35,8 +86,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Maintenance
 - Add ci workflow
 - Various linter issues, linter config fix
-- Comment cleanup across the codebase
-
+- Comment cleanup
+- Cleanup comments
 ## [0.2.0-alpha] - 2026-01-09
 
 ### Added
@@ -111,7 +162,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **cli:** Move from flags to cobra
 - **plugins:** Swap plugins to use go sdk
 - **engine:** Update engine values and add capabilities
-- **engine:** Failures take precedence over errors
+- **engine:** Failures take precendence over errors
 - **plugin:** Add maxbodysize exceeded, de-dupe types
 - Remove un-needed locking
 - Lint error fixes
@@ -133,7 +184,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Style (gofmt), move valueobjects to values, move status
 - Valueobjects to values
 - Move version to infrastructure/build and inject into runtime
-- Clean up inefficient loop for filters
+- Clean up ineffiecient loop for filters
 - **terminal:** Move to huh prompt library
 - Move to hmac hash
 - Move files around, create interfaces
@@ -143,7 +194,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Remove global state from check cmd
 - Add buffer limit to output.
 - Update worker pool to not wait on levels
-- Remove duplicate env methods
+- Remove duplicat env methods
 - Add prefix based pattern matching for interpreters
 - Rename observation to observationresult
 - Standardize observation terminology
@@ -236,7 +287,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update deprecated goreleaser options
 
 ### Maintenance
-- Initialize project structure and tooling
 - **lint:** Add golangci-lint configuration and development rules
 - Naming change
 - More from gopkg.in/yaml.v3 to github.com/goccy/go-yaml
@@ -296,8 +346,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix cyclo > 15 for points i suppose
 - Fix cyclo issues in plugin.go
 - Clean up lint errors
+## [0.0.0-alpha] - 2025-11-25
+
+### Maintenance
+- Initialize project structure and tooling
 ---
 
+[Unreleased]: https://github.com/reglet-dev/reglet/compare/v0.3.0-alpha...HEAD
 [0.3.0-alpha]: https://github.com/reglet-dev/reglet/compare/v0.2.0-alpha...v0.3.0-alpha
-
 [0.2.0-alpha]: https://github.com/reglet-dev/reglet/compare/v0.0.0-alpha...v0.2.0-alpha
+
