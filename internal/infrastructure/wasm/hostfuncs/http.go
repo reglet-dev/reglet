@@ -199,8 +199,8 @@ func executeHTTPRequest(ctx context.Context, req *http.Request, pluginName strin
 			checker:    checker,
 		},
 		CheckRedirect: func(_ *http.Request, via []*http.Request) error {
-			if len(via) >= 10 {
-				return fmt.Errorf("stopped after 10 redirects")
+			if len(via) >= constants.DefaultMaxHTTPRedirects {
+				return fmt.Errorf("stopped after %d redirects", constants.DefaultMaxHTTPRedirects)
 			}
 			return nil
 		},
