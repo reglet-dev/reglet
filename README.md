@@ -37,6 +37,11 @@ docker run --rm -v $(pwd)/quickstart.yaml:/quickstart.yaml \
 # Run compliance checks
 reglet check profile.yaml
 
+# Preview execution plan (dry-run)
+reglet plan profile.yaml
+reglet plan profile.yaml --tree         # Show execution flow diagram
+reglet plan profile.yaml --details      # Show observations and expectations
+
 # Output formats
 reglet check profile.yaml --format=json
 reglet check profile.yaml --format=sarif -o results.sarif
@@ -280,6 +285,7 @@ make build
 - **[05-tcp-connectivity.yaml](docs/examples/05-tcp-connectivity.yaml)** - TCP ports and TLS testing
 - **[06-command-checks.yaml](docs/examples/06-command-checks.yaml)** - Command execution and output validation
 - **[07-vars-and-defaults.yaml](docs/examples/07-vars-and-defaults.yaml)** - Variables and control defaults
+- **[99-comprehensive-showcase.yaml](docs/examples/99-comprehensive-showcase.yaml)** - Complete feature reference (all plugins, dependencies, retries)
 
 ## Status: Alpha (Released: v0.3.0-alpha Development: v0.3.5-alpha)
 
