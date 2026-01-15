@@ -60,7 +60,10 @@ func (t *dnsPinningTransport) createPinnedTransport(validatedIP, port, hostname,
 	pinnedTransport := t.base.Clone()
 	pinnedTransport.DialContext = func(dialCtx context.Context, network, _ string) (net.Conn, error) {
 		targetAddr := net.JoinHostPort(validatedIP, port)
-		dialer := &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}
+		dialer := &net.Dialer{
+			Timeout:   constants.DefaultHTTPTimeout,
+			KeepAlive: constants.DefaultHTTPTimeout,
+		}
 		return dialer.DialContext(dialCtx, network, targetAddr)
 	}
 
@@ -186,9 +189,9 @@ func executeHTTPRequest(ctx context.Context, req *http.Request, pluginName strin
 	baseTransport := &http.Transport{
 		ForceAttemptHTTP2:     true,
 		MaxIdleConns:          10,
-		IdleConnTimeout:       90 * time.Second,
+		IdleConnTimeout:       constants.DefaultHTTPIdleTimeout,
 		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
+		ExpectContinueTimeout: constants.DefaultHTTPExpectContinueTimeout,
 	}
 
 	client := &http.Client{
@@ -199,8 +202,8 @@ func executeHTTPRequest(ctx context.Context, req *http.Request, pluginName strin
 			checker:    checker,
 		},
 		CheckRedirect: func(_ *http.Request, via []*http.Request) error {
-			if len(via) >= 10 {
-				return fmt.Errorf("stopped after 10 redirects")
+			if len(via) >= constants.DefaultMaxHTTPRedirects {
+				return fmt.Errorf("stopped after %d redirects", constants.DefaultMaxHTTPRedirects)
 			}
 			return nil
 		},
