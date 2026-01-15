@@ -186,7 +186,7 @@ func executeHTTPRequest(ctx context.Context, req *http.Request, pluginName strin
 	baseTransport := &http.Transport{
 		ForceAttemptHTTP2:     true,
 		MaxIdleConns:          10,
-		IdleConnTimeout:       90 * time.Second,
+		IdleConnTimeout:       constants.DefaultHTTPIdleTimeout,
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: constants.DefaultHTTPExpectContinueTimeout,
 	}
