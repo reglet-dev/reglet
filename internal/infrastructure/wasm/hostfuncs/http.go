@@ -60,7 +60,10 @@ func (t *dnsPinningTransport) createPinnedTransport(validatedIP, port, hostname,
 	pinnedTransport := t.base.Clone()
 	pinnedTransport.DialContext = func(dialCtx context.Context, network, _ string) (net.Conn, error) {
 		targetAddr := net.JoinHostPort(validatedIP, port)
-		dialer := &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}
+		dialer := &net.Dialer{
+			Timeout:   constants.DefaultHTTPTimeout,
+			KeepAlive: constants.DefaultHTTPTimeout,
+		}
 		return dialer.DialContext(dialCtx, network, targetAddr)
 	}
 
