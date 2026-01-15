@@ -79,3 +79,12 @@ type PlanProfileRequest struct {
 	Metadata    RequestMetadata
 	Filters     FilterOptions
 }
+
+// ValidateProfileRequest encapsulates inputs for validating a profile.
+// It validates structure and syntax without execution.
+type ValidateProfileRequest struct {
+	ProfilePath          string
+	Metadata             RequestMetadata
+	SkipSchemaValidation bool
+	SkipExpectValidation bool
+}

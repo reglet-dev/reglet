@@ -320,3 +320,42 @@ controls:
 	assert.Equal(t, "3", config["retries"])
 	assert.Equal(t, "true", config["enabled"])
 }
+
+// TestSubstituteVariables_ExpectExpressions verifies variable substitution in expect expressions.
+// This was a bug fix: expect expressions with {{ .vars.xxx }} were not being substituted.
+func TestSubstituteVariables_ExpectExpressions(t *testing.T) {
+	yaml := `
+profile:
+  name: test-profile
+  version: 1.0.0
+
+vars:
+  max_response_time_ms: 1000
+  min_file_size: 100
+
+controls:
+  items:
+    - id: test-control
+      name: Test Control
+      observations:
+        - plugin: http
+          config:
+            url: "http://example.com"
+          expect:
+            - "data.response_time_ms < {{ .vars.max_response_time_ms }}"
+            - "data.size > {{ .vars.min_file_size }}"
+`
+
+	loader := NewProfileLoader()
+	profile, err := loader.LoadProfileFromReader(strings.NewReader(yaml))
+	require.NoError(t, err)
+
+	substitutor := NewVariableSubstitutor(nil)
+	err = substitutor.Substitute(profile)
+	require.NoError(t, err)
+
+	// Verify expect expressions have variables substituted
+	expects := profile.Controls.Items[0].ObservationDefinitions[0].Expect
+	assert.Equal(t, "data.response_time_ms < 1000", expects[0])
+	assert.Equal(t, "data.size > 100", expects[1])
+}

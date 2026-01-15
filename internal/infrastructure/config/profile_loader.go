@@ -166,12 +166,37 @@ func (l *ProfileLoader) loadSingleProfile(path string) (*entities.Profile, error
 // LoadProfileFromReader loads a profile from an io.Reader.
 // Note: This does NOT resolve inheritance, only parses YAML.
 func (l *ProfileLoader) LoadProfileFromReader(r io.Reader) (*entities.Profile, error) {
-	var cfg Profile
+	// Read all content first for potential re-parsing
+	content, err := io.ReadAll(r)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read profile: %w", err)
+	}
 
-	decoder := yaml.NewDecoder(r)
-	if err := decoder.Decode(&cfg); err != nil {
+	// First, do a loose parse to check for common format errors
+	var rawCheck map[string]interface{}
+	if err := yaml.Unmarshal(content, &rawCheck); err != nil {
 		return nil, fmt.Errorf("failed to decode profile YAML: %w", err)
 	}
+
+	// Check for missing 'profile:' section (common mistake)
+	if _, hasProfile := rawCheck["profile"]; !hasProfile {
+		// Check if they put name/version at top level (wrong format)
+		if _, hasName := rawCheck["name"]; hasName {
+			return nil, fmt.Errorf("invalid profile format: 'name' and 'version' must be under 'profile:' section, not at top level. " +
+				"Example:\n  profile:\n    name: my-profile\n    version: 1.0.0")
+		}
+		return nil, fmt.Errorf("invalid profile format: missing 'profile:' section. " +
+			"Profile YAML must have 'profile:' with 'name:' and 'version:' fields")
+	}
+
+	// Now do the strict decode into the typed struct
+	var cfg Profile
+	if err := yaml.Unmarshal(content, &cfg); err != nil {
+		return nil, fmt.Errorf("failed to decode profile YAML: %w", err)
+	}
+
+	// Note: We don't validate name/version here - that's done by ProfileCompiler
+	// The loader only catches structural YAML issues (like missing profile: section)
 
 	profile := cfg.ToEntity()
 	return &profile, nil

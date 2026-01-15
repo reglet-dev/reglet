@@ -42,6 +42,11 @@ reglet plan profile.yaml
 reglet plan profile.yaml --tree         # Show execution flow diagram
 reglet plan profile.yaml --details      # Show observations and expectations
 
+# Validate profile syntax (fast, no execution)
+reglet validate profile.yaml
+reglet validate profile.yaml --stats    # Show profile statistics
+reglet validate profile.yaml --skip-expects  # Skip expect expression validation
+
 # Output formats
 reglet check profile.yaml --format=json
 reglet check profile.yaml --format=sarif -o results.sarif
@@ -324,7 +329,7 @@ Reglet is in active development. Core features work, but expect breaking changes
 - [x] Tag and severity filtering
 - [ ] `reglet init` (interactive wizard)
 - [x] `reglet plan` (dry-run validation)
-- [ ] `reglet validate` (schema-only check)
+- [x] `reglet validate` (schema and syntax validation)
 - [ ] `--watch` mode (live feedback on file changes)
 - [ ] Looping (`loop: [item1, item2]`)
 - [ ] Plugin SDK (Go) Enhanced

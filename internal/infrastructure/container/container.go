@@ -27,17 +27,18 @@ import (
 
 // Container holds all application dependencies.
 type Container struct {
-	profileLoader       ports.ProfileLoader
-	profileValidator    ports.ProfileValidator
-	systemConfig        ports.SystemConfigProvider
-	pluginResolver      ports.PluginDirectoryResolver
-	engineFactory       ports.EngineFactory
-	checkProfileUseCase *services.CheckProfileUseCase
-	planProfileUseCase  *services.PlanProfileUseCase
-	pluginService       *services.PluginService
-	systemCfg           *system.Config
-	logger              *slog.Logger
-	trustPlugins        bool
+	profileLoader          ports.ProfileLoader
+	profileValidator       ports.ProfileValidator
+	systemConfig           ports.SystemConfigProvider
+	pluginResolver         ports.PluginDirectoryResolver
+	engineFactory          ports.EngineFactory
+	checkProfileUseCase    *services.CheckProfileUseCase
+	planProfileUseCase     *services.PlanProfileUseCase
+	validateProfileUseCase *services.ValidateProfileUseCase
+	pluginService          *services.PluginService
+	systemCfg              *system.Config
+	logger                 *slog.Logger
+	trustPlugins           bool
 }
 
 // Options configure the container.
@@ -213,18 +214,27 @@ func New(opts Options) (*Container, error) {
 		services.WithPlanLogger(opts.Logger),
 	)
 
+	// Wire up validate use case
+	validateProfileUseCase := services.NewValidateProfileUseCase(
+		profileLoader,
+		profileCompiler,
+		services.WithValidateProfileValidator(profileValidator),
+		services.WithValidateLogger(opts.Logger),
+	)
+
 	return &Container{
-		profileLoader:       profileLoader,
-		profileValidator:    profileValidator,
-		systemConfig:        systemConfigAdapter,
-		pluginResolver:      pluginResolver,
-		engineFactory:       engineFactory,
-		checkProfileUseCase: checkProfileUseCase,
-		planProfileUseCase:  planProfileUseCase,
-		pluginService:       pluginService,
-		trustPlugins:        opts.TrustPlugins,
-		systemCfg:           systemCfg,
-		logger:              opts.Logger,
+		profileLoader:          profileLoader,
+		profileValidator:       profileValidator,
+		systemConfig:           systemConfigAdapter,
+		pluginResolver:         pluginResolver,
+		engineFactory:          engineFactory,
+		checkProfileUseCase:    checkProfileUseCase,
+		planProfileUseCase:     planProfileUseCase,
+		validateProfileUseCase: validateProfileUseCase,
+		pluginService:          pluginService,
+		trustPlugins:           opts.TrustPlugins,
+		systemCfg:              systemCfg,
+		logger:                 opts.Logger,
 	}, nil
 }
 
@@ -251,6 +261,11 @@ func (c *Container) ProfileLoader() ports.ProfileLoader {
 // ProfileValidator returns the profile validator port.
 func (c *Container) ProfileValidator() ports.ProfileValidator {
 	return c.profileValidator
+}
+
+// ValidateProfileUseCase returns the validate profile use case.
+func (c *Container) ValidateProfileUseCase() *services.ValidateProfileUseCase {
+	return c.validateProfileUseCase
 }
 
 // SystemConfig returns the system configuration.

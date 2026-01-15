@@ -70,3 +70,29 @@ type PlanProfileResponse struct {
 	// Metadata contains response metadata
 	Metadata ResponseMetadata
 }
+
+// ValidateProfileResponse contains the result of validating a profile.
+type ValidateProfileResponse struct {
+	ProfileName string
+	Version     string
+	Metadata    ResponseMetadata
+	Errors      []ValidationError
+	Warnings    []string
+	Stats       ValidationStats
+	Valid       bool
+}
+
+// ValidationError represents a single validation failure.
+type ValidationError struct {
+	Type    string // "structural", "schema", "dependency", "expect"
+	Path    string // e.g., "controls[0].observations[1].expect[2]"
+	Message string // human-readable error description
+}
+
+// ValidationStats provides summary information about the validated profile.
+type ValidationStats struct {
+	PluginsUsed      []string
+	ControlCount     int
+	ObservationCount int
+	ExpectCount      int
+}

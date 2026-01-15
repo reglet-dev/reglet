@@ -18,7 +18,11 @@ func (e *ValidationError) Error() string {
 	if len(e.Details) == 0 {
 		return fmt.Sprintf("validation failed: %s: %s", e.Field, e.Message)
 	}
-	return fmt.Sprintf("validation failed: %s: %s (%d issues)", e.Field, e.Message, len(e.Details))
+	if len(e.Details) == 1 {
+		return fmt.Sprintf("validation failed: %s: %s: %s", e.Field, e.Message, e.Details[0])
+	}
+	// For multiple details, show first one and count
+	return fmt.Sprintf("validation failed: %s: %s: %s (+%d more issues)", e.Field, e.Message, e.Details[0], len(e.Details)-1)
 }
 
 // NewValidationError creates a new validation error.

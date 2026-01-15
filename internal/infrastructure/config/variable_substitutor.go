@@ -58,6 +58,14 @@ func (s *VariableSubstitutor) Substitute(profile *entities.Profile) error {
 			if err := s.substituteInMap(obs.Config, profile.Vars); err != nil {
 				return fmt.Errorf("control %s, observation %d: %w", ctrl.ID, j, err)
 			}
+
+			// Substitute in expect expressions
+			for k := range obs.Expect {
+				obs.Expect[k], err = s.substituteInString(obs.Expect[k], profile.Vars)
+				if err != nil {
+					return fmt.Errorf("control %s, observation %d, expect %d: %w", ctrl.ID, j, k, err)
+				}
+			}
 		}
 	}
 
