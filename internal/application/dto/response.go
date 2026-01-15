@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/reglet-dev/reglet/internal/domain/capabilities"
+	"github.com/reglet-dev/reglet/internal/domain/entities"
 	"github.com/reglet-dev/reglet/internal/domain/execution"
 )
 
@@ -59,4 +60,13 @@ type CollectCapabilitiesResponse struct {
 type ExecuteProfileResponse struct {
 	// ExecutionResult is the domain execution result
 	ExecutionResult *execution.ExecutionResult
+}
+
+// PlanProfileResponse contains the execution plan for a profile.
+type PlanProfileResponse struct {
+	// Plan is the dry-run execution plan
+	Plan *entities.ExecutionPlan
+
+	// Metadata contains response metadata
+	Metadata ResponseMetadata
 }

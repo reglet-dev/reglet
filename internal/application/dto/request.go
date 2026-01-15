@@ -71,3 +71,11 @@ type ExecuteProfileRequest struct {
 	Execution            ExecutionOptions
 	SkipSchemaValidation bool
 }
+
+// PlanProfileRequest encapsulates inputs for planning profile execution.
+// It generates a dry-run execution plan without actually running controls.
+type PlanProfileRequest struct {
+	ProfilePath string
+	Metadata    RequestMetadata
+	Filters     FilterOptions
+}

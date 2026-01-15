@@ -317,7 +317,7 @@ Reglet is in active development. Core features work, but expect breaking changes
 **v0.4.0-alpha** (Next - Developer Experience)
 - [x] Tag and severity filtering
 - [ ] `reglet init` (interactive wizard)
-- [ ] `reglet plan` (dry-run validation)
+- [x] `reglet plan` (dry-run validation)
 - [ ] `reglet validate` (schema-only check)
 - [ ] `--watch` mode (live feedback on file changes)
 - [ ] Looping (`loop: [item1, item2]`)

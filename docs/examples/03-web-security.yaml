@@ -94,7 +94,8 @@ controls:
             method: GET
             body_preview_length: -1
           expect:
-            - |
-              data.status_code == 200 &&
-              data.body.contains("{") &&
-              data.body.contains("}")
+            # Check status and body contains JSON markers using 'in' operator
+            - data.status_code == 200
+            - data.body contains "{"
+            - data.body contains "}"
+

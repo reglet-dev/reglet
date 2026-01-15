@@ -205,6 +205,44 @@ controls:
       # Inherits severity=medium, owner=platform-team
 ```
 
+---
+
+### 99-comprehensive-showcase.yaml - Complete Feature Reference
+
+**What it demonstrates:**
+- Full profile metadata configuration
+- All 5 plugins (file, http, dns, tcp, command)
+- Variable substitution (`vars`)
+- Control defaults (severity, owner, tags, timeout, retries)
+- Dependencies between controls (`depends_on`)
+- Multiple observations per control
+- Advanced expect expressions (`in`, `&&`, `||`, comparisons)
+- Retry configuration (retries, delay, backoff)
+- Execution levels and parallelism (DAG)
+
+**Requirements:** Network access, standard Linux system
+**Plugins:** `file`, `http`, `dns`, `tcp`, `command`
+
+**View execution plan:**
+```bash
+./bin/reglet plan docs/examples/99-comprehensive-showcase.yaml
+./bin/reglet plan docs/examples/99-comprehensive-showcase.yaml --details
+```
+
+**Run with:**
+```bash
+./bin/reglet check docs/examples/99-comprehensive-showcase.yaml --trust-plugins
+```
+
+**Filter examples:**
+```bash
+# Only security controls
+./bin/reglet plan docs/examples/99-comprehensive-showcase.yaml --tags security
+
+# JSON output
+./bin/reglet plan docs/examples/99-comprehensive-showcase.yaml --format json
+```
+
 ## Running Examples
 
 ### Basic usage
@@ -243,15 +281,27 @@ controls:
 ./bin/reglet check examples/01-quickstart.yaml --output json > results.json
 ```
 
+### Preview execution plan (dry-run)
+```bash
+# See what would run without executing
+./bin/reglet plan examples/99-comprehensive-showcase.yaml
+
+# With detailed control info
+./bin/reglet plan examples/99-comprehensive-showcase.yaml --details
+
+# Plan for specific severities
+./bin/reglet plan examples/02-ssh-hardening.yaml --severity critical,high
+```
+
 ## Plugin Summary
 
 | Plugin | Examples | Use Cases |
 |--------|----------|----------|
-| `file` | 01, 02, 07 | File permissions, content checks, config validation |
-| `command` | 06 | Service status, command output validation |
-| `http` | 03 | Web endpoints, APIs, status codes, response validation |
-| `dns` | 04 | DNS resolution, record validation, propagation checks |
-| `tcp` | 05 | Port connectivity, TLS validation, service availability |
+| `file` | 01, 02, 07, 99 | File permissions, content checks, config validation |
+| `command` | 06, 99 | Service status, command output validation |
+| `http` | 03, 99 | Web endpoints, APIs, status codes, response validation |
+| `dns` | 04, 99 | DNS resolution, record validation, propagation checks |
+| `tcp` | 05, 99 | Port connectivity, TLS validation, service availability |
 
 ## Creating Your Own Profiles
 

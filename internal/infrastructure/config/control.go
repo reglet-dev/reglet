@@ -26,19 +26,19 @@ type Defaults struct {
 
 // Control represents a control in YAML.
 type Control struct {
-	ID               string        `yaml:"id"`
-	Name             string        `yaml:"name"`
-	Description      string        `yaml:"description,omitempty"`
-	Severity         string        `yaml:"severity,omitempty"`
-	Owner            string        `yaml:"owner,omitempty"`
-	RetryBackoff     string        `yaml:"retry_backoff,omitempty"`
-	DependsOn        []string      `yaml:"depends_on,omitempty"`
-	Observations     []Observation `yaml:"observations"`
-	Tags             []string      `yaml:"tags,omitempty"`
-	Timeout          time.Duration `yaml:"timeout,omitempty"`
-	Retries          int           `yaml:"retries,omitempty"`
-	RetryDelay       time.Duration `yaml:"retry_delay,omitempty"`
-	RetryMaxDelay    time.Duration `yaml:"retry_max_delay,omitempty"`
+	ID            string        `yaml:"id"`
+	Name          string        `yaml:"name"`
+	Description   string        `yaml:"description,omitempty"`
+	Severity      string        `yaml:"severity,omitempty"`
+	Owner         string        `yaml:"owner,omitempty"`
+	RetryBackoff  string        `yaml:"retry_backoff,omitempty"`
+	DependsOn     []string      `yaml:"depends_on,omitempty"`
+	Observations  []Observation `yaml:"observations"`
+	Tags          []string      `yaml:"tags,omitempty"`
+	Timeout       time.Duration `yaml:"timeout,omitempty"`
+	Retries       int           `yaml:"retries,omitempty"`
+	RetryDelay    time.Duration `yaml:"retry_delay,omitempty"`
+	RetryMaxDelay time.Duration `yaml:"retry_max_delay,omitempty"`
 }
 
 // Observation represents an observation in YAML.

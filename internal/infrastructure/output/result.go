@@ -10,15 +10,15 @@ import (
 // ExecutionResult represents the serialization format for execution results.
 // This is the wire format for JSON/YAML output.
 type ExecutionResult struct {
-	StartTime      time.Time         `json:"start_time" yaml:"start_time"`
-	EndTime        time.Time         `json:"end_time" yaml:"end_time"`
-	RegletVersion  string            `json:"reglet_version,omitempty" yaml:"reglet_version,omitempty"`
-	ProfileName    string            `json:"profile_name" yaml:"profile_name"`
-	ProfileVersion string            `json:"profile_version" yaml:"profile_version"`
-	Controls       []ControlResult   `json:"controls" yaml:"controls"`
-	Summary        Summary           `json:"summary" yaml:"summary"`
-	Version        int               `json:"version" yaml:"version"`
-	Duration       time.Duration     `json:"duration_ms" yaml:"duration_ms"`
+	StartTime      time.Time          `json:"start_time" yaml:"start_time"`
+	EndTime        time.Time          `json:"end_time" yaml:"end_time"`
+	RegletVersion  string             `json:"reglet_version,omitempty" yaml:"reglet_version,omitempty"`
+	ProfileName    string             `json:"profile_name" yaml:"profile_name"`
+	ProfileVersion string             `json:"profile_version" yaml:"profile_version"`
+	Controls       []ControlResult    `json:"controls" yaml:"controls"`
+	Summary        Summary            `json:"summary" yaml:"summary"`
+	Version        int                `json:"version" yaml:"version"`
+	Duration       time.Duration      `json:"duration_ms" yaml:"duration_ms"`
 	ExecutionID    values.ExecutionID `json:"execution_id" yaml:"execution_id"`
 }
 
@@ -39,14 +39,14 @@ type ControlResult struct {
 
 // ObservationResult represents the serialization format for an observation result.
 type ObservationResult struct {
-	Config       map[string]any       `json:"config" yaml:"config"`
-	Evidence     *execution.Evidence  `json:"evidence,omitempty" yaml:"evidence,omitempty"`
-	EvidenceMeta *EvidenceMeta        `json:"evidence_meta,omitempty" yaml:"evidence_meta,omitempty"`
-	Error        *PluginError         `json:"error,omitempty" yaml:"error,omitempty"`
-	Plugin       string               `json:"plugin" yaml:"plugin"`
-	Status       values.Status        `json:"status" yaml:"status"`
-	Expectations []ExpectationResult  `json:"expectations,omitempty" yaml:"expectations,omitempty"`
-	Duration     time.Duration        `json:"duration_ms" yaml:"duration_ms"`
+	Config       map[string]any      `json:"config" yaml:"config"`
+	Evidence     *execution.Evidence `json:"evidence,omitempty" yaml:"evidence,omitempty"`
+	EvidenceMeta *EvidenceMeta       `json:"evidence_meta,omitempty" yaml:"evidence_meta,omitempty"`
+	Error        *PluginError        `json:"error,omitempty" yaml:"error,omitempty"`
+	Plugin       string              `json:"plugin" yaml:"plugin"`
+	Status       values.Status       `json:"status" yaml:"status"`
+	Expectations []ExpectationResult `json:"expectations,omitempty" yaml:"expectations,omitempty"`
+	Duration     time.Duration       `json:"duration_ms" yaml:"duration_ms"`
 }
 
 // ExpectationResult represents the serialization format for an expectation result.

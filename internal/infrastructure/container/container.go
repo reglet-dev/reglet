@@ -33,6 +33,7 @@ type Container struct {
 	pluginResolver      ports.PluginDirectoryResolver
 	engineFactory       ports.EngineFactory
 	checkProfileUseCase *services.CheckProfileUseCase
+	planProfileUseCase  *services.PlanProfileUseCase
 	pluginService       *services.PluginService
 	systemCfg           *system.Config
 	logger              *slog.Logger
@@ -191,7 +192,7 @@ func New(opts Options) (*Container, error) {
 	// Create domain services
 	profileCompiler := domainservices.NewProfileCompiler()
 
-	// Wire up use case
+	// Wire up check use case
 	checkProfileUseCase := services.NewCheckProfileUseCase(
 		profileLoader,
 		profileCompiler,
@@ -205,6 +206,13 @@ func New(opts Options) (*Container, error) {
 		services.WithUseCaseLogger(opts.Logger),
 	)
 
+	// Wire up plan use case
+	planProfileUseCase := services.NewPlanProfileUseCase(
+		profileLoader,
+		profileCompiler,
+		services.WithPlanLogger(opts.Logger),
+	)
+
 	return &Container{
 		profileLoader:       profileLoader,
 		profileValidator:    profileValidator,
@@ -212,6 +220,7 @@ func New(opts Options) (*Container, error) {
 		pluginResolver:      pluginResolver,
 		engineFactory:       engineFactory,
 		checkProfileUseCase: checkProfileUseCase,
+		planProfileUseCase:  planProfileUseCase,
 		pluginService:       pluginService,
 		trustPlugins:        opts.TrustPlugins,
 		systemCfg:           systemCfg,
@@ -222,6 +231,11 @@ func New(opts Options) (*Container, error) {
 // CheckProfileUseCase returns the check profile use case.
 func (c *Container) CheckProfileUseCase() *services.CheckProfileUseCase {
 	return c.checkProfileUseCase
+}
+
+// PlanProfileUseCase returns the plan profile use case.
+func (c *Container) PlanProfileUseCase() *services.PlanProfileUseCase {
+	return c.planProfileUseCase
 }
 
 // PluginService returns the plugin service.

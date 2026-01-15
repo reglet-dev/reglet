@@ -1,0 +1,408 @@
+# Comprehensive Feature Showcase Profile
+#
+# This profile demonstrates ALL Reglet profile features in one place.
+# Use it as a reference for:
+#   - Profile metadata
+#   - Plugin declarations
+#   - Variable substitution (vars)
+#   - Control defaults (inherited values)
+#   - Control configuration (severity, owner, tags, timeout, retries)
+#   - Dependencies between controls (depends_on)
+#   - Multiple observation definitions
+#   - Expect expressions with various operators
+#   - Expression language features (comparisons, 'in' operator, boolean logic)
+#
+# Run with: ./bin/reglet check docs/examples/99-comprehensive-showcase.yaml --trust-plugins
+# Plan with: ./bin/reglet plan docs/examples/99-comprehensive-showcase.yaml
+#
+# Filter examples:
+#   --severity critical,high       # Only critical and high severity
+#   --tags security                 # Only controls with 'security' tag
+#   --control file-exists,network-connectivity  # Specific controls
+#   --exclude-tags slow             # Skip slow tests
+
+profile:
+  name: Comprehensive Feature Showcase
+  description: |
+    A complete demonstration of all Reglet profile features.
+    This profile covers file checks, HTTP requests, DNS resolution,
+    TCP connectivity, and command execution using all available plugins.
+  version: 2.0.0
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PLUGINS
+# ═══════════════════════════════════════════════════════════════════════════════
+# Declare all plugins used in this profile.
+# Supports: simple names, OCI references, version pinning (future)
+plugins:
+  - file      # File system operations
+  - http      # HTTP/HTTPS requests
+  - dns       # DNS resolution
+  - tcp       # TCP connectivity
+  - command   # Shell command execution
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# VARIABLES
+# ═══════════════════════════════════════════════════════════════════════════════
+# Reusable values substituted using {{ .vars.key }} syntax in configs.
+# Useful for environment-specific paths, URLs, timeouts, etc.
+vars:
+  # System paths
+  config_dir: /etc
+  ssh_config: /etc/ssh/sshd_config
+  
+  # Network configuration
+  test_domain: example.com
+  api_url: https://api.github.com
+  http_timeout: 5s
+  
+  # Command configuration
+  shell: /bin/sh
+  
+  # Thresholds
+  min_file_size: 100
+  max_response_time_ms: 1000
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CONTROLS
+# ═══════════════════════════════════════════════════════════════════════════════
+controls:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # DEFAULTS - Inherited by all controls unless explicitly overridden
+  # ─────────────────────────────────────────────────────────────────────────────
+  defaults:
+    severity: medium          # Default severity for all controls
+    owner: platform-team      # Default owner/team responsible
+    tags:                     # Default tags applied to all controls
+      - compliance
+      - baseline
+    timeout: 30s              # Default timeout per control
+    retries: 2                # Default retry count on failure
+    retry_delay: 1s           # Default delay between retries
+    retry_backoff: linear     # Retry strategy: none, linear, exponential
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # CONTROL ITEMS
+  # ─────────────────────────────────────────────────────────────────────────────
+  items:
+    # ═══════════════════════════════════════════════════════════════════════════
+    # FILE PLUGIN EXAMPLES
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    # Basic file existence check (inherits all defaults)
+    - id: passwd-file-exists
+      name: Password file exists
+      description: Verify the system password file is present
+      observations:
+        - plugin: file
+          config:
+            path: "{{ .vars.config_dir }}/passwd"
+          expect:
+            - data.exists == true
+
+    # File with permission checks (overrides severity)
+    - id: ssh-config-secure
+      name: SSH config has secure permissions
+      description: sshd_config should not be world-readable
+      severity: high
+      tags: [security, ssh, hardening]
+      observations:
+        - plugin: file
+          config:
+            path: "{{ .vars.ssh_config }}"
+          expect:
+            - data.exists == true
+            - data.mode <= 0600        # Octal comparison
+            - data.uid == 0            # Owned by root
+
+    # File size validation
+    - id: hosts-file-valid
+      name: Hosts file is non-empty
+      description: The hosts file should contain mappings
+      observations:
+        - plugin: file
+          config:
+            path: "{{ .vars.config_dir }}/hosts"
+          expect:
+            - data.exists == true
+            - data.size > 0
+            - data.readable == true
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # HTTP PLUGIN EXAMPLES
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    # Basic HTTP connectivity
+    - id: network-connectivity
+      name: External network is accessible
+      description: Verify we can reach the internet
+      severity: critical
+      tags: [network, connectivity, infrastructure]
+      timeout: 10s
+      observations:
+        - plugin: http
+          config:
+            url: http://{{ .vars.test_domain }}
+            method: GET
+            timeout: "{{ .vars.http_timeout }}"
+          expect:
+            - data.status_code >= 200 && data.status_code < 400
+
+    # HTTPS with certificate validation
+    - id: https-works
+      name: HTTPS endpoint accessible
+      description: Verify TLS/SSL works correctly
+      severity: high
+      tags: [security, network, tls]
+      observations:
+        - plugin: http
+          config:
+            url: https://{{ .vars.test_domain }}
+            method: GET
+          expect:
+            - data.status_code == 200
+            - data.protocol == "HTTP/1.1" || data.protocol == "HTTP/2.0"
+
+    # API health check with response validation
+    - id: api-health
+      name: API is responsive
+      description: GitHub API returns valid JSON
+      severity: low
+      tags: [api, monitoring]
+      observations:
+        - plugin: http
+          config:
+            url: "{{ .vars.api_url }}"
+            method: GET
+            body_preview_length: -1
+          expect:
+            - data.status_code == 200
+            - data.body_size > 0
+            # Use 'in' operator for string containment check
+            - '"{" in data.body'
+
+    # Response time validation
+    - id: api-performance
+      name: API responds within SLA
+      description: API should respond within acceptable time
+      severity: low
+      tags: [performance, sla, api]
+      depends_on: [api-health]  # Only run if api-health passes
+      observations:
+        - plugin: http
+          config:
+            url: "{{ .vars.api_url }}"
+            method: GET
+          expect:
+            - data.status_code == 200
+            - data.response_time_ms < {{ .vars.max_response_time_ms }}
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # DNS PLUGIN EXAMPLES
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    # DNS resolution check
+    - id: dns-resolves
+      name: DNS resolution works
+      description: Verify domain resolves to IP addresses
+      severity: high
+      tags: [dns, network, infrastructure]
+      observations:
+        - plugin: dns
+          config:
+            name: "{{ .vars.test_domain }}"
+            type: A
+          expect:
+            - data.resolved == true
+            - len(data.addresses) > 0
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # TCP PLUGIN EXAMPLES
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    # TCP port connectivity (depends on DNS)
+    - id: https-port-open
+      name: HTTPS port is reachable
+      description: Verify TCP port 443 is open on the target
+      severity: high
+      tags: [network, connectivity, ports]
+      depends_on: [dns-resolves]  # Need DNS first
+      observations:
+        - plugin: tcp
+          config:
+            host: "{{ .vars.test_domain }}"
+            port: 443
+            timeout: "5s"
+          expect:
+            - data.connected == true
+            - data.handshake_time_ms > 0
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # COMMAND PLUGIN EXAMPLES
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    # Simple command execution
+    - id: shell-works
+      name: Shell is functional
+      description: Verify shell commands execute correctly
+      severity: critical
+      tags: [system, shell]
+      owner: sre-team
+      observations:
+        - plugin: command
+          config:
+            command: "{{ .vars.shell }}"
+            args: ["-c", "echo 'hello world'"]
+          expect:
+            - data.exit_code == 0
+            - '"hello" in data.stdout'
+
+    # System information check
+    - id: kernel-version
+      name: Kernel version check
+      description: Capture kernel version for compliance reporting
+      severity: low
+      tags: [system, compliance, inventory]
+      observations:
+        - plugin: command
+          config:
+            command: uname
+            args: ["-r"]
+          expect:
+            - data.exit_code == 0
+            - data.stdout != ""
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # CONTROLS WITH DEPENDENCIES (DAG)
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    # Final validation - depends on all critical checks
+    - id: system-ready
+      name: System is fully operational
+      description: Aggregate check that confirms all critical systems work
+      severity: critical
+      tags: [final, aggregate]
+      depends_on:
+        - passwd-file-exists
+        - ssh-config-secure
+        - network-connectivity
+        - shell-works
+      observations:
+        - plugin: command
+          config:
+            command: "{{ .vars.shell }}"
+            args: ["-c", "echo 'All critical systems verified'"]
+          expect:
+            - data.exit_code == 0
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # MULTIPLE OBSERVATIONS EXAMPLE
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    # Control with multiple observations (all must pass)
+    - id: system-files-complete
+      name: Critical system files are present
+      description: Multiple files verified in a single control
+      severity: high
+      tags: [system, files, baseline]
+      observations:
+        - plugin: file
+          config:
+            path: "{{ .vars.config_dir }}/passwd"
+          expect:
+            - data.exists == true
+        - plugin: file
+          config:
+            path: "{{ .vars.config_dir }}/group"
+          expect:
+            - data.exists == true
+        - plugin: file
+          config:
+            path: "{{ .vars.config_dir }}/hosts"
+          expect:
+            - data.exists == true
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # COMPLEX EXPECT EXPRESSIONS
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    # Demonstrates advanced expression features
+    - id: advanced-expressions
+      name: Advanced expression validation
+      description: Demonstrates various expression operators
+      severity: low
+      tags: [demo, expressions]
+      observations:
+        - plugin: file
+          config:
+            path: "{{ .vars.config_dir }}/passwd"
+          expect:
+            # Boolean operators
+            - data.exists == true && data.readable == true
+            # OR conditions
+            - data.size > 0 || data.is_dir == false
+            # Numeric comparisons
+            - data.uid >= 0
+            - data.gid >= 0
+            # NOT condition
+            - data.is_symlink == false
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # RETRY CONFIGURATION EXAMPLE
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    # Custom retry configuration for flaky network checks
+    - id: flaky-http-check
+      name: Network check with retries
+      description: Uses custom retry configuration for unreliable endpoints
+      severity: low
+      tags: [network, retry-demo]
+      retries: 3
+      retry_delay: 2s
+      retry_backoff: exponential
+      retry_max_delay: 10s
+      observations:
+        - plugin: http
+          config:
+            url: http://{{ .vars.test_domain }}
+            method: HEAD
+          expect:
+            - data.status_code >= 200 && data.status_code < 500
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # THIRD LEVEL (depends on Level 1 controls)
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    # This creates a 3-level DAG: L0 -> L1 -> L2
+    - id: full-stack-verified
+      name: Full stack verification complete
+      description: Final check after all system and network validations pass
+      severity: critical
+      tags: [final, verification, aggregate]
+      depends_on:
+        - system-ready        # Level 1 - depends on multiple L0 controls
+        - api-performance     # Level 1 - depends on api-health
+      observations:
+        - plugin: command
+          config:
+            command: "{{ .vars.shell }}"
+            args: ["-c", "echo 'Full stack verified: system + network + API'"]
+          expect:
+            - data.exit_code == 0
+
+    # Another Level 2 control with different dependency path
+    - id: network-stack-verified
+      name: Network stack verification complete  
+      description: All network-related checks passed
+      severity: high
+      tags: [network, final, aggregate]
+      depends_on:
+        - https-port-open     # Level 1 - depends on dns-resolves
+      observations:
+        - plugin: command
+          config:
+            command: "{{ .vars.shell }}"
+            args: ["-c", "echo 'Network stack verified: DNS + TCP + HTTPS'"]
+          expect:
+            - data.exit_code == 0
+
