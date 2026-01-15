@@ -42,9 +42,12 @@ func (f *YAMLFormatter) Format(result *execution.ExecutionResult) error {
 
 	encoder := yaml.NewEncoder(f.writer, yaml.Indent(f.indent))
 
-	if err := encoder.Encode(out); err != nil {
-		return err
+	encodeErr := encoder.Encode(out)
+	closeErr := encoder.Close()
+
+	if encodeErr != nil {
+		return encodeErr
 	}
 
-	return encoder.Close()
+	return closeErr
 }
