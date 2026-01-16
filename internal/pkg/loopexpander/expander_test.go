@@ -99,11 +99,13 @@ func TestSubstituteLoopInMap_Nested(t *testing.T) {
 
 	result := SubstituteLoopInMap(config, loopCtx, "")
 
-	outer := result["outer"].(map[string]interface{})
+	outer, ok := result["outer"].(map[string]interface{})
+	require.True(t, ok)
 	assert.Equal(t, "value", outer["inner"])
 	assert.Equal(t, "2", outer["index"])
 
-	array := result["array"].([]interface{})
+	array, ok := result["array"].([]interface{})
+	require.True(t, ok)
 	assert.Equal(t, "value", array[0])
 	assert.Equal(t, "static", array[1])
 }
@@ -144,7 +146,8 @@ func TestResolveLoopItems_ListOfMaps(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, items, 2)
 
-	first := items[0].(map[string]interface{})
+	first, ok := items[0].(map[string]interface{})
+	require.True(t, ok)
 	assert.Equal(t, "/etc/ssh/sshd_config", first["path"])
 }
 
