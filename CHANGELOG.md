@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Scrubstring collect all matches first then apply replacement in single pass.
 - Add panic recover to work pool
 - Switch worker q to ring buffer q
-- Move output to func options patter in prep for oscal
+- Move output to func options pattern in prep for oscal
 - Extract controls out of profile and create control set
 - Clean up filtering with func opt
 - Add func options to profile loader for fs
