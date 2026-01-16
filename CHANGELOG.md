@@ -43,7 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix race condition in redactor.go walkthrough
 - Fix another race condition in redactor
 - Stack overflow risk in cycle detection
-- SSRF vulnerability 0.0.0.0
+- Fix SSRF vulnerability by validating IP addresses and blocking access to 0.0.0.0
 - Enforce max request size before mem allocation
 - Ensure correct cache invalidation for secret matcher
 - Address integer overflow issue in secret matching
@@ -55,7 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Optimize redactor performance with aho-corasick
 
 ### Testing
-- Add plugin registry test.
+- Add plugin registry test
 ## [0.3.0-alpha] - 2026-01-10
 
 ### Added
@@ -162,7 +162,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **cli:** Move from flags to cobra
 - **plugins:** Swap plugins to use go sdk
 - **engine:** Update engine values and add capabilities
-- **engine:** Failures take precendence over errors
+- **engine:** Failures take precedence over errors
 - **plugin:** Add maxbodysize exceeded, de-dupe types
 - Remove un-needed locking
 - Lint error fixes
@@ -272,7 +272,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Embed file contents in SARIF
 - Race cond in file plugin
 - Handle relative path
-- Various
+- Various minor internal improvements and maintenance tasks
 - Check for cycles and circular dependencies
 - Deterministic order of observations
 - Filters were not working in certain circumstances
