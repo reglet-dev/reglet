@@ -82,9 +82,9 @@ controls:
 	// Parse JSON output (skip log lines)
 	outputStr := string(outputBytes)
 	jsonStart := 0
-	for i, char := range outputStr {
+	for pos, char := range outputStr {
 		if char == '{' {
-			jsonStart = i
+			jsonStart = pos
 			break
 		}
 	}
