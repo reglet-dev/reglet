@@ -103,7 +103,8 @@ func TestSubstituteLoopInMap_Nested(t *testing.T) {
 	assert.Equal(t, "value", outer["inner"])
 	assert.Equal(t, "2", outer["index"])
 
-	array := result["array"].([]interface{})
+	array, ok := result["array"].([]interface{})
+	require.True(t, ok)
 	assert.Equal(t, "value", array[0])
 	assert.Equal(t, "static", array[1])
 }
