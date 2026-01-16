@@ -72,6 +72,7 @@ reglet plugins prune --keep 3
 
 - **Declarative Profiles** - Define validation rules in simple, versioned YAML
 - **Parallel Execution** - Optimized for CI/CD with concurrent execution of independent controls
+- **Loop Observations** - Execute checks across multiple items with variable substitution (`loop: { items: "{{ .vars.files }}" }`)
 - **Standardized Output** - JSON, YAML, JUnit, SARIF - ready for compliance platforms or OSCAL integration (coming soon)
 - **Secure Sandbox** - All validation logic runs inside a CGO-free WebAssembly runtime (wazero)
 - **Capability-Based Security** - Plugins can only access files, networks, or environment variables if explicitly allowed
