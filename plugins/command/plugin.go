@@ -35,7 +35,11 @@ type CommandConfig struct {
 	Args    []string `json:"args,omitempty" description:"Arguments"`
 	Dir     string   `json:"dir,omitempty" description:"Working directory"`
 	Env     []string `json:"env,omitempty" description:"Environment variables"`
-	Timeout int      `json:"timeout,omitempty" default:"30" description:"Execution timeout in seconds"`
+	// Timeout is the effective execution timeout.
+	// It is derived from TimeoutSeconds (in seconds) after configuration validation.
+	Timeout time.Duration `json:"-" description:"Execution timeout"`
+	// TimeoutSeconds is the JSON-configurable timeout in seconds.
+	TimeoutSeconds int `json:"timeout,omitempty" default:"30" description:"Execution timeout in seconds"`
 }
 
 // Schema returns the JSON schema for the plugin's configuration.
@@ -52,6 +56,12 @@ func (p *commandPlugin) Check(ctx context.Context, config regletsdk.Config) (reg
 			Error:  regletsdk.ToErrorDetail(&regletsdk.ConfigError{Err: err}),
 		}, nil
 	}
+
+	// Derive the effective timeout as a time.Duration.
+	if cfg.TimeoutSeconds <= 0 {
+		cfg.TimeoutSeconds = 30
+	}
+	cfg.Timeout = time.Duration(cfg.TimeoutSeconds) * time.Second
 
 	// Validate mutual exclusivity
 	if cfg.Run == "" && cfg.Command == "" {
@@ -99,7 +109,7 @@ func (p *commandPlugin) Check(ctx context.Context, config regletsdk.Config) (reg
 		Args:    args,
 		Dir:     cfg.Dir,
 		Env:     cfg.Env,
-		Timeout: cfg.Timeout,
+		Timeout: time.Duration(cfg.Timeout) * time.Second,
 	})
 	if err != nil {
 		return regletsdk.Failure("exec", fmt.Sprintf("execution failed: %v", err)), nil
