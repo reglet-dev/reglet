@@ -43,7 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix race condition in redactor.go walkthrough
 - Fix another race condition in redactor
 - Stack overflow risk in cycle detection
-- SSRF vulnerability 0.0.0.0
+- Fix SSRF vulnerability by validating IP addresses and blocking access to 0.0.0.0
 - Enforce max request size before mem allocation
 - Ensure correct cache invalidation for secret matcher
 - Address integer overflow issue in secret matching
