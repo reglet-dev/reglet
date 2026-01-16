@@ -355,4 +355,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [Unreleased]: https://github.com/reglet-dev/reglet/compare/v0.3.0-alpha...HEAD
 [0.3.0-alpha]: https://github.com/reglet-dev/reglet/compare/v0.2.0-alpha...v0.3.0-alpha
 [0.2.0-alpha]: https://github.com/reglet-dev/reglet/compare/v0.0.0-alpha...v0.2.0-alpha
+[0.0.0-alpha]: https://github.com/reglet-dev/reglet/releases/tag/v0.0.0-alpha
 
