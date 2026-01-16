@@ -272,7 +272,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Embed file contents in SARIF
 - Race cond in file plugin
 - Handle relative path
-- Various
+- Various minor internal improvements and maintenance tasks
 - Check for cycles and circular dependencies
 - Deterministic order of observations
 - Filters were not working in certain circumstances
