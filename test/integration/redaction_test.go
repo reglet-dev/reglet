@@ -88,10 +88,10 @@ controls:
 			break
 		}
 	}
-	jsonStr := outputStr[jsonStart:]
+	jsonOutput := outputStr[jsonStart:]
 
 	var result map[string]interface{}
-	err = json.Unmarshal([]byte(jsonStr), &result)
+	err = json.Unmarshal([]byte(jsonOutput), &result)
 	require.NoError(t, err, "Failed to parse JSON output")
 
 	// 6. Verify Redaction
