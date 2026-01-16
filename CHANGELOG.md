@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Consolidate executor using functional opts
-- Engine add checkcancellation, default configs
+- Engine adds check cancellation and default configs
 - Add errors.Is
 - Improve robustness of VariableSubstitutor
 - Move runtime to func opt pattern and remove namedruntimes
