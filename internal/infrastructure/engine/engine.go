@@ -109,12 +109,13 @@ func WithTruncator(t execution.TruncationStrategy) EngineOption {
 
 // Engine coordinates profile execution.
 type Engine struct {
-	repository repositories.ExecutionResultRepository
-	executor   ObservationExecutable
-	truncator  execution.TruncationStrategy
-	runtime    *wasm.Runtime
-	version    build.Info
-	config     ExecutionConfig
+	repository  repositories.ExecutionResultRepository
+	executor    ObservationExecutable
+	truncator   execution.TruncationStrategy
+	runtime     *wasm.Runtime
+	version     build.Info
+	config      ExecutionConfig
+	profileVars map[string]interface{} // Profile variables for loop expansion
 }
 
 // CapabilityCollector collects required capabilities from plugins.
@@ -252,12 +253,13 @@ func newEngineWithCapabilities(
 	}
 
 	return &Engine{
-		runtime:    runtime,
-		executor:   executor,
-		config:     cfg.executionConfig,
-		repository: cfg.repository,
-		version:    version,
-		truncator:  cfg.truncator,
+		runtime:     runtime,
+		executor:    executor,
+		config:      cfg.executionConfig,
+		repository:  cfg.repository,
+		version:     version,
+		truncator:   cfg.truncator,
+		profileVars: cfg.profile.GetVars(),
 	}, nil
 }
 
@@ -319,6 +321,9 @@ func (e *Engine) Execute(ctx context.Context, profile entities.ProfileReader) (*
 	if err := checkContextCancellation(ctx); err != nil {
 		return nil, err
 	}
+
+	// Store profile vars for loop expansion
+	e.profileVars = profile.GetVars()
 
 	metadata := profile.GetMetadata()
 	result := execution.NewExecutionResult(metadata.Name, metadata.Version)

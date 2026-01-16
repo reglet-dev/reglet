@@ -53,6 +53,11 @@ type ObservationResult struct {
 	Status       values.Status
 	Expectations []ExpectationResult
 	Duration     time.Duration
+	// Loop fields - populated only when observation has a loop
+	IsLoop    bool                // True if this is a loop parent observation
+	LoopItem  interface{}         // The current item (for child observations)
+	LoopIndex int                 // Index of this item in the loop
+	Children  []ObservationResult // Child observation results (for parent)
 }
 
 // ExpectationResult represents the result of evaluating a single expectation expression.

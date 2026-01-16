@@ -1,0 +1,59 @@
+# Loop Observations Example
+#
+# This profile demonstrates:
+# - loop: Iterate observations over a list from vars
+# - Each item is accessible via {{ .loop.item }}
+# - Custom variable names with the 'as' field
+#
+# Run with: ./bin/reglet check docs/examples/08-loops-demo.yaml --trust-plugins
+
+profile:
+  name: Loop Observations Demo
+  description: Demonstrates loop functionality for observations
+  version: 1.0.0
+
+plugins:
+  - file
+
+vars:
+  # Simple list of file paths
+  config_files:
+    - /etc/passwd
+    - /etc/group
+    - /etc/hosts
+
+  # More complex items with properties
+  services:
+    - name: ssh-config
+      path: /etc/ssh/sshd_config
+    - name: resolv
+      path: /etc/resolv.conf
+
+controls:
+  items:
+    # Simple loop over list of strings
+    - id: config-files-exist
+      name: Config Files Exist
+      description: Check that all config files exist using loop
+      observations:
+        - loop:
+            items: "{{ .vars.config_files }}"
+          plugin: file
+          config:
+            path: "{{ .loop.item }}"
+          expect:
+            - data.exists == true
+
+    # Loop with custom variable name for object properties
+    - id: service-configs-exist
+      name: Service Config Files Exist
+      description: Check service configuration files using custom loop variable
+      observations:
+        - loop:
+            items: "{{ .vars.services }}"
+            as: svc
+          plugin: file
+          config:
+            path: "{{ .svc.path }}"
+          expect:
+            - data.exists == true

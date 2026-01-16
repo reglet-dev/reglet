@@ -35,6 +35,7 @@ type CheckOptions struct {
 
 	trustPlugins        bool
 	includeDependencies bool
+	showDetails         bool
 }
 
 func init() {
@@ -109,6 +110,7 @@ Filtering:
 	cmd.Flags().StringSliceVar(&opts.excludeControlIDs, "exclude-control", nil, "Exclude specific controls by ID (comma-separated)")
 	cmd.Flags().StringVar(&opts.filterExpr, "filter", "", "Advanced filter expression (e.g. \"severity == 'critical'\")")
 	cmd.Flags().BoolVar(&opts.includeDependencies, "include-dependencies", false, "Include dependencies of selected controls")
+	cmd.Flags().BoolVar(&opts.showDetails, "details", false, "Show detailed evidence for loop observations")
 
 	return cmd
 }
@@ -142,12 +144,12 @@ func runCheckAction(ctx context.Context, profilePath string, opts *CheckOptions)
 		return fmt.Errorf("check failed: %w", err)
 	}
 
-	// 4. Write output
+	// 5. Write output
 	if err := writeOutput(c.OutputFormatterFactory(), response.ExecutionResult, profilePath, opts); err != nil {
 		return fmt.Errorf("failed to write output: %w", err)
 	}
 
-	// 5. Verify results
+	// 6. Verify results
 	if c.CheckProfileUseCase().CheckFailed(response.ExecutionResult) {
 		return fmt.Errorf("check failed: %d passed, %d failed, %d errors",
 			response.ExecutionResult.Summary.PassedControls,
@@ -200,17 +202,18 @@ func writeOutput(factory ports.OutputFormatterFactory, result *execution.Executi
 		slog.Info("writing output", "file", opts.outFile, "format", opts.Format)
 	}
 
-	return formatOutput(factory, writer, result, opts.Format, profilePath)
+	return formatOutput(factory, writer, result, opts, profilePath)
 }
 
 // formatOutput applies the selected formatter to the execution result.
-func formatOutput(factory ports.OutputFormatterFactory, writer io.Writer, result *execution.ExecutionResult, format string, profilePath string) error {
+func formatOutput(factory ports.OutputFormatterFactory, writer io.Writer, result *execution.ExecutionResult, opts *CheckOptions, profilePath string) error {
 	formatter, err := factory.Create(
-		format,
+		opts.Format,
 		writer,
 		output.FactoryOptions{
 			Indent:      true,
 			ProfilePath: profilePath,
+			ShowDetails: opts.showDetails,
 		},
 	)
 	if err != nil {

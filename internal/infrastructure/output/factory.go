@@ -34,6 +34,7 @@ func (f *FormatterFactory) Create(
 	case "table":
 		return NewTableFormatter(writer,
 			WithNoColor(opts.NoColor),
+			WithShowDetails(opts.ShowDetails),
 		), nil
 
 	case "json":

@@ -46,12 +46,20 @@ type Control struct {
 	RetryMaxDelay          time.Duration
 }
 
+// LoopConfig defines iteration settings for an observation.
+// When specified, the observation will be executed once per item in the list.
+type LoopConfig struct {
+	Items string // Template expression for list, e.g., "{{ .vars.services }}"
+	As    string // Optional variable name (default: uses .loop.item)
+}
+
 // ObservationDefinition configuration for a specific plugin execution.
 // It is an immutable value object.
 type ObservationDefinition struct {
 	Plugin string
 	Config map[string]interface{}
 	Expect []string
+	Loop   *LoopConfig // Optional loop configuration
 }
 
 // ApplyDefaults applies the given defaults to the control if values are missing.

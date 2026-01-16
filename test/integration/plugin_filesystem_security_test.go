@@ -18,6 +18,7 @@ func TestPluginFilesystemIsolation(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
+	t.Parallel()
 
 	ctx := context.Background()
 

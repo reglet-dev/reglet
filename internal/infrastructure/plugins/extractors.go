@@ -56,13 +56,9 @@ func (e *NetworkExtractor) Extract(config map[string]interface{}) []capabilities
 		}
 	}
 
-	// Check for "host" (tcp, dns) - only if url wasn't found or to support both
+	// Check for "host" (tcp, dns)
 	if hostVal, ok := config["host"]; ok {
 		if host, ok := hostVal.(string); ok && host != "" {
-			// Deduplicate if needed, but for now just add it.
-			// The analyzer usually deduplicates, but let's be safe.
-			// If we already added a capability for this pattern (from url), we might duplicate.
-			// But the core analyzer does deduplication.
 			caps = append(caps, capabilities.Capability{
 				Kind:    "network",
 				Pattern: "outbound:" + host,

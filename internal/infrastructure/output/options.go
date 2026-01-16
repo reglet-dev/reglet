@@ -23,4 +23,5 @@ type FactoryOptions struct {
 	Indent      bool
 	Verbose     bool
 	NoColor     bool
+	ShowDetails bool // Show detailed evidence for loop observations
 }

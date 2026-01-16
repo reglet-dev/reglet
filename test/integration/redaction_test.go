@@ -12,20 +12,24 @@ import (
 )
 
 func TestRedaction_EndToEnd(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+	t.Parallel()
+
 	// 1. Setup Paths
 	rootDir := findProjectRoot(t)
 	binPath := filepath.Join(rootDir, "bin", "reglet")
 
-	// Ensure binary is built
-	cmd := exec.Command("make", "build")
-	cmd.Dir = rootDir
-	out, err := cmd.CombinedOutput()
-	require.NoError(t, err, "Failed to build reglet: %s", out)
+	// Check binary exists (assume 'make build' already ran)
+	if _, statErr := os.Stat(binPath); os.IsNotExist(statErr) {
+		t.Skipf("reglet binary not found at %s - run 'make build' first", binPath)
+	}
 
 	// 2. Create a temporary home directory for config
 	tempHome := t.TempDir()
 	configDir := filepath.Join(tempHome, ".reglet")
-	err = os.MkdirAll(configDir, 0o755)
+	err := os.MkdirAll(configDir, 0o755)
 	require.NoError(t, err)
 
 	// 3. Create config.yaml with redaction rules

@@ -26,6 +26,7 @@ const (
 type TableFormatter struct {
 	writer      io.Writer
 	EnableColor bool
+	ShowDetails bool // When true, show full evidence for loop children
 }
 
 // TableOption configures the table formatter.
@@ -47,6 +48,13 @@ func NewTableFormatter(w io.Writer, opts ...TableOption) *TableFormatter {
 func WithNoColor(disabled bool) TableOption {
 	return func(f *TableFormatter) {
 		f.EnableColor = !disabled
+	}
+}
+
+// WithShowDetails enables detailed evidence display for loop children.
+func WithShowDetails(enabled bool) TableOption {
+	return func(f *TableFormatter) {
+		f.ShowDetails = enabled
 	}
 }
 
@@ -152,6 +160,16 @@ func (f *TableFormatter) formatObservation(obs execution.ObservationResult, inde
 	coloredSymbol := f.colorize(statusSymbol, statusColor)
 	pluginName := f.colorize(obs.Plugin, colorCyan)
 
+	// Check if this is a loop observation with children
+	if obs.IsLoop && len(obs.Children) > 0 {
+		fmt.Fprintf(f.writer, "    %d. %s Plugin: %s (loop, %d items, %s)\n", index, coloredSymbol, pluginName, len(obs.Children), obs.Status)
+		for i, child := range obs.Children {
+			f.formatLoopChild(child, i+1)
+		}
+		fmt.Fprintf(f.writer, "       Duration: %s\n", obs.Duration.Round(time.Millisecond))
+		return
+	}
+
 	fmt.Fprintf(f.writer, "    %d. %s Plugin: %s (%s)\n", index, coloredSymbol, pluginName, obs.Status)
 
 	f.formatObsError(obs)
@@ -159,6 +177,92 @@ func (f *TableFormatter) formatObservation(obs execution.ObservationResult, inde
 	f.formatEvidence(obs)
 
 	fmt.Fprintf(f.writer, "       Duration: %s\n", obs.Duration.Round(time.Millisecond))
+}
+
+// formatLoopChild formats a single loop iteration child observation.
+//
+//nolint:errcheck // Best-effort terminal output
+func (f *TableFormatter) formatLoopChild(obs execution.ObservationResult, index int) {
+	statusSymbol, statusColor := f.getStatusInfo(obs.Status)
+	coloredSymbol := f.colorize(statusSymbol, statusColor)
+
+	// Format the loop item value for display
+	itemStr := fmt.Sprintf("%v", obs.LoopItem)
+	if len(itemStr) > 50 {
+		itemStr = itemStr[:47] + "..."
+	}
+
+	fmt.Fprintf(f.writer, "       [%d] %s %s\n", index, coloredSymbol, itemStr)
+
+	f.formatChildError(obs)
+	f.formatChildFailedExpectations(obs)
+
+	// Show evidence for loop children when --details is enabled
+	if f.ShowDetails {
+		f.formatChildEvidence(obs)
+	}
+}
+
+// formatChildError formats error for loop child (with deeper indent).
+//
+//nolint:errcheck // Best-effort terminal output
+func (f *TableFormatter) formatChildError(obs execution.ObservationResult) {
+	if obs.Error == nil {
+		return
+	}
+	errMsg := fmt.Sprintf("[%s] %s", obs.Error.Code, obs.Error.Message)
+	fmt.Fprintf(f.writer, "           %s: %s\n", f.colorize("Error", colorRed), errMsg)
+}
+
+// formatChildFailedExpectations formats failed expectations for loop child.
+//
+//nolint:errcheck // Best-effort terminal output
+func (f *TableFormatter) formatChildFailedExpectations(obs execution.ObservationResult) {
+	if len(obs.Expectations) == 0 {
+		return
+	}
+
+	var failedExpectations []execution.ExpectationResult
+	for _, exp := range obs.Expectations {
+		if !exp.Passed {
+			failedExpectations = append(failedExpectations, exp)
+		}
+	}
+
+	if len(failedExpectations) == 0 {
+		return
+	}
+
+	for _, exp := range failedExpectations {
+		fmt.Fprintf(f.writer, "           %s: %s\n", f.colorize("✗", colorRed), exp.Expression)
+		if exp.Message != "" {
+			fmt.Fprintf(f.writer, "             %s\n", f.colorize(exp.Message, colorYellow))
+		}
+	}
+}
+
+// formatChildEvidence formats evidence for loop child (with deeper indent).
+//
+//nolint:errcheck // Best-effort terminal output
+func (f *TableFormatter) formatChildEvidence(obs execution.ObservationResult) {
+	if obs.Evidence == nil {
+		return
+	}
+
+	keys := f.collectEvidenceKeys(obs.Evidence.Data)
+	if len(keys) == 0 {
+		return
+	}
+
+	fmt.Fprintf(f.writer, "           Evidence:\n")
+	for _, key := range keys {
+		valStr := f.formatValue(obs.Evidence.Data[key])
+		if strings.Contains(valStr, "\n") {
+			fmt.Fprintf(f.writer, "             - %s:%s\n", f.colorize(key, colorBlue), valStr)
+		} else {
+			fmt.Fprintf(f.writer, "             - %s: %s\n", f.colorize(key, colorBlue), valStr)
+		}
+	}
 }
 
 // formatObsError formats the error section of an observation.

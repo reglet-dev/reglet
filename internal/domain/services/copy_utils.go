@@ -101,9 +101,21 @@ func CopyObservations(src []entities.ObservationDefinition) []entities.Observati
 			Plugin: obs.Plugin,
 			Config: CopyConfig(obs.Config),
 			Expect: CopyStringSlice(obs.Expect),
+			Loop:   CopyLoopConfig(obs.Loop),
 		}
 	}
 	return dst
+}
+
+// CopyLoopConfig creates a deep copy of a loop configuration.
+func CopyLoopConfig(src *entities.LoopConfig) *entities.LoopConfig {
+	if src == nil {
+		return nil
+	}
+	return &entities.LoopConfig{
+		Items: src.Items,
+		As:    src.As,
+	}
 }
 
 // CopyConfig creates a shallow copy of a config map.

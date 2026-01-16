@@ -270,6 +270,13 @@ func validateObservation(obs entities.ObservationDefinition) error {
 		errors = append(errors, "config is required")
 	}
 
+	// Validate loop config if present
+	if obs.Loop != nil {
+		if obs.Loop.Items == "" {
+			errors = append(errors, "loop.items is required when loop is specified")
+		}
+	}
+
 	if len(errors) > 0 {
 		return fmt.Errorf("%s", strings.Join(errors, "; "))
 	}

@@ -41,8 +41,15 @@ type Control struct {
 	RetryMaxDelay time.Duration `yaml:"retry_max_delay,omitempty"`
 }
 
+// LoopConfig represents the loop configuration in YAML.
+type LoopConfig struct {
+	Items string `yaml:"items"`        // Variable path, e.g., "{{ .vars.services }}"
+	As    string `yaml:"as,omitempty"` // Optional custom variable name
+}
+
 // Observation represents an observation in YAML.
 type Observation struct {
+	Loop   *LoopConfig            `yaml:"loop,omitempty"`
 	Plugin string                 `yaml:"plugin"`
 	Config map[string]interface{} `yaml:"config,omitempty"`
 	Expect []string               `yaml:"expect,omitempty"`
@@ -107,9 +114,16 @@ func (c *Control) ToEntity() entities.Control {
 
 // ToEntity converts the observation to a domain entity.
 func (o *Observation) ToEntity() entities.ObservationDefinition {
-	return entities.ObservationDefinition{
+	def := entities.ObservationDefinition{
 		Plugin: o.Plugin,
 		Config: o.Config,
 		Expect: o.Expect,
 	}
+	if o.Loop != nil {
+		def.Loop = &entities.LoopConfig{
+			Items: o.Loop.Items,
+			As:    o.Loop.As,
+		}
+	}
+	return def
 }

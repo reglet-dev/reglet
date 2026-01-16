@@ -1,8 +1,11 @@
 package services
 
 import (
+	"log/slog"
+
 	"github.com/reglet-dev/reglet/internal/domain/capabilities"
 	"github.com/reglet-dev/reglet/internal/domain/entities"
+	"github.com/reglet-dev/reglet/internal/pkg/loopexpander"
 )
 
 // CapabilityAnalyzer extracts specific capability requirements from profiles.
@@ -24,6 +27,16 @@ func NewCapabilityAnalyzer(registry *capabilities.Registry) *CapabilityAnalyzer 
 //
 // Returns a map of plugin name to required capabilities, deduplicated.
 func (a *CapabilityAnalyzer) ExtractCapabilities(profile entities.ProfileReader) map[string][]capabilities.Capability {
+	// Delegate to ExtractCapabilitiesWithVars with the profile's vars
+	return a.ExtractCapabilitiesWithVars(profile, profile.GetVars())
+}
+
+// ExtractCapabilitiesWithVars analyzes profile observations to extract specific capability requirements,
+// expanding loop observations using the provided vars to extract specific paths.
+//
+// This is the security-first implementation that ensures loop observations request only
+// the specific resources they will access, rather than falling back to broad wildcards.
+func (a *CapabilityAnalyzer) ExtractCapabilitiesWithVars(profile entities.ProfileReader, vars map[string]interface{}) map[string][]capabilities.Capability {
 	// Use map to deduplicate capabilities per plugin
 	profileCaps := make(map[string]map[string]capabilities.Capability)
 
@@ -45,13 +58,16 @@ func (a *CapabilityAnalyzer) ExtractCapabilities(profile entities.ProfileReader)
 				continue
 			}
 
-			// Extract plugin-specific capabilities based on config
-			extractedCaps := extractor.Extract(obs.Config)
-
-			// Deduplicate by using capability string as key
-			for _, capability := range extractedCaps {
-				key := capability.Kind + ":" + capability.Pattern
-				profileCaps[pluginName][key] = capability
+			// Check if this is a loop observation - expand it before extracting capabilities
+			if obs.Loop != nil && vars != nil {
+				a.extractLoopCapabilities(obs, vars, extractor, profileCaps[pluginName])
+			} else {
+				// Regular observation - extract directly
+				extractedCaps := extractor.Extract(obs.Config)
+				for _, capability := range extractedCaps {
+					key := capability.Kind + ":" + capability.Pattern
+					profileCaps[pluginName][key] = capability
+				}
 			}
 		}
 	}
@@ -69,4 +85,47 @@ func (a *CapabilityAnalyzer) ExtractCapabilities(profile entities.ProfileReader)
 	}
 
 	return result
+}
+
+// extractLoopCapabilities expands a loop observation and extracts capabilities from each expanded config.
+func (a *CapabilityAnalyzer) extractLoopCapabilities(
+	obs entities.ObservationDefinition,
+	vars map[string]interface{},
+	extractor capabilities.Extractor,
+	capMap map[string]capabilities.Capability,
+) {
+	// Resolve the loop items from vars
+	items, err := loopexpander.ResolveLoopItems(obs.Loop.Items, vars)
+	if err != nil {
+		slog.Warn("failed to resolve loop items for capability extraction",
+			"items_expr", obs.Loop.Items,
+			"error", err)
+		return
+	}
+
+	if len(items) == 0 {
+		return
+	}
+
+	// Extract capabilities from each expanded config
+	customName := obs.Loop.As
+	for i, item := range items {
+		loopCtx := &loopexpander.Context{
+			Item:   item,
+			Index:  i,
+			First:  i == 0,
+			Last:   i == len(items)-1,
+			Length: len(items),
+		}
+
+		// Substitute loop variables into the config
+		expandedConfig := loopexpander.SubstituteLoopInMap(obs.Config, loopCtx, customName)
+
+		// Extract capabilities from the expanded config
+		extractedCaps := extractor.Extract(expandedConfig)
+		for _, capability := range extractedCaps {
+			key := capability.Kind + ":" + capability.Pattern
+			capMap[key] = capability
+		}
+	}
 }

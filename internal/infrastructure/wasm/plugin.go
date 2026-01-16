@@ -56,7 +56,8 @@ func extractMountPath(pattern string) string {
 	}
 
 	// Handle root wildcard pattern first (before trimming)
-	if path == "/**" || path == "/*" {
+	// These patterns mean "all files" and should mount the root filesystem
+	if path == "/**" || path == "/*" || path == "**" || path == "*" {
 		return "/"
 	}
 
