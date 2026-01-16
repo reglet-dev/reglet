@@ -11,8 +11,9 @@ import (
 // TestMain runs before all tests in the integration package.
 // It ensures the binary and plugins are built once before tests start.
 func TestMain(m *testing.M) {
-	// Only build if not in short mode
-	if !testing.Short() {
+	// Build binary before tests (unless SHORT env var is set)
+	// We can't use testing.Short() here because it's not initialized yet
+	if os.Getenv("SHORT") == "" {
 		if err := ensureBinaryBuilt(); err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to build binary: %v\n", err)
 			os.Exit(1)

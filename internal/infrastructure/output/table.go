@@ -174,7 +174,11 @@ func (f *TableFormatter) formatObservation(obs execution.ObservationResult, inde
 
 	f.formatObsError(obs)
 	f.formatFailedExpectations(obs)
-	f.formatEvidence(obs)
+
+	// Show evidence only when --details is enabled
+	if f.ShowDetails {
+		f.formatEvidence(obs)
+	}
 
 	fmt.Fprintf(f.writer, "       Duration: %s\n", obs.Duration.Round(time.Millisecond))
 }
@@ -197,7 +201,7 @@ func (f *TableFormatter) formatLoopChild(obs execution.ObservationResult, index 
 	f.formatChildError(obs)
 	f.formatChildFailedExpectations(obs)
 
-	// Show evidence for loop children when --details is enabled
+	// Show evidence only when --details is enabled
 	if f.ShowDetails {
 		f.formatChildEvidence(obs)
 	}

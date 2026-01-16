@@ -196,18 +196,40 @@ func (r *ExecutionResult) calculateSummary() {
 			r.Summary.SkippedControls++
 		}
 
-		// Count observation statuses
-		r.Summary.TotalObservations += len(ctrl.ObservationResults)
+		// Count observation statuses (including loop children)
 		for _, obs := range ctrl.ObservationResults {
-			switch obs.Status {
-			case values.StatusPass:
-				r.Summary.PassedObservations++
-			case values.StatusFail:
-				r.Summary.FailedObservations++
-			case values.StatusError:
-				r.Summary.ErrorObservations++
-			}
+			r.countObservation(obs)
 		}
+	}
+}
+
+// countObservation recursively counts an observation and its children.
+// For loop observations (obs.IsLoop == true), only count the children, not the parent,
+// since the parent is just organizational structure - the actual checks are the children.
+func (r *ExecutionResult) countObservation(obs ObservationResult) {
+	// If this is a loop parent, count only the children
+	if obs.IsLoop && len(obs.Children) > 0 {
+		for _, child := range obs.Children {
+			r.countObservation(child)
+		}
+		return
+	}
+
+	// Count this observation
+	r.Summary.TotalObservations++
+
+	switch obs.Status {
+	case values.StatusPass:
+		r.Summary.PassedObservations++
+	case values.StatusFail:
+		r.Summary.FailedObservations++
+	case values.StatusError:
+		r.Summary.ErrorObservations++
+	}
+
+	// Recursively count children (for non-loop observations that might have children)
+	for _, child := range obs.Children {
+		r.countObservation(child)
 	}
 }
 
