@@ -89,6 +89,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Various linter issues, linter config fix
 - Comment cleanup
 - Cleanup comments
+
 ## [0.2.0-alpha] - 2026-01-09
 
 ### Added
@@ -351,7 +352,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Maintenance
 - Initialize project structure and tooling
----
 
 [Unreleased]: https://github.com/reglet-dev/reglet/compare/v0.3.0-alpha...HEAD
 [0.3.0-alpha]: https://github.com/reglet-dev/reglet/compare/v0.2.0-alpha...v0.3.0-alpha
