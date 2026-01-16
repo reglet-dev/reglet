@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Replace sdk imports to new repo
 - Clean up plugins with sdk repo move
 - Move engine and redactor to functional options
-- Scrubstring collects all matches first, then applies replacement in a single pass.
+- ScrubString collects all matches first, then applies replacement in a single pass.
 - Add panic recover to work pool
 - Switch worker q to ring buffer q
 - Move output to func options pattern in prep for oscal
