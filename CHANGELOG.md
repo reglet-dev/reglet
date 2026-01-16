@@ -63,7 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Implement lockfile for plugins
 - Add retry and backoff
 - Add secret resolution and sensitive data protection
-- Implement max evidence size limits.
+- Implement max evidence size limits
 - Add global timeout with cancellation
 
 ### Changed
