@@ -82,16 +82,16 @@ controls:
 	// Parse JSON output (skip log lines)
 	outputStr := string(outputBytes)
 	jsonStart := 0
-	for i, char := range outputStr {
+	for pos, char := range outputStr {
 		if char == '{' {
-			jsonStart = i
+			jsonStart = pos
 			break
 		}
 	}
-	jsonStr := outputStr[jsonStart:]
+	jsonOutput := outputStr[jsonStart:]
 
 	var result map[string]interface{}
-	err = json.Unmarshal([]byte(jsonStr), &result)
+	err = json.Unmarshal([]byte(jsonOutput), &result)
 	require.NoError(t, err, "Failed to parse JSON output")
 
 	// 6. Verify Redaction
