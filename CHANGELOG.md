@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Consolidate executor using functional opts
-- Engine add checkcancellation, default configs
+- Engine adds check cancellation and default configs
 - Add errors.Is
 - Improve robustness of VariableSubstitutor
 - Move runtime to func opt pattern and remove namedruntimes
@@ -25,10 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Replace sdk imports to new repo
 - Clean up plugins with sdk repo move
 - Move engine and redactor to functional options
-- Scrubstring collect all matches first then apply replacement in single pass.
+- Scrubstring collects all matches first, then applies replacement in a single pass.
 - Add panic recover to work pool
 - Switch worker q to ring buffer q
-- Move output to func options patter in prep for oscal
+- Move output to func options pattern in prep for oscal
 - Extract controls out of profile and create control set
 - Clean up filtering with func opt
 - Add func options to profile loader for fs
@@ -43,10 +43,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix race condition in redactor.go walkthrough
 - Fix another race condition in redactor
 - Stack overflow risk in cycle detection
-- Ssrf vulnerabilty 0.0.0.0
+- Ssrf vulnerability 0.0.0.0
 - Enforce max request size before mem allocation
 - Ensure correct cache invalidation for secret matcher
-- Address integer overlow issue in secret matching
+- Address integer overflow issue in secret matching
 
 ### Maintenance
 - Fix Changelog
