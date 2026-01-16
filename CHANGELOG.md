@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Replace sdk imports to new repo
 - Clean up plugins with sdk repo move
 - Move engine and redactor to functional options
-- Scrubstring collects all matches first, then applies replacement in a single pass.
+- ScrubString collects all matches first, then applies replacement in a single pass.
 - Add panic recover to work pool
 - Switch worker q to ring buffer q
 - Move output to func options pattern in prep for oscal
@@ -43,7 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix race condition in redactor.go walkthrough
 - Fix another race condition in redactor
 - Stack overflow risk in cycle detection
-- Ssrf vulnerability 0.0.0.0
+- SSRF vulnerability 0.0.0.0
 - Enforce max request size before mem allocation
 - Ensure correct cache invalidation for secret matcher
 - Address integer overflow issue in secret matching
@@ -184,7 +184,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Style (gofmt), move valueobjects to values, move status
 - Valueobjects to values
 - Move version to infrastructure/build and inject into runtime
-- Clean up ineffiecient loop for filters
+- Clean up inefficient loop for filters
 - **terminal:** Move to huh prompt library
 - Move to hmac hash
 - Move files around, create interfaces
@@ -194,7 +194,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Remove global state from check cmd
 - Add buffer limit to output.
 - Update worker pool to not wait on levels
-- Remove duplicat env methods
+- Remove duplicate env methods
 - Add prefix based pattern matching for interpreters
 - Rename observation to observationresult
 - Standardize observation terminology
