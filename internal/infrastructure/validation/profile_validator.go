@@ -242,9 +242,6 @@ func validateControl(ctrl entities.Control) error {
 // ValidatePluginName validates that a plugin name is safe to use in filesystem paths.
 // This prevents path traversal attacks when loading plugins.
 // EXPORTED for use by other packages that need to validate plugin names.
-// ValidatePluginName validates that a plugin name is safe to use in filesystem paths.
-// This prevents path traversal attacks when loading plugins.
-// EXPORTED for use by other packages that need to validate plugin names.
 func ValidatePluginName(name string) error {
 	// Delegate to domain value object for single source of truth
 	_, err := values.NewPluginName(name)

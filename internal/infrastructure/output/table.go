@@ -191,9 +191,9 @@ func (f *TableFormatter) formatLoopChild(obs execution.ObservationResult, index 
 	coloredSymbol := f.colorize(statusSymbol, statusColor)
 
 	// Format the loop item value for display
-	itemStr := fmt.Sprintf("%v", obs.LoopItem)
-	if len(itemStr) > 50 {
-		itemStr = itemStr[:47] + "..."
+	itemStr := f.formatLoopItem(obs.LoopItem)
+	if len(itemStr) > 80 {
+		itemStr = itemStr[:77] + "..."
 	}
 
 	fmt.Fprintf(f.writer, "       [%d] %s %s\n", index, coloredSymbol, itemStr)
@@ -204,6 +204,34 @@ func (f *TableFormatter) formatLoopChild(obs execution.ObservationResult, index 
 	// Show evidence only when --details is enabled
 	if f.ShowDetails {
 		f.formatChildEvidence(obs)
+	}
+}
+
+// formatLoopItem formats a loop item value for human-readable display.
+// Maps are formatted as key: value, key: value (YAML-style inline)
+// Strings and primitives are shown as-is
+func (f *TableFormatter) formatLoopItem(item interface{}) string {
+	switch v := item.(type) {
+	case string:
+		return v
+	case map[string]interface{}:
+		// Format map as key: value, key: value
+		if len(v) == 0 {
+			return ""
+		}
+		var keys []string
+		for k := range v {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+
+		var parts []string
+		for _, k := range keys {
+			parts = append(parts, fmt.Sprintf("%s: %v", k, v[k]))
+		}
+		return strings.Join(parts, ", ")
+	default:
+		return fmt.Sprintf("%v", item)
 	}
 }
 

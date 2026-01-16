@@ -50,6 +50,7 @@ reglet validate profile.yaml --skip-expects  # Skip expect expression validation
 # Output formats
 reglet check profile.yaml --format=json
 reglet check profile.yaml --format=sarif -o results.sarif
+reglet check profile.yaml --details        # Show detailed evidence
 
 # Quiet mode for CI/scripts
 reglet check profile.yaml --quiet
@@ -155,6 +156,71 @@ controls:
               Authorization: "Bearer {{ secret \"api_token\" }}"
           expect: |
             data.status_code == 200
+```
+
+## Loop Observations
+
+Reglet supports looping over multiple items in a single observation, allowing you to validate similar resources without duplicating control definitions:
+
+```yaml
+vars:
+  critical_files:
+    - /etc/passwd
+    - /etc/shadow
+    - /etc/sudoers
+
+controls:
+  items:
+    - id: file-permissions
+      name: Critical files have restricted permissions
+      observations:
+        - plugin: file
+          loop:
+            items: "{{ .vars.critical_files }}"
+          config:
+            path: "{{ .loop.item }}"
+            mode: exists
+          expect: |
+            data.exists == true &&
+            data.permissions.startsWith("-rw-------")
+```
+
+**Loop Features:**
+- **Variable Expansion**: Reference variables with `{{ .vars.name }}`
+- **Loop Context**: Access current item with `{{ .loop.item }}`, index with `{{ .loop.index }}`
+- **Custom Variable Names**: Use `as: filename` to access items as `{{ .filename }}`
+- **Status Aggregation**: Loop passes only if all items pass
+- **Capability Discovery**: Each loop item gets specific permissions (not broad wildcards)
+
+**Loop Context Variables:**
+- `.loop.item` - Current item value
+- `.loop.index` - Zero-based index (0, 1, 2...)
+- `.loop.first` - Boolean, true for first item
+- `.loop.last` - Boolean, true for last item
+- `.loop.length` - Total number of items
+
+**Example with custom variable name:**
+
+```yaml
+vars:
+  servers:
+    - { name: web-1, host: 10.0.1.10 }
+    - { name: web-2, host: 10.0.1.11 }
+
+controls:
+  items:
+    - id: server-health
+      name: All web servers are responding
+      observations:
+        - plugin: tcp
+          loop:
+            items: "{{ .vars.servers }}"
+            as: server
+          config:
+            host: "{{ .server.host }}"
+            port: 443
+          expect: |
+            data.connected == true
 ```
 
 ## Plugin Management
@@ -291,6 +357,7 @@ make build
 - **[05-tcp-connectivity.yaml](docs/examples/05-tcp-connectivity.yaml)** - TCP ports and TLS testing
 - **[06-command-checks.yaml](docs/examples/06-command-checks.yaml)** - Command execution and output validation
 - **[07-vars-and-defaults.yaml](docs/examples/07-vars-and-defaults.yaml)** - Variables and control defaults
+- **[08-loops-demo.yaml](docs/examples/08-loops-demo.yaml)** - Loop observations with variable substitution
 - **[99-comprehensive-showcase.yaml](docs/examples/99-comprehensive-showcase.yaml)** - Complete feature reference (all plugins, dependencies, retries)
 
 ## Status: Alpha (Released: v0.3.0-alpha Development: v0.3.5-alpha)
@@ -332,7 +399,7 @@ Reglet is in active development. Core features work, but expect breaking changes
 - [x] `reglet plan` (dry-run validation)
 - [x] `reglet validate` (schema and syntax validation)
 - [ ] `--watch` mode (live feedback on file changes)
-- [ ] Looping (`loop: [item1, item2]`)
+- [x] Looping (`loop: { items: "{{ .vars.list }}" }`)
 - [ ] Plugin SDK (Go) Enhanced
 
 **v0.5.0-alpha** (Infrastructure & IaC Plugins)
