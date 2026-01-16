@@ -99,7 +99,8 @@ func TestSubstituteLoopInMap_Nested(t *testing.T) {
 
 	result := SubstituteLoopInMap(config, loopCtx, "")
 
-	outer := result["outer"].(map[string]interface{})
+	outer, ok := result["outer"].(map[string]interface{})
+	require.True(t, ok)
 	assert.Equal(t, "value", outer["inner"])
 	assert.Equal(t, "2", outer["index"])
 
