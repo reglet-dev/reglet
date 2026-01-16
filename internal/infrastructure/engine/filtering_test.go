@@ -40,6 +40,7 @@ func (m *testCapabilityManager) GrantCapabilities(required map[string][]capabili
 
 // TestFiltering_EndToEnd simulates a full run with 20 controls and filtering.
 func TestFiltering_EndToEnd(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}

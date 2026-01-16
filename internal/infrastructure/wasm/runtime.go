@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/reglet-dev/reglet/internal/domain/capabilities"
@@ -17,13 +18,40 @@ import (
 )
 
 // defaultGlobalCache is the shared compilation cache used when no custom cache is provided.
-// This speeds up compilation across runtimes within a single process.
+// This speeds up compilation across runtimes within a single process AND across runs.
+//
+// Uses disk-based caching (~/.cache/reglet/wasm) for persistence between test runs,
+// significantly speeding up repeated test executions with the -race flag.
 //
 // Cleanup considerations:
 //   - CLI tools: No explicit cleanup needed - OS reclaims memory on exit.
 //   - Servers/Workers: Manage your own cache with WithCompilationCache() option.
-//   - Tests: Use WithCompilationCache(wazero.NewCompilationCache()) for isolation.
-var defaultGlobalCache = wazero.NewCompilationCache()
+//   - Tests: Benefits from disk cache across runs; use WithCompilationCache() for isolation.
+var defaultGlobalCache = initGlobalCache()
+
+func initGlobalCache() wazero.CompilationCache {
+	// Try to use disk-based cache for persistence across test runs
+	cacheDir := getCacheDir()
+	if cacheDir != "" {
+		cache, err := wazero.NewCompilationCacheWithDir(cacheDir)
+		if err == nil {
+			return cache
+		}
+		slog.Debug("failed to create disk compilation cache, using in-memory", "error", err)
+	}
+	return wazero.NewCompilationCache()
+}
+
+func getCacheDir() string {
+	// Try XDG cache first, then fallback to home directory
+	if xdgCache := os.Getenv("XDG_CACHE_HOME"); xdgCache != "" {
+		return filepath.Join(xdgCache, "reglet", "wasm")
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		return filepath.Join(home, ".cache", "reglet", "wasm")
+	}
+	return ""
+}
 
 // Runtime manages WASM execution.
 type Runtime struct {

@@ -38,6 +38,10 @@ func TestPlugin_Observe_Concurrent(t *testing.T) {
 
 	// Create multiple temp files with unique content
 	numFiles := 10
+
+	// Pre-warm the instance pool to avoid instantiation delays during concurrent test
+	_, err = plugin.WarmPool(ctx, numFiles)
+	require.NoError(t, err)
 	files := make([]*os.File, numFiles)
 	expectedPaths := make([]string, numFiles)
 

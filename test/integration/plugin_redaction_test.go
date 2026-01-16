@@ -15,6 +15,7 @@ import (
 // TestPluginOutputRedaction_ManualVerification demonstrates that redaction works
 // by creating a minimal test that would fail if redaction was disabled.
 func TestPluginOutputRedaction_ManualVerification(t *testing.T) {
+	t.Parallel()
 	// This test verifies the RedactingWriter integration by checking that
 	// a runtime WITH redactor differs from one WITHOUT redactor.
 
@@ -50,6 +51,7 @@ func TestPluginOutputRedaction_ManualVerification(t *testing.T) {
 // TestPluginOutputRedaction_GitleaksPatterns verifies that the gitleaks integration
 // works end-to-end for plugin stdout/stderr redaction.
 func TestPluginOutputRedaction_GitleaksPatterns(t *testing.T) {
+	t.Parallel()
 	// Create redactor with gitleaks enabled (default)
 	redactor, err := sensitivedata.NewRedactor()
 	require.NoError(t, err)
@@ -124,6 +126,7 @@ func TestPluginOutputRedaction_GitleaksPatterns(t *testing.T) {
 // TestPluginOutputRedaction_Gitleaks222Patterns demonstrates the comprehensive
 // coverage provided by gitleaks (222+ patterns) vs manual patterns (4).
 func TestPluginOutputRedaction_Gitleaks222Patterns(t *testing.T) {
+	t.Parallel()
 	// Redactor WITHOUT gitleaks (only 4 default patterns)
 	redactorWithout, err := sensitivedata.NewRedactor(
 		sensitivedata.WithGitleaksDisabled(true),

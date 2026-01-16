@@ -23,6 +23,7 @@ import (
 // However, we CAN test that the redactor is passed correctly.
 
 func TestObservationExecutor_Redaction(t *testing.T) {
+	t.Parallel()
 	// This test requires a mocked runtime or actual WASM file.
 	// Since we don't have easy mocking of wasm.Runtime (it's a struct),
 	// we will skip deep execution tests and focus on the redactor integration
@@ -45,6 +46,7 @@ func TestObservationExecutor_Redaction(t *testing.T) {
 }
 
 func TestRedactionInObservationResult(t *testing.T) {
+	t.Parallel()
 	// Since we can't easily run the full executor chain without WASM,
 	// let's simulate the redaction step that happens inside Execute.
 	// We'll reproduce the logic here to verify it works as expected.

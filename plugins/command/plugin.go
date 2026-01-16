@@ -109,7 +109,7 @@ func (p *commandPlugin) Check(ctx context.Context, config regletsdk.Config) (reg
 		Args:    args,
 		Dir:     cfg.Dir,
 		Env:     cfg.Env,
-		Timeout: time.Duration(cfg.Timeout) * time.Second,
+		Timeout: int(cfg.Timeout / time.Second), // Convert Duration to seconds
 	})
 	if err != nil {
 		return regletsdk.Failure("exec", fmt.Sprintf("execution failed: %v", err)), nil

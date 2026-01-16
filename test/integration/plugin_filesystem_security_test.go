@@ -81,6 +81,7 @@ func TestPluginFilesystemIsolation(t *testing.T) {
 
 // TestPluginNoCapabilitiesNoAccess verifies plugins with no capabilities cannot access filesystem
 func TestPluginNoCapabilitiesNoAccess(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
@@ -122,6 +123,7 @@ func TestPluginNoCapabilitiesNoAccess(t *testing.T) {
 
 // TestPluginSpecificFileAccess verifies fine-grained file-level access control
 func TestPluginSpecificFileAccess(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
@@ -185,6 +187,7 @@ func TestPluginSpecificFileAccess(t *testing.T) {
 
 // TestPluginRootAccess verifies root filesystem access with warning
 func TestPluginRootAccess(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
@@ -225,6 +228,7 @@ func TestPluginRootAccess(t *testing.T) {
 
 // TestPluginReadOnlyVsReadWrite verifies mount type differentiation
 func TestPluginReadOnlyVsReadWrite(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}

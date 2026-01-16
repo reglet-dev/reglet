@@ -30,6 +30,12 @@ type Plugin struct {
 	capabilities []capabilities.Capability
 	frozenEnv    []string
 	mu           sync.Mutex
+
+	// Instance pooling for performance
+	instancePool chan api.Module
+	poolSize     int
+	moduleConfig wazero.ModuleConfig // Cached config for instance creation
+	configOnce   sync.Once
 }
 
 // fsMount represents a filesystem mount configuration
@@ -257,19 +263,108 @@ func (p *Plugin) injectEnvironmentVariables(config wazero.ModuleConfig) wazero.M
 	return config
 }
 
-// createInstance instantiates the WASM module with a fresh memory environment.
-// It ensures thread safety by providing isolated memory for each execution.
-func (p *Plugin) createInstance(ctx context.Context) (api.Module, error) {
-	// Create fresh instance every time - no caching
-	instance, err := p.runtime.InstantiateModule(ctx, p.module, p.createModuleConfig(ctx))
+// defaultPoolSize is the number of pre-instantiated WASM instances to keep ready.
+// This significantly speeds up concurrent Observe() calls by avoiding instantiation overhead.
+const defaultPoolSize = 16
+
+// initPool initializes the instance pool lazily on first use.
+func (p *Plugin) initPool(ctx context.Context) {
+	p.configOnce.Do(func() {
+		p.moduleConfig = p.createModuleConfig(ctx)
+		p.poolSize = defaultPoolSize
+		p.instancePool = make(chan api.Module, p.poolSize)
+	})
+}
+
+// WarmPool pre-creates instances in the pool for faster concurrent access.
+// Instances are created in parallel to minimize warmup time.
+// Call this before heavy concurrent usage to avoid instantiation delays.
+// Returns the number of instances created.
+func (p *Plugin) WarmPool(ctx context.Context, count int) (int, error) {
+	p.initPool(ctx)
+
+	// Cap count to pool size
+	if count > p.poolSize {
+		count = p.poolSize
+	}
+
+	// Create instances in parallel for faster warmup
+	type result struct {
+		instance api.Module
+		err      error
+	}
+	results := make(chan result, count)
+
+	for i := 0; i < count; i++ {
+		go func() {
+			instance, err := p.newInstance(ctx)
+			results <- result{instance, err}
+		}()
+	}
+
+	// Collect results
+	created := 0
+	var firstErr error
+	for i := 0; i < count; i++ {
+		r := <-results
+		if r.err != nil {
+			if firstErr == nil {
+				firstErr = r.err
+			}
+			continue
+		}
+
+		// Try to add to pool
+		select {
+		case p.instancePool <- r.instance:
+			created++
+		default:
+			// Pool is full, close this instance
+			_ = r.instance.Close(ctx)
+		}
+	}
+
+	return created, firstErr
+}
+
+// acquireInstance gets an instance from the pool or creates a new one.
+// Callers MUST call releaseInstance when done.
+func (p *Plugin) acquireInstance(ctx context.Context) (api.Module, error) {
+	p.initPool(ctx)
+
+	// Try to get from pool (non-blocking)
+	select {
+	case instance := <-p.instancePool:
+		return instance, nil
+	default:
+		// Pool empty, create new instance
+		return p.newInstance(ctx)
+	}
+}
+
+// releaseInstance returns an instance to the pool for reuse.
+// If the pool is full, the instance is closed.
+func (p *Plugin) releaseInstance(ctx context.Context, instance api.Module) {
+	if instance == nil {
+		return
+	}
+
+	// Try to return to pool (non-blocking)
+	select {
+	case p.instancePool <- instance:
+		// Successfully returned to pool
+	default:
+		// Pool full, close instance
+		_ = instance.Close(ctx)
+	}
+}
+
+// newInstance creates a fresh WASM module instance.
+func (p *Plugin) newInstance(ctx context.Context) (api.Module, error) {
+	instance, err := p.runtime.InstantiateModule(ctx, p.module, p.moduleConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate plugin %s: %w", p.name, err)
 	}
-
-	// Debug: List all exported functions
-	// for _, def := range instance.ExportedFunctionDefinitions() {
-	// 	fmt.Fprintf(os.Stderr, "DEBUG: Exported function: %s from %s\n", def.Name(), p.name)
-	// }
 
 	// Call _initialize for WASI modules built with -buildmode=c-shared
 	// This must be called before any other exported functions
@@ -282,6 +377,14 @@ func (p *Plugin) createInstance(ctx context.Context) (api.Module, error) {
 	}
 
 	return instance, nil
+}
+
+// createInstance instantiates the WASM module with a fresh memory environment.
+// It ensures thread safety by providing isolated memory for each execution.
+// Deprecated: Use acquireInstance/releaseInstance for better performance.
+func (p *Plugin) createInstance(ctx context.Context) (api.Module, error) {
+	p.initPool(ctx)
+	return p.newInstance(ctx)
 }
 
 // Describe executes the plugin's 'describe' function to retrieve metadata.
@@ -409,15 +512,13 @@ func (p *Plugin) Observe(ctx context.Context, cfg Config) (*PluginObservationRes
 	// Wrap context with plugin name so host functions can access it
 	ctx = hostfuncs.WithPluginName(ctx, p.name)
 
-	// Create FRESH instance for this call - ensures thread safety
-	instance, err := p.createInstance(ctx)
+	// Acquire instance from pool (or create new one)
+	instance, err := p.acquireInstance(ctx)
 	if err != nil {
 		return nil, err
 	}
-	// CRITICAL: Always close instance when done
-	defer func() {
-		_ = instance.Close(ctx) // Best-effort cleanup
-	}()
+	// Return instance to pool when done (or close if pool is full)
+	defer p.releaseInstance(ctx, instance)
 
 	// Get the observe function
 	observeFn := instance.ExportedFunction("observe")
@@ -493,11 +594,15 @@ func (p *Plugin) Observe(ctx context.Context, cfg Config) (*PluginObservationRes
 		nil
 }
 
-// Close performs any necessary cleanup.
-// Currently a no-op as instances are ephemeral.
+// Close performs any necessary cleanup including draining the instance pool.
 func (p *Plugin) Close() error {
-	// No cached instance to close anymore
-	// Each method call creates and closes its own instance
+	// Drain the instance pool
+	if p.instancePool != nil {
+		close(p.instancePool)
+		for instance := range p.instancePool {
+			_ = instance.Close(context.Background())
+		}
+	}
 	return nil
 }
 
