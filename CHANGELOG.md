@@ -46,7 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ssrf vulnerabilty 0.0.0.0
 - Enforce max request size before mem allocation
 - Ensure correct cache invalidation for secret matcher
-- Address integer overlow issue in secret matching
+- Address integer overflow issue in secret matching
 
 ### Maintenance
 - Fix Changelog
