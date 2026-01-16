@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Replace sdk imports to new repo
 - Clean up plugins with sdk repo move
 - Move engine and redactor to functional options
-- ScrubString collects all matches first, then applies replacement in a single pass.
+- ScrubString collects all matches first, then applies replacement in a single pass
 - Add panic recover to work pool
 - Switch worker q to ring buffer q
 - Move output to func options pattern in prep for oscal
@@ -56,6 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Testing
 - Add plugin registry test
+
 ## [0.3.0-alpha] - 2026-01-10
 
 ### Added
@@ -355,4 +356,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [Unreleased]: https://github.com/reglet-dev/reglet/compare/v0.3.0-alpha...HEAD
 [0.3.0-alpha]: https://github.com/reglet-dev/reglet/compare/v0.2.0-alpha...v0.3.0-alpha
 [0.2.0-alpha]: https://github.com/reglet-dev/reglet/compare/v0.0.0-alpha...v0.2.0-alpha
+[0.0.0-alpha]: https://github.com/reglet-dev/reglet/releases/tag/v0.0.0-alpha
 
