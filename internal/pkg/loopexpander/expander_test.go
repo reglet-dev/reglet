@@ -144,7 +144,8 @@ func TestResolveLoopItems_ListOfMaps(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, items, 2)
 
-	first := items[0].(map[string]interface{})
+	first, ok := items[0].(map[string]interface{})
+	require.True(t, ok)
 	assert.Equal(t, "/etc/ssh/sshd_config", first["path"])
 }
 
