@@ -435,9 +435,9 @@ Reglet is in active development. Core features work, but expect breaking changes
 - [x] `reglet validate` (schema and syntax validation)
 - [x] `--watch` mode (live feedback on file changes)
 - [x] Looping (`loop: { items: "{{ .vars.list }}" }`)
-- [ ] Plugin SDK (Go) Enhanced
 
 **v0.5.0-alpha** (Infrastructure & IaC Plugins)
+- [ ] Plugin SDK (Go) Enhanced
 - [ ] AWS plugin
 - [ ] GCP plugin
 - [ ] Azure plugin
