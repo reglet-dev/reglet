@@ -113,9 +113,9 @@ type Engine struct {
 	executor    ObservationExecutable
 	truncator   execution.TruncationStrategy
 	runtime     *wasm.Runtime
+	profileVars map[string]interface{}
 	version     build.Info
 	config      ExecutionConfig
-	profileVars map[string]interface{} // Profile variables for loop expansion
 }
 
 // CapabilityCollector collects required capabilities from plugins.

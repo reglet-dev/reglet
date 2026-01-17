@@ -10,6 +10,9 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"os/signal"
+	"path/filepath"
+	"syscall"
 	"time"
 
 	"github.com/reglet-dev/reglet/internal/application/dto"
@@ -17,6 +20,7 @@ import (
 	"github.com/reglet-dev/reglet/internal/domain/execution"
 	"github.com/reglet-dev/reglet/internal/infrastructure/container"
 	"github.com/reglet-dev/reglet/internal/infrastructure/output"
+	"github.com/reglet-dev/reglet/internal/infrastructure/watcher"
 	"github.com/spf13/cobra"
 )
 
@@ -36,6 +40,10 @@ type CheckOptions struct {
 	trustPlugins        bool
 	includeDependencies bool
 	showDetails         bool
+
+	// Watch mode options
+	watch         bool
+	watchInterval time.Duration
 }
 
 func init() {
@@ -60,7 +68,12 @@ Filtering:
   --control ssh-check           Run specific controls (exclusive)
   --exclude-tags slow           Exclude controls with 'slow' tag
   --filter "severity == 'high'" Advanced filtering expression
-  --include-dependencies        Include dependencies of selected controls`,
+  --include-dependencies        Include dependencies of selected controls
+
+Watch Mode:
+  Use --watch to continuously monitor files and re-run checks on changes.
+  --watch                       Enable watch mode
+  --interval=2s                 Debounce interval (default: 2s)`,
 		Example: `  # Run all controls in a profile
   reglet check profile.yaml
 
@@ -74,7 +87,13 @@ Filtering:
   reglet check profile.yaml --tags security -o results.json --format json
 
   # Auto-grant plugin capabilities (CI/CD pipelines)
-  reglet check profile.yaml --trust-plugins`,
+  reglet check profile.yaml --trust-plugins
+
+  # Watch mode: re-run checks when files change
+  reglet check profile.yaml --watch
+
+  # Watch mode with custom debounce interval
+  reglet check profile.yaml --watch --interval=500ms`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Validate common flags
@@ -91,6 +110,10 @@ Filtering:
 				setupLogging()
 			}
 
+			// Route to watch mode or single-run mode
+			if opts.watch {
+				return runWatchMode(cmd.Context(), args[0], opts)
+			}
 			return runCheckAction(cmd.Context(), args[0], opts)
 		},
 	}
@@ -111,6 +134,10 @@ Filtering:
 	cmd.Flags().StringVar(&opts.filterExpr, "filter", "", "Advanced filter expression (e.g. \"severity == 'critical'\")")
 	cmd.Flags().BoolVar(&opts.includeDependencies, "include-dependencies", false, "Include dependencies of selected controls")
 	cmd.Flags().BoolVar(&opts.showDetails, "details", false, "Show detailed evidence for loop observations")
+
+	// Watch mode flags
+	cmd.Flags().BoolVar(&opts.watch, "watch", false, "Enable watch mode: re-run checks when files change")
+	cmd.Flags().DurationVar(&opts.watchInterval, "interval", 2*time.Second, "Debounce interval for watch mode (e.g., 500ms, 2s, 1m)")
 
 	return cmd
 }
@@ -231,4 +258,155 @@ func generateRequestID() string {
 		return fmt.Sprintf("req-%d", time.Now().UnixNano())
 	}
 	return hex.EncodeToString(b)
+}
+
+// runWatchMode implements the watch loop for continuous compliance monitoring.
+// It watches the profile file and any referenced files for changes, re-running
+// checks with a configurable debounce interval.
+func runWatchMode(ctx context.Context, profilePath string, opts *CheckOptions) error {
+	// Validate and setup
+	ws, err := newWatchSession(profilePath, opts)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = ws.watcher.Close() }()
+
+	// Set up signal handling for graceful shutdown
+	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	ws.printStatus(fmt.Sprintf("Watching %s for changes...", profilePath))
+	ws.printStatus("Running initial check...")
+	fmt.Println()
+
+	// Run initial check
+	if err := runCheckAction(ctx, profilePath, opts); err != nil {
+		if ctx.Err() != nil {
+			return nil // User canceled
+		}
+		slog.Warn("initial check failed", "error", err)
+	}
+	ws.checksExecuted++
+
+	return ws.runLoop(ctx, profilePath, opts)
+}
+
+// watchSession holds state for a watch mode session.
+type watchSession struct {
+	startTime      time.Time
+	watcher        *watcher.FSNotifyWatcher
+	absPath        string
+	watchInterval  time.Duration
+	checksExecuted int
+}
+
+// newWatchSession validates options and creates a watch session.
+func newWatchSession(profilePath string, opts *CheckOptions) (*watchSession, error) {
+	if opts.watchInterval <= 0 {
+		return nil, fmt.Errorf("invalid interval value %q: duration must be positive", opts.watchInterval)
+	}
+	if opts.watchInterval > time.Hour {
+		return nil, fmt.Errorf("invalid interval value %q: duration must not exceed 1 hour", opts.watchInterval)
+	}
+
+	absPath, err := filepath.Abs(profilePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve profile path: %w", err)
+	}
+
+	if _, err := os.Stat(absPath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("profile not found: %s", absPath)
+	}
+
+	w, err := watcher.NewFSNotifyWatcher()
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize file watcher: %w", err)
+	}
+
+	profileDir := filepath.Dir(absPath)
+	if err := w.Add(profileDir); err != nil {
+		_ = w.Close()
+		return nil, fmt.Errorf("failed to watch profile directory: %w", err)
+	}
+
+	return &watchSession{
+		watcher:       w,
+		absPath:       absPath,
+		startTime:     time.Now(),
+		watchInterval: opts.watchInterval,
+	}, nil
+}
+
+// printStatus outputs a timestamped status message.
+func (ws *watchSession) printStatus(msg string) {
+	fmt.Printf("[%s] %s\n", time.Now().Format("15:04:05"), msg)
+}
+
+// printSummary outputs the session summary.
+func (ws *watchSession) printSummary() {
+	fmt.Println()
+	ws.printStatus(fmt.Sprintf("Watch mode stopped. Executed %d checks in %s.",
+		ws.checksExecuted, time.Since(ws.startTime).Round(time.Second)))
+}
+
+// runLoop executes the main watch loop.
+func (ws *watchSession) runLoop(ctx context.Context, profilePath string, opts *CheckOptions) error {
+	var debounceTimer *time.Timer
+	debounceChan := make(chan struct{}, 1)
+
+	for {
+		select {
+		case <-ctx.Done():
+			if debounceTimer != nil {
+				debounceTimer.Stop()
+			}
+			ws.printSummary()
+			return nil
+
+		case event := <-ws.watcher.Events():
+			if !ws.isRelevantEvent(event) {
+				continue
+			}
+			ws.printStatus(fmt.Sprintf("Change detected: %s", filepath.Base(event.Path)))
+			debounceTimer = ws.resetDebounce(debounceTimer, debounceChan)
+
+		case err := <-ws.watcher.Errors():
+			slog.Error("watcher error", "error", err)
+
+		case <-debounceChan:
+			fmt.Println()
+			ws.printStatus("Running check...")
+			fmt.Println()
+
+			if err := runCheckAction(ctx, profilePath, opts); err != nil {
+				if ctx.Err() != nil {
+					ws.printSummary()
+					return nil //nolint:nilerr // Intentionally return nil on user cancellation
+				}
+				slog.Warn("check failed", "error", err)
+			}
+			ws.checksExecuted++
+		}
+	}
+}
+
+// isRelevantEvent checks if the event is for the watched profile.
+func (ws *watchSession) isRelevantEvent(event watcher.Event) bool {
+	if event.Path != ws.absPath && filepath.Base(event.Path) != filepath.Base(ws.absPath) {
+		return false
+	}
+	return event.Op&(watcher.Write|watcher.Create) != 0
+}
+
+// resetDebounce stops the old timer and starts a new one.
+func (ws *watchSession) resetDebounce(timer *time.Timer, ch chan struct{}) *time.Timer {
+	if timer != nil {
+		timer.Stop()
+	}
+	return time.AfterFunc(ws.watchInterval, func() {
+		select {
+		case ch <- struct{}{}:
+		default:
+		}
+	})
 }

@@ -56,10 +56,10 @@ type LoopConfig struct {
 // ObservationDefinition configuration for a specific plugin execution.
 // It is an immutable value object.
 type ObservationDefinition struct {
-	Plugin string
 	Config map[string]interface{}
+	Loop   *LoopConfig
+	Plugin string
 	Expect []string
-	Loop   *LoopConfig // Optional loop configuration
 }
 
 // ApplyDefaults applies the given defaults to the control if values are missing.
