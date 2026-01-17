@@ -403,7 +403,7 @@ Reglet is in active development. Core features work, but expect breaking changes
 - [ ] `reglet init` (interactive wizard)
 - [x] `reglet plan` (dry-run validation)
 - [x] `reglet validate` (schema and syntax validation)
-- [ ] `--watch` mode (live feedback on file changes)
+- [x] `--watch` mode (live feedback on file changes)
 - [x] Looping (`loop: { items: "{{ .vars.list }}" }`)
 - [ ] Plugin SDK (Go) Enhanced
 
