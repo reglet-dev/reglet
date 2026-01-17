@@ -420,7 +420,7 @@ Reglet is in active development. Core features work, but expect breaking changes
 - [x] Evidence artifacts and size limits (size, count)
 - [x] Global timeout
 
-**v0.3.5-alpha** (Current)
+**v0.3.5-alpha** (Released)
 - [x] Lockfile for reproducible plugin versions (`reglet.lock`)
 - [x] OCI-based plugin registry (GHCR, DockerHub, Harbor)
 - [x] Plugin management commands (`pull`, `push`, `list`, `prune`)
@@ -428,7 +428,7 @@ Reglet is in active development. Core features work, but expect breaking changes
 - [x] Digest verification for supply chain security
 - [x] Signature verification scaffolding (Cosign/Sigstore)
       
-**v0.4.0-alpha** (Next - Developer Experience)
+**v0.4.0-alpha** (Released)
 - [x] Tag and severity filtering
 - [x] `reglet init` (interactive wizard)
 - [x] `reglet plan` (dry-run validation)
