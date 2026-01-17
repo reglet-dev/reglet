@@ -23,6 +23,9 @@ curl -sSL https://raw.githubusercontent.com/reglet-dev/reglet/main/scripts/insta
 # Get an example profile
 curl -fsSL https://raw.githubusercontent.com/reglet-dev/reglet/main/docs/examples/01-quickstart.yaml > quickstart.yaml
 
+# Or create your own with the interactive wizard
+reglet init
+
 # Run it
 reglet check quickstart.yaml
 
@@ -34,6 +37,12 @@ docker run --rm -v $(pwd)/quickstart.yaml:/quickstart.yaml \
 
 ## Usage
 ```bash
+# Create a new profile interactively
+reglet init
+
+# Create a profile with flags (for CI/scripts)
+reglet init --name=my-profile --plugins=file,http
+
 # Run compliance checks
 reglet check profile.yaml
 
@@ -72,6 +81,27 @@ reglet plugins list
 reglet plugins push my-plugin.wasm ghcr.io/myorg/my-plugin:1.0.0
 reglet plugins prune --keep 3
 ```
+
+## Creating Your First Profile
+
+The `reglet init` command guides you through creating a starter profile:
+
+```bash
+# Interactive wizard
+reglet init
+
+# Non-interactive for CI/CD
+reglet init --name=my-profile --plugins=file,http
+reglet init --name=production --plugins=file,command --output=./profiles/prod.yaml
+reglet init --name=baseline --plugins=file,http,dns --with-config
+reglet init --name=test --plugins=file --force  # Overwrite existing
+```
+
+**Available Plugins:** `file`, `http`, `dns`, `tcp`, `command`, `smtp`
+
+**Generated Files:**
+- **Profile** (`./reglet-profile.yaml`) - YAML with example controls for each selected plugin
+- **Config** (`~/.reglet/config.yaml`) - Optional system config with capability grants (use `--with-config`)
 
 ## Features
 
@@ -400,7 +430,7 @@ Reglet is in active development. Core features work, but expect breaking changes
       
 **v0.4.0-alpha** (Next - Developer Experience)
 - [x] Tag and severity filtering
-- [ ] `reglet init` (interactive wizard)
+- [x] `reglet init` (interactive wizard)
 - [x] `reglet plan` (dry-run validation)
 - [x] `reglet validate` (schema and syntax validation)
 - [x] `--watch` mode (live feedback on file changes)
