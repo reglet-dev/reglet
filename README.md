@@ -395,7 +395,7 @@ make build
 - **[08-loops-demo.yaml](docs/examples/08-loops-demo.yaml)** - Loop observations with variable substitution
 - **[99-comprehensive-showcase.yaml](docs/examples/99-comprehensive-showcase.yaml)** - Complete feature reference (all plugins, dependencies, retries)
 
-## Status: Alpha (Released: v0.3.0-alpha Development: v0.3.5-alpha)
+## Status: Alpha (Released: v0.4.0-alpha Development: v0.5.0-alpha)
 
 Reglet is in active development. Core features work, but expect breaking changes before 1.0.
 
