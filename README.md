@@ -436,8 +436,12 @@ Reglet is in active development. Core features work, but expect breaking changes
 - [x] `--watch` mode (live feedback on file changes)
 - [x] Looping (`loop: { items: "{{ .vars.list }}" }`)
 
-**v0.5.0-alpha** (Infrastructure & IaC Plugins)
+**v0.4.5-alpha** (current)
+- [ ] CLI vars (`--set key=value`)
+- [ ] Remote profiles (`reglet check https://...`)
 - [ ] Plugin SDK (Go) Enhanced
+
+**v0.5.0-alpha** (Infrastructure & IaC Plugins)
 - [ ] AWS plugin
 - [ ] GCP plugin
 - [ ] Azure plugin
@@ -445,11 +449,9 @@ Reglet is in active development. Core features work, but expect breaking changes
 - [ ] Kubernetes plugin
 
 **v0.6.0-alpha** (GitHub Action & CI/CD)
-- [ ] GitHub Action (validates all 3 pillars!)
+- [ ] GitHub Action
 - [ ] GitLab CI template
 - [ ] OIDC authentication
-- [ ] CLI vars (`--set key=value`)
-- [ ] Remote profiles (`reglet check https://...`)
 
 **v0.7.0-alpha** (OSCAL & Evidence)
 - [ ] OSCAL output (assessment results)
@@ -457,7 +459,7 @@ Reglet is in active development. Core features work, but expect breaking changes
 - [ ] POA&M generation
 
 **v1.0 GA** (Compliance Packs)
-- [ ] Remote pack registry (reglet.io/packs)
+- [ ] Remote pack registry (reglet packs)
 - [ ] SOC2 pack
 - [ ] ISO27001 pack
 - [ ] CIS Linux pack
