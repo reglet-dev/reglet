@@ -45,19 +45,18 @@ type ControlResult struct {
 // ObservationResult represents the result of executing a single observation.
 type ObservationResult struct {
 	RawError     error
+	LoopItem     interface{}
 	Config       map[string]interface{}
 	Evidence     *Evidence
 	EvidenceMeta *EvidenceMeta
 	Error        *PluginError
-	Plugin       string
 	Status       values.Status
+	Plugin       string
 	Expectations []ExpectationResult
+	Children     []ObservationResult
 	Duration     time.Duration
-	// Loop fields - populated only when observation has a loop
-	IsLoop    bool                // True if this is a loop parent observation
-	LoopItem  interface{}         // The current item (for child observations)
-	LoopIndex int                 // Index of this item in the loop
-	Children  []ObservationResult // Child observation results (for parent)
+	LoopIndex    int
+	IsLoop       bool
 }
 
 // ExpectationResult represents the result of evaluating a single expectation expression.

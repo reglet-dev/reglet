@@ -20,22 +20,20 @@ import (
 
 // Plugin manages the lifecycle and execution of a compiled WASM module.
 type Plugin struct {
-	module       wazero.CompiledModule
 	runtime      wazero.Runtime
 	stdout       io.Writer
 	stderr       io.Writer
+	module       wazero.CompiledModule
+	moduleConfig wazero.ModuleConfig
+	instancePool chan api.Module
 	info         *PluginInfo
 	schema       *ConfigSchema
 	name         string
-	capabilities []capabilities.Capability
 	frozenEnv    []string
-	mu           sync.Mutex
-
-	// Instance pooling for performance
-	instancePool chan api.Module
+	capabilities []capabilities.Capability
 	poolSize     int
-	moduleConfig wazero.ModuleConfig // Cached config for instance creation
 	configOnce   sync.Once
+	mu           sync.Mutex
 }
 
 // fsMount represents a filesystem mount configuration
@@ -379,14 +377,6 @@ func (p *Plugin) newInstance(ctx context.Context) (api.Module, error) {
 	return instance, nil
 }
 
-// createInstance instantiates the WASM module with a fresh memory environment.
-// It ensures thread safety by providing isolated memory for each execution.
-// Deprecated: Use acquireInstance/releaseInstance for better performance.
-func (p *Plugin) createInstance(ctx context.Context) (api.Module, error) {
-	p.initPool(ctx)
-	return p.newInstance(ctx)
-}
-
 // Describe executes the plugin's 'describe' function to retrieve metadata.
 func (p *Plugin) Describe(ctx context.Context) (*PluginInfo, error) {
 	// Wrap context with plugin name for host functions
@@ -400,13 +390,11 @@ func (p *Plugin) Describe(ctx context.Context) (*PluginInfo, error) {
 	}
 	p.mu.Unlock()
 
-	instance, err := p.createInstance(ctx)
+	instance, err := p.acquireInstance(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		_ = instance.Close(ctx)
-	}()
+	defer p.releaseInstance(ctx, instance)
 
 	describeFn := instance.ExportedFunction("describe")
 	if describeFn == nil {
@@ -459,13 +447,11 @@ func (p *Plugin) Schema(ctx context.Context) (*ConfigSchema, error) {
 	}
 	p.mu.Unlock()
 
-	instance, err := p.createInstance(ctx)
+	instance, err := p.acquireInstance(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		_ = instance.Close(ctx)
-	}()
+	defer p.releaseInstance(ctx, instance)
 
 	schemaFn := instance.ExportedFunction("schema")
 	if schemaFn == nil {
