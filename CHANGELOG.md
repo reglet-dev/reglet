@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enable remote plugin distribution using OCI registries
 - Add env variable security tiers and capability grants
 - Add dry-run validation with plan
-- Impelement reglet validate command for pre-flight validation
+- Implement reglet validate command for pre-flight validation
 - **loops:** Add loop functionality with shared utilities and test optimizations
 - Add watch mode for continuous monitoring
 - **cli:** Add reglet init command with interactive wizard
