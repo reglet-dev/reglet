@@ -62,6 +62,10 @@ reglet check profile.yaml --log-level=debug
 reglet check profile.yaml --tags security
 reglet check profile.yaml --severity critical,high
 
+# Watch mode (continuous monitoring)
+reglet check profile.yaml --watch              # Re-run on file changes
+reglet check profile.yaml --watch --interval=500ms  # Custom debounce
+
 # Plugin management (OCI registries)
 reglet plugins pull ghcr.io/reglet-dev/plugins/aws:1.0.0
 reglet plugins list
@@ -72,6 +76,7 @@ reglet plugins prune --keep 3
 ## Features
 
 - **Declarative Profiles** - Define validation rules in simple, versioned YAML
+- **Watch Mode** - Continuous monitoring with automatic re-checks on file changes
 - **Parallel Execution** - Optimized for CI/CD with concurrent execution of independent controls
 - **Loop Observations** - Execute checks across multiple items with variable substitution (`loop: { items: "{{ .vars.files }}" }`)
 - **Standardized Output** - JSON, YAML, JUnit, SARIF - ready for compliance platforms or OSCAL integration (coming soon)
