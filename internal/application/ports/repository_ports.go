@@ -12,6 +12,9 @@ import (
 // ProfileLoader loads profiles from storage.
 type ProfileLoader interface {
 	LoadProfile(path string) (*entities.Profile, error)
+	// LoadProfileWithCLIVars loads a profile and merges CLI variables before substitution.
+	// CLI variables override profile variables at the same path.
+	LoadProfileWithCLIVars(path string, cliVars map[string]interface{}) (*entities.Profile, error)
 }
 
 // ProfileValidator validates profile structure and schemas.

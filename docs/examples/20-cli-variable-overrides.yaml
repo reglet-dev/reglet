@@ -1,0 +1,109 @@
+# CLI Variable Overrides Example
+
+# This profile demonstrates the use of CLI variable overrides with reglet check.
+#
+# Usage Examples:
+#   # Override environment variable
+#   reglet check 20-cli-variable-overrides.yaml --set environment=prod
+#
+#   # Override multiple variables
+#   reglet check 20-cli-variable-overrides.yaml --set environment=staging --set max_response_time_ms=2000
+#
+#   # Use --set-file for sensitive values (not logged to shell history)
+#   reglet check 20-cli-variable-overrides.yaml --set-file api_key=/path/to/key.txt
+#
+#   # Use --set-env for CI/CD pipelines
+#   reglet check 20-cli-variable-overrides.yaml --set-env build_id=CI_COMMIT_SHA
+#
+#   # Override nested paths
+#   reglet check 20-cli-variable-overrides.yaml --set server.host=prod.example.com --set server.port=443
+
+profile:
+  name: cli-variable-overrides-example
+  version: "1.0.0"
+  description: |
+    Demonstrates CLI variable override capabilities.
+    Variables defined in this profile can be overridden at runtime
+    using --set, --set-file, or --set-env flags.
+
+# Default variable values (can be overridden via CLI)
+vars:
+  # Simple variables
+  environment: dev
+  max_response_time_ms: 500
+  
+  # Nested variables (use dot notation to override: --set server.host=prod.example.com)
+  server:
+    host: localhost
+    port: 8080
+    protocol: https
+
+  # Boolean and numeric variables (auto-detected from CLI input)
+  debug_enabled: false
+  retry_count: 3
+
+  # Paths (useful with --set-file for dynamic configuration)
+  config_path: /etc/app/config.yaml
+
+plugins:
+  - http
+  - file
+  - command
+
+controls:
+  items:
+    # Example 1: HTTP health check with configurable timeout
+    - id: api-health-check
+      name: API Health Check
+      description: Verify API responds within {{ .vars.max_response_time_ms }}ms in {{ .vars.environment }} environment
+      severity: critical
+      tags: [api, health, "{{ .vars.environment }}"]
+      observe:
+        - plugin: http
+          config:
+            url: "{{ .vars.server.protocol }}://{{ .vars.server.host }}:{{ .vars.server.port }}/health"
+            method: GET
+            timeout: "{{ .vars.max_response_time_ms }}ms"
+          expect:
+            - data.status_code == 200
+            - data.response_time_ms < {{ .vars.max_response_time_ms }}
+
+    # Example 2: Configuration file check
+    - id: config-exists
+      name: Configuration File Exists
+      description: Verify configuration file is present at {{ .vars.config_path }}
+      severity: high
+      tags: [configuration]
+      observe:
+        - plugin: file
+          config:
+            path: "{{ .vars.config_path }}"
+          expect:
+            - data.exists == true
+
+    # Example 3: Debug mode check (boolean variable)
+    - id: debug-mode-check
+      name: Debug Mode Status
+      description: Check if debug mode is enabled (current: {{ .vars.debug_enabled }})
+      severity: medium
+      tags: [security, debug]
+      observe:
+        - plugin: command
+          config:
+            command: echo "{{ .vars.debug_enabled }}"
+          expect:
+            # In production, debug should be false
+            - "!{{ .vars.debug_enabled }} || '{{ .vars.environment }}' != 'prod'"
+
+    # Example 4: Environment-specific configuration
+    - id: environment-check
+      name: Environment Configuration
+      description: Verify environment is properly configured
+      severity: high
+      tags: ["{{ .vars.environment }}", configuration]
+      observe:
+        - plugin: command
+          config:
+            command: echo "Environment: {{ .vars.environment }}, Debug: {{ .vars.debug_enabled }}, Retries: {{ .vars.retry_count }}"
+          expect:
+            - data.exit_code == 0

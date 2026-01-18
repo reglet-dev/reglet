@@ -7,11 +7,12 @@ import (
 
 // CheckProfileRequest encapsulates all inputs needed to check a profile.
 type CheckProfileRequest struct {
-	Options     CheckOptions
-	ProfilePath string
-	Metadata    RequestMetadata
-	Filters     FilterOptions
-	Execution   ExecutionOptions
+	CLIVariables map[string]interface{}
+	ProfilePath  string
+	Metadata     RequestMetadata
+	Options      CheckOptions
+	Filters      FilterOptions
+	Execution    ExecutionOptions
 }
 
 // FilterOptions defines filters for control selection.
@@ -43,6 +44,7 @@ type CheckOptions struct {
 	SystemConfigPath     string
 	TrustPlugins         bool
 	SkipSchemaValidation bool
+	WarnUnusedVars       bool // Enable warnings for unused CLI variables (enabled by default when CLI vars are set)
 }
 
 // RequestMetadata contains metadata for request tracking.

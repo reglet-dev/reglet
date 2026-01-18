@@ -207,6 +207,51 @@ controls:
 
 ---
 
+### 20-cli-variable-overrides.yaml - CLI Variable Overrides
+
+**What it demonstrates:**
+- Runtime variable override using `--set key=value`
+- Reading sensitive values from files with `--set-file`
+- Reading values from environment with `--set-env`
+- Nested variable override with dot notation (`--set server.host=prod`)
+- Type auto-detection (integers, floats, booleans)
+
+**Requirements:** None - demonstrates override capability
+**Plugins:** `http`, `file`, `command`
+
+**Try it:**
+```bash
+# Override environment variable
+./bin/reglet check docs/examples/20-cli-variable-overrides.yaml \
+  --set environment=prod --trust-plugins
+
+# Override multiple values
+./bin/reglet check docs/examples/20-cli-variable-overrides.yaml \
+  --set environment=staging \
+  --set max_response_time_ms=2000 \
+  --set debug_enabled=true \
+  --trust-plugins
+
+# Use environment variable (for CI/CD)
+export MY_BUILD_ID="abc123"
+./bin/reglet check docs/examples/20-cli-variable-overrides.yaml \
+  --set-env build_id=MY_BUILD_ID \
+  --trust-plugins
+```
+
+**Features demonstrated:**
+```bash
+--set key=value           # Direct value override
+--set paths.config=/opt   # Nested path override
+--set port=8080           # Auto-detect integer
+--set debug=true          # Auto-detect boolean
+--set-file api_key=./key  # Read from file (secure)
+--set-env token=API_TOKEN # Read from environment variable
+--no-warn-unused-vars     # Suppress unused var warnings
+```
+
+---
+
 ### 99-comprehensive-showcase.yaml - Complete Feature Reference
 
 **What it demonstrates:**
