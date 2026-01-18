@@ -103,7 +103,7 @@ func (uc *CheckProfileUseCase) Execute(ctx context.Context, req dto.CheckProfile
 	uc.logger.Info("loading profile", "path", req.ProfilePath)
 
 	// 1-2. Load and compile (clean up imports, validation)
-	profile, err := uc.loadAndCompileProfile(req.ProfilePath)
+	profile, err := uc.loadAndCompileProfile(req.ProfilePath, req.CLIVariables)
 	if err != nil {
 		return nil, err
 	}
@@ -157,8 +157,16 @@ func (uc *CheckProfileUseCase) Execute(ctx context.Context, req dto.CheckProfile
 	return uc.buildResponse(req, startTime, result, requiredCaps, grantedCaps), nil
 }
 
-func (uc *CheckProfileUseCase) loadAndCompileProfile(path string) (*entities.ValidatedProfile, error) {
-	rawProfile, err := uc.profileLoader.LoadProfile(path)
+func (uc *CheckProfileUseCase) loadAndCompileProfile(path string, cliVars map[string]interface{}) (*entities.ValidatedProfile, error) {
+	var rawProfile *entities.Profile
+	var err error
+
+	// Use CLI vars aware loading if any are provided
+	if len(cliVars) > 0 {
+		rawProfile, err = uc.profileLoader.LoadProfileWithCLIVars(path, cliVars)
+	} else {
+		rawProfile, err = uc.profileLoader.LoadProfile(path)
+	}
 	if err != nil {
 		return nil, apperrors.NewValidationError("profile", "failed to load profile", err.Error())
 	}

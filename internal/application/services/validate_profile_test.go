@@ -25,6 +25,10 @@ func (m *mockProfileLoaderForValidate) LoadProfile(_ string) (*entities.Profile,
 	return m.profile, m.err
 }
 
+func (m *mockProfileLoaderForValidate) LoadProfileWithCLIVars(_ string, _ map[string]interface{}) (*entities.Profile, error) {
+	return m.profile, m.err
+}
+
 // mockProfileValidatorForValidate implements ports.ProfileValidator for testing.
 type mockProfileValidatorForValidate struct {
 	err error

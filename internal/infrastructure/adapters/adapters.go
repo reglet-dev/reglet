@@ -135,12 +135,23 @@ func NewProfileLoaderAdapter(resolver ports.SecretResolver) *ProfileLoaderAdapte
 
 // LoadProfile loads and substitutes variables in a profile.
 func (a *ProfileLoaderAdapter) LoadProfile(path string) (*entities.Profile, error) {
+	return a.LoadProfileWithCLIVars(path, nil)
+}
+
+// LoadProfileWithCLIVars loads a profile and merges CLI variables before substitution.
+// CLI variables override profile variables at the same path.
+func (a *ProfileLoaderAdapter) LoadProfileWithCLIVars(path string, cliVars map[string]interface{}) (*entities.Profile, error) {
 	profile, err := a.loader.LoadProfile(path)
 	if err != nil {
 		return nil, err
 	}
 
-	// Apply variable substitution
+	// Merge CLI variables into profile vars (CLI wins)
+	if len(cliVars) > 0 {
+		profile.Vars = infraconfig.MergeCLIVars(profile.Vars, cliVars)
+	}
+
+	// Apply variable substitution with merged vars
 	if err := a.substitutor.Substitute(profile); err != nil {
 		return nil, fmt.Errorf("variable substitution failed: %w", err)
 	}

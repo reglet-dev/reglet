@@ -18,6 +18,7 @@ import (
 	"github.com/reglet-dev/reglet/internal/application/dto"
 	"github.com/reglet-dev/reglet/internal/application/ports"
 	"github.com/reglet-dev/reglet/internal/domain/execution"
+	"github.com/reglet-dev/reglet/internal/infrastructure/config"
 	"github.com/reglet-dev/reglet/internal/infrastructure/container"
 	"github.com/reglet-dev/reglet/internal/infrastructure/output"
 	"github.com/reglet-dev/reglet/internal/infrastructure/watcher"
@@ -44,6 +45,12 @@ type CheckOptions struct {
 	// Watch mode options
 	watch         bool
 	watchInterval time.Duration
+
+	// CLI variable overrides
+	setVars          []string // --set key=value flags
+	setFileVars      []string // --set-file key=path flags
+	setEnvVars       []string // --set-env key=ENV_VAR flags
+	noWarnUnusedVars bool     // --no-warn-unused-vars
 }
 
 func init() {
@@ -70,6 +77,12 @@ Filtering:
   --filter "severity == 'high'" Advanced filtering expression
   --include-dependencies        Include dependencies of selected controls
 
+Variable Overrides:
+  Override or inject profile variables from the command line.
+  --set environment=prod        Override {{ .vars.environment }} with "prod"
+  --set paths.config=/custom    Override nested variable {{ .vars.paths.config }}
+  --set port=8080               Auto-detect type: integers, floats, booleans
+
 Watch Mode:
   Use --watch to continuously monitor files and re-run checks on changes.
   --watch                       Enable watch mode
@@ -85,6 +98,12 @@ Watch Mode:
 
   # Run controls with security tag, save to file
   reglet check profile.yaml --tags security -o results.json --format json
+
+  # Override profile variables from CLI
+  reglet check profile.yaml --set environment=prod --set debug=true
+
+  # Override nested variables
+  reglet check profile.yaml --set paths.config=/opt/custom
 
   # Auto-grant plugin capabilities (CI/CD pipelines)
   reglet check profile.yaml --trust-plugins
@@ -139,6 +158,12 @@ Watch Mode:
 	cmd.Flags().BoolVar(&opts.watch, "watch", false, "Enable watch mode: re-run checks when files change")
 	cmd.Flags().DurationVar(&opts.watchInterval, "interval", 2*time.Second, "Debounce interval for watch mode (e.g., 500ms, 2s, 1m)")
 
+	// Variable override flags
+	cmd.Flags().StringSliceVar(&opts.setVars, "set", nil, "Set variable values (key=value, can be repeated)")
+	cmd.Flags().StringSliceVar(&opts.setFileVars, "set-file", nil, "Set variable from file (key=path, can be repeated)")
+	cmd.Flags().StringSliceVar(&opts.setEnvVars, "set-env", nil, "Set variable from environment (key=ENV_VAR, can be repeated)")
+	cmd.Flags().BoolVar(&opts.noWarnUnusedVars, "no-warn-unused-vars", false, "Suppress warnings about unused CLI variables")
+
 	return cmd
 }
 
@@ -156,7 +181,15 @@ func runCheckAction(ctx context.Context, profilePath string, opts *CheckOptions)
 	}
 
 	// 2. Build request
-	request := buildCheckProfileRequest(profilePath, opts)
+	request, err := buildCheckProfileRequest(profilePath, opts)
+	if err != nil {
+		return err
+	}
+
+	// 2b. Emit unused var warnings (if enabled and CLI vars provided)
+	if !opts.noWarnUnusedVars && len(request.CLIVariables) > 0 {
+		emitUnusedVarWarnings(profilePath, request.CLIVariables)
+	}
 
 	// 3. Apply timeout to context
 	ctx, cancel := opts.ApplyToContext(ctx)
@@ -187,8 +220,64 @@ func runCheckAction(ctx context.Context, profilePath string, opts *CheckOptions)
 	return nil
 }
 
+// emitUnusedVarWarnings reads the profile and warns about CLI vars that aren't referenced.
+func emitUnusedVarWarnings(profilePath string, cliVars map[string]interface{}) {
+	// Read profile content
+	content, err := os.ReadFile(filepath.Clean(profilePath))
+	if err != nil {
+		// Silently skip - profile load errors will be caught later
+		return
+	}
+
+	unused := config.FindUnusedVars(cliVars, string(content))
+	for _, key := range unused {
+		slog.Warn("CLI variable not referenced in profile", "variable", key)
+	}
+}
+
 // buildCheckProfileRequest maps CLI flags to a CheckProfileRequest DTO.
-func buildCheckProfileRequest(profilePath string, opts *CheckOptions) dto.CheckProfileRequest {
+func buildCheckProfileRequest(profilePath string, opts *CheckOptions) (dto.CheckProfileRequest, error) {
+	// Initialize result map for all CLI vars
+	cliVars := make(map[string]interface{})
+
+	// Parse --set flags
+	if len(opts.setVars) > 0 {
+		parsed, err := config.ParseMultipleCLIVars(opts.setVars)
+		if err != nil {
+			return dto.CheckProfileRequest{}, fmt.Errorf("invalid --set value: %w", err)
+		}
+		for k, v := range parsed {
+			cliVars[k] = v
+		}
+	}
+
+	// Parse --set-file flags (file content wins over --set for same key)
+	for _, input := range opts.setFileVars {
+		key, value, err := config.ParseSetFile(input)
+		if err != nil {
+			return dto.CheckProfileRequest{}, fmt.Errorf("invalid --set-file value: %w", err)
+		}
+		if err := config.SetNestedValue(cliVars, key, value); err != nil {
+			return dto.CheckProfileRequest{}, fmt.Errorf("setting --set-file %q: %w", key, err)
+		}
+	}
+
+	// Parse --set-env flags (env wins over --set and --set-file for same key)
+	for _, input := range opts.setEnvVars {
+		key, value, err := config.ParseSetEnv(input)
+		if err != nil {
+			return dto.CheckProfileRequest{}, fmt.Errorf("invalid --set-env value: %w", err)
+		}
+		if err := config.SetNestedValue(cliVars, key, value); err != nil {
+			return dto.CheckProfileRequest{}, fmt.Errorf("setting --set-env %q: %w", key, err)
+		}
+	}
+
+	// Set nil if empty to match existing behavior
+	if len(cliVars) == 0 {
+		cliVars = nil
+	}
+
 	return dto.CheckProfileRequest{
 		ProfilePath: profilePath,
 		Filters: dto.FilterOptions{
@@ -205,12 +294,14 @@ func buildCheckProfileRequest(profilePath string, opts *CheckOptions) dto.CheckP
 			// MaxConcurrentControls and MaxConcurrentObservations will use defaults (0 = auto-detect)
 		},
 		Options: dto.CheckOptions{
-			TrustPlugins: opts.trustPlugins,
+			TrustPlugins:   opts.trustPlugins,
+			WarnUnusedVars: true, // Default to warning about unused vars
 		},
 		Metadata: dto.RequestMetadata{
 			RequestID: generateRequestID(),
 		},
-	}
+		CLIVariables: cliVars,
+	}, nil
 }
 
 // writeOutput directs the execution result to the configured output destination.

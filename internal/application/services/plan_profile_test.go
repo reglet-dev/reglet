@@ -23,6 +23,10 @@ func (m *mockProfileLoaderForPlan) LoadProfile(_ string) (*entities.Profile, err
 	return m.profile, m.err
 }
 
+func (m *mockProfileLoaderForPlan) LoadProfileWithCLIVars(_ string, _ map[string]interface{}) (*entities.Profile, error) {
+	return m.profile, m.err
+}
+
 // newTestProfileCompiler creates a ProfileCompiler for tests.
 func newTestProfileCompiler() *services.ProfileCompiler {
 	return services.NewProfileCompiler()

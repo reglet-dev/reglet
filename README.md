@@ -258,6 +258,45 @@ controls:
             data.connected == true
 ```
 
+## CLI Variable Overrides
+
+Override or inject profile variables at runtime without modifying the profile file:
+
+```bash
+# Override existing variable
+reglet check profile.yaml --set environment=prod
+
+# Override nested variables with dot notation
+reglet check profile.yaml --set server.host=prod.example.com --set server.port=443
+
+# Auto-detect types: integers, floats, booleans
+reglet check profile.yaml --set port=8080 --set debug=true --set timeout=30.5
+
+# Read sensitive values from file (not logged to shell history)
+reglet check profile.yaml --set-file api_key=/path/to/secret.txt
+
+# Read values from environment variables (ideal for CI/CD)
+reglet check profile.yaml --set-env build_id=CI_COMMIT_SHA
+
+# Combine multiple sources
+reglet check profile.yaml \
+  --set environment=prod \
+  --set-env api_key=API_KEY \
+  --set-file db_password=/secrets/db.txt
+```
+
+**Features:**
+- **Type Detection**: Automatically detects integers, floats, and booleans (conservative rules)
+- **Nested Paths**: Use dot notation (`paths.config=/opt`) for nested map overrides
+- **Secure Options**: `--set-file` and `--set-env` avoid shell history exposure
+- **Last Wins**: When the same key is specified multiple times, the last value wins
+- **Unused Warnings**: Get warnings for CLI vars not referenced in the profile (suppress with `--no-warn-unused-vars`)
+
+**Security:**
+- CLI values are treated as literal strings, never re-parsed as templates
+- Use `--set-file` or `--set-env` for sensitive values in CI/CD pipelines
+- Values from `--set` appear in shell history; prefer `--set-file` for secrets
+
 ## Plugin Management
 
 Reglet supports distributing plugins via OCI-compliant registries (GHCR, DockerHub, Harbor, etc.):
@@ -393,6 +432,7 @@ make build
 - **[06-command-checks.yaml](docs/examples/06-command-checks.yaml)** - Command execution and output validation
 - **[07-vars-and-defaults.yaml](docs/examples/07-vars-and-defaults.yaml)** - Variables and control defaults
 - **[08-loops-demo.yaml](docs/examples/08-loops-demo.yaml)** - Loop observations with variable substitution
+- **[20-cli-variable-overrides.yaml](docs/examples/20-cli-variable-overrides.yaml)** - CLI variable override examples
 - **[99-comprehensive-showcase.yaml](docs/examples/99-comprehensive-showcase.yaml)** - Complete feature reference (all plugins, dependencies, retries)
 
 ## Status: Alpha (Released: v0.4.0-alpha Development: v0.5.0-alpha)
@@ -437,7 +477,7 @@ Reglet is in active development. Core features work, but expect breaking changes
 - [x] Looping (`loop: { items: "{{ .vars.list }}" }`)
 
 **v0.4.5-alpha** (current)
-- [ ] CLI vars (`--set key=value`)
+- [x] CLI vars (`--set`, `--set-file`, `--set-env`)
 - [ ] Remote profiles (`reglet check https://...`)
 - [ ] Plugin SDK (Go) Enhanced
 
