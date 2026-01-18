@@ -27,30 +27,24 @@ import (
 
 // CheckOptions holds the configuration for the check command.
 type CheckOptions struct {
-	outFile           string
 	securityLevel     string
 	filterExpr        string
+	outFile           string
+	setVars           []string
 	includeTags       []string
 	includeSeverities []string
 	includeControlIDs []string
 	excludeTags       []string
 	excludeControlIDs []string
-
-	CommonOptions // Embed common options (Starts with Ptr, ends with NonPtr)
-
-	trustPlugins        bool
-	includeDependencies bool
+	setEnvVars        []string
+	setFileVars       []string
+	CommonOptions
+	watchInterval       time.Duration
+	watch               bool
 	showDetails         bool
-
-	// Watch mode options
-	watch         bool
-	watchInterval time.Duration
-
-	// CLI variable overrides
-	setVars          []string // --set key=value flags
-	setFileVars      []string // --set-file key=path flags
-	setEnvVars       []string // --set-env key=ENV_VAR flags
-	noWarnUnusedVars bool     // --no-warn-unused-vars
+	includeDependencies bool
+	trustPlugins        bool
+	noWarnUnusedVars    bool
 }
 
 func init() {

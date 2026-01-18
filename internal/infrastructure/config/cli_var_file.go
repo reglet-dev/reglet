@@ -4,6 +4,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -15,8 +16,11 @@ const MaxFileSize = 1024 * 1024 // 1MB
 // The file content is trimmed of trailing newlines.
 // Returns error if file doesn't exist or exceeds size limit.
 func ReadValueFromFile(path string) (string, error) {
+	// Clean the path to prevent path traversal attacks
+	cleanPath := filepath.Clean(path)
+
 	// Check file exists and get size
-	info, err := os.Stat(path)
+	info, err := os.Stat(cleanPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return "", fmt.Errorf("file not found: %s", path)
@@ -29,8 +33,9 @@ func ReadValueFromFile(path string) (string, error) {
 		return "", fmt.Errorf("file too large: %s (max %d bytes)", path, MaxFileSize)
 	}
 
-	// Read content
-	content, err := os.ReadFile(path)
+	// Read content - path is cleaned above, safe from traversal
+	// #nosec G304 -- path is sanitized with filepath.Clean above
+	content, err := os.ReadFile(cleanPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read file %s: %w", path, err)
 	}

@@ -7,12 +7,12 @@ import (
 
 // CheckProfileRequest encapsulates all inputs needed to check a profile.
 type CheckProfileRequest struct {
-	Options      CheckOptions
+	CLIVariables map[string]interface{}
 	ProfilePath  string
 	Metadata     RequestMetadata
+	Options      CheckOptions
 	Filters      FilterOptions
 	Execution    ExecutionOptions
-	CLIVariables map[string]interface{} // Parsed --set, --set-file, --set-env values
 }
 
 // FilterOptions defines filters for control selection.
