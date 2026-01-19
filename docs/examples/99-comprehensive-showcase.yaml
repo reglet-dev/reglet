@@ -52,7 +52,7 @@ vars:
   ssh_config: /etc/ssh/sshd_config
   
   # Network configuration
-  test_domain: example.com
+  test_domain: google.com
   api_url: https://api.github.com
   http_timeout: 5s
   
@@ -112,7 +112,7 @@ controls:
             path: "{{ .vars.ssh_config }}"
           expect:
             - data.exists == true
-            - data.mode <= 0600        # Octal comparison
+            - data.mode <= "0600"        # Octal comparison
             - data.uid == 0            # Owned by root
 
     # File size validation
@@ -178,8 +178,7 @@ controls:
           expect:
             - data.status_code == 200
             - data.body_size > 0
-            # Use 'in' operator for string containment check
-            - '"{" in data.body'
+            - data.body contains "{" 
 
     # Response time validation
     - id: api-performance
@@ -210,11 +209,11 @@ controls:
       observations:
         - plugin: dns
           config:
-            name: "{{ .vars.test_domain }}"
-            type: A
+            hostname: "{{ .vars.test_domain }}"
+            record_type: A
           expect:
-            - data.resolved == true
-            - len(data.addresses) > 0
+            - isIPv4(data.records[0])
+            - data.record_count > 0
 
     # ═══════════════════════════════════════════════════════════════════════════
     # TCP PLUGIN EXAMPLES
@@ -231,11 +230,11 @@ controls:
         - plugin: tcp
           config:
             host: "{{ .vars.test_domain }}"
-            port: 443
+            port: "443"
             timeout: "5s"
           expect:
             - data.connected == true
-            - data.handshake_time_ms > 0
+            - data.response_time_ms > 0
 
     # ═══════════════════════════════════════════════════════════════════════════
     # COMMAND PLUGIN EXAMPLES
@@ -255,7 +254,7 @@ controls:
             args: ["-c", "echo 'hello world'"]
           expect:
             - data.exit_code == 0
-            - '"hello" in data.stdout'
+            - data.stdout contains "hello"
 
     # System information check
     - id: kernel-version

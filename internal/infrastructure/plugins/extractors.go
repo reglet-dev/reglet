@@ -2,6 +2,8 @@
 package plugins
 
 import (
+	"strconv"
+
 	"github.com/reglet-dev/reglet/internal/domain/capabilities"
 )
 
@@ -62,6 +64,26 @@ func (e *NetworkExtractor) Extract(config map[string]interface{}) []capabilities
 			caps = append(caps, capabilities.Capability{
 				Kind:    "network",
 				Pattern: "outbound:" + host,
+			})
+		}
+	}
+
+	// Check for "port" (tcp)
+	if portVal, ok := config["port"]; ok {
+		var portStr string
+		switch v := portVal.(type) {
+		case string:
+			portStr = v
+		case float64:
+			portStr = strconv.FormatFloat(v, 'f', 0, 64)
+		case int:
+			portStr = strconv.Itoa(v)
+		}
+
+		if portStr != "" {
+			caps = append(caps, capabilities.Capability{
+				Kind:    "network",
+				Pattern: "outbound:" + portStr,
 			})
 		}
 	}

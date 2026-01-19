@@ -57,7 +57,15 @@ func TCPConnect(ctx context.Context, mod api.Module, stack []uint64, checker *Ca
 		pluginName = name
 	}
 
-	if err := checker.Check(pluginName, "network", fmt.Sprintf("outbound:%s", request.Port)); err != nil {
+	// Check host capability first (e.g. outbound:google.com), then port (e.g. outbound:443)
+	// This matches what the NetworkExtractor produces (outbound:<host>)
+	err := checker.Check(pluginName, "network", fmt.Sprintf("outbound:%s", request.Host))
+	if err != nil {
+		// Fallback to checking port
+		err = checker.Check(pluginName, "network", fmt.Sprintf("outbound:%s", request.Port))
+	}
+
+	if err != nil {
 		errMsg := fmt.Sprintf("permission denied: %v", err)
 		slog.WarnContext(ctx, errMsg, "host", request.Host, "port", request.Port)
 		stack[0] = hostWriteResponse(ctx, mod, TCPResponseWire{
