@@ -45,6 +45,11 @@ type CheckOptions struct {
 	includeDependencies bool
 	trustPlugins        bool
 	noWarnUnusedVars    bool
+	// Remote profile options
+	allowPrivateNetwork bool          // Allow fetching from private IP addresses
+	fetchTimeout        time.Duration // Timeout for remote profile fetching
+	refresh             bool          // Bypass cache and force re-fetch
+	insecure            bool          // Skip TLS certificate verification
 }
 
 func init() {
@@ -57,10 +62,18 @@ func newCheckCmd() *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:   "check <profile.yaml>",
+		Use:   "check <profile.yaml | https://...>",
 		Short: "Execute compliance checks from a profile",
 		Long: `Load a profile configuration and execute the defined validation controls.
-The profile must be a valid YAML file defining the checks to run.
+The profile can be a local YAML file or a remote URL (HTTPS or OCI).
+
+Remote Profiles:
+  Run checks directly from a URL:
+  reglet check https://example.com/profiles/security.yaml
+  reglet check oci://ghcr.io/org/profiles/baseline:v1.0
+
+  Remote profiles are cached locally for 1 hour by default.
+  Use --refresh to bypass cache and force re-fetch.
 
 Filtering:
   Use flags to select specific controls to run.
@@ -106,7 +119,16 @@ Watch Mode:
   reglet check profile.yaml --watch
 
   # Watch mode with custom debounce interval
-  reglet check profile.yaml --watch --interval=500ms`,
+  reglet check profile.yaml --watch --interval=500ms
+
+  # Run checks from a remote profile
+  reglet check https://example.com/profiles/security.yaml
+
+  # Force re-fetch of cached remote profile
+  reglet check https://example.com/profiles/security.yaml --refresh
+
+  # Allow fetching from internal network (use with caution)
+  reglet check https://internal.corp/profiles/test.yaml --allow-private-network`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Validate common flags
@@ -157,6 +179,12 @@ Watch Mode:
 	cmd.Flags().StringSliceVar(&opts.setFileVars, "set-file", nil, "Set variable from file (key=path, can be repeated)")
 	cmd.Flags().StringSliceVar(&opts.setEnvVars, "set-env", nil, "Set variable from environment (key=ENV_VAR, can be repeated)")
 	cmd.Flags().BoolVar(&opts.noWarnUnusedVars, "no-warn-unused-vars", false, "Suppress warnings about unused CLI variables")
+
+	// Remote profile flags
+	cmd.Flags().BoolVar(&opts.allowPrivateNetwork, "allow-private-network", false, "Allow fetching profiles from private IP addresses (SSRF bypass)")
+	cmd.Flags().DurationVar(&opts.fetchTimeout, "fetch-timeout", 30*time.Second, "Timeout for remote profile fetching")
+	cmd.Flags().BoolVar(&opts.refresh, "refresh", false, "Bypass cache and force re-fetch of remote profile")
+	cmd.Flags().BoolVar(&opts.insecure, "insecure", false, "Skip TLS certificate verification for remote profiles (not recommended)")
 
 	return cmd
 }

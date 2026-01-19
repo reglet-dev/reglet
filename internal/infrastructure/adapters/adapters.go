@@ -5,9 +5,12 @@ package adapters
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/expr-lang/expr"
 	"github.com/reglet-dev/reglet/internal/application/dto"
@@ -121,16 +124,45 @@ func (p *PluginAdapter) Describe(ctx context.Context) (*ports.PluginInfo, error)
 
 // ProfileLoaderAdapter adapts infrastructure profile loader to port interface.
 type ProfileLoaderAdapter struct {
-	loader      *infraconfig.ProfileLoader
-	substitutor *infraconfig.VariableSubstitutor
+	loader        *infraconfig.ProfileLoader
+	substitutor   *infraconfig.VariableSubstitutor
+	remoteFetcher RemoteProfileFetcher
+}
+
+// RemoteProfileFetcher is the interface for fetching remote profiles.
+// This allows the adapter to fetch profiles from URLs without depending on
+// the concrete implementation from application/services.
+type RemoteProfileFetcher interface {
+	FetchAsReader(ctx context.Context, url string, opts RemoteFetchOptions) (io.Reader, error)
+}
+
+// RemoteFetchOptions configures remote profile fetching.
+type RemoteFetchOptions struct {
+	Refresh             bool
+	AllowPrivateNetwork bool
+	Timeout             time.Duration
+	Insecure            bool
+	Headers             map[string]string
+}
+
+// ProfileLoaderOption configures a ProfileLoaderAdapter.
+type ProfileLoaderOption func(*ProfileLoaderAdapter)
+
+// WithRemoteFetcher sets the remote profile fetcher.
+func WithRemoteFetcher(fetcher RemoteProfileFetcher) ProfileLoaderOption {
+	return func(a *ProfileLoaderAdapter) { a.remoteFetcher = fetcher }
 }
 
 // NewProfileLoaderAdapter creates a new profile loader adapter.
-func NewProfileLoaderAdapter(resolver ports.SecretResolver) *ProfileLoaderAdapter {
-	return &ProfileLoaderAdapter{
+func NewProfileLoaderAdapter(resolver ports.SecretResolver, opts ...ProfileLoaderOption) *ProfileLoaderAdapter {
+	a := &ProfileLoaderAdapter{
 		loader:      infraconfig.NewProfileLoader(),
 		substitutor: infraconfig.NewVariableSubstitutor(resolver),
 	}
+	for _, opt := range opts {
+		opt(a)
+	}
+	return a
 }
 
 // LoadProfile loads and substitutes variables in a profile.
@@ -140,8 +172,18 @@ func (a *ProfileLoaderAdapter) LoadProfile(path string) (*entities.Profile, erro
 
 // LoadProfileWithCLIVars loads a profile and merges CLI variables before substitution.
 // CLI variables override profile variables at the same path.
+// Supports both local file paths and remote URLs (https://, oci://).
 func (a *ProfileLoaderAdapter) LoadProfileWithCLIVars(path string, cliVars map[string]interface{}) (*entities.Profile, error) {
-	profile, err := a.loader.LoadProfile(path)
+	var profile *entities.Profile
+	var err error
+
+	// Check if path is a remote URL
+	if isRemoteProfile(path) {
+		profile, err = a.loadRemoteProfile(path)
+	} else {
+		profile, err = a.loader.LoadProfile(path)
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -157,6 +199,29 @@ func (a *ProfileLoaderAdapter) LoadProfileWithCLIVars(path string, cliVars map[s
 	}
 
 	return profile, nil
+}
+
+// loadRemoteProfile fetches and loads a profile from a remote URL.
+func (a *ProfileLoaderAdapter) loadRemoteProfile(url string) (*entities.Profile, error) {
+	if a.remoteFetcher == nil {
+		return nil, fmt.Errorf("remote profile fetching not configured; cannot load %s", url)
+	}
+
+	// Fetch the remote profile content
+	ctx := context.Background()
+	reader, err := a.remoteFetcher.FetchAsReader(ctx, url, RemoteFetchOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch remote profile: %w", err)
+	}
+
+	// Parse the fetched content
+	return a.loader.LoadProfileFromReader(reader)
+}
+
+// isRemoteProfile returns true if the path looks like a remote URL.
+func isRemoteProfile(path string) bool {
+	lower := strings.ToLower(path)
+	return strings.HasPrefix(lower, "https://") || strings.HasPrefix(lower, "oci://")
 }
 
 // ProfileValidatorAdapter adapts infrastructure validator to port interface.
