@@ -2,6 +2,7 @@ package netutil
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"time"
@@ -11,25 +12,11 @@ import (
 // It resolves DNS once and pins the IP for the duration of the connection,
 // preventing DNS rebinding attacks.
 type SecureDialer struct {
-	// AllowPrivateNetwork permits connections to private IP ranges.
-	// Default: false (blocked with callback notification).
+	OnPrivateIPBlocked  func(ip net.IP)
+	OnDNSPinning        func(host string, ip net.IP)
+	Resolver            *net.Resolver
+	Timeout             time.Duration
 	AllowPrivateNetwork bool
-
-	// OnPrivateIPBlocked is called when a connection to a private IP is blocked.
-	// The callback receives the blocked IP address.
-	OnPrivateIPBlocked func(ip net.IP)
-
-	// OnDNSPinning is called when DNS is resolved and pinned.
-	// The callback receives the hostname and pinned IP.
-	OnDNSPinning func(host string, ip net.IP)
-
-	// Timeout for the dial operation.
-	// Default: 30s if zero.
-	Timeout time.Duration
-
-	// Resolver is the DNS resolver to use.
-	// Default: net.DefaultResolver if nil.
-	Resolver *net.Resolver
 }
 
 // DialContext connects to the address with DNS pinning and SSRF protection.
@@ -127,6 +114,7 @@ func (e *PrivateIPError) Error() string {
 
 // IsPrivateIPError returns true if the error is a PrivateIPError.
 func IsPrivateIPError(err error) bool {
-	_, ok := err.(*PrivateIPError)
+	privateIPError := &PrivateIPError{}
+	ok := errors.As(err, &privateIPError)
 	return ok
 }

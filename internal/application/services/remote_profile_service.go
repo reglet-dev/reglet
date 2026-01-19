@@ -21,14 +21,14 @@ type RemoteProfileService struct {
 	cache   ports.ProfileCacheRepository
 	logger  *slog.Logger
 
-	// DefaultTTL is the cache TTL for fetched profiles.
-	DefaultTTL time.Duration
-
 	// OnFetchStart is called when a fetch operation begins.
 	OnFetchStart func(url string)
 
 	// OnFetchComplete is called when a fetch operation completes.
 	OnFetchComplete func(url string, cached bool)
+
+	// DefaultTTL is the cache TTL for fetched profiles.
+	DefaultTTL time.Duration
 }
 
 // RemoteProfileServiceOption configures a RemoteProfileService.
@@ -65,40 +65,40 @@ func WithDefaultTTL(ttl time.Duration) RemoteProfileServiceOption {
 	return func(s *RemoteProfileService) { s.DefaultTTL = ttl }
 }
 
-// FetchOptions configures a fetch operation.
+// RemoteFetchOptions configures a fetch operation.
 type RemoteFetchOptions struct {
+	// Headers are custom HTTP headers to send with the request.
+	Headers map[string]string
+
+	// Timeout overrides the default fetch timeout.
+	Timeout time.Duration
+
 	// Refresh forces a cache bypass and re-fetch.
 	Refresh bool
 
 	// AllowPrivateNetwork permits fetching from private IP addresses.
 	AllowPrivateNetwork bool
 
-	// Timeout overrides the default fetch timeout.
-	Timeout time.Duration
-
 	// Insecure allows TLS certificate validation to be skipped.
 	Insecure bool
-
-	// Headers are custom HTTP headers to send with the request.
-	Headers map[string]string
 }
 
-// FetchResult contains the result of fetching a remote profile.
+// RemoteFetchResult contains the result of fetching a remote profile.
 type RemoteFetchResult struct {
-	// Content is the raw profile YAML content.
-	Content []byte
-
-	// ContentHash is the SHA256 digest of the content.
-	ContentHash values.Digest
+	// FetchedAt is when the content was fetched (or cache entry created).
+	FetchedAt time.Time
 
 	// Reference is the parsed profile reference.
 	Reference values.ProfileReference
 
+	// ContentHash is the SHA256 digest of the content.
+	ContentHash values.Digest
+
+	// Content is the raw profile YAML content.
+	Content []byte
+
 	// FromCache indicates if the content came from cache.
 	FromCache bool
-
-	// FetchedAt is when the content was fetched (or cache entry created).
-	FetchedAt time.Time
 }
 
 // IsRemoteProfile returns true if the path looks like a remote URL.
@@ -131,24 +131,26 @@ func (s *RemoteProfileService) Fetch(
 		if err != nil {
 			s.logger.Warn("cache lookup failed", "error", err)
 			// Continue to fetch
-		} else if entry != nil && entry.IsFresh() {
-			s.logger.Debug("using cached profile",
-				"url", urlString,
-				"age", entry.Age(),
-				"expires_in", entry.TimeUntilExpiry())
-
-			if s.OnFetchComplete != nil {
-				s.OnFetchComplete(urlString, true)
-			}
-
-			return &RemoteFetchResult{
-				Content:     entry.Content(),
-				ContentHash: entry.ContentHash(),
-				Reference:   ref,
-				FromCache:   true,
-				FetchedAt:   entry.FetchedAt(),
-			}, nil
 		} else if entry != nil {
+			if entry.IsFresh() {
+				s.logger.Debug("using cached profile",
+					"url", urlString,
+					"age", entry.Age(),
+					"expires_in", entry.TimeUntilExpiry())
+
+				if s.OnFetchComplete != nil {
+					s.OnFetchComplete(urlString, true)
+				}
+
+				return &RemoteFetchResult{
+					Content:     entry.Content(),
+					ContentHash: entry.ContentHash(),
+					Reference:   ref,
+					FromCache:   true,
+					FetchedAt:   entry.FetchedAt(),
+				}, nil
+			}
+			// Entry exists but is stale/expired
 			s.logger.Debug("cache entry stale/expired, re-fetching",
 				"url", urlString,
 				"state", entry.StateString())

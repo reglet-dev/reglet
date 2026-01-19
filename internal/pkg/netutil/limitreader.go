@@ -1,6 +1,7 @@
 package netutil
 
 import (
+	"errors"
 	"fmt"
 	"io"
 )
@@ -70,7 +71,8 @@ func (e *SizeLimitExceededError) Error() string {
 
 // IsSizeLimitExceededError returns true if the error is a SizeLimitExceededError.
 func IsSizeLimitExceededError(err error) bool {
-	_, ok := err.(*SizeLimitExceededError)
+	sizeLimitExceededError := &SizeLimitExceededError{}
+	ok := errors.As(err, &sizeLimitExceededError)
 	return ok
 }
 

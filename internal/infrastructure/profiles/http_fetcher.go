@@ -3,6 +3,7 @@ package profiles
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -18,9 +19,6 @@ import (
 // HTTPProfileFetcher fetches profiles over HTTPS using secure defaults.
 // It implements the ports.ProfileFetcher interface.
 type HTTPProfileFetcher struct {
-	// UserAgent is the User-Agent header sent with requests.
-	UserAgent string
-
 	// OnRedirect is called when a redirect is followed.
 	// Returns an error to abort the redirect.
 	OnRedirect func(req *http.Request, via []*http.Request) error
@@ -36,6 +34,9 @@ type HTTPProfileFetcher struct {
 
 	// OnRetry is called before each retry attempt.
 	OnRetry func(attempt int, statusCode int)
+
+	// UserAgent is the User-Agent header sent with requests.
+	UserAgent string
 }
 
 // NewHTTPProfileFetcher creates a new HTTP profile fetcher with default settings.
@@ -51,7 +52,27 @@ func (f *HTTPProfileFetcher) Fetch(ctx context.Context, ref values.ProfileRefere
 		return nil, fmt.Errorf("HTTPProfileFetcher only supports HTTPS URLs, got: %s", ref.Scheme())
 	}
 
-	// Apply defaults
+	opts = f.applyDefaults(opts)
+	client := f.createClient(opts)
+
+	req, reqURL, err := f.createRequest(ctx, ref, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		if netutil.IsPrivateIPError(err) {
+			return nil, err
+		}
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	return f.handleResponse(resp, reqURL, ref, opts)
+}
+
+func (f *HTTPProfileFetcher) applyDefaults(opts ports.FetchOptions) ports.FetchOptions {
 	if opts.MaxSize == 0 {
 		opts.MaxSize = 10 * 1024 * 1024 // 10MB
 	}
@@ -61,8 +82,10 @@ func (f *HTTPProfileFetcher) Fetch(ctx context.Context, ref values.ProfileRefere
 	if opts.MaxRetries == 0 {
 		opts.MaxRetries = 3
 	}
+	return opts
+}
 
-	// Create secure dialer with SSRF protection
+func (f *HTTPProfileFetcher) createClient(opts ports.FetchOptions) *http.Client {
 	dialer := &netutil.SecureDialer{
 		AllowPrivateNetwork: opts.AllowPrivateNetwork,
 		Timeout:             opts.Timeout,
@@ -78,13 +101,11 @@ func (f *HTTPProfileFetcher) Fetch(ctx context.Context, ref values.ProfileRefere
 		},
 	}
 
-	// Configure TLS
 	tlsConfig := netutil.TLSConfig()
 	if opts.Insecure {
 		tlsConfig = netutil.InsecureTLSConfig()
 	}
 
-	// Create transport with secure dialer and retry logic
 	baseTransport := &http.Transport{
 		DialContext:     dialer.DialContext,
 		TLSClientConfig: tlsConfig,
@@ -102,31 +123,33 @@ func (f *HTTPProfileFetcher) Fetch(ctx context.Context, ref values.ProfileRefere
 		},
 	}
 
-	// Create client with redirect handling
-	client := &http.Client{
-		Transport: retryTransport,
-		Timeout:   opts.Timeout,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			// Limit redirects to 5 hops (as per spec)
-			if len(via) >= 5 {
-				return fmt.Errorf("too many redirects (max 5)")
-			}
+	return &http.Client{
+		Transport:     retryTransport,
+		Timeout:       opts.Timeout,
+		CheckRedirect: f.checkRedirect,
+	}
+}
 
-			// Warn on cross-domain redirects
-			if len(via) > 0 && req.URL.Host != via[len(via)-1].URL.Host {
-				// Different domain
-				if f.OnRedirect != nil {
-					if err := f.OnRedirect(req, via); err != nil {
-						return err
-					}
-				}
-			}
-
-			return nil
-		},
+func (f *HTTPProfileFetcher) checkRedirect(req *http.Request, via []*http.Request) error {
+	// Limit redirects to 5 hops (as per spec)
+	if len(via) >= 5 {
+		return fmt.Errorf("too many redirects (max 5)")
 	}
 
-	// Build request
+	// Warn on cross-domain redirects
+	if len(via) > 0 && req.URL.Host != via[len(via)-1].URL.Host {
+		// Different domain
+		if f.OnRedirect != nil {
+			if err := f.OnRedirect(req, via); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (f *HTTPProfileFetcher) createRequest(ctx context.Context, ref values.ProfileReference, opts ports.FetchOptions) (*http.Request, string, error) {
 	reqURL := ref.String()
 	// Remove fragment for HTTP request (fragments are client-side only)
 	if idx := strings.Index(reqURL, "#"); idx != -1 {
@@ -139,7 +162,7 @@ func (f *HTTPProfileFetcher) Fetch(ctx context.Context, ref values.ProfileRefere
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, "", fmt.Errorf("failed to create request: %w", err)
 	}
 
 	// Set headers
@@ -151,16 +174,10 @@ func (f *HTTPProfileFetcher) Fetch(ctx context.Context, ref values.ProfileRefere
 		req.Header.Set(k, v)
 	}
 
-	// Execute request
-	resp, err := client.Do(req)
-	if err != nil {
-		if netutil.IsPrivateIPError(err) {
-			return nil, err
-		}
-		return nil, fmt.Errorf("request failed: %w", err)
-	}
-	defer resp.Body.Close()
+	return req, reqURL, nil
+}
 
+func (f *HTTPProfileFetcher) handleResponse(resp *http.Response, reqURL string, ref values.ProfileReference, opts ports.FetchOptions) (*ports.FetchResult, error) {
 	// Check status
 	if resp.StatusCode != http.StatusOK {
 		return nil, &HTTPError{
@@ -227,9 +244,9 @@ func isYAMLContentType(contentType string) bool {
 
 // HTTPError represents an HTTP error response.
 type HTTPError struct {
-	StatusCode int
 	Status     string
 	URL        string
+	StatusCode int
 }
 
 func (e *HTTPError) Error() string {
@@ -238,13 +255,15 @@ func (e *HTTPError) Error() string {
 
 // IsHTTPError returns true if the error is an HTTPError.
 func IsHTTPError(err error) bool {
-	_, ok := err.(*HTTPError)
+	hTTPError := &HTTPError{}
+	ok := errors.As(err, &hTTPError)
 	return ok
 }
 
 // GetHTTPStatusCode returns the status code if the error is an HTTPError, or 0.
 func GetHTTPStatusCode(err error) int {
-	if httpErr, ok := err.(*HTTPError); ok {
+	httpErr := &HTTPError{}
+	if errors.As(err, &httpErr) {
 		return httpErr.StatusCode
 	}
 	return 0

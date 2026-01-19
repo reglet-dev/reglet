@@ -16,15 +16,15 @@ import (
 //   - ttl must be positive
 //   - size must equal len(content)
 type ProfileCacheEntry struct {
-	id             string                  // Cache key (hash of URL)
-	reference      values.ProfileReference // Original reference
-	content        []byte                  // Profile YAML content
-	contentHash    values.Digest           // SHA256 of content
-	fetchedAt      time.Time               // When first fetched
-	lastAccessedAt time.Time               // Last time this entry was accessed
-	ttl            time.Duration           // Cache validity period
-	etag           string                  // HTTP ETag for update checks (optional)
-	size           int64                   // Content size in bytes
+	fetchedAt      time.Time
+	lastAccessedAt time.Time
+	reference      values.ProfileReference
+	contentHash    values.Digest
+	id             string
+	etag           string
+	content        []byte
+	ttl            time.Duration
+	size           int64
 }
 
 // NewProfileCacheEntry creates a new cache entry with validated invariants.

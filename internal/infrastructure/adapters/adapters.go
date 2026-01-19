@@ -138,11 +138,11 @@ type RemoteProfileFetcher interface {
 
 // RemoteFetchOptions configures remote profile fetching.
 type RemoteFetchOptions struct {
+	Headers             map[string]string
+	Timeout             time.Duration
 	Refresh             bool
 	AllowPrivateNetwork bool
-	Timeout             time.Duration
 	Insecure            bool
-	Headers             map[string]string
 }
 
 // ProfileLoaderOption configures a ProfileLoaderAdapter.

@@ -49,6 +49,7 @@ func Test_RetryTransport_SuccessFirstAttempt(t *testing.T) {
 	resp, err := transport.RoundTrip(req)
 
 	require.NoError(t, err)
+	defer resp.Body.Close()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, 1, mock.calls)
 }
@@ -76,6 +77,7 @@ func Test_RetryTransport_Retries429(t *testing.T) {
 	resp, err := transport.RoundTrip(req)
 
 	require.NoError(t, err)
+	defer resp.Body.Close()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, 3, mock.calls)
 	assert.Equal(t, []int{1, 2}, retryAttempts)
@@ -110,6 +112,7 @@ func Test_RetryTransport_Retries5xx(t *testing.T) {
 			resp, err := transport.RoundTrip(req)
 
 			require.NoError(t, err)
+			defer resp.Body.Close()
 			assert.Equal(t, http.StatusOK, resp.StatusCode)
 			assert.Equal(t, 2, mock.calls)
 		})
@@ -145,6 +148,7 @@ func Test_RetryTransport_NoRetryOn4xx(t *testing.T) {
 			resp, err := transport.RoundTrip(req)
 
 			require.NoError(t, err)
+			defer resp.Body.Close()
 			assert.Equal(t, tt.statusCode, resp.StatusCode)
 			assert.Equal(t, 1, mock.calls) // No retries
 		})
@@ -174,7 +178,10 @@ func Test_RetryTransport_RespectsRetryAfterHeader(t *testing.T) {
 	}
 
 	req, _ := http.NewRequest("GET", "http://example.com", nil)
-	_, _ = transport.RoundTrip(req)
+	resp, _ := transport.RoundTrip(req)
+	if resp != nil {
+		defer resp.Body.Close()
+	}
 
 	// Should use the Retry-After value (1 second)
 	assert.Equal(t, time.Second, waitDuration)

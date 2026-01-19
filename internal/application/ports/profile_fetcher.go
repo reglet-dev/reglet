@@ -19,9 +19,6 @@ type FetchOptions struct {
 	// Headers contains custom HTTP headers (e.g., Authorization).
 	Headers map[string]string
 
-	// Insecure allows invalid TLS certificates when true.
-	Insecure bool
-
 	// MaxSize limits the response body size in bytes.
 	// Default: 10MB if zero.
 	MaxSize int64
@@ -34,6 +31,9 @@ type FetchOptions struct {
 	// Default: 3 if zero.
 	MaxRetries int
 
+	// Insecure allows invalid TLS certificates when true.
+	Insecure bool
+
 	// AllowPrivateNetwork permits fetching from private IP ranges.
 	// Default: false (blocked with warning).
 	AllowPrivateNetwork bool
@@ -41,9 +41,6 @@ type FetchOptions struct {
 
 // FetchResult contains the result of a profile fetch operation.
 type FetchResult struct {
-	// Content is the raw profile YAML content.
-	Content []byte
-
 	// ContentHash is the SHA256 digest of the content.
 	ContentHash values.Digest
 
@@ -55,6 +52,9 @@ type FetchResult struct {
 
 	// FinalURL is the URL after any redirects.
 	FinalURL string
+
+	// Content is the raw profile YAML content.
+	Content []byte
 
 	// RedirectCount is the number of redirects followed.
 	RedirectCount int

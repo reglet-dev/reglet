@@ -13,6 +13,10 @@ type RetryTransport struct {
 	// Default: http.DefaultTransport if nil.
 	Base http.RoundTripper
 
+	// OnRetry is called before each retry attempt.
+	// The callback receives the attempt number (1-based) and wait duration.
+	OnRetry func(attempt int, waitDuration time.Duration, statusCode int)
+
 	// MaxRetries is the maximum number of retry attempts.
 	// Default: 3 if zero.
 	MaxRetries int
@@ -24,10 +28,6 @@ type RetryTransport struct {
 	// MaxBackoff is the maximum backoff duration.
 	// Default: 30s if zero.
 	MaxBackoff time.Duration
-
-	// OnRetry is called before each retry attempt.
-	// The callback receives the attempt number (1-based) and wait duration.
-	OnRetry func(attempt int, waitDuration time.Duration, statusCode int)
 }
 
 // RoundTrip implements http.RoundTripper with retry logic.
@@ -100,7 +100,7 @@ func (t *RetryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 				t.OnRetry(attempt+1, waitDuration, resp.StatusCode)
 			}
 			// Close the response body before retry
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			time.Sleep(waitDuration)
 			continue
 		}
@@ -114,26 +114,26 @@ func (t *RetryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 // calculateBackoff determines the wait duration for the given attempt.
 // It respects Retry-After headers when present.
-func (t *RetryTransport) calculateBackoff(attempt int, initial, max time.Duration, resp *http.Response) time.Duration {
+func (t *RetryTransport) calculateBackoff(attempt int, initial, maxDuration time.Duration, resp *http.Response) time.Duration {
 	// Check for Retry-After header
 	if resp != nil {
 		if retryAfter := resp.Header.Get("Retry-After"); retryAfter != "" {
 			// Try parsing as seconds
 			if seconds, err := strconv.Atoi(retryAfter); err == nil {
 				duration := time.Duration(seconds) * time.Second
-				if duration > max {
-					return max
+				if duration > maxDuration {
+					return maxDuration
 				}
 				return duration
 			}
 			// Try parsing as HTTP date (RFC 1123)
-			if t, err := http.ParseTime(retryAfter); err == nil {
-				duration := time.Until(t)
+			if tParser, err := http.ParseTime(retryAfter); err == nil {
+				duration := time.Until(tParser)
 				if duration < 0 {
 					return initial
 				}
-				if duration > max {
-					return max
+				if duration > maxDuration {
+					return maxDuration
 				}
 				return duration
 			}
@@ -142,8 +142,8 @@ func (t *RetryTransport) calculateBackoff(attempt int, initial, max time.Duratio
 
 	// Exponential backoff: initial * 2^attempt
 	backoff := initial * (1 << attempt)
-	if backoff > max {
-		return max
+	if backoff > maxDuration {
+		return maxDuration
 	}
 	return backoff
 }
@@ -151,10 +151,10 @@ func (t *RetryTransport) calculateBackoff(attempt int, initial, max time.Duratio
 // isRetryableStatus returns true if the status code indicates a transient error.
 func isRetryableStatus(statusCode int) bool {
 	switch statusCode {
-	case http.StatusTooManyRequests,      // 429
-		http.StatusBadGateway,            // 502
-		http.StatusServiceUnavailable,    // 503
-		http.StatusGatewayTimeout:        // 504
+	case http.StatusTooManyRequests, // 429
+		http.StatusBadGateway,         // 502
+		http.StatusServiceUnavailable, // 503
+		http.StatusGatewayTimeout:     // 504
 		return true
 	default:
 		return false

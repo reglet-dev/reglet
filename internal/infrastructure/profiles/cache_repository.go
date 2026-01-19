@@ -31,7 +31,7 @@ func NewFSProfileCacheRepository(root string) (*FSProfileCacheRepository, error)
 	}
 
 	// Ensure root directory exists
-	if err := os.MkdirAll(root, 0750); err != nil {
+	if err := os.MkdirAll(root, 0o750); err != nil {
 		return nil, fmt.Errorf("failed to create cache directory: %w", err)
 	}
 
@@ -49,6 +49,7 @@ func (r *FSProfileCacheRepository) Find(ctx context.Context, ref values.ProfileR
 
 	// Read metadata
 	metadataPath := filepath.Join(cacheDir, "metadata.json")
+	//nolint:gosec // Path is constructed from hash and is within cache root
 	metadataBytes, err := os.ReadFile(metadataPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -64,6 +65,7 @@ func (r *FSProfileCacheRepository) Find(ctx context.Context, ref values.ProfileR
 
 	// Read content
 	contentPath := filepath.Join(cacheDir, "profile.yaml")
+	//nolint:gosec // Path is constructed from hash and is within cache root
 	content, err := os.ReadFile(contentPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read cached content: %w", err)
@@ -104,7 +106,7 @@ func (r *FSProfileCacheRepository) Store(ctx context.Context, entry *entities.Pr
 	}
 
 	// Create cache directory
-	if err := os.MkdirAll(cacheDir, 0750); err != nil {
+	if err := os.MkdirAll(cacheDir, 0o750); err != nil {
 		return fmt.Errorf("failed to create cache directory: %w", err)
 	}
 
@@ -163,6 +165,7 @@ func (r *FSProfileCacheRepository) List(ctx context.Context) ([]*entities.Profil
 		cacheDir := filepath.Join(r.Root, entry.Name())
 		metadataPath := filepath.Join(cacheDir, "metadata.json")
 
+		//nolint:gosec // Path is from os.ReadDir (safe) and within cache root
 		metadataBytes, err := os.ReadFile(metadataPath)
 		if err != nil {
 			continue // Skip invalid entries
@@ -181,6 +184,7 @@ func (r *FSProfileCacheRepository) List(ctx context.Context) ([]*entities.Profil
 
 		// Read content
 		contentPath := filepath.Join(cacheDir, "profile.yaml")
+		//nolint:gosec // Path is from os.ReadDir (safe) and within cache root
 		content, err := os.ReadFile(contentPath)
 		if err != nil {
 			continue // Skip invalid entries
@@ -288,17 +292,17 @@ func (r *FSProfileCacheRepository) writeFileAtomic(path string, data []byte) err
 	// Clean up on failure
 	defer func() {
 		if tmpPath != "" {
-			os.Remove(tmpPath)
+			_ = os.Remove(tmpPath)
 		}
 	}()
 
 	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
+		_ = tmp.Close()
 		return err
 	}
 
-	if err := tmp.Chmod(0640); err != nil {
-		tmp.Close()
+	if err := tmp.Chmod(0o640); err != nil {
+		_ = tmp.Close()
 		return err
 	}
 
@@ -318,6 +322,7 @@ func (r *FSProfileCacheRepository) writeFileAtomic(path string, data []byte) err
 func (r *FSProfileCacheRepository) updateLastAccessed(cacheDir string, t time.Time) error {
 	metadataPath := filepath.Join(cacheDir, "metadata.json")
 
+	//nolint:gosec // Path is constructed from hash and is within cache root
 	metadataBytes, err := os.ReadFile(metadataPath)
 	if err != nil {
 		return err
@@ -340,11 +345,11 @@ func (r *FSProfileCacheRepository) updateLastAccessed(cacheDir string, t time.Ti
 
 // cacheMetadata is the JSON structure stored in metadata.json.
 type cacheMetadata struct {
-	URL            string        `json:"url"`
-	Digest         string        `json:"digest"`
 	FetchedAt      time.Time     `json:"fetched_at"`
 	LastAccessedAt time.Time     `json:"last_accessed_at"`
-	TTL            time.Duration `json:"ttl"`
+	URL            string        `json:"url"`
+	Digest         string        `json:"digest"`
 	ETag           string        `json:"etag,omitempty"`
+	TTL            time.Duration `json:"ttl"`
 	Size           int64         `json:"size"`
 }

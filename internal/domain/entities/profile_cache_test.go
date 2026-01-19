@@ -54,8 +54,8 @@ func Test_ProfileCacheEntry_CacheStates(t *testing.T) {
 
 	ttl := time.Hour
 	freshTime := time.Now().UTC()
-	staleTime := freshTime.Add(-ttl - time.Minute)    // Past TTL but within 2x
-	expiredTime := freshTime.Add(-ttl * 3)            // Past 2x TTL
+	staleTime := freshTime.Add(-ttl - time.Minute) // Past TTL but within 2x
+	expiredTime := freshTime.Add(-ttl * 3)         // Past 2x TTL
 
 	tests := []struct {
 		name      string

@@ -39,10 +39,10 @@ func (m *mockProfileFetcher) Fetch(ctx context.Context, ref values.ProfileRefere
 
 // mockProfileCacheRepository implements ports.ProfileCacheRepository for testing.
 type mockProfileCacheRepository struct {
-	entries     map[string]*entities.ProfileCacheEntry
-	storeCount  int
-	storeErr    error
-	findErr     error
+	entries    map[string]*entities.ProfileCacheEntry
+	storeCount int
+	storeErr   error
+	findErr    error
 }
 
 func newMockCache() *mockProfileCacheRepository {

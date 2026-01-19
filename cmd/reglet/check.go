@@ -30,26 +30,25 @@ type CheckOptions struct {
 	securityLevel     string
 	filterExpr        string
 	outFile           string
-	setVars           []string
+	setFileVars       []string
 	includeTags       []string
 	includeSeverities []string
 	includeControlIDs []string
 	excludeTags       []string
 	excludeControlIDs []string
 	setEnvVars        []string
-	setFileVars       []string
+	setVars           []string
 	CommonOptions
 	watchInterval       time.Duration
+	fetchTimeout        time.Duration
 	watch               bool
 	showDetails         bool
 	includeDependencies bool
 	trustPlugins        bool
 	noWarnUnusedVars    bool
-	// Remote profile options
-	allowPrivateNetwork bool          // Allow fetching from private IP addresses
-	fetchTimeout        time.Duration // Timeout for remote profile fetching
-	refresh             bool          // Bypass cache and force re-fetch
-	insecure            bool          // Skip TLS certificate verification
+	allowPrivateNetwork bool
+	refresh             bool
+	insecure            bool
 }
 
 func init() {

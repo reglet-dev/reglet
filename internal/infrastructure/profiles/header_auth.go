@@ -120,11 +120,15 @@ func (p *NoAuthProvider) GetAuthHeader(ctx context.Context, url string) (string,
 
 // ChainAuthProvider tries multiple providers in order until one returns a non-empty header.
 type ChainAuthProvider struct {
-	Providers []interface{ GetAuthHeader(context.Context, string) (string, error) }
+	Providers []interface {
+		GetAuthHeader(context.Context, string) (string, error)
+	}
 }
 
 // NewChainAuthProvider creates a provider that chains multiple providers.
-func NewChainAuthProvider(providers ...interface{ GetAuthHeader(context.Context, string) (string, error) }) *ChainAuthProvider {
+func NewChainAuthProvider(providers ...interface {
+	GetAuthHeader(context.Context, string) (string, error)
+}) *ChainAuthProvider {
 	return &ChainAuthProvider{Providers: providers}
 }
 

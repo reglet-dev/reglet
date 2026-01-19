@@ -3,9 +3,9 @@ package values_test
 import (
 	"testing"
 
+	"github.com/reglet-dev/reglet/internal/domain/values"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/reglet-dev/reglet/internal/domain/values"
 )
 
 func Test_ParseProfileReference_ValidHTTPS(t *testing.T) {
