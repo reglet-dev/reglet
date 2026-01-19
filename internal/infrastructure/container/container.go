@@ -3,6 +3,7 @@ package container
 
 import (
 	"context"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -20,6 +21,7 @@ import (
 	ociplugin "github.com/reglet-dev/reglet/internal/infrastructure/plugins/oci"
 	pluginrepo "github.com/reglet-dev/reglet/internal/infrastructure/plugins/repository"
 	signingplugin "github.com/reglet-dev/reglet/internal/infrastructure/plugins/signing"
+	"github.com/reglet-dev/reglet/internal/infrastructure/profiles"
 	"github.com/reglet-dev/reglet/internal/infrastructure/secrets"
 	"github.com/reglet-dev/reglet/internal/infrastructure/sensitivedata"
 	"github.com/reglet-dev/reglet/internal/infrastructure/system"
@@ -68,8 +70,8 @@ func New(opts Options) (*Container, error) {
 	// Create resolver with config from system config
 	secretResolver := secrets.NewResolver(&systemCfg.SensitiveData.Secrets, sensitiveProvider)
 
-	// Initialize adapters
-	profileLoader := adapters.NewProfileLoaderAdapter(secretResolver)
+	// Initialize adapters (remote profile fetching configured below after homeDir is available)
+	var profileLoader *adapters.ProfileLoaderAdapter
 	profileValidator := adapters.NewProfileValidatorAdapter()
 	pluginResolver := adapters.NewPluginDirectoryAdapter()
 
@@ -181,6 +183,33 @@ func New(opts Options) (*Container, error) {
 		services.WithLogger(opts.Logger),
 	)
 
+	// --- Remote Profile Fetching ---
+	// Create HTTP profile fetcher with secure defaults
+	httpFetcher := profiles.NewHTTPProfileFetcher()
+
+	// Create profile cache repository (uses same homeDir as plugins)
+	profileCacheDir := filepath.Join(homeDir, ".reglet", "profiles")
+	profileCacheRepo, err := profiles.NewFSProfileCacheRepository(profileCacheDir)
+	if err != nil {
+		opts.Logger.Warn("failed to create profile cache, remote profiles will not be cached", "error", err)
+	}
+
+	// Create remote profile service
+	remoteProfileService := services.NewRemoteProfileService(
+		httpFetcher,
+		services.WithCache(profileCacheRepo),
+		services.WithRemoteLogger(opts.Logger),
+	)
+
+	// Create adapter wrapper for remote fetcher
+	remoteFetcher := &remoteProfileFetcherAdapter{service: remoteProfileService}
+
+	// Initialize profile loader with remote fetching support
+	profileLoader = adapters.NewProfileLoaderAdapter(
+		secretResolver,
+		adapters.WithRemoteFetcher(remoteFetcher),
+	)
+
 	// Create lockfile infrastructure
 	lockfileRepo := filesystem.NewFileLockfileRepository()
 	versionResolver := plugins.NewSemverResolver()
@@ -281,4 +310,22 @@ func (c *Container) OutputFormatterFactory() ports.OutputFormatterFactory {
 // Logger returns the configured logger.
 func (c *Container) Logger() *slog.Logger {
 	return c.logger
+}
+
+// remoteProfileFetcherAdapter adapts services.RemoteProfileService to adapters.RemoteProfileFetcher.
+type remoteProfileFetcherAdapter struct {
+	service *services.RemoteProfileService
+}
+
+// FetchAsReader fetches a remote profile and returns it as an io.Reader.
+func (a *remoteProfileFetcherAdapter) FetchAsReader(ctx context.Context, url string, opts adapters.RemoteFetchOptions) (io.Reader, error) {
+	// Convert adapter options to service options
+	serviceOpts := services.RemoteFetchOptions{
+		Refresh:             opts.Refresh,
+		AllowPrivateNetwork: opts.AllowPrivateNetwork,
+		Timeout:             opts.Timeout,
+		Insecure:            opts.Insecure,
+		Headers:             opts.Headers,
+	}
+	return a.service.FetchAsReader(ctx, url, serviceOpts)
 }
