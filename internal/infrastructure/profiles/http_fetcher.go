@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"strings"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/reglet-dev/reglet/internal/application/ports"
 	"github.com/reglet-dev/reglet/internal/domain/values"
+	"github.com/reglet-dev/reglet/internal/infrastructure/sensitivedata"
 	"github.com/reglet-dev/reglet/internal/pkg/netutil"
 )
 
@@ -34,6 +36,10 @@ type HTTPProfileFetcher struct {
 
 	// OnRetry is called before each retry attempt.
 	OnRetry func(attempt int, statusCode int)
+
+	// OnSecretDetected is called when potential secrets are found in fetched content.
+	// This implements Constitution II: Credential Hygiene - Secret Detection.
+	OnSecretDetected func(findings []sensitivedata.SecretFinding)
 
 	// UserAgent is the User-Agent header sent with requests.
 	UserAgent string
@@ -217,6 +223,19 @@ func (f *HTTPProfileFetcher) handleResponse(resp *http.Response, reqURL string, 
 		}
 	}
 
+	// Scan for secrets in fetched content (Constitution II: Credential Hygiene)
+	if f.OnSecretDetected != nil {
+		redactor, err := sensitivedata.NewRedactor()
+		if err != nil {
+			slog.Debug("failed to create redactor for secret detection", "error", err)
+		} else {
+			findings := redactor.DetectSecrets(string(content))
+			if len(findings) > 0 {
+				f.OnSecretDetected(findings)
+			}
+		}
+	}
+
 	// Count redirects
 	redirectCount := 0
 	if resp.Request != nil && resp.Request.URL.String() != reqURL {
@@ -267,4 +286,96 @@ func GetHTTPStatusCode(err error) int {
 		return httpErr.StatusCode
 	}
 	return 0
+}
+
+// UpdateCheckResult contains the result of an update check.
+type UpdateCheckResult struct {
+	// CurrentETag is the ETag of the cached version.
+	CurrentETag string
+	// RemoteETag is the ETag of the remote version.
+	RemoteETag string
+	// LastModified is the Last-Modified header from the remote.
+	LastModified string
+	// HasUpdate indicates whether the remote content has changed.
+	HasUpdate bool
+}
+
+// CheckForUpdate performs a HEAD request to check if a profile has been updated.
+// Compares the remote ETag with the cached ETag to detect changes.
+func (f *HTTPProfileFetcher) CheckForUpdate(
+	ctx context.Context,
+	ref values.ProfileReference,
+	cachedETag string,
+	opts ports.FetchOptions,
+) (*UpdateCheckResult, error) {
+	if !ref.IsHTTPS() {
+		return nil, fmt.Errorf("HTTPProfileFetcher only supports HTTPS URLs, got: %s", ref.Scheme())
+	}
+
+	opts = f.applyDefaults(opts)
+	client := f.createClient(opts)
+
+	// Build URL (reuse createRequest logic but change method)
+	reqURL := ref.String()
+	if idx := strings.Index(reqURL, "#"); idx != -1 {
+		reqURL = reqURL[:idx]
+	}
+	if idx := strings.Index(reqURL, "@sha256:"); idx != -1 {
+		reqURL = reqURL[:idx]
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, reqURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create HEAD request: %w", err)
+	}
+
+	req.Header.Set("User-Agent", f.UserAgent)
+	for k, v := range opts.Headers {
+		req.Header.Set(k, v)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("HEAD request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, &HTTPError{
+			StatusCode: resp.StatusCode,
+			Status:     resp.Status,
+			URL:        reqURL,
+		}
+	}
+
+	remoteETag := resp.Header.Get("ETag")
+	lastModified := resp.Header.Get("Last-Modified")
+
+	// Determine if there's an update
+	hasUpdate := false
+	if cachedETag != "" && remoteETag != "" {
+		// Compare ETags (strip weak validator prefix if present)
+		cachedClean := stripWeakValidator(cachedETag)
+		remoteClean := stripWeakValidator(remoteETag)
+		hasUpdate = cachedClean != remoteClean
+	} else if remoteETag != "" && cachedETag == "" {
+		// Remote has ETag but we don't have one cached - assume update available
+		hasUpdate = true
+	}
+	// If both are empty, we can't determine - assume no update
+
+	return &UpdateCheckResult{
+		HasUpdate:    hasUpdate,
+		CurrentETag:  cachedETag,
+		RemoteETag:   remoteETag,
+		LastModified: lastModified,
+	}, nil
+}
+
+// stripWeakValidator removes the weak validator prefix "W/" from an ETag.
+func stripWeakValidator(etag string) string {
+	if strings.HasPrefix(etag, "W/") {
+		return etag[2:]
+	}
+	return etag
 }

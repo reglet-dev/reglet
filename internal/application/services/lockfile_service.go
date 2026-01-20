@@ -135,3 +135,69 @@ func (s *LockfileService) ResolvePlugins(
 
 	return lock, nil
 }
+
+// LockProfile adds a remote profile to the lockfile with its resolved version and digest.
+// This enables reproducible builds by pinning profile versions.
+func (s *LockfileService) LockProfile(
+	ctx context.Context,
+	lockfilePath string,
+	profileURL string,
+	version string,
+	digest string,
+) error {
+	// Load existing lockfile
+	lock, err := s.repo.Load(ctx, lockfilePath)
+	if err != nil {
+		return fmt.Errorf("loading lockfile: %w", err)
+	}
+
+	if lock == nil {
+		lock = entities.NewLockfile()
+	}
+
+	// Ensure Profiles map is initialized
+	if lock.Profiles == nil {
+		lock.Profiles = make(map[string]entities.ProfileLock)
+	}
+
+	// Add or update the profile lock
+	profileLock := entities.ProfileLock{
+		Requested: profileURL,
+		Resolved:  version,
+		Source:    profileURL,
+		Digest:    digest,
+		Fetched:   time.Now().UTC(),
+	}
+
+	if err := lock.AddProfile(profileURL, profileLock); err != nil {
+		return fmt.Errorf("adding profile lock: %w", err)
+	}
+
+	// Save updated lockfile
+	lock.Generated = time.Now().UTC()
+	lock.Version = 2 // Profile locking requires version 2
+	if err := s.repo.Save(ctx, lock, lockfilePath); err != nil {
+		return fmt.Errorf("saving lockfile: %w", err)
+	}
+
+	return nil
+}
+
+// GetLockedProfile retrieves a locked profile entry by URL.
+// Returns nil if the profile is not locked.
+func (s *LockfileService) GetLockedProfile(
+	ctx context.Context,
+	lockfilePath string,
+	profileURL string,
+) (*entities.ProfileLock, error) {
+	lock, err := s.repo.Load(ctx, lockfilePath)
+	if err != nil {
+		return nil, fmt.Errorf("loading lockfile: %w", err)
+	}
+
+	if lock == nil {
+		return nil, nil
+	}
+
+	return lock.GetProfile(profileURL), nil
+}

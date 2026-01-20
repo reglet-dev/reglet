@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/reglet-dev/reglet/internal/application/dto"
+	"github.com/reglet-dev/reglet/internal/application/ports"
 	"github.com/reglet-dev/reglet/internal/domain/entities"
 	"github.com/reglet-dev/reglet/internal/domain/services"
 	"github.com/stretchr/testify/assert"
@@ -24,6 +25,10 @@ func (m *mockProfileLoaderForPlan) LoadProfile(_ string) (*entities.Profile, err
 }
 
 func (m *mockProfileLoaderForPlan) LoadProfileWithCLIVars(_ string, _ map[string]interface{}) (*entities.Profile, error) {
+	return m.profile, m.err
+}
+
+func (m *mockProfileLoaderForPlan) LoadProfileWithOptions(_ string, _ map[string]interface{}, _ ports.RemoteLoadOptions) (*entities.Profile, error) {
 	return m.profile, m.err
 }
 

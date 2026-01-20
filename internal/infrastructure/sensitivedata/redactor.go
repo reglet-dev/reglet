@@ -156,6 +156,74 @@ func newGitleaksDetector() (*detect.Detector, error) {
 	return detect.NewDetector(cfg), nil
 }
 
+// SecretFinding represents a detected secret in content.
+type SecretFinding struct {
+	RuleID      string // Identifier for the detection rule (e.g., "aws-access-key")
+	Description string // Human-readable description of the secret type
+	Match       string // The matched pattern (redacted for logging safety)
+	StartLine   int    // 1-indexed line number where secret starts
+	EndLine     int    // 1-indexed line number where secret ends
+}
+
+// DetectSecrets scans content for potential secrets without modifying it.
+// Returns a list of findings. This is useful for warning users about
+// hardcoded secrets in fetched remote profiles (Constitution II: Credential Hygiene).
+func (r *Redactor) DetectSecrets(content string) []SecretFinding {
+	if content == "" {
+		return nil
+	}
+
+	var findings []SecretFinding
+
+	// Use gitleaks detector if available
+	if r.gitleaksDetector != nil {
+		//nolint:staticcheck // SA1019: detect.Fragment deprecated, will update when gitleaks v9 releases
+		fragment := detect.Fragment{
+			Raw: content,
+		}
+
+		gitleaksFindings := r.gitleaksDetector.Detect(fragment)
+		for _, f := range gitleaksFindings {
+			findings = append(findings, SecretFinding{
+				RuleID:      f.RuleID,
+				Description: f.Description,
+				StartLine:   f.StartLine,
+				EndLine:     f.EndLine,
+				Match:       redactMatch(f.Secret),
+			})
+		}
+	}
+
+	// Also check regex patterns
+	lines := strings.Split(content, "\n")
+	for lineNum, line := range lines {
+		for _, re := range r.patterns {
+			if matches := re.FindAllString(line, -1); len(matches) > 0 {
+				for _, m := range matches {
+					findings = append(findings, SecretFinding{
+						RuleID:      "regex-pattern",
+						Description: "Matched built-in pattern",
+						StartLine:   lineNum + 1,
+						EndLine:     lineNum + 1,
+						Match:       redactMatch(m),
+					})
+				}
+			}
+		}
+	}
+
+	return findings
+}
+
+// redactMatch partially redacts a match for safe logging.
+// Shows first 4 and last 2 chars, redacts the middle.
+func redactMatch(s string) string {
+	if len(s) <= 8 {
+		return "[REDACTED]"
+	}
+	return s[:4] + "..." + s[len(s)-2:]
+}
+
 // Redact sanitizes the given data structure.
 // It modifies the data in-place if it's a pointer, or returns a new copy.
 // Supported types: string, []interface{}, map[string]interface{}, and pointers to them.

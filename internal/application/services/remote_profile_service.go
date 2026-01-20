@@ -157,6 +157,14 @@ func (s *RemoteProfileService) Fetch(
 		}
 	}
 
+	// Try to get a potentially stale cache entry for offline fallback
+	var staleEntry *entities.ProfileCacheEntry
+	if s.cache != nil && !opts.Refresh {
+		if entry, _ := s.cache.Find(ctx, ref); entry != nil && !entry.IsFresh() {
+			staleEntry = entry // Save for potential offline fallback
+		}
+	}
+
 	// Fetch from network
 	s.logger.Info("fetching remote profile", "url", urlString)
 
@@ -169,6 +177,26 @@ func (s *RemoteProfileService) Fetch(
 
 	result, err := s.fetcher.Fetch(ctx, ref, fetchOpts)
 	if err != nil {
+		// Offline fallback - use stale cache if network unavailable
+		if staleEntry != nil {
+			s.logger.Warn("network unavailable, using stale cached profile",
+				"url", urlString,
+				"cached_at", staleEntry.FetchedAt(),
+				"age", staleEntry.Age(),
+				"error", err)
+
+			if s.OnFetchComplete != nil {
+				s.OnFetchComplete(urlString, true)
+			}
+
+			return &RemoteFetchResult{
+				Content:     staleEntry.Content(),
+				ContentHash: staleEntry.ContentHash(),
+				Reference:   ref,
+				FromCache:   true,
+				FetchedAt:   staleEntry.FetchedAt(),
+			}, nil
+		}
 		return nil, fmt.Errorf("failed to fetch profile: %w", err)
 	}
 

@@ -322,8 +322,10 @@ func printControlSummary(ctrl entities.ControlSummary, showDetails bool) {
 // planOutputData is the structured output format for JSON/YAML.
 type planOutputData struct {
 	Profile struct {
-		Name    string `json:"name" yaml:"name"`
-		Version string `json:"version" yaml:"version"`
+		Name    string   `json:"name" yaml:"name"`
+		Version string   `json:"version" yaml:"version"`
+		Source  string   `json:"source,omitempty" yaml:"source,omitempty"`
+		Plugins []string `json:"plugins,omitempty" yaml:"plugins,omitempty"`
 	} `json:"profile" yaml:"profile"`
 	Levels  []planLevelOutput `json:"levels" yaml:"levels"`
 	Summary struct {

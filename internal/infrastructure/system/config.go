@@ -14,13 +14,19 @@ import (
 // Config represents the global configuration file (~/.reglet/config.yaml).
 // This is infrastructure-level configuration separate from profile configuration.
 type Config struct {
-	SensitiveData        SensitiveDataConfig `yaml:"sensitive_data"`
-	Limits               *LimitsConfig       `yaml:"limits,omitempty"`
-	Redaction            RedactionConfig     `yaml:"redaction"`
-	Security             SecurityConfig      `yaml:"security"`
-	Capabilities         []CapabilityConfig  `yaml:"capabilities"`
-	WasmMemoryLimitMB    int                 `yaml:"wasm_memory_limit_mb"`
-	MaxEvidenceSizeBytes int                 `yaml:"max_evidence_size_bytes"`
+	SensitiveData SensitiveDataConfig `yaml:"sensitive_data"`
+	Limits        *LimitsConfig       `yaml:"limits,omitempty"`
+	Redaction     RedactionConfig     `yaml:"redaction"`
+	Security      SecurityConfig      `yaml:"security"`
+	Capabilities  []CapabilityConfig  `yaml:"capabilities"`
+
+	// TrustedProfileSources contains glob patterns for trusted remote profile sources.
+	// Profiles from URLs matching these patterns bypass interactive trust prompts.
+	// Example: ["https://company.github.io/*", "https://internal.example.com/profiles/*"]
+	TrustedProfileSources []string `yaml:"trusted_profile_sources"`
+
+	WasmMemoryLimitMB    int `yaml:"wasm_memory_limit_mb"`
+	MaxEvidenceSizeBytes int `yaml:"max_evidence_size_bytes"`
 }
 
 // CapabilityConfig represents a capability grant in the system configuration.
@@ -132,9 +138,10 @@ func DefaultConfig() *Config {
 			Level:               string(SecurityLevelStandard),
 			CustomBroadPatterns: []string{},
 		},
-		Capabilities:         []CapabilityConfig{},
-		WasmMemoryLimitMB:    0, // 0 means use runtime default
-		MaxEvidenceSizeBytes: 0, // 0 means no limit
+		Capabilities:          []CapabilityConfig{},
+		TrustedProfileSources: []string{},
+		WasmMemoryLimitMB:     0, // 0 means use runtime default
+		MaxEvidenceSizeBytes:  0, // 0 means no limit
 	}
 }
 

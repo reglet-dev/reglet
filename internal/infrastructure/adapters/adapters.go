@@ -174,12 +174,18 @@ func (a *ProfileLoaderAdapter) LoadProfile(path string) (*entities.Profile, erro
 // CLI variables override profile variables at the same path.
 // Supports both local file paths and remote URLs (https://, oci://).
 func (a *ProfileLoaderAdapter) LoadProfileWithCLIVars(path string, cliVars map[string]interface{}) (*entities.Profile, error) {
+	return a.LoadProfileWithOptions(path, cliVars, ports.RemoteLoadOptions{})
+}
+
+// LoadProfileWithOptions loads a profile with CLI variables and remote fetch options.
+// remoteOpts configures behavior for remote profile fetching (refresh, timeout, etc.).
+func (a *ProfileLoaderAdapter) LoadProfileWithOptions(path string, cliVars map[string]interface{}, remoteOpts ports.RemoteLoadOptions) (*entities.Profile, error) {
 	var profile *entities.Profile
 	var err error
 
 	// Check if path is a remote URL
 	if isRemoteProfile(path) {
-		profile, err = a.loadRemoteProfile(path)
+		profile, err = a.loadRemoteProfile(path, remoteOpts)
 	} else {
 		profile, err = a.loader.LoadProfile(path)
 	}
@@ -202,14 +208,20 @@ func (a *ProfileLoaderAdapter) LoadProfileWithCLIVars(path string, cliVars map[s
 }
 
 // loadRemoteProfile fetches and loads a profile from a remote URL.
-func (a *ProfileLoaderAdapter) loadRemoteProfile(url string) (*entities.Profile, error) {
+func (a *ProfileLoaderAdapter) loadRemoteProfile(url string, opts ports.RemoteLoadOptions) (*entities.Profile, error) {
 	if a.remoteFetcher == nil {
 		return nil, fmt.Errorf("remote profile fetching not configured; cannot load %s", url)
 	}
 
-	// Fetch the remote profile content
+	// Fetch the remote profile content with the provided options
 	ctx := context.Background()
-	reader, err := a.remoteFetcher.FetchAsReader(ctx, url, RemoteFetchOptions{})
+	fetchOpts := RemoteFetchOptions{
+		Refresh:             opts.Refresh,
+		AllowPrivateNetwork: opts.AllowPrivateNetwork,
+		Insecure:            opts.Insecure,
+		Timeout:             opts.Timeout,
+	}
+	reader, err := a.remoteFetcher.FetchAsReader(ctx, url, fetchOpts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch remote profile: %w", err)
 	}
