@@ -16,6 +16,21 @@ type ProfileLoader interface {
 	// LoadProfileWithCLIVars loads a profile and merges CLI variables before substitution.
 	// CLI variables override profile variables at the same path.
 	LoadProfileWithCLIVars(path string, cliVars map[string]interface{}) (*entities.Profile, error)
+	// LoadProfileWithOptions loads a profile with CLI variables and remote fetch options.
+	// remoteOpts configures behavior for remote profile fetching (refresh, timeout, etc.).
+	LoadProfileWithOptions(path string, cliVars map[string]interface{}, remoteOpts RemoteLoadOptions) (*entities.Profile, error)
+}
+
+// RemoteLoadOptions configures remote profile loading behavior.
+type RemoteLoadOptions struct {
+	// Refresh forces cache bypass for remote profiles.
+	Refresh bool
+	// AllowPrivateNetwork permits fetching from private IPs.
+	AllowPrivateNetwork bool
+	// Insecure skips TLS validation for remote profiles.
+	Insecure bool
+	// Timeout for remote fetch operations.
+	Timeout time.Duration
 }
 
 // ProfileValidator validates profile structure and schemas.

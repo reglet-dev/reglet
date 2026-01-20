@@ -45,6 +45,7 @@ type CheckOptions struct {
 	showDetails         bool
 	includeDependencies bool
 	trustPlugins        bool
+	trustSource         bool // Trust the remote profile source without prompting
 	noWarnUnusedVars    bool
 	allowPrivateNetwork bool
 	refresh             bool
@@ -184,6 +185,7 @@ Watch Mode:
 	cmd.Flags().DurationVar(&opts.fetchTimeout, "fetch-timeout", 30*time.Second, "Timeout for remote profile fetching")
 	cmd.Flags().BoolVar(&opts.refresh, "refresh", false, "Bypass cache and force re-fetch of remote profile")
 	cmd.Flags().BoolVar(&opts.insecure, "insecure", false, "Skip TLS certificate verification for remote profiles (not recommended)")
+	cmd.Flags().BoolVar(&opts.trustSource, "trust-source", false, "Trust remote profile source without interactive prompt")
 
 	return cmd
 }
@@ -317,6 +319,13 @@ func buildCheckProfileRequest(profilePath string, opts *CheckOptions) (dto.Check
 		Options: dto.CheckOptions{
 			TrustPlugins:   opts.trustPlugins,
 			WarnUnusedVars: true, // Default to warning about unused vars
+		},
+		RemoteOptions: dto.RemoteProfileOptions{
+			Refresh:             opts.refresh,
+			AllowPrivateNetwork: opts.allowPrivateNetwork,
+			Insecure:            opts.insecure,
+			Timeout:             opts.fetchTimeout,
+			TrustSource:         opts.trustSource,
 		},
 		Metadata: dto.RequestMetadata{
 			RequestID: generateRequestID(),

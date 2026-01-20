@@ -80,6 +80,17 @@ reglet plugins pull ghcr.io/reglet-dev/plugins/aws:1.0.0
 reglet plugins list
 reglet plugins push my-plugin.wasm ghcr.io/myorg/my-plugin:1.0.0
 reglet plugins prune --keep 3
+
+# Remote profiles
+reglet check https://example.com/compliance.yaml
+reglet check https://example.com/profile.yaml#v1.2.0  # Pinned version
+reglet check https://example.com/profile.yaml --refresh  # Force re-fetch
+
+# Profile cache management
+reglet profile list       # List cached profiles
+reglet profile pull <url> # Pre-fetch a profile
+reglet profile prune      # Remove expired profiles
+reglet profile outdated   # Check for updates
 ```
 
 ## Creating Your First Profile
@@ -337,6 +348,20 @@ The lockfile (`reglet.lock`) ensures:
 - **Integrity verification** - Cryptographic digest validation
 - **Supply chain security** - Detect tampering or version drift
 
+## Remote Profiles
+
+Run compliance checks directly from remote URLs:
+
+```bash
+reglet check https://company.github.io/compliance/soc2.yaml
+reglet check https://example.com/profile.yaml#v1.2.0  # Version pinning
+reglet profile list                                    # Manage cache
+```
+
+Features: SSRF protection, DNS rebinding protection, hash verification, trusted sources config.
+
+See [docs/remote-profiles.md](docs/remote-profiles.md) for full documentation.
+
 ## Example Profile
 
 ```yaml
@@ -478,7 +503,10 @@ Reglet is in active development. Core features work, but expect breaking changes
 
 **v0.4.5-alpha** (current)
 - [x] CLI vars (`--set`, `--set-file`, `--set-env`)
-- [ ] Remote profiles (`reglet check https://...`)
+- [x] Remote profiles (`reglet check https://...`)
+- [x] Profile cache management (`reglet profile list/pull/prune/outdated`)
+- [x] Trusted sources configuration
+- [x] Version pinning (`#v1.2.0`, `@sha256:...`)
 - [ ] Plugin SDK (Go) Enhanced
 
 **v0.5.0-alpha** (Infrastructure & IaC Plugins)

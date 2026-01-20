@@ -2,17 +2,38 @@
 package dto
 
 import (
+	"time"
+
 	"github.com/reglet-dev/reglet/internal/domain/capabilities"
 )
 
 // CheckProfileRequest encapsulates all inputs needed to check a profile.
 type CheckProfileRequest struct {
-	CLIVariables map[string]interface{}
-	ProfilePath  string
-	Metadata     RequestMetadata
-	Options      CheckOptions
-	Filters      FilterOptions
-	Execution    ExecutionOptions
+	CLIVariables  map[string]interface{}
+	ProfilePath   string
+	Metadata      RequestMetadata
+	Options       CheckOptions
+	Filters       FilterOptions
+	Execution     ExecutionOptions
+	RemoteOptions RemoteProfileOptions
+}
+
+// RemoteProfileOptions configures remote profile fetching behavior.
+type RemoteProfileOptions struct {
+	// Timeout overrides the default fetch timeout.
+	Timeout time.Duration
+
+	// Refresh forces a cache bypass and re-fetch.
+	Refresh bool
+
+	// AllowPrivateNetwork permits fetching from private IP addresses.
+	AllowPrivateNetwork bool
+
+	// Insecure skips TLS certificate validation (not recommended).
+	Insecure bool
+
+	// TrustSource bypasses interactive trust prompt for remote profiles.
+	TrustSource bool
 }
 
 // FilterOptions defines filters for control selection.

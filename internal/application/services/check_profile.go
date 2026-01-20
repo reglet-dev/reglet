@@ -103,7 +103,7 @@ func (uc *CheckProfileUseCase) Execute(ctx context.Context, req dto.CheckProfile
 	uc.logger.Info("loading profile", "path", req.ProfilePath)
 
 	// 1-2. Load and compile (clean up imports, validation)
-	profile, err := uc.loadAndCompileProfile(req.ProfilePath, req.CLIVariables)
+	profile, err := uc.loadAndCompileProfile(req.ProfilePath, req.CLIVariables, req.RemoteOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -157,16 +157,20 @@ func (uc *CheckProfileUseCase) Execute(ctx context.Context, req dto.CheckProfile
 	return uc.buildResponse(req, startTime, result, requiredCaps, grantedCaps), nil
 }
 
-func (uc *CheckProfileUseCase) loadAndCompileProfile(path string, cliVars map[string]interface{}) (*entities.ValidatedProfile, error) {
+func (uc *CheckProfileUseCase) loadAndCompileProfile(path string, cliVars map[string]interface{}, remoteOpts dto.RemoteProfileOptions) (*entities.ValidatedProfile, error) {
 	var rawProfile *entities.Profile
 	var err error
 
-	// Use CLI vars aware loading if any are provided
-	if len(cliVars) > 0 {
-		rawProfile, err = uc.profileLoader.LoadProfileWithCLIVars(path, cliVars)
-	} else {
-		rawProfile, err = uc.profileLoader.LoadProfile(path)
+	// Convert DTO options to ports options
+	loadOpts := ports.RemoteLoadOptions{
+		Refresh:             remoteOpts.Refresh,
+		AllowPrivateNetwork: remoteOpts.AllowPrivateNetwork,
+		Insecure:            remoteOpts.Insecure,
+		Timeout:             remoteOpts.Timeout,
 	}
+
+	// Always use LoadProfileWithOptions to support remote profiles with flags
+	rawProfile, err = uc.profileLoader.LoadProfileWithOptions(path, cliVars, loadOpts)
 	if err != nil {
 		return nil, apperrors.NewValidationError("profile", "failed to load profile", err.Error())
 	}

@@ -67,3 +67,21 @@ type SignatureResult struct {
 	Certificate     []byte
 	Verified        bool
 }
+
+// ProfileTrustChecker verifies trust for remote profile sources.
+type ProfileTrustChecker interface {
+	// RequiresTrust returns true if the profile path requires trust verification.
+	RequiresTrust(path string) bool
+
+	// IsTrusted returns true if the URL matches a trusted source pattern.
+	IsTrusted(url string) bool
+
+	// PromptForTrust prompts the user to trust a remote profile.
+	// Returns true if trusted, false if denied, or error for non-interactive mode.
+	PromptForTrust(
+		ctx context.Context,
+		url string,
+		requiredCaps map[string][]capabilities.Capability,
+		trustFlag bool,
+	) (bool, error)
+}

@@ -201,6 +201,44 @@ func Test_RemoteProfileService_Fetch(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid profile URL")
 	})
+
+	t.Run("uses stale cache when network fails (offline fallback)", func(t *testing.T) {
+		fetcher := &mockProfileFetcher{
+			fetchErr: assert.AnError, // Network failure
+		}
+		cache := newMockCache()
+
+		// Pre-populate cache with a stale entry (TTL expired)
+		ref, _ := values.ParseProfileReference("https://example.com/stale.yaml")
+		// Create entry with very short TTL that's already expired
+		entry, _ := entities.NewProfileCacheEntry(ref, profileContent, contentHash, time.Nanosecond)
+		// Sleep briefly to ensure entry is stale
+		time.Sleep(time.Millisecond)
+		cache.entries[ref.CacheKey()] = entry
+
+		svc := services.NewRemoteProfileService(fetcher, services.WithCache(cache))
+
+		result, err := svc.Fetch(ctx, "https://example.com/stale.yaml", services.RemoteFetchOptions{})
+
+		require.NoError(t, err) // Should NOT error due to offline fallback
+		assert.Equal(t, profileContent, result.Content)
+		assert.True(t, result.FromCache)
+		assert.Equal(t, 1, fetcher.fetchCount) // Should have tried network
+	})
+
+	t.Run("returns error when network fails and no cache available", func(t *testing.T) {
+		fetcher := &mockProfileFetcher{
+			fetchErr: assert.AnError, // Network failure
+		}
+		cache := newMockCache() // Empty cache
+
+		svc := services.NewRemoteProfileService(fetcher, services.WithCache(cache))
+
+		_, err := svc.Fetch(ctx, "https://example.com/nocache.yaml", services.RemoteFetchOptions{})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to fetch profile")
+	})
 }
 
 func Test_RemoteProfileService_FetchAsReader(t *testing.T) {
