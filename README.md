@@ -507,7 +507,8 @@ Reglet is in active development. Core features work, but expect breaking changes
 - [x] Profile cache management (`reglet profile list/pull/prune/outdated`)
 - [x] Trusted sources configuration
 - [x] Version pinning (`#v1.2.0`, `@sha256:...`)
-- [ ] Plugin SDK (Go) Enhanced
+- [x] Plugin SDK (Go) Enhanced
+- [ ] integrate Enhanced SDK into Reglet
 
 **v0.5.0-alpha** (Infrastructure & IaC Plugins)
 - [ ] AWS plugin
