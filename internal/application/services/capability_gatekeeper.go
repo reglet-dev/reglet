@@ -100,109 +100,150 @@ func (g *CapabilityGatekeeper) promptForCapabilities(
 	newGrants *sdkEntities.GrantSet,
 	shouldSave *bool,
 ) error {
-	// Prompt for network capabilities
-	if missing.Network != nil {
-		for _, rule := range missing.Network.Rules {
-			granted, always, err := g.evaluateNetworkRule(rule, capabilityInfo)
+	if err := g.promptForNetwork(missing, capabilityInfo, newGrants, shouldSave); err != nil {
+		return err
+	}
+	if err := g.promptForFS(missing, capabilityInfo, newGrants, shouldSave); err != nil {
+		return err
+	}
+	if err := g.promptForEnv(missing, capabilityInfo, newGrants, shouldSave); err != nil {
+		return err
+	}
+	return g.promptForExec(missing, capabilityInfo, newGrants, shouldSave)
+}
+
+func (g *CapabilityGatekeeper) promptForNetwork(
+	missing *sdkEntities.GrantSet,
+	capabilityInfo map[string]ports.CapabilityInfo,
+	newGrants *sdkEntities.GrantSet,
+	shouldSave *bool,
+) error {
+	if missing.Network == nil {
+		return nil
+	}
+	for _, rule := range missing.Network.Rules {
+		granted, always, err := g.evaluateNetworkRule(rule, capabilityInfo)
+		if err != nil {
+			return err
+		}
+		if granted {
+			if newGrants.Network == nil {
+				newGrants.Network = &sdkEntities.NetworkCapability{}
+			}
+			newGrants.Network.Rules = append(newGrants.Network.Rules, rule)
+			if always {
+				*shouldSave = true
+			}
+		} else {
+			return fmt.Errorf("capability denied by user: network %v:%v", rule.Hosts, rule.Ports)
+		}
+	}
+	return nil
+}
+
+func (g *CapabilityGatekeeper) promptForFS(
+	missing *sdkEntities.GrantSet,
+	capabilityInfo map[string]ports.CapabilityInfo,
+	newGrants *sdkEntities.GrantSet,
+	shouldSave *bool,
+) error {
+	if missing.FS == nil {
+		return nil
+	}
+	for _, rule := range missing.FS.Rules {
+		for _, path := range rule.Read {
+			granted, always, err := g.evaluateFSPath("read", path, capabilityInfo)
 			if err != nil {
 				return err
 			}
 			if granted {
-				if newGrants.Network == nil {
-					newGrants.Network = &sdkEntities.NetworkCapability{}
+				if newGrants.FS == nil {
+					newGrants.FS = &sdkEntities.FileSystemCapability{}
 				}
-				newGrants.Network.Rules = append(newGrants.Network.Rules, rule)
+				newGrants.FS.Rules = append(newGrants.FS.Rules, sdkEntities.FileSystemRule{Read: []string{path}})
 				if always {
 					*shouldSave = true
 				}
 			} else {
-				return fmt.Errorf("capability denied by user: network %v:%v", rule.Hosts, rule.Ports)
+				return fmt.Errorf("capability denied by user: fs read:%s", path)
 			}
 		}
-	}
-
-	// Prompt for filesystem capabilities
-	if missing.FS != nil {
-		for _, rule := range missing.FS.Rules {
-			for _, path := range rule.Read {
-				granted, always, err := g.evaluateFSPath("read", path, capabilityInfo)
-				if err != nil {
-					return err
-				}
-				if granted {
-					if newGrants.FS == nil {
-						newGrants.FS = &sdkEntities.FileSystemCapability{}
-					}
-					newGrants.FS.Rules = append(newGrants.FS.Rules, sdkEntities.FileSystemRule{Read: []string{path}})
-					if always {
-						*shouldSave = true
-					}
-				} else {
-					return fmt.Errorf("capability denied by user: fs read:%s", path)
-				}
-			}
-			for _, path := range rule.Write {
-				granted, always, err := g.evaluateFSPath("write", path, capabilityInfo)
-				if err != nil {
-					return err
-				}
-				if granted {
-					if newGrants.FS == nil {
-						newGrants.FS = &sdkEntities.FileSystemCapability{}
-					}
-					newGrants.FS.Rules = append(newGrants.FS.Rules, sdkEntities.FileSystemRule{Write: []string{path}})
-					if always {
-						*shouldSave = true
-					}
-				} else {
-					return fmt.Errorf("capability denied by user: fs write:%s", path)
-				}
-			}
-		}
-	}
-
-	// Prompt for environment capabilities
-	if missing.Env != nil {
-		for _, v := range missing.Env.Variables {
-			granted, always, err := g.evaluateEnvVar(v, capabilityInfo)
+		for _, path := range rule.Write {
+			granted, always, err := g.evaluateFSPath("write", path, capabilityInfo)
 			if err != nil {
 				return err
 			}
 			if granted {
-				if newGrants.Env == nil {
-					newGrants.Env = &sdkEntities.EnvironmentCapability{}
+				if newGrants.FS == nil {
+					newGrants.FS = &sdkEntities.FileSystemCapability{}
 				}
-				newGrants.Env.Variables = append(newGrants.Env.Variables, v)
+				newGrants.FS.Rules = append(newGrants.FS.Rules, sdkEntities.FileSystemRule{Write: []string{path}})
 				if always {
 					*shouldSave = true
 				}
 			} else {
-				return fmt.Errorf("capability denied by user: env %s", v)
+				return fmt.Errorf("capability denied by user: fs write:%s", path)
 			}
 		}
 	}
+	return nil
+}
 
-	// Prompt for exec capabilities
-	if missing.Exec != nil {
-		for _, cmd := range missing.Exec.Commands {
-			granted, always, err := g.evaluateExecCmd(cmd, capabilityInfo)
-			if err != nil {
-				return err
+func (g *CapabilityGatekeeper) promptForEnv(
+	missing *sdkEntities.GrantSet,
+	capabilityInfo map[string]ports.CapabilityInfo,
+	newGrants *sdkEntities.GrantSet,
+	shouldSave *bool,
+) error {
+	if missing.Env == nil {
+		return nil
+	}
+	for _, v := range missing.Env.Variables {
+		granted, always, err := g.evaluateEnvVar(v, capabilityInfo)
+		if err != nil {
+			return err
+		}
+		if granted {
+			if newGrants.Env == nil {
+				newGrants.Env = &sdkEntities.EnvironmentCapability{}
 			}
-			if granted {
-				if newGrants.Exec == nil {
-					newGrants.Exec = &sdkEntities.ExecCapability{}
-				}
-				newGrants.Exec.Commands = append(newGrants.Exec.Commands, cmd)
-				if always {
-					*shouldSave = true
-				}
-			} else {
-				return fmt.Errorf("capability denied by user: exec %s", cmd)
+			newGrants.Env.Variables = append(newGrants.Env.Variables, v)
+			if always {
+				*shouldSave = true
 			}
+		} else {
+			return fmt.Errorf("capability denied by user: env %s", v)
 		}
 	}
+	return nil
+}
 
+func (g *CapabilityGatekeeper) promptForExec(
+	missing *sdkEntities.GrantSet,
+	capabilityInfo map[string]ports.CapabilityInfo,
+	newGrants *sdkEntities.GrantSet,
+	shouldSave *bool,
+) error {
+	if missing.Exec == nil {
+		return nil
+	}
+	for _, cmd := range missing.Exec.Commands {
+		granted, always, err := g.evaluateExecCmd(cmd, capabilityInfo)
+		if err != nil {
+			return err
+		}
+		if granted {
+			if newGrants.Exec == nil {
+				newGrants.Exec = &sdkEntities.ExecCapability{}
+			}
+			newGrants.Exec.Commands = append(newGrants.Exec.Commands, cmd)
+			if always {
+				*shouldSave = true
+			}
+		} else {
+			return fmt.Errorf("capability denied by user: exec %s", cmd)
+		}
+	}
 	return nil
 }
 

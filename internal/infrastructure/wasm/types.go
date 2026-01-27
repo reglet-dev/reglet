@@ -10,10 +10,10 @@ import (
 // PluginInfo contains metadata about a plugin
 // Maps to the WIT plugin-info record
 type PluginInfo struct {
+	Capabilities *entities.GrantSet
 	Name         string
 	Version      string
 	Description  string
-	Capabilities *entities.GrantSet
 }
 
 // Config represents plugin configuration

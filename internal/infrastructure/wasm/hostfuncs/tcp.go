@@ -70,7 +70,7 @@ func TCPConnect(ctx context.Context, mod api.Module, stack []uint64, checker *Ca
 	sdkReq := hostfuncs.TCPConnectRequest{
 		Host:    request.Host,
 		Port:    port,
-		Timeout: int(request.TimeoutMs),
+		Timeout: request.TimeoutMs,
 		UseTLS:  request.TLS,
 	}
 

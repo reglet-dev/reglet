@@ -3,10 +3,8 @@ package hostfuncs
 import (
 	"context"
 	"encoding/json"
-	"errors" // New import
 	"fmt"
 	"log/slog"
-	"net" // New import
 	"time"
 
 	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
@@ -62,36 +60,6 @@ func createContextFromWire(parentCtx context.Context, wireCtx ContextWireFormat)
 	}
 
 	return context.WithCancel(parentCtx) // Default to cancellable context
-}
-
-// toErrorDetail converts a Go error to our structured ErrorDetail.
-func toErrorDetail(err error) *ErrorDetail {
-	if err == nil {
-		return nil
-	}
-
-	detail := &ErrorDetail{
-		Message: err.Error(),
-		Type:    "internal", // Default type
-		Code:    "",
-	}
-
-	var dnsErr *net.DNSError
-	if errors.As(err, &dnsErr) {
-		detail.Type = "network" // DNS errors are network errors
-		if dnsErr.IsTimeout {
-			detail.Type = "timeout"
-			detail.IsTimeout = true
-		}
-		if dnsErr.IsNotFound {
-			detail.IsNotFound = true
-			// Could add specific code like "NXDOMAIN" if needed
-		}
-		// Consider other net.DNSError flags if relevant
-	}
-
-	// TODO: Expand this to unwrap and categorize errors more granularly for other types of errors
-	return detail
 }
 
 // hostWriteResponse writes the JSON response to WASM memory and returns packed ptr+len.

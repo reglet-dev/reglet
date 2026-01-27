@@ -25,12 +25,12 @@ type Plugin struct {
 	stderr       io.Writer
 	module       wazero.CompiledModule
 	moduleConfig wazero.ModuleConfig
-	instancePool chan api.Module
 	info         *PluginInfo
+	instancePool chan api.Module
 	schema       *ConfigSchema
+	capabilities *entities.GrantSet
 	name         string
 	frozenEnv    []string
-	capabilities *entities.GrantSet
 	poolSize     int
 	configOnce   sync.Once
 	mu           sync.Mutex
@@ -734,13 +734,14 @@ func parseCapabilitiesToGrantSet(raw map[string]interface{}) *entities.GrantSet 
 				grantSet.FS = &entities.FileSystemCapability{}
 			}
 			// Parse pattern like "read:/path" or "write:/path"
-			if strings.HasPrefix(pattern, "read:") {
+			switch {
+			case strings.HasPrefix(pattern, "read:"):
 				path := strings.TrimPrefix(pattern, "read:")
 				grantSet.FS.Rules = append(grantSet.FS.Rules, entities.FileSystemRule{Read: []string{path}})
-			} else if strings.HasPrefix(pattern, "write:") {
+			case strings.HasPrefix(pattern, "write:"):
 				path := strings.TrimPrefix(pattern, "write:")
 				grantSet.FS.Rules = append(grantSet.FS.Rules, entities.FileSystemRule{Write: []string{path}})
-			} else {
+			default:
 				// Default to read if no prefix
 				grantSet.FS.Rules = append(grantSet.FS.Rules, entities.FileSystemRule{Read: []string{pattern}})
 			}

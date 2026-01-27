@@ -59,11 +59,6 @@ func (e *NetworkExtractor) Extract(config map[string]interface{}) *entities.Gran
 		}
 	}
 
-	// Check for "host" (tcp, dns)
-	if _, ok := config["host"]; ok {
-		// Host alone doesn't determine port
-	}
-
 	// Check for "port" (tcp)
 	if portVal, ok := config["port"]; ok {
 		var portStr string

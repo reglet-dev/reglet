@@ -36,8 +36,8 @@ func NewValidationError(field, message string, details ...string) *ValidationErr
 
 // CapabilityError indicates capability permission issue.
 type CapabilityError struct {
-	Reason   string
 	Required *sdkEntities.GrantSet
+	Reason   string
 }
 
 func (e *CapabilityError) Error() string {

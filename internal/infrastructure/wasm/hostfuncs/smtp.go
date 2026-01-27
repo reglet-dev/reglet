@@ -62,7 +62,7 @@ func SMTPConnect(ctx context.Context, mod api.Module, stack []uint64, checker *C
 		Port:        port,
 		UseTLS:      request.TLS,
 		UseSTARTTLS: request.StartTLS,
-		Timeout:     int(request.TimeoutMs),
+		Timeout:     request.TimeoutMs,
 	}
 
 	// Determine if private IPs should be allowed via capability

@@ -9,10 +9,10 @@ import (
 // PluginInfo contains metadata about a plugin.
 // This is the application-layer representation of plugin metadata.
 type PluginInfo struct {
+	Capabilities *sdkEntities.GrantSet
 	Name         string
 	Version      string
 	Description  string
-	Capabilities *sdkEntities.GrantSet
 }
 
 // Plugin represents a loaded WASM plugin that can be inspected and executed.

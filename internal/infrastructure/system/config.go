@@ -186,13 +186,14 @@ func (c *Config) ToGrantSet() *entities.GrantSet {
 				grantSet.FS = &entities.FileSystemCapability{}
 			}
 			// Parse pattern like "read:/path" or "write:/path"
-			if strings.HasPrefix(cap.Pattern, "read:") {
+			switch {
+			case strings.HasPrefix(cap.Pattern, "read:"):
 				path := strings.TrimPrefix(cap.Pattern, "read:")
 				grantSet.FS.Rules = append(grantSet.FS.Rules, entities.FileSystemRule{Read: []string{path}})
-			} else if strings.HasPrefix(cap.Pattern, "write:") {
+			case strings.HasPrefix(cap.Pattern, "write:"):
 				path := strings.TrimPrefix(cap.Pattern, "write:")
 				grantSet.FS.Rules = append(grantSet.FS.Rules, entities.FileSystemRule{Write: []string{path}})
-			} else {
+			default:
 				// Default to read if no prefix
 				grantSet.FS.Rules = append(grantSet.FS.Rules, entities.FileSystemRule{Read: []string{cap.Pattern}})
 			}
