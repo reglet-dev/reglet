@@ -1,81 +1,18 @@
 package hostfuncs
 
 import (
-	"bytes"
 	"context"
-	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
-	"net"
-	"net/http"
 	"net/url"
-	"time"
+	"strings"
 
-	"github.com/reglet-dev/reglet/internal/domain/constants"
+	"github.com/reglet-dev/reglet-sdk/go/hostfuncs"
 	"github.com/reglet-dev/reglet/internal/infrastructure/build"
 	"github.com/tetratelabs/wazero/api"
 )
-
-// dnsPinningTransport is a custom http.RoundTripper that prevents DNS rebinding attacks
-// by resolving DNS once, validating the IP, and connecting to that specific IP.
-type dnsPinningTransport struct {
-	ctx        context.Context
-	base       *http.Transport
-	checker    *CapabilityChecker
-	pluginName string
-}
-
-// RoundTrip implements http.RoundTripper with DNS pinning and SSRF protection.
-func (t *dnsPinningTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	hostname := req.URL.Hostname()
-
-	// Resolve and validate hostname to IP (prevents DNS rebinding)
-	validatedIP, err := resolveAndValidate(t.ctx, hostname, t.pluginName, t.checker)
-	if err != nil {
-		return nil, fmt.Errorf("SSRF protection: %w", err)
-	}
-
-	port := getPort(req.URL)
-	pinnedTransport := t.createPinnedTransport(validatedIP, port, hostname, req.URL.Scheme)
-
-	return pinnedTransport.RoundTrip(req)
-}
-
-// getPort returns the port for a URL, defaulting based on scheme.
-func getPort(u *url.URL) string {
-	if port := u.Port(); port != "" {
-		return port
-	}
-	if u.Scheme == "https" {
-		return "443"
-	}
-	return "80"
-}
-
-// createPinnedTransport creates a transport that connects to the validated IP.
-func (t *dnsPinningTransport) createPinnedTransport(validatedIP, port, hostname, scheme string) *http.Transport {
-	pinnedTransport := t.base.Clone()
-	pinnedTransport.DialContext = func(dialCtx context.Context, network, _ string) (net.Conn, error) {
-		targetAddr := net.JoinHostPort(validatedIP, port)
-		dialer := &net.Dialer{
-			Timeout:   constants.DefaultHTTPTimeout,
-			KeepAlive: constants.DefaultHTTPTimeout,
-		}
-		return dialer.DialContext(dialCtx, network, targetAddr)
-	}
-
-	if scheme == "https" {
-		if pinnedTransport.TLSClientConfig == nil {
-			pinnedTransport.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12}
-		}
-		pinnedTransport.TLSClientConfig.ServerName = hostname
-	}
-
-	return pinnedTransport
-}
 
 // HTTPRequest performs an HTTP request on behalf of the plugin.
 func HTTPRequest(ctx context.Context, mod api.Module, stack []uint64, checker *CapabilityChecker, version build.Info) {
@@ -85,23 +22,86 @@ func HTTPRequest(ctx context.Context, mod api.Module, stack []uint64, checker *C
 		return
 	}
 
-	httpCtx, cancel := createContextFromWire(ctx, request.Context)
-	defer cancel()
-
-	pluginName := getPluginName(ctx, mod)
+	// 1. Check capability
+	pluginName := mod.Name()
+	if name, ok := PluginNameFromContext(ctx); ok {
+		pluginName = name
+	}
 
 	if err := checkHTTPCapability(ctx, checker, pluginName, request); err != nil {
-		stack[0] = hostWriteResponse(ctx, mod, HTTPResponseWire{Error: err})
+		errMsg := fmt.Sprintf("permission denied: %v", err)
+		slog.WarnContext(ctx, errMsg, "url", request.URL)
+		stack[0] = hostWriteResponse(ctx, mod, HTTPResponseWire{
+			Error: &ErrorDetail{Message: errMsg, Type: "capability"},
+		})
 		return
 	}
 
-	req, err := buildHTTPRequest(ctx, httpCtx, request, version)
-	if err != nil {
-		stack[0] = hostWriteResponse(ctx, mod, HTTPResponseWire{Error: err})
-		return
+	// 2. Build SDK request
+	var body []byte
+	if request.Body != "" {
+		var decodeErr error
+		body, decodeErr = base64.StdEncoding.DecodeString(request.Body)
+		if decodeErr != nil {
+			errMsg := fmt.Sprintf("failed to decode request body: %v", decodeErr)
+			slog.ErrorContext(ctx, errMsg, "url", request.URL)
+			stack[0] = hostWriteResponse(ctx, mod, HTTPResponseWire{
+				Error: &ErrorDetail{Message: errMsg, Type: "config"},
+			})
+			return
+		}
 	}
 
-	response := executeHTTPRequest(ctx, req, pluginName, checker, request.URL)
+	// Flatten headers for SDK (map[string][]string -> map[string]string)
+	sdkHeaders := make(map[string]string)
+	for k, v := range request.Headers {
+		if len(v) > 0 {
+			sdkHeaders[k] = strings.Join(v, ", ")
+		}
+	}
+
+	// Add User-Agent if not present
+	userAgent := fmt.Sprintf("Reglet/%s (%s)", version.Version, version.Platform)
+	if _, ok := sdkHeaders["User-Agent"]; !ok {
+		sdkHeaders["User-Agent"] = userAgent
+	}
+
+	sdkReq := hostfuncs.HTTPRequest{
+		Method:  request.Method,
+		URL:     request.URL,
+		Headers: sdkHeaders,
+		Body:    body,
+		Timeout: int(request.Context.TimeoutMs),
+	}
+
+	// Determine if private network access is allowed
+	allowPrivate := checker.AllowsPrivateNetwork(pluginName)
+
+	// 3. Call SDK
+	sdkResp := hostfuncs.PerformHTTPRequest(ctx, sdkReq,
+		hostfuncs.WithHTTPSSRFProtection(!allowPrivate),
+	)
+
+	// 4. Convert to wire format
+	var encodedRespBody string
+	if len(sdkResp.Body) > 0 {
+		encodedRespBody = base64.StdEncoding.EncodeToString(sdkResp.Body)
+	}
+
+	response := HTTPResponseWire{
+		StatusCode:    sdkResp.StatusCode,
+		Headers:       sdkResp.Headers,
+		Body:          encodedRespBody,
+		BodyTruncated: sdkResp.BodyTruncated,
+	}
+
+	if sdkResp.Error != nil {
+		response.Error = &ErrorDetail{
+			Message: sdkResp.Error.Message,
+			Type:    sdkResp.Error.Code,
+		}
+	}
+
 	stack[0] = hostWriteResponse(ctx, mod, response)
 }
 
@@ -127,137 +127,27 @@ func readHTTPRequest(ctx context.Context, mod api.Module, requestPacked uint64) 
 }
 
 // checkHTTPCapability validates URL and checks network capability.
-func checkHTTPCapability(ctx context.Context, checker *CapabilityChecker, pluginName string, request *HTTPRequestWire) *ErrorDetail {
-	parsedURL, err := url.Parse(request.URL)
-	if err != nil {
-		errMsg := fmt.Sprintf("invalid URL: %v", err)
-		slog.WarnContext(ctx, errMsg, "url", request.URL)
-		return &ErrorDetail{Message: errMsg, Type: "config"}
-	}
-
-	// Try checking the specific URL first (matches what Extractor produces)
+func checkHTTPCapability(ctx context.Context, checker *CapabilityChecker, pluginName string, request *HTTPRequestWire) error {
+	// Simple wrapper around checker logic, matching previous behavior
+	// Try checking the specific URL first
 	if err := checker.Check(pluginName, "network", "outbound:"+request.URL); err == nil {
 		return nil
 	}
 
-	port := getPort(parsedURL)
+	parsedURL, err := url.Parse(request.URL)
+	if err != nil {
+		return fmt.Errorf("invalid URL: %w", err)
+	}
+
+	port := parsedURL.Port()
+	if port == "" {
+		if parsedURL.Scheme == "https" {
+			port = "443"
+		} else {
+			port = "80"
+		}
+	}
+
 	capabilityPattern := fmt.Sprintf("outbound:%s", port)
-
-	if err := checker.Check(pluginName, "network", capabilityPattern); err != nil {
-		errMsg := fmt.Sprintf("permission denied for %s %s: %v", request.Method, request.URL, err)
-		slog.WarnContext(ctx, errMsg, "url", request.URL, "method", request.Method)
-		return &ErrorDetail{Message: errMsg, Type: "capability"}
-	}
-
-	return nil
-}
-
-// buildHTTPRequest creates the native http.Request from wire format.
-func buildHTTPRequest(ctx context.Context, httpCtx context.Context, request *HTTPRequestWire, version build.Info) (*http.Request, *ErrorDetail) {
-	var reqBody io.Reader
-	if request.Body != "" {
-		decodedBody, err := base64.StdEncoding.DecodeString(request.Body)
-		if err != nil {
-			errMsg := fmt.Sprintf("failed to decode request body: %v", err)
-			slog.ErrorContext(ctx, errMsg, "url", request.URL)
-			return nil, &ErrorDetail{Message: errMsg, Type: "config"}
-		}
-		reqBody = bytes.NewReader(decodedBody)
-	}
-
-	req, err := http.NewRequestWithContext(httpCtx, request.Method, request.URL, reqBody)
-	if err != nil {
-		errMsg := fmt.Sprintf("failed to create HTTP request: %v", err)
-		slog.ErrorContext(ctx, errMsg, "url", request.URL, "method", request.Method)
-		return nil, &ErrorDetail{Message: errMsg, Type: "internal"}
-	}
-
-	userAgent := fmt.Sprintf("Reglet/%s (%s)", version.Version, version.Platform)
-	req.Header.Set("User-Agent", userAgent)
-
-	for key, values := range request.Headers {
-		for _, value := range values {
-			req.Header.Add(key, value)
-		}
-	}
-
-	return req, nil
-}
-
-// executeHTTPRequest performs the HTTP request and returns the response.
-func executeHTTPRequest(ctx context.Context, req *http.Request, pluginName string, checker *CapabilityChecker, requestURL string) HTTPResponseWire {
-	baseTransport := &http.Transport{
-		ForceAttemptHTTP2:     true,
-		MaxIdleConns:          10,
-		IdleConnTimeout:       constants.DefaultHTTPIdleTimeout,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: constants.DefaultHTTPExpectContinueTimeout,
-	}
-
-	client := &http.Client{
-		Transport: &dnsPinningTransport{
-			base:       baseTransport,
-			ctx:        ctx,
-			pluginName: pluginName,
-			checker:    checker,
-		},
-		CheckRedirect: func(_ *http.Request, via []*http.Request) error {
-			if len(via) >= constants.DefaultMaxHTTPRedirects {
-				return fmt.Errorf("stopped after %d redirects", constants.DefaultMaxHTTPRedirects)
-			}
-			return nil
-		},
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		errMsg := fmt.Sprintf("HTTP request failed: %v", err)
-		slog.ErrorContext(ctx, errMsg, "url", requestURL, "method", req.Method)
-		return HTTPResponseWire{Error: toErrorDetail(err)}
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	return readHTTPResponse(ctx, resp, requestURL)
-}
-
-// readHTTPResponse reads and encodes the HTTP response.
-func readHTTPResponse(ctx context.Context, resp *http.Response, requestURL string) HTTPResponseWire {
-	// Limit HTTP response bodies to prevent OOM
-	// Uses constants.DefaultMaxHTTPResponseSize - configurable via RuntimeConfig in future
-	const maxBodySize = constants.DefaultMaxHTTPResponseSize
-
-	limitedReader := io.LimitReader(resp.Body, maxBodySize+1)
-	respBodyBytes, err := io.ReadAll(limitedReader)
-	if err != nil {
-		errMsg := fmt.Sprintf("failed to read response body: %v", err)
-		slog.ErrorContext(ctx, errMsg, "url", requestURL)
-		return HTTPResponseWire{Error: toErrorDetail(err)}
-	}
-
-	bodyTruncated := false
-	if len(respBodyBytes) > maxBodySize {
-		respBodyBytes = respBodyBytes[:maxBodySize]
-		bodyTruncated = true
-		slog.WarnContext(ctx, "HTTP response body truncated",
-			"url", requestURL,
-			"max_size_mb", maxBodySize/(1024*1024),
-			"truncated", true)
-	}
-
-	var encodedRespBody string
-	if len(respBodyBytes) > 0 {
-		encodedRespBody = base64.StdEncoding.EncodeToString(respBodyBytes)
-	}
-
-	responseHeaders := make(map[string][]string)
-	for key, values := range resp.Header {
-		responseHeaders[key] = values
-	}
-
-	return HTTPResponseWire{
-		StatusCode:    resp.StatusCode,
-		Headers:       responseHeaders,
-		Body:          encodedRespBody,
-		BodyTruncated: bodyTruncated,
-	}
+	return checker.Check(pluginName, "network", capabilityPattern)
 }

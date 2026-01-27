@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/reglet-dev/reglet/internal/domain/capabilities"
+	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
 	"github.com/reglet-dev/reglet/internal/infrastructure/build"
 	"github.com/reglet-dev/reglet/internal/infrastructure/sensitivedata"
 	"github.com/reglet-dev/reglet/internal/infrastructure/wasm/hostfuncs"
@@ -58,7 +58,7 @@ type Runtime struct {
 	runtime             wazero.Runtime
 	plugins             map[string]*Plugin
 	redactor            *sensitivedata.Redactor
-	grantedCapabilities map[string][]capabilities.Capability
+	grantedCapabilities map[string]*entities.GrantSet
 	version             build.Info
 	frozenEnv           []string
 	mu                  sync.RWMutex
@@ -70,13 +70,13 @@ type RuntimeOption func(*runtimeConfig)
 // runtimeConfig holds configuration for runtime creation.
 type runtimeConfig struct {
 	cache         wazero.CompilationCache
-	caps          map[string][]capabilities.Capability
+	caps          map[string]*entities.GrantSet
 	redactor      *sensitivedata.Redactor
 	memoryLimitMB int
 }
 
-// WithCapabilities sets the granted capabilities.
-func WithCapabilities(caps map[string][]capabilities.Capability) RuntimeOption {
+// WithCapabilities sets the granted capabilities using the SDK GrantSet format.
+func WithCapabilities(caps map[string]*entities.GrantSet) RuntimeOption {
 	return func(c *runtimeConfig) {
 		c.caps = caps
 	}

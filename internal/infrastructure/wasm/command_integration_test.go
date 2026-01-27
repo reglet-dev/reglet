@@ -6,9 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
 	"github.com/reglet-dev/reglet/internal/infrastructure/build"
-
-	"github.com/reglet-dev/reglet/internal/domain/capabilities"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,11 +18,11 @@ func TestCommandPlugin_Integration(t *testing.T) {
 	ctx := context.Background()
 
 	// Grant exec capabilities for testing
-	grantedCaps := map[string][]capabilities.Capability{
+	grantedCaps := map[string]*entities.GrantSet{
 		"command": {
-			{Kind: "exec", Pattern: "/bin/echo"},
-			{Kind: "exec", Pattern: "/bin/sh"},
-			{Kind: "exec", Pattern: "/usr/bin/env"},
+			Exec: &entities.ExecCapability{
+				Commands: []string{"/bin/echo", "/bin/sh", "/usr/bin/env"},
+			},
 		},
 	}
 

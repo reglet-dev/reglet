@@ -7,8 +7,8 @@ import (
 	"log/slog"
 	"strings"
 
+	sdkEntities "github.com/reglet-dev/reglet-sdk/go/domain/entities"
 	"github.com/reglet-dev/reglet/internal/application/ports"
-	"github.com/reglet-dev/reglet/internal/domain/capabilities"
 	infraCapabilities "github.com/reglet-dev/reglet/internal/infrastructure/capabilities"
 )
 
@@ -162,7 +162,7 @@ func indexOf(s, substr string) int {
 func (s *ProfileTrustService) PromptForTrust(
 	ctx context.Context,
 	url string,
-	requiredCaps map[string][]capabilities.Capability,
+	requiredCaps map[string]*sdkEntities.GrantSet,
 	trustFlag bool,
 ) (bool, error) {
 	// If trust flag is set, auto-trust
@@ -183,13 +183,13 @@ func (s *ProfileTrustService) PromptForTrust(
 	}
 
 	// Display the remote profile info and prompt for trust
-	return s.prompter.PromptForProfileTrust(url, requiredCaps)
+	return s.prompter.PromptForProfileTrustWithGrantSet(url, requiredCaps)
 }
 
 // FormatNonInteractiveError creates a helpful error message for non-interactive mode.
 func (s *ProfileTrustService) FormatNonInteractiveError(
 	url string,
-	requiredCaps map[string][]capabilities.Capability,
+	requiredCaps map[string]*sdkEntities.GrantSet,
 ) error {
 	var msg strings.Builder
 	msg.WriteString(fmt.Sprintf("Remote profile requires trust approval: %s\n\n", url))
@@ -197,9 +197,30 @@ func (s *ProfileTrustService) FormatNonInteractiveError(
 
 	if len(requiredCaps) > 0 {
 		msg.WriteString("Required capabilities:\n")
-		for plugin, caps := range requiredCaps {
-			for _, cap := range caps {
-				msg.WriteString(fmt.Sprintf("  - [%s] %s\n", plugin, cap.String()))
+		for plugin, gs := range requiredCaps {
+			if gs == nil {
+				continue
+			}
+			if gs.Network != nil {
+				for _, rule := range gs.Network.Rules {
+					msg.WriteString(fmt.Sprintf("  - [%s] Network: hosts=%v, ports=%v\n", plugin, rule.Hosts, rule.Ports))
+				}
+			}
+			if gs.FS != nil {
+				for _, rule := range gs.FS.Rules {
+					if len(rule.Read) > 0 {
+						msg.WriteString(fmt.Sprintf("  - [%s] Read files: %v\n", plugin, rule.Read))
+					}
+					if len(rule.Write) > 0 {
+						msg.WriteString(fmt.Sprintf("  - [%s] Write files: %v\n", plugin, rule.Write))
+					}
+				}
+			}
+			if gs.Env != nil && len(gs.Env.Variables) > 0 {
+				msg.WriteString(fmt.Sprintf("  - [%s] Environment variables: %v\n", plugin, gs.Env.Variables))
+			}
+			if gs.Exec != nil && len(gs.Exec.Commands) > 0 {
+				msg.WriteString(fmt.Sprintf("  - [%s] Execute commands: %v\n", plugin, gs.Exec.Commands))
 			}
 		}
 		msg.WriteString("\n")

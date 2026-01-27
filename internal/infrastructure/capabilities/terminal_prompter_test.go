@@ -3,7 +3,7 @@ package capabilities
 import (
 	"testing"
 
-	"github.com/reglet-dev/reglet/internal/domain/capabilities"
+	sdkEntities "github.com/reglet-dev/reglet-sdk/go/domain/entities"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -18,44 +18,86 @@ func TestTerminalPrompter_IsInteractive(t *testing.T) {
 // tested with simple os.Pipe mocking.
 // The logic is now delegated to github.com/charmbracelet/huh.
 
-func TestTerminalPrompter_describeCapability(t *testing.T) {
+func TestTerminalPrompter_describeGrantSet(t *testing.T) {
 	t.Parallel()
 
 	prompter := NewTerminalPrompter()
 
 	tests := []struct {
-		capability capabilities.Capability
-		expected   string
+		name     string
+		grantSet *sdkEntities.GrantSet
+		expected []string
 	}{
-		{capabilities.Capability{Kind: "network", Pattern: "outbound:*"}, "Network access to any port"},
-		{capabilities.Capability{Kind: "network", Pattern: "outbound:private"}, "Network access to private/reserved IPs (localhost, 192.168.x.x, 10.x.x.x, 169.254.169.254, etc.)"},
-		{capabilities.Capability{Kind: "network", Pattern: "outbound:80"}, "Network access to port 80"},
-		{capabilities.Capability{Kind: "fs", Pattern: "read:/var/log"}, "Read files: /var/log"},
-		{capabilities.Capability{Kind: "exec", Pattern: "/bin/sh"}, "Shell execution (executes shell commands)"},
-		{capabilities.Capability{Kind: "env", Pattern: "AWS_ACCESS_KEY"}, "Read environment variables: AWS_ACCESS_KEY"},
-		{capabilities.Capability{Kind: "unknown", Pattern: "foo"}, "unknown: foo"},
+		{
+			name: "network capability",
+			grantSet: &sdkEntities.GrantSet{
+				Network: &sdkEntities.NetworkCapability{
+					Rules: []sdkEntities.NetworkRule{
+						{Hosts: []string{"*"}, Ports: []string{"80"}},
+					},
+				},
+			},
+			expected: []string{"Network: hosts=[*], ports=[80]"},
+		},
+		{
+			name: "filesystem read capability",
+			grantSet: &sdkEntities.GrantSet{
+				FS: &sdkEntities.FileSystemCapability{
+					Rules: []sdkEntities.FileSystemRule{
+						{Read: []string{"/var/log"}},
+					},
+				},
+			},
+			expected: []string{"Read files: [/var/log]"},
+		},
+		{
+			name: "exec capability",
+			grantSet: &sdkEntities.GrantSet{
+				Exec: &sdkEntities.ExecCapability{
+					Commands: []string{"/bin/sh"},
+				},
+			},
+			expected: []string{"Execute commands: [/bin/sh]"},
+		},
+		{
+			name: "env capability",
+			grantSet: &sdkEntities.GrantSet{
+				Env: &sdkEntities.EnvironmentCapability{
+					Variables: []string{"AWS_ACCESS_KEY"},
+				},
+			},
+			expected: []string{"Environment variables: [AWS_ACCESS_KEY]"},
+		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.expected, func(t *testing.T) {
-			assert.Equal(t, tt.expected, prompter.describeCapability(tt.capability))
+		t.Run(tt.name, func(t *testing.T) {
+			result := prompter.describeGrantSet(tt.grantSet)
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
-func TestTerminalPrompter_FormatNonInteractiveError(t *testing.T) {
+func TestTerminalPrompter_FormatNonInteractiveErrorForGrantSet(t *testing.T) {
 	t.Parallel()
 
 	prompter := NewTerminalPrompter()
-	missing := capabilities.NewGrant()
-	missing.Add(capabilities.Capability{Kind: "fs", Pattern: "read:/etc/shadow"})
-	missing.Add(capabilities.Capability{Kind: "exec", Pattern: "/usr/bin/sudo"})
+	missing := &sdkEntities.GrantSet{
+		FS: &sdkEntities.FileSystemCapability{
+			Rules: []sdkEntities.FileSystemRule{
+				{Read: []string{"/etc/shadow"}},
+			},
+		},
+		Exec: &sdkEntities.ExecCapability{
+			Commands: []string{"/usr/bin/sudo"},
+		},
+	}
 
 	err := prompter.FormatNonInteractiveError(missing)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "Plugins require additional permissions")
-	assert.Contains(t, err.Error(), "  - Read files: /etc/shadow")
-	assert.Contains(t, err.Error(), "  - Execute commands: /usr/bin/sudo")
+	assert.Contains(t, err.Error(), "Read files: [/etc/shadow]")
+	assert.Contains(t, err.Error(), "Execute commands: [/usr/bin/sudo]")
 	assert.Contains(t, err.Error(), "1. Run interactively")
 	assert.Contains(t, err.Error(), "2. Use --trust-plugins flag")
 	assert.Contains(t, err.Error(), "3. Manually edit: ~/.reglet/config.yaml")

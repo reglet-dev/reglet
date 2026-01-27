@@ -9,7 +9,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/reglet-dev/reglet/internal/domain/capabilities"
+	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
 	"github.com/reglet-dev/reglet/internal/infrastructure/build"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -59,9 +59,11 @@ func TestLoadFilePlugin(t *testing.T) {
 	wasmBytes := getWasmBytes(t, "file")
 
 	// File plugin needs filesystem capabilities
-	caps := map[string][]capabilities.Capability{
+	caps := map[string]*entities.GrantSet{
 		"file": {
-			{Kind: "fs", Pattern: "read:/**"},
+			FS: &entities.FileSystemCapability{
+				Rules: []entities.FileSystemRule{{Read: []string{"/**"}}},
+			},
 		},
 	}
 
@@ -92,9 +94,11 @@ func TestFilePlugin_Describe(t *testing.T) {
 	wasmBytes := getWasmBytes(t, "file")
 
 	// File plugin needs filesystem capabilities
-	caps := map[string][]capabilities.Capability{
+	caps := map[string]*entities.GrantSet{
 		"file": {
-			{Kind: "fs", Pattern: "read:/**"},
+			FS: &entities.FileSystemCapability{
+				Rules: []entities.FileSystemRule{{Read: []string{"/**"}}},
+			},
 		},
 	}
 
@@ -118,9 +122,10 @@ func TestFilePlugin_Describe(t *testing.T) {
 	assert.Equal(t, "File existence, content, and hash checks", info.Description)
 
 	// Verify capabilities
-	require.Len(t, info.Capabilities, 1)
-	assert.Equal(t, "fs", info.Capabilities[0].Kind)
-	assert.Equal(t, "read:**", info.Capabilities[0].Pattern)
+	require.NotNil(t, info.Capabilities)
+	require.NotNil(t, info.Capabilities.FS)
+	require.Len(t, info.Capabilities.FS.Rules, 1)
+	assert.Contains(t, info.Capabilities.FS.Rules[0].Read, "**")
 }
 
 // TestFilePlugin_Schema tests calling the schema function
@@ -129,9 +134,11 @@ func TestFilePlugin_Schema(t *testing.T) {
 	wasmBytes := getWasmBytes(t, "file")
 
 	// File plugin needs filesystem capabilities
-	caps := map[string][]capabilities.Capability{
+	caps := map[string]*entities.GrantSet{
 		"file": {
-			{Kind: "fs", Pattern: "read:/**"},
+			FS: &entities.FileSystemCapability{
+				Rules: []entities.FileSystemRule{{Read: []string{"/**"}}},
+			},
 		},
 	}
 
@@ -187,9 +194,11 @@ func TestFilePlugin_Observe_FileExists(t *testing.T) {
 	require.NoError(t, err)
 
 	// File plugin needs filesystem capabilities
-	caps := map[string][]capabilities.Capability{
+	caps := map[string]*entities.GrantSet{
 		"file": {
-			{Kind: "fs", Pattern: "read:/**"},
+			FS: &entities.FileSystemCapability{
+				Rules: []entities.FileSystemRule{{Read: []string{"/**"}}},
+			},
 		},
 	}
 
@@ -265,9 +274,11 @@ func TestFilePlugin_Observe_Symlink(t *testing.T) {
 	require.NoError(t, err)
 
 	// File plugin needs filesystem capabilities
-	caps := map[string][]capabilities.Capability{
+	caps := map[string]*entities.GrantSet{
 		"file": {
-			{Kind: "fs", Pattern: "read:/**"},
+			FS: &entities.FileSystemCapability{
+				Rules: []entities.FileSystemRule{{Read: []string{"/**"}}},
+			},
 		},
 	}
 
@@ -313,9 +324,11 @@ func TestFilePlugin_Observe_FileNotFound(t *testing.T) {
 	wasmBytes := getWasmBytes(t, "file")
 
 	// File plugin needs filesystem capabilities
-	caps := map[string][]capabilities.Capability{
+	caps := map[string]*entities.GrantSet{
 		"file": {
-			{Kind: "fs", Pattern: "read:/**"},
+			FS: &entities.FileSystemCapability{
+				Rules: []entities.FileSystemRule{{Read: []string{"/**"}}},
+			},
 		},
 	}
 
@@ -368,9 +381,11 @@ func TestFilePlugin_Observe_ReadContent(t *testing.T) {
 	require.NoError(t, err)
 
 	// File plugin needs filesystem capabilities
-	caps := map[string][]capabilities.Capability{
+	caps := map[string]*entities.GrantSet{
 		"file": {
-			{Kind: "fs", Pattern: "read:/**"},
+			FS: &entities.FileSystemCapability{
+				Rules: []entities.FileSystemRule{{Read: []string{"/**"}}},
+			},
 		},
 	}
 
@@ -444,9 +459,11 @@ func TestFilePlugin_Observe_BinaryContent(t *testing.T) {
 	require.NoError(t, err)
 
 	// File plugin needs filesystem capabilities
-	caps := map[string][]capabilities.Capability{
+	caps := map[string]*entities.GrantSet{
 		"file": {
-			{Kind: "fs", Pattern: "read:/**"},
+			FS: &entities.FileSystemCapability{
+				Rules: []entities.FileSystemRule{{Read: []string{"/**"}}},
+			},
 		},
 	}
 
@@ -504,9 +521,11 @@ func TestDNSPlugin_Describe(t *testing.T) {
 	wasmBytes := getWasmBytes(t, "dns")
 
 	// DNS plugin needs network capabilities for port 53
-	caps := map[string][]capabilities.Capability{
+	caps := map[string]*entities.GrantSet{
 		"dns": {
-			{Kind: "network", Pattern: "outbound:53"},
+			Network: &entities.NetworkCapability{
+				Rules: []entities.NetworkRule{{Hosts: []string{"*"}, Ports: []string{"53"}}},
+			},
 		},
 	}
 
@@ -526,9 +545,10 @@ func TestDNSPlugin_Describe(t *testing.T) {
 	assert.Equal(t, "1.0.0", info.Version)
 	assert.Equal(t, "DNS resolution and record validation", info.Description)
 
-	require.Len(t, info.Capabilities, 1)
-	assert.Equal(t, "network", info.Capabilities[0].Kind)
-	assert.Equal(t, "outbound:53", info.Capabilities[0].Pattern)
+	require.NotNil(t, info.Capabilities)
+	require.NotNil(t, info.Capabilities.Network)
+	require.Len(t, info.Capabilities.Network.Rules, 1)
+	assert.Contains(t, info.Capabilities.Network.Rules[0].Ports, "53")
 }
 
 // TestDNSPlugin_Schema tests DNS plugin configuration schema
@@ -537,9 +557,11 @@ func TestDNSPlugin_Schema(t *testing.T) {
 	wasmBytes := getWasmBytes(t, "dns")
 
 	// DNS plugin needs network capabilities for port 53
-	caps := map[string][]capabilities.Capability{
+	caps := map[string]*entities.GrantSet{
 		"dns": {
-			{Kind: "network", Pattern: "outbound:53"},
+			Network: &entities.NetworkCapability{
+				Rules: []entities.NetworkRule{{Hosts: []string{"*"}, Ports: []string{"53"}}},
+			},
 		},
 	}
 
@@ -579,9 +601,11 @@ func TestDNSPlugin_Observe_A_Record(t *testing.T) {
 	wasmBytes := getWasmBytes(t, "dns")
 
 	// DNS plugin needs network capabilities for port 53
-	caps := map[string][]capabilities.Capability{
+	caps := map[string]*entities.GrantSet{
 		"dns": {
-			{Kind: "network", Pattern: "outbound:53"},
+			Network: &entities.NetworkCapability{
+				Rules: []entities.NetworkRule{{Hosts: []string{"*"}, Ports: []string{"53"}}},
+			},
 		},
 	}
 
@@ -639,9 +663,11 @@ func TestDNSPlugin_Observe_MX_Record(t *testing.T) {
 	wasmBytes := getWasmBytes(t, "dns")
 
 	// DNS plugin needs network capabilities for port 53
-	caps := map[string][]capabilities.Capability{
+	caps := map[string]*entities.GrantSet{
 		"dns": {
-			{Kind: "network", Pattern: "outbound:53"},
+			Network: &entities.NetworkCapability{
+				Rules: []entities.NetworkRule{{Hosts: []string{"*"}, Ports: []string{"53"}}},
+			},
 		},
 	}
 
@@ -703,9 +729,11 @@ func TestDNSPlugin_Observe_InvalidHostname(t *testing.T) {
 	wasmBytes := getWasmBytes(t, "dns")
 
 	// DNS plugin needs network capabilities for port 53
-	caps := map[string][]capabilities.Capability{
+	caps := map[string]*entities.GrantSet{
 		"dns": {
-			{Kind: "network", Pattern: "outbound:53"},
+			Network: &entities.NetworkCapability{
+				Rules: []entities.NetworkRule{{Hosts: []string{"*"}, Ports: []string{"53"}}},
+			},
 		},
 	}
 
@@ -760,9 +788,11 @@ func TestDNSPlugin_Observe_MissingHostname(t *testing.T) {
 	wasmBytes := getWasmBytes(t, "dns")
 
 	// DNS plugin needs network capabilities for port 53
-	caps := map[string][]capabilities.Capability{
+	caps := map[string]*entities.GrantSet{
 		"dns": {
-			{Kind: "network", Pattern: "outbound:53"},
+			Network: &entities.NetworkCapability{
+				Rules: []entities.NetworkRule{{Hosts: []string{"*"}, Ports: []string{"53"}}},
+			},
 		},
 	}
 
@@ -799,9 +829,11 @@ func TestHTTPPlugin_Describe(t *testing.T) {
 	wasmBytes := getWasmBytes(t, "http")
 
 	// HTTP plugin needs network capabilities for ports 80,443
-	caps := map[string][]capabilities.Capability{
+	caps := map[string]*entities.GrantSet{
 		"http": {
-			{Kind: "network", Pattern: "outbound:80,443"},
+			Network: &entities.NetworkCapability{
+				Rules: []entities.NetworkRule{{Hosts: []string{"*"}, Ports: []string{"80", "443"}}},
+			},
 		},
 	}
 
@@ -828,9 +860,11 @@ func TestHTTPPlugin_Schema(t *testing.T) {
 	wasmBytes := getWasmBytes(t, "http")
 
 	// HTTP plugin needs network capabilities for ports 80,443
-	caps := map[string][]capabilities.Capability{
+	caps := map[string]*entities.GrantSet{
 		"http": {
-			{Kind: "network", Pattern: "outbound:80,443"},
+			Network: &entities.NetworkCapability{
+				Rules: []entities.NetworkRule{{Hosts: []string{"*"}, Ports: []string{"80", "443"}}},
+			},
 		},
 	}
 
@@ -864,9 +898,11 @@ func TestHTTPPlugin_Observe_GET(t *testing.T) {
 	wasmBytes := getWasmBytes(t, "http")
 
 	// HTTP plugin needs network capabilities for ports 80,443
-	caps := map[string][]capabilities.Capability{
+	caps := map[string]*entities.GrantSet{
 		"http": {
-			{Kind: "network", Pattern: "outbound:80,443"},
+			Network: &entities.NetworkCapability{
+				Rules: []entities.NetworkRule{{Hosts: []string{"*"}, Ports: []string{"80", "443"}}},
+			},
 		},
 	}
 
@@ -929,9 +965,11 @@ func TestTCPPlugin_Describe(t *testing.T) {
 	wasmBytes := getWasmBytes(t, "tcp")
 
 	// TCP plugin needs network capabilities for outbound connections
-	caps := map[string][]capabilities.Capability{
+	caps := map[string]*entities.GrantSet{
 		"tcp": {
-			{Kind: "network", Pattern: "outbound:*"},
+			Network: &entities.NetworkCapability{
+				Rules: []entities.NetworkRule{{Hosts: []string{"*"}, Ports: []string{"*"}}},
+			},
 		},
 	}
 
@@ -958,9 +996,11 @@ func TestTCPPlugin_Schema(t *testing.T) {
 	wasmBytes := getWasmBytes(t, "tcp")
 
 	// TCP plugin needs network capabilities for outbound connections
-	caps := map[string][]capabilities.Capability{
+	caps := map[string]*entities.GrantSet{
 		"tcp": {
-			{Kind: "network", Pattern: "outbound:*"},
+			Network: &entities.NetworkCapability{
+				Rules: []entities.NetworkRule{{Hosts: []string{"*"}, Ports: []string{"*"}}},
+			},
 		},
 	}
 
@@ -994,9 +1034,11 @@ func TestTCPPlugin_Observe_PlainTCP(t *testing.T) {
 	wasmBytes := getWasmBytes(t, "tcp")
 
 	// TCP plugin needs network capabilities for outbound connections
-	caps := map[string][]capabilities.Capability{
+	caps := map[string]*entities.GrantSet{
 		"tcp": {
-			{Kind: "network", Pattern: "outbound:*"},
+			Network: &entities.NetworkCapability{
+				Rules: []entities.NetworkRule{{Hosts: []string{"*"}, Ports: []string{"*"}}},
+			},
 		},
 	}
 
@@ -1036,9 +1078,11 @@ func TestTCPPlugin_Observe_TLS(t *testing.T) {
 	wasmBytes := getWasmBytes(t, "tcp")
 
 	// TCP plugin needs network capabilities for outbound connections
-	caps := map[string][]capabilities.Capability{
+	caps := map[string]*entities.GrantSet{
 		"tcp": {
-			{Kind: "network", Pattern: "outbound:*"},
+			Network: &entities.NetworkCapability{
+				Rules: []entities.NetworkRule{{Hosts: []string{"*"}, Ports: []string{"*"}}},
+			},
 		},
 	}
 

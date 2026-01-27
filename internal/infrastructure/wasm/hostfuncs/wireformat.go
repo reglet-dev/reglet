@@ -9,37 +9,37 @@ import (
 	"net" // New import
 	"time"
 
-	"github.com/reglet-dev/reglet-sdk/go/wireformat"
+	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
 	"github.com/tetratelabs/wazero/api"
 )
 
 type (
-	// ContextWireFormat is a re-export of wireformat.ContextWireFormat
-	ContextWireFormat = wireformat.ContextWireFormat
-	// DNSRequestWire is a re-export of wireformat.DNSRequestWire
-	DNSRequestWire = wireformat.DNSRequestWire
-	// DNSResponseWire is a re-export of wireformat.DNSResponseWire
-	DNSResponseWire = wireformat.DNSResponseWire
-	// HTTPRequestWire is a re-export of wireformat.HTTPRequestWire
-	HTTPRequestWire = wireformat.HTTPRequestWire
-	// HTTPResponseWire is a re-export of wireformat.HTTPResponseWire
-	HTTPResponseWire = wireformat.HTTPResponseWire
-	// TCPRequestWire is a re-export of wireformat.TCPRequestWire
-	TCPRequestWire = wireformat.TCPRequestWire
-	// TCPResponseWire is a re-export of wireformat.TCPResponseWire
-	TCPResponseWire = wireformat.TCPResponseWire
-	// SMTPRequestWire is a re-export of wireformat.SMTPRequestWire
-	SMTPRequestWire = wireformat.SMTPRequestWire
-	// SMTPResponseWire is a re-export of wireformat.SMTPResponseWire
-	SMTPResponseWire = wireformat.SMTPResponseWire
-	// ExecRequestWire is a re-export of wireformat.ExecRequestWire
-	ExecRequestWire = wireformat.ExecRequestWire
-	// ExecResponseWire is a re-export of wireformat.ExecResponseWire
-	ExecResponseWire = wireformat.ExecResponseWire
-	// ErrorDetail is a re-export of wireformat.ErrorDetail
-	ErrorDetail = wireformat.ErrorDetail
-	// MXRecordWire is a re-export of wireformat.MXRecordWire
-	MXRecordWire = wireformat.MXRecordWire
+	// ContextWireFormat is an alias for entities.ContextWire
+	ContextWireFormat = entities.ContextWire
+	// DNSRequestWire is an alias for entities.DNSRequest
+	DNSRequestWire = entities.DNSRequest
+	// DNSResponseWire is an alias for entities.DNSResponse
+	DNSResponseWire = entities.DNSResponse
+	// HTTPRequestWire is an alias for entities.HTTPRequest
+	HTTPRequestWire = entities.HTTPRequest
+	// HTTPResponseWire is an alias for entities.HTTPResponse
+	HTTPResponseWire = entities.HTTPResponse
+	// TCPRequestWire is an alias for entities.TCPRequest
+	TCPRequestWire = entities.TCPRequest
+	// TCPResponseWire is an alias for entities.TCPResponse
+	TCPResponseWire = entities.TCPResponse
+	// SMTPRequestWire is an alias for entities.SMTPRequest
+	SMTPRequestWire = entities.SMTPRequest
+	// SMTPResponseWire is an alias for entities.SMTPResponse
+	SMTPResponseWire = entities.SMTPResponse
+	// ExecRequestWire is an alias for entities.ExecRequest
+	ExecRequestWire = entities.ExecRequest
+	// ExecResponseWire is an alias for entities.ExecResponse
+	ExecResponseWire = entities.ExecResponse
+	// ErrorDetail is an alias for entities.ErrorDetail
+	ErrorDetail = entities.ErrorDetail
+	// MXRecordWire is an alias for entities.MXRecord
+	MXRecordWire = entities.MXRecord
 )
 
 // createContextFromWire creates a new context from the wire format.

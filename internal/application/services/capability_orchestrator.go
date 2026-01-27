@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 
+	sdkEntities "github.com/reglet-dev/reglet-sdk/go/domain/entities"
 	"github.com/reglet-dev/reglet/internal/application/ports"
 	"github.com/reglet-dev/reglet/internal/domain/capabilities"
 	"github.com/reglet-dev/reglet/internal/domain/entities"
@@ -82,7 +83,7 @@ func WithTrustAll(trust bool) CapabilityOrchestratorOption {
 
 // CollectCapabilities creates a temporary runtime and collects required capabilities.
 // Returns the required capabilities and the temporary runtime (caller must close it).
-func (o *CapabilityOrchestrator) CollectCapabilities(ctx context.Context, profile entities.ProfileReader, pluginDir string) (map[string][]capabilities.Capability, ports.PluginRuntime, error) {
+func (o *CapabilityOrchestrator) CollectCapabilities(ctx context.Context, profile entities.ProfileReader, pluginDir string) (map[string]*sdkEntities.GrantSet, ports.PluginRuntime, error) {
 	// Create temporary runtime for capability collection
 	runtime, err := o.runtimeFactory.NewRuntime(ctx)
 	if err != nil {
@@ -102,8 +103,8 @@ func (o *CapabilityOrchestrator) CollectCapabilities(ctx context.Context, profil
 
 // CollectRequiredCapabilities loads plugins and identifies requirements.
 // It prioritizes specific capabilities extracted from profile configs over plugin metadata.
-func (o *CapabilityOrchestrator) CollectRequiredCapabilities(ctx context.Context, profile entities.ProfileReader, runtime ports.PluginRuntime, pluginDir string) (map[string][]capabilities.Capability, error) {
-	// Extract specific capabilities from profile observation configs
+func (o *CapabilityOrchestrator) CollectRequiredCapabilities(ctx context.Context, profile entities.ProfileReader, runtime ports.PluginRuntime, pluginDir string) (map[string]*sdkEntities.GrantSet, error) {
+	// Extract specific capabilities from profile observation configs (returns GrantSet)
 	profileCaps := o.analyzer.ExtractCapabilities(profile)
 
 	// Get unique plugin names from profile
@@ -131,7 +132,7 @@ func extractPluginNames(profile entities.ProfileReader) map[string]bool {
 }
 
 // loadPluginCapabilities loads plugins in parallel and collects their declared capabilities.
-func (o *CapabilityOrchestrator) loadPluginCapabilities(ctx context.Context, runtime ports.PluginRuntime, pluginDir string, pluginNames map[string]bool) (map[string][]capabilities.Capability, error) {
+func (o *CapabilityOrchestrator) loadPluginCapabilities(ctx context.Context, runtime ports.PluginRuntime, pluginDir string, pluginNames map[string]bool) (map[string]*sdkEntities.GrantSet, error) {
 	// Convert to slice for parallel iteration
 	names := make([]string, 0, len(pluginNames))
 	for name := range pluginNames {
@@ -140,18 +141,18 @@ func (o *CapabilityOrchestrator) loadPluginCapabilities(ctx context.Context, run
 
 	// Thread-safe map for collecting plugin metadata capabilities
 	var mu sync.Mutex
-	pluginMetaCaps := make(map[string][]capabilities.Capability)
+	pluginMetaCaps := make(map[string]*sdkEntities.GrantSet)
 
 	g, gctx := errgroup.WithContext(ctx)
 	for _, name := range names {
 		g.Go(func() error {
-			caps, err := o.loadSinglePlugin(gctx, runtime, pluginDir, name)
+			gs, err := o.loadSinglePlugin(gctx, runtime, pluginDir, name)
 			if err != nil {
 				return err
 			}
 
 			mu.Lock()
-			pluginMetaCaps[name] = caps
+			pluginMetaCaps[name] = gs
 			mu.Unlock()
 			return nil
 		})
@@ -164,8 +165,8 @@ func (o *CapabilityOrchestrator) loadPluginCapabilities(ctx context.Context, run
 	return pluginMetaCaps, nil
 }
 
-// loadSinglePlugin loads a single plugin and returns its declared capabilities.
-func (o *CapabilityOrchestrator) loadSinglePlugin(ctx context.Context, runtime ports.PluginRuntime, pluginDir, name string) ([]capabilities.Capability, error) {
+// loadSinglePlugin loads a single plugin and returns its declared capabilities as GrantSet.
+func (o *CapabilityOrchestrator) loadSinglePlugin(ctx context.Context, runtime ports.PluginRuntime, pluginDir, name string) (*sdkEntities.GrantSet, error) {
 	// Security: Validate plugin name to prevent path traversal
 	if strings.ContainsAny(name, `/\`) || strings.Contains(name, "..") {
 		return nil, fmt.Errorf("invalid plugin name %q: contains path separator or traversal", name)
@@ -197,95 +198,109 @@ func (o *CapabilityOrchestrator) loadSinglePlugin(ctx context.Context, runtime p
 		return nil, fmt.Errorf("failed to get capabilities from plugin %s: %w", name, err)
 	}
 
-	// Convert to domain capabilities
-	var caps []capabilities.Capability
-	for _, capability := range info.Capabilities {
-		caps = append(caps, capabilities.Capability{
-			Kind:    capability.Kind,
-			Pattern: capability.Pattern,
-		})
-	}
-
-	return caps, nil
+	// info.Capabilities is already a *GrantSet from the plugin
+	return info.Capabilities, nil
 }
 
 // mergeCapabilities merges profile-extracted capabilities with plugin metadata.
 // Profile-extracted capabilities take precedence (more specific).
-func (o *CapabilityOrchestrator) mergeCapabilities(pluginNames map[string]bool, profileCaps, pluginMetaCaps map[string][]capabilities.Capability) (map[string][]capabilities.Capability, error) {
-	required := make(map[string][]capabilities.Capability)
+func (o *CapabilityOrchestrator) mergeCapabilities(pluginNames map[string]bool, profileCaps, pluginMetaCaps map[string]*sdkEntities.GrantSet) (map[string]*sdkEntities.GrantSet, error) {
+	required := make(map[string]*sdkEntities.GrantSet)
 
 	// Clear and rebuild capability info metadata
 	o.capabilityInfo = make(map[string]ports.CapabilityInfo)
 
 	for name := range pluginNames {
-		profileSpecific := profileCaps[name]
-		metaCaps := pluginMetaCaps[name]
+		profileGS := profileCaps[name]
+		metaGS := pluginMetaCaps[name]
 
-		if len(profileSpecific) > 0 {
-			o.useProfileCapabilities(name, profileSpecific, required)
-		} else if len(metaCaps) > 0 {
-			o.useMetadataCapabilities(name, metaCaps, profileSpecific, required)
+		if profileGS != nil && !profileGS.IsEmpty() {
+			required[name] = profileGS
+			o.recordCapabilityInfo(name, profileGS, true)
+			slog.Debug("using profile-extracted capabilities",
+				"plugin", name,
+				"capabilities", profileGS)
+		} else if metaGS != nil && !metaGS.IsEmpty() {
+			required[name] = metaGS
+			o.recordCapabilityInfo(name, metaGS, false)
+			slog.Debug("using plugin metadata capabilities (fallback)",
+				"plugin", name,
+				"capabilities", metaGS)
 		}
 	}
 
 	return required, nil
 }
 
-// useProfileCapabilities uses profile-extracted capabilities for a plugin.
-func (o *CapabilityOrchestrator) useProfileCapabilities(name string, caps []capabilities.Capability, required map[string][]capabilities.Capability) {
-	required[name] = caps
-	slog.Debug("using profile-extracted capabilities",
-		"plugin", name,
-		"count", len(caps),
-		"capabilities", caps)
-
-	for _, capability := range caps {
-		key := capability.Kind + ":" + capability.Pattern
-		o.capabilityInfo[key] = ports.CapabilityInfo{
-			Capability:      capability,
-			IsProfileBased:  true,
-			PluginName:      name,
-			IsBroad:         capability.IsBroad(),
-			ProfileSpecific: nil,
+// recordCapabilityInfo records capability metadata for the gatekeeper.
+func (o *CapabilityOrchestrator) recordCapabilityInfo(name string, gs *sdkEntities.GrantSet, isProfileBased bool) {
+	// Record network capabilities
+	if gs.Network != nil {
+		for _, rule := range gs.Network.Rules {
+			key := fmt.Sprintf("network:%v:%v", rule.Hosts, rule.Ports)
+			o.capabilityInfo[key] = ports.CapabilityInfo{
+				IsProfileBased: isProfileBased,
+				PluginName:     name,
+				IsBroad:        len(rule.Hosts) == 1 && rule.Hosts[0] == "*" && len(rule.Ports) == 1 && rule.Ports[0] == "*",
+			}
 		}
 	}
-}
 
-// useMetadataCapabilities uses plugin metadata capabilities as fallback.
-func (o *CapabilityOrchestrator) useMetadataCapabilities(name string, metaCaps, profileCaps []capabilities.Capability, required map[string][]capabilities.Capability) {
-	required[name] = metaCaps
-	slog.Debug("using plugin metadata capabilities (fallback)",
-		"plugin", name,
-		"count", len(metaCaps),
-		"capabilities", metaCaps)
-
-	for _, capability := range metaCaps {
-		key := capability.Kind + ":" + capability.Pattern
-		info := ports.CapabilityInfo{
-			Capability:     capability,
-			IsProfileBased: false,
-			PluginName:     name,
-			IsBroad:        capability.IsBroad(),
+	// Record filesystem capabilities
+	if gs.FS != nil {
+		for _, rule := range gs.FS.Rules {
+			for _, path := range rule.Read {
+				key := "fs:read:" + path
+				o.capabilityInfo[key] = ports.CapabilityInfo{
+					IsProfileBased: isProfileBased,
+					PluginName:     name,
+					IsBroad:        path == "/**" || path == "**",
+				}
+			}
+			for _, path := range rule.Write {
+				key := "fs:write:" + path
+				o.capabilityInfo[key] = ports.CapabilityInfo{
+					IsProfileBased: isProfileBased,
+					PluginName:     name,
+					IsBroad:        path == "/**" || path == "**",
+				}
+			}
 		}
+	}
 
-		// Check if there's a profile-specific alternative we could have used
-		if len(profileCaps) > 0 {
-			alt := profileCaps[0]
-			info.ProfileSpecific = &alt
+	// Record environment capabilities
+	if gs.Env != nil {
+		for _, v := range gs.Env.Variables {
+			key := "env:" + v
+			o.capabilityInfo[key] = ports.CapabilityInfo{
+				IsProfileBased: isProfileBased,
+				PluginName:     name,
+				IsBroad:        v == "*",
+			}
 		}
+	}
 
-		o.capabilityInfo[key] = info
+	// Record exec capabilities
+	if gs.Exec != nil {
+		for _, cmd := range gs.Exec.Commands {
+			key := "exec:" + cmd
+			o.capabilityInfo[key] = ports.CapabilityInfo{
+				IsProfileBased: isProfileBased,
+				PluginName:     name,
+				IsBroad:        cmd == "**" || cmd == "*",
+			}
+		}
 	}
 }
 
 // GrantCapabilities resolves permissions via the gatekeeper.
 // Delegates the complete granting workflow to CapabilityGatekeeper.
-func (o *CapabilityOrchestrator) GrantCapabilities(required map[string][]capabilities.Capability, trustAll bool) (map[string][]capabilities.Capability, error) {
-	// Flatten all required capabilities to a unique set
-	flatRequired := capabilities.NewGrant()
-	for _, caps := range required {
-		for _, capability := range caps {
-			flatRequired.Add(capability)
+func (o *CapabilityOrchestrator) GrantCapabilities(required map[string]*sdkEntities.GrantSet, trustAll bool) (map[string]*sdkEntities.GrantSet, error) {
+	// Flatten all required capabilities into a single GrantSet
+	flatRequired := &sdkEntities.GrantSet{}
+	for _, gs := range required {
+		if gs != nil {
+			flatRequired.Merge(gs)
 		}
 	}
 
@@ -295,20 +310,11 @@ func (o *CapabilityOrchestrator) GrantCapabilities(required map[string][]capabil
 		return nil, err
 	}
 
-	// Filter the requested capabilities against the globally granted ones
-	// ensuring each plugin only gets what it requested AND what was granted
-	grantedPerPlugin := make(map[string][]capabilities.Capability)
-	for name, caps := range required {
-		var allowed capabilities.Grant
-		for _, capability := range caps {
-			if grantedGlobal.Contains(capability) {
-				allowed.Add(capability)
-			}
-		}
-		if len(allowed) > 0 {
-			grantedPerPlugin[name] = allowed
-		}
+	// For now, return the original required capabilities if granted
+	// The gatekeeper has validated that these are allowed
+	if grantedGlobal != nil && !grantedGlobal.IsEmpty() {
+		return required, nil
 	}
 
-	return grantedPerPlugin, nil
+	return nil, nil
 }

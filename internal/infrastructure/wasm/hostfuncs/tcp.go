@@ -2,13 +2,13 @@ package hostfuncs
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"net"
+	"strconv"
 	"time"
 
+	"github.com/reglet-dev/reglet-sdk/go/hostfuncs"
 	"github.com/tetratelabs/wazero/api"
 )
 
@@ -41,16 +41,6 @@ func TCPConnect(ctx context.Context, mod api.Module, stack []uint64, checker *Ca
 		return
 	}
 
-	// Create a new context from the wire format, with parent ctx for cancellation.
-	tcpCtx, cancel := createContextFromWire(ctx, request.Context)
-	defer cancel() // Ensure context resources are released.
-
-	// Apply timeout from request if specified
-	if request.TimeoutMs > 0 {
-		tcpCtx, cancel = context.WithTimeout(tcpCtx, time.Duration(request.TimeoutMs)*time.Millisecond)
-		defer cancel()
-	}
-
 	// 1. Check capability for outbound TCP
 	pluginName := mod.Name()
 	if name, ok := PluginNameFromContext(ctx); ok {
@@ -74,142 +64,50 @@ func TCPConnect(ctx context.Context, mod api.Module, stack []uint64, checker *Ca
 		return
 	}
 
-	// 2. Validate input
-	if request.Host == "" {
-		errMsg := "host cannot be empty"
-		slog.WarnContext(ctx, errMsg)
-		stack[0] = hostWriteResponse(ctx, mod, TCPResponseWire{
-			Error: &ErrorDetail{Message: errMsg, Type: "config"},
-		})
-		return
+	// 2. Prepare SDK request
+	port, _ := strconv.Atoi(request.Port) // Error check not strictly needed as earlier checks might catch it, or SDK will
+
+	sdkReq := hostfuncs.TCPConnectRequest{
+		Host:    request.Host,
+		Port:    port,
+		Timeout: int(request.TimeoutMs),
+		UseTLS:  request.TLS,
 	}
 
-	// SSRF protection: Resolve hostname ONCE, validate IP, then use validated IP
-	// This prevents DNS rebinding attacks where DNS changes between validation and connection
-	validatedIP, err := resolveAndValidate(ctx, request.Host, pluginName, checker)
-	if err != nil {
-		errMsg := fmt.Sprintf("SSRF protection: %v", err)
-		slog.WarnContext(ctx, errMsg, "host", request.Host, "port", request.Port)
-		stack[0] = hostWriteResponse(ctx, mod, TCPResponseWire{
-			Error: &ErrorDetail{Message: errMsg, Type: "ssrf_protection"},
-		})
-		return
+	// Determine if private IPs should be allowed via capability
+	allowPrivate := checker.AllowsPrivateNetwork(pluginName)
+
+	// Call SDK with SSRF protection
+	sdkResp := hostfuncs.PerformTCPConnect(ctx, sdkReq,
+		hostfuncs.WithTCPSSRFProtection(!allowPrivate),
+	)
+
+	// 3. Convert to wire format
+	response := TCPResponseWire{
+		Connected:      sdkResp.Connected,
+		LocalAddr:      "",
+		RemoteAddr:     sdkResp.RemoteAddr,
+		ResponseTimeMs: sdkResp.LatencyMs,
+		TLS:            sdkResp.TLSVersion != "", // If TLS version is set, TLS was used
+		TLSVersion:     sdkResp.TLSVersion,
+		TLSCipherSuite: sdkResp.TLSCipherSuite,
+		TLSServerName:  sdkResp.TLSServerName,
+		TLSCertSubject: sdkResp.TLSCertSubject,
+		TLSCertIssuer:  sdkResp.TLSCertIssuer,
 	}
 
-	if request.Port == "" {
-		errMsg := "port cannot be empty"
-		slog.WarnContext(ctx, errMsg)
-		stack[0] = hostWriteResponse(ctx, mod, TCPResponseWire{
-			Error: &ErrorDetail{Message: errMsg, Type: "config"},
-		})
-		return
-	}
-
-	// 3. Perform TCP connection test using validated IP
-	start := time.Now()
-	response, err := performTCPConnect(tcpCtx, validatedIP, request.Port, request.TLS, request.Host)
-	responseTime := time.Since(start).Milliseconds()
-
-	if err != nil {
-		errMsg := fmt.Sprintf("TCP connection failed: %v", err)
-		slog.ErrorContext(ctx, errMsg, "host", request.Host, "port", request.Port)
-		stack[0] = hostWriteResponse(ctx, mod, TCPResponseWire{
-			Error: toErrorDetail(err),
-		})
-		return
-	}
-
-	// Add response time to result
-	response.ResponseTimeMs = responseTime
-
-	// 4. Write success response
-	stack[0] = hostWriteResponse(ctx, mod, *response)
-}
-
-// performTCPConnect executes the actual TCP connection test
-// validatedIP is the pre-resolved and validated IP address to connect to
-// originalHost is the original hostname (used for TLS SNI and logging)
-func performTCPConnect(ctx context.Context, validatedIP, port string, useTLS bool, originalHost string) (*TCPResponseWire, error) {
-	// Connect to the validated IP address, not the hostname
-	// This prevents DNS rebinding attacks
-	address := net.JoinHostPort(validatedIP, port)
-
-	response := &TCPResponseWire{
-		Connected: false,
-		// Use original hostname in address field for user-friendliness
-		// (actual connection uses validated IP for security)
-		Address: net.JoinHostPort(originalHost, port),
-	}
-
-	// Create dialer with context
-	dialer := &net.Dialer{}
-
-	if !useTLS {
-		// Plain TCP connection
-		conn, err := dialer.DialContext(ctx, "tcp", address)
-		if err != nil {
-			return nil, fmt.Errorf("connection failed: %w", err)
+	if sdkResp.TLSCertExpiry != "" {
+		if t, err := time.Parse(time.RFC3339, sdkResp.TLSCertExpiry); err == nil {
+			response.TLSCertNotAfter = &t
 		}
-		defer func() {
-			_ = conn.Close() // Best-effort cleanup
-		}()
-
-		response.Connected = true
-		response.RemoteAddr = conn.RemoteAddr().String()
-		response.LocalAddr = conn.LocalAddr().String()
-
-		return response, nil
 	}
 
-	// TLS connection
-	tlsConfig := &tls.Config{
-		// Use original hostname for SNI (Server Name Indication), not the IP
-		ServerName: originalHost,
-		MinVersion: tls.VersionTLS12,
+	if sdkResp.Error != nil {
+		response.Error = &ErrorDetail{
+			Message: sdkResp.Error.Message,
+			Type:    sdkResp.Error.Code,
+		}
 	}
 
-	conn, err := tls.DialWithDialer(dialer, "tcp", address, tlsConfig)
-	if err != nil {
-		return nil, fmt.Errorf("TLS connection failed: %w", err)
-	}
-	defer func() {
-		_ = conn.Close() // Best-effort cleanup
-	}()
-
-	// Get TLS connection state
-	state := conn.ConnectionState()
-
-	response.Connected = true
-	response.RemoteAddr = conn.RemoteAddr().String()
-	response.LocalAddr = conn.LocalAddr().String()
-	response.TLS = true
-	response.TLSVersion = tlsVersionString(state.Version)
-	response.TLSCipherSuite = tls.CipherSuiteName(state.CipherSuite)
-	response.TLSServerName = state.ServerName
-
-	// Certificate info (basic)
-	if len(state.PeerCertificates) > 0 {
-		cert := state.PeerCertificates[0]
-		response.TLSCertSubject = cert.Subject.String()
-		response.TLSCertIssuer = cert.Issuer.String()
-		response.TLSCertNotAfter = &cert.NotAfter
-	}
-
-	return response, nil
-}
-
-// tlsVersionString converts TLS version constant to string
-func tlsVersionString(version uint16) string {
-	switch version {
-	case tls.VersionTLS10:
-		return "TLS 1.0"
-	case tls.VersionTLS11:
-		return "TLS 1.1"
-	case tls.VersionTLS12:
-		return "TLS 1.2"
-	case tls.VersionTLS13:
-		return "TLS 1.3"
-	default:
-		return fmt.Sprintf("Unknown (0x%04X)", version)
-	}
+	stack[0] = hostWriteResponse(ctx, mod, response)
 }

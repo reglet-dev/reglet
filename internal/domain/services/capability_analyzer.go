@@ -3,6 +3,7 @@ package services
 import (
 	"log/slog"
 
+	sdkEntities "github.com/reglet-dev/reglet-sdk/go/domain/entities"
 	"github.com/reglet-dev/reglet/internal/domain/capabilities"
 	"github.com/reglet-dev/reglet/internal/domain/entities"
 	"github.com/reglet-dev/reglet/internal/pkg/loopexpander"
@@ -25,8 +26,8 @@ func NewCapabilityAnalyzer(registry *capabilities.Registry) *CapabilityAnalyzer 
 // This enables principle of least privilege by requesting only the resources actually used,
 // rather than the plugin's full declared capabilities.
 //
-// Returns a map of plugin name to required capabilities, deduplicated.
-func (a *CapabilityAnalyzer) ExtractCapabilities(profile entities.ProfileReader) map[string][]capabilities.Capability {
+// Returns a map of plugin name to required GrantSet.
+func (a *CapabilityAnalyzer) ExtractCapabilities(profile entities.ProfileReader) map[string]*sdkEntities.GrantSet {
 	// Delegate to ExtractCapabilitiesWithVars with the profile's vars
 	return a.ExtractCapabilitiesWithVars(profile, profile.GetVars())
 }
@@ -36,9 +37,9 @@ func (a *CapabilityAnalyzer) ExtractCapabilities(profile entities.ProfileReader)
 //
 // This is the security-first implementation that ensures loop observations request only
 // the specific resources they will access, rather than falling back to broad wildcards.
-func (a *CapabilityAnalyzer) ExtractCapabilitiesWithVars(profile entities.ProfileReader, vars map[string]interface{}) map[string][]capabilities.Capability {
-	// Use map to deduplicate capabilities per plugin
-	profileCaps := make(map[string]map[string]capabilities.Capability)
+func (a *CapabilityAnalyzer) ExtractCapabilitiesWithVars(profile entities.ProfileReader, vars map[string]interface{}) map[string]*sdkEntities.GrantSet {
+	// Accumulate GrantSets per plugin
+	profileCaps := make(map[string]*sdkEntities.GrantSet)
 
 	// Analyze each control's observations
 	for _, ctrl := range profile.GetControls() {
@@ -47,7 +48,7 @@ func (a *CapabilityAnalyzer) ExtractCapabilitiesWithVars(profile entities.Profil
 
 			// Initialize plugin entry if needed
 			if _, ok := profileCaps[pluginName]; !ok {
-				profileCaps[pluginName] = make(map[string]capabilities.Capability)
+				profileCaps[pluginName] = &sdkEntities.GrantSet{}
 			}
 
 			// Look up extractor for this plugin
@@ -64,23 +65,18 @@ func (a *CapabilityAnalyzer) ExtractCapabilitiesWithVars(profile entities.Profil
 			} else {
 				// Regular observation - extract directly
 				extractedCaps := extractor.Extract(obs.Config)
-				for _, capability := range extractedCaps {
-					key := capability.Kind + ":" + capability.Pattern
-					profileCaps[pluginName][key] = capability
+				if extractedCaps != nil {
+					profileCaps[pluginName].Merge(extractedCaps)
 				}
 			}
 		}
 	}
 
-	// Convert map to slice
-	result := make(map[string][]capabilities.Capability)
-	for pluginName, capMap := range profileCaps {
-		caps := make([]capabilities.Capability, 0, len(capMap))
-		for _, cap := range capMap {
-			caps = append(caps, cap)
-		}
-		if len(caps) > 0 {
-			result[pluginName] = caps
+	// Remove empty GrantSets
+	result := make(map[string]*sdkEntities.GrantSet)
+	for pluginName, gs := range profileCaps {
+		if gs != nil && !gs.IsEmpty() {
+			result[pluginName] = gs
 		}
 	}
 
@@ -92,7 +88,7 @@ func (a *CapabilityAnalyzer) extractLoopCapabilities(
 	obs entities.ObservationDefinition,
 	vars map[string]interface{},
 	extractor capabilities.Extractor,
-	capMap map[string]capabilities.Capability,
+	grantSet *sdkEntities.GrantSet,
 ) {
 	// Resolve the loop items from vars
 	items, err := loopexpander.ResolveLoopItems(obs.Loop.Items, vars)
@@ -123,9 +119,8 @@ func (a *CapabilityAnalyzer) extractLoopCapabilities(
 
 		// Extract capabilities from the expanded config
 		extractedCaps := extractor.Extract(expandedConfig)
-		for _, capability := range extractedCaps {
-			key := capability.Kind + ":" + capability.Pattern
-			capMap[key] = capability
+		if extractedCaps != nil {
+			grantSet.Merge(extractedCaps)
 		}
 	}
 }

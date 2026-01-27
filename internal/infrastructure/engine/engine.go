@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/reglet-dev/reglet/internal/domain/capabilities"
+	sdkEntities "github.com/reglet-dev/reglet-sdk/go/domain/entities"
 	"github.com/reglet-dev/reglet/internal/domain/entities"
 	"github.com/reglet-dev/reglet/internal/domain/execution"
 	"github.com/reglet-dev/reglet/internal/domain/repositories"
@@ -120,12 +120,12 @@ type Engine struct {
 
 // CapabilityCollector collects required capabilities from plugins.
 type CapabilityCollector interface {
-	CollectRequiredCapabilities(ctx context.Context, profile entities.ProfileReader, runtime *wasm.Runtime, pluginDir string) (map[string][]capabilities.Capability, error)
+	CollectRequiredCapabilities(ctx context.Context, profile entities.ProfileReader, runtime *wasm.Runtime, pluginDir string) (map[string]*sdkEntities.GrantSet, error)
 }
 
 // CapabilityGranter grants capabilities (interactively or automatically).
 type CapabilityGranter interface {
-	GrantCapabilities(required map[string][]capabilities.Capability) (map[string][]capabilities.Capability, error)
+	GrantCapabilities(required map[string]*sdkEntities.GrantSet) (map[string]*sdkEntities.GrantSet, error)
 }
 
 // CapabilityManager combines collection and granting for convenience.

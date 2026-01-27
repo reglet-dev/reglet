@@ -11,10 +11,10 @@ import (
 	"time"
 
 	"github.com/expr-lang/expr"
+	sdkEntities "github.com/reglet-dev/reglet-sdk/go/domain/entities"
 	"github.com/reglet-dev/reglet/internal/application/dto"
 	apperrors "github.com/reglet-dev/reglet/internal/application/errors"
 	"github.com/reglet-dev/reglet/internal/application/ports"
-	"github.com/reglet-dev/reglet/internal/domain/capabilities"
 	"github.com/reglet-dev/reglet/internal/domain/entities"
 	"github.com/reglet-dev/reglet/internal/domain/execution"
 	"github.com/reglet-dev/reglet/internal/domain/services"
@@ -229,8 +229,8 @@ func (uc *CheckProfileUseCase) prepareEngine(
 	req dto.CheckProfileRequest,
 ) (
 	ports.ExecutionEngine,
-	map[string][]capabilities.Capability,
-	map[string][]capabilities.Capability,
+	map[string]*sdkEntities.GrantSet,
+	map[string]*sdkEntities.GrantSet,
 	error,
 ) {
 	requiredCaps, tempRuntime, err := uc.capOrchestrator.CollectCapabilities(ctx, profile, pluginDir)
@@ -243,7 +243,7 @@ func (uc *CheckProfileUseCase) prepareEngine(
 
 	grantedCaps, err := uc.capOrchestrator.GrantCapabilities(requiredCaps, req.Options.TrustPlugins)
 	if err != nil {
-		return nil, nil, nil, apperrors.NewCapabilityError("capability grant failed", flattenCapabilities(requiredCaps))
+		return nil, nil, nil, apperrors.NewCapabilityError("capability grant failed", mergeGrantSets(requiredCaps))
 	}
 
 	eng, err := uc.engineFactory.CreateEngine(
@@ -287,7 +287,7 @@ func (uc *CheckProfileUseCase) buildResponse(
 	req dto.CheckProfileRequest,
 	startTime time.Time,
 	result *execution.ExecutionResult,
-	reqCaps, grantedCaps map[string][]capabilities.Capability,
+	reqCaps, grantedCaps map[string]*sdkEntities.GrantSet,
 ) *dto.CheckProfileResponse {
 	return &dto.CheckProfileResponse{
 		ExecutionResult: result,
@@ -472,13 +472,15 @@ func extractPluginName(declared string) string {
 	return name
 }
 
-// flattenCapabilities converts map of capabilities to flat list.
-func flattenCapabilities(caps map[string][]capabilities.Capability) []capabilities.Capability {
-	var flat []capabilities.Capability
-	for _, pluginCaps := range caps {
-		flat = append(flat, pluginCaps...)
+// mergeGrantSets merges all GrantSets into a single GrantSet.
+func mergeGrantSets(caps map[string]*sdkEntities.GrantSet) *sdkEntities.GrantSet {
+	merged := &sdkEntities.GrantSet{}
+	for _, gs := range caps {
+		if gs != nil {
+			merged.Merge(gs)
+		}
 	}
-	return flat
+	return merged
 }
 
 // CheckFailed returns true if the execution result indicates failures.

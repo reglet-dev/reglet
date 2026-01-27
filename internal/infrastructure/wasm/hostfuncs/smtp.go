@@ -1,18 +1,13 @@
 package hostfuncs
 
 import (
-	"bufio"
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"net"
-	"net/smtp"
-	"net/textproto"
-	"strings"
-	"time"
+	"strconv"
 
+	"github.com/reglet-dev/reglet-sdk/go/hostfuncs"
 	"github.com/tetratelabs/wazero/api"
 )
 
@@ -45,16 +40,6 @@ func SMTPConnect(ctx context.Context, mod api.Module, stack []uint64, checker *C
 		return
 	}
 
-	// Create a new context from the wire format, with parent ctx for cancellation.
-	smtpCtx, cancel := createContextFromWire(ctx, request.Context)
-	defer cancel() // Ensure context resources are released.
-
-	// Apply timeout from request if specified
-	if request.TimeoutMs > 0 {
-		smtpCtx, cancel = context.WithTimeout(smtpCtx, time.Duration(request.TimeoutMs)*time.Millisecond)
-		defer cancel()
-	}
-
 	// 1. Check capability for outbound SMTP
 	pluginName := mod.Name()
 	if name, ok := PluginNameFromContext(ctx); ok {
@@ -70,174 +55,42 @@ func SMTPConnect(ctx context.Context, mod api.Module, stack []uint64, checker *C
 		return
 	}
 
-	// 2. Validate input
-	if request.Host == "" {
-		errMsg := "host cannot be empty"
-		slog.WarnContext(ctx, errMsg)
-		stack[0] = hostWriteResponse(ctx, mod, SMTPResponseWire{
-			Error: &ErrorDetail{Message: errMsg, Type: "config"},
-		})
-		return
+	// 2. Build SDK request
+	port, _ := strconv.Atoi(request.Port) // Wire format uses string port, SDK uses int
+	sdkReq := hostfuncs.SMTPConnectRequest{
+		Host:        request.Host,
+		Port:        port,
+		UseTLS:      request.TLS,
+		UseSTARTTLS: request.StartTLS,
+		Timeout:     int(request.TimeoutMs),
 	}
 
-	// SSRF protection: Resolve hostname ONCE, validate IP, then use validated IP
-	// This prevents DNS rebinding attacks where DNS changes between validation and connection
-	validatedIP, err := resolveAndValidate(ctx, request.Host, pluginName, checker)
-	if err != nil {
-		errMsg := fmt.Sprintf("SSRF protection: %v", err)
-		slog.WarnContext(ctx, errMsg, "host", request.Host, "port", request.Port)
-		stack[0] = hostWriteResponse(ctx, mod, SMTPResponseWire{
-			Error: &ErrorDetail{Message: errMsg, Type: "ssrf_protection"},
-		})
-		return
+	// Determine if private IPs should be allowed via capability
+	allowPrivate := checker.AllowsPrivateNetwork(pluginName)
+
+	// Call SDK with SSRF protection
+	sdkResp := hostfuncs.PerformSMTPConnect(ctx, sdkReq,
+		hostfuncs.WithSMTPSSRFProtection(!allowPrivate),
+	)
+
+	// 3. Convert to wire format
+	response := SMTPResponseWire{
+		Connected:      sdkResp.Connected,
+		Banner:         sdkResp.Banner,
+		TLS:            sdkResp.TLSVersion != "",
+		TLSVersion:     sdkResp.TLSVersion,
+		ResponseTimeMs: sdkResp.LatencyMs,
 	}
 
-	if request.Port == "" {
-		errMsg := "port cannot be empty"
-		slog.WarnContext(ctx, errMsg)
-		stack[0] = hostWriteResponse(ctx, mod, SMTPResponseWire{
-			Error: &ErrorDetail{Message: errMsg, Type: "config"},
-		})
-		return
-	}
+	response.TLSCipherSuite = sdkResp.TLSCipherSuite
+	response.TLSServerName = sdkResp.TLSServerName
 
-	// 3. Perform SMTP connection test using validated IP
-	start := time.Now()
-	response, err := performSMTPConnect(smtpCtx, validatedIP, request.Port, request.TLS, request.StartTLS, request.Host)
-	responseTime := time.Since(start).Milliseconds()
-
-	if err != nil {
-		errMsg := fmt.Sprintf("SMTP connection failed: %v", err)
-		slog.ErrorContext(ctx, errMsg, "host", request.Host, "port", request.Port)
-		stack[0] = hostWriteResponse(ctx, mod, SMTPResponseWire{
-			Error: toErrorDetail(err),
-		})
-		return
-	}
-
-	// Add response time to result
-	response.ResponseTimeMs = responseTime
-
-	// 4. Write success response
-	stack[0] = hostWriteResponse(ctx, mod, *response)
-}
-
-// performSMTPConnect executes the actual SMTP connection test
-// validatedIP is the pre-resolved and validated IP address to connect to
-// originalHost is the original hostname (used for TLS SNI and SMTP HELO)
-func performSMTPConnect(ctx context.Context, validatedIP, port string, useTLS bool, useStartTLS bool, originalHost string) (*SMTPResponseWire, error) {
-	// Connect to the validated IP address, not the hostname
-	// This prevents DNS rebinding attacks
-	address := net.JoinHostPort(validatedIP, port)
-
-	// Create dialer with reasonable timeout (also respects context cancellation)
-	dialer := &net.Dialer{
-		Timeout:   30 * time.Second,
-		KeepAlive: 30 * time.Second,
-	}
-
-	response := &SMTPResponseWire{
-		Connected: false,
-		// Use original hostname in address field for user-friendliness
-		// (actual connection uses validated IP for security)
-		Address: net.JoinHostPort(originalHost, port),
-	}
-
-	if useTLS {
-		// Direct TLS connection (SMTPS on port 465)
-		tlsConfig := &tls.Config{
-			ServerName: originalHost,
-			MinVersion: tls.VersionTLS12,
+	if sdkResp.Error != nil {
+		response.Error = &ErrorDetail{
+			Message: sdkResp.Error.Message,
+			Type:    sdkResp.Error.Code,
 		}
-
-		// Use context-aware dial via tls.Dialer
-		tlsDialer := &tls.Dialer{
-			NetDialer: dialer,
-			Config:    tlsConfig,
-		}
-		conn, err := tlsDialer.DialContext(ctx, "tcp", address)
-		if err != nil {
-			return nil, fmt.Errorf("TLS connection failed: %w", err)
-		}
-		defer func() {
-			_ = conn.Close() // Best-effort cleanup
-		}()
-
-		// Read banner using textproto
-		tp := textproto.NewReader(bufio.NewReader(conn))
-		code, msg, err := tp.ReadResponse(220)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read SMTP banner: %w", err)
-		}
-
-		banner := fmt.Sprintf("%d %s", code, msg)
-
-		// Get TLS connection state - conn is *tls.Conn
-		tlsConn := conn.(*tls.Conn)
-		state := tlsConn.ConnectionState()
-
-		response.Connected = true
-		response.Banner = strings.TrimSpace(banner)
-		response.TLS = true
-		response.TLSVersion = tlsVersionString(state.Version)
-		response.TLSCipherSuite = tls.CipherSuiteName(state.CipherSuite)
-		response.TLSServerName = state.ServerName
-
-		return response, nil
 	}
 
-	// Plain connection (possibly with STARTTLS)
-	conn, err := dialer.DialContext(ctx, "tcp", address)
-	if err != nil {
-		return nil, fmt.Errorf("connection failed: %w", err)
-	}
-	defer func() {
-		_ = conn.Close() // Best-effort cleanup
-	}()
-
-	// Read banner using textproto
-	tp := textproto.NewReader(bufio.NewReader(conn))
-	code, msg, err := tp.ReadResponse(220)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read SMTP banner: %w", err)
-	}
-
-	banner := fmt.Sprintf("%d %s", code, msg)
-
-	response.Connected = true
-	response.Banner = strings.TrimSpace(banner)
-
-	if useStartTLS {
-		// For STARTTLS, we need to use the SMTP client
-		client, err := smtp.NewClient(conn, originalHost)
-		if err != nil {
-			return nil, fmt.Errorf("SMTP client creation failed: %w", err)
-		}
-		defer func() {
-			_ = client.Quit() // Best-effort cleanup
-		}()
-
-		// Upgrade to TLS via STARTTLS
-		tlsConfig := &tls.Config{
-			ServerName: originalHost,
-			MinVersion: tls.VersionTLS12,
-		}
-
-		if err := client.StartTLS(tlsConfig); err != nil {
-			return nil, fmt.Errorf("STARTTLS failed: %w", err)
-		}
-
-		// Get TLS connection state after upgrade
-		state, ok := client.TLSConnectionState()
-		if !ok {
-			return nil, fmt.Errorf("failed to get TLS state after STARTTLS")
-		}
-
-		response.TLS = true
-		response.TLSVersion = tlsVersionString(state.Version)
-		response.TLSCipherSuite = tls.CipherSuiteName(state.CipherSuite)
-		response.TLSServerName = state.ServerName
-	}
-
-	return response, nil
+	stack[0] = hostWriteResponse(ctx, mod, response)
 }

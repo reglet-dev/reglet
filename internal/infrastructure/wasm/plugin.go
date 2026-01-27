@@ -12,7 +12,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/reglet-dev/reglet/internal/domain/capabilities"
+	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
 	"github.com/reglet-dev/reglet/internal/infrastructure/wasm/hostfuncs"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
@@ -30,7 +30,7 @@ type Plugin struct {
 	schema       *ConfigSchema
 	name         string
 	frozenEnv    []string
-	capabilities []capabilities.Capability
+	capabilities *entities.GrantSet
 	poolSize     int
 	configOnce   sync.Once
 	mu           sync.Mutex
@@ -111,53 +111,68 @@ func (p *Plugin) extractFilesystemMounts() []fsMount {
 	var mounts []fsMount
 	seenPaths := make(map[string]bool)
 
-	for _, cap := range p.capabilities {
-		if cap.Kind != "fs" {
-			continue
+	if p.capabilities == nil || p.capabilities.FS == nil {
+		return mounts
+	}
+
+	for _, rule := range p.capabilities.FS.Rules {
+		// Process read paths
+		for _, pattern := range rule.Read {
+			mountPath := extractMountPath(pattern)
+			if mountPath == "" {
+				slog.Warn("skipping invalid capability pattern - could not determine safe mount path",
+					"plugin", p.name,
+					"pattern", pattern)
+				continue
+			}
+
+			if mountPath == "/" || pattern == "/**" {
+				slog.Warn("plugin granted root filesystem access",
+					"plugin", p.name,
+					"capability", "read:"+pattern)
+			}
+
+			mountKey := fmt.Sprintf("read:%s", mountPath)
+			if seenPaths[mountKey] {
+				continue
+			}
+			seenPaths[mountKey] = true
+
+			mounts = append(mounts, fsMount{
+				hostPath:  mountPath,
+				guestPath: mountPath,
+				readOnly:  true,
+			})
 		}
 
-		// Parse pattern: "read:/etc/hosts" or "write:/var/log/**"
-		parts := strings.SplitN(cap.Pattern, ":", 2)
-		if len(parts) != 2 {
-			slog.Warn("invalid filesystem capability pattern",
-				"plugin", p.name,
-				"pattern", cap.Pattern)
-			continue
+		// Process write paths
+		for _, pattern := range rule.Write {
+			mountPath := extractMountPath(pattern)
+			if mountPath == "" {
+				slog.Warn("skipping invalid capability pattern - could not determine safe mount path",
+					"plugin", p.name,
+					"pattern", pattern)
+				continue
+			}
+
+			if mountPath == "/" || pattern == "/**" {
+				slog.Warn("plugin granted root filesystem access",
+					"plugin", p.name,
+					"capability", "write:"+pattern)
+			}
+
+			mountKey := fmt.Sprintf("write:%s", mountPath)
+			if seenPaths[mountKey] {
+				continue
+			}
+			seenPaths[mountKey] = true
+
+			mounts = append(mounts, fsMount{
+				hostPath:  mountPath,
+				guestPath: mountPath,
+				readOnly:  false,
+			})
 		}
-
-		operation := parts[0] // "read" or "write"
-		pattern := parts[1]   // "/etc/hosts" or "/var/log/**"
-
-		// Extract mount path
-		mountPath := extractMountPath(pattern)
-
-		// Skip empty mount paths (indicates error in path extraction)
-		if mountPath == "" {
-			slog.Warn("skipping invalid capability pattern - could not determine safe mount path",
-				"plugin", p.name,
-				"pattern", cap.Pattern)
-			continue
-		}
-
-		// Warn about root access
-		if mountPath == "/" || pattern == "/**" {
-			slog.Warn("plugin granted root filesystem access",
-				"plugin", p.name,
-				"capability", cap.Pattern)
-		}
-
-		// Track mount (don't deduplicate per user preference)
-		mountKey := fmt.Sprintf("%s:%s", operation, mountPath)
-		if seenPaths[mountKey] {
-			continue // Same operation + path already added
-		}
-		seenPaths[mountKey] = true
-
-		mounts = append(mounts, fsMount{
-			hostPath:  mountPath,
-			guestPath: mountPath, // Mount at same path in guest
-			readOnly:  operation == "read",
-		})
 	}
 
 	return mounts
@@ -202,7 +217,7 @@ func (p *Plugin) createModuleConfig(_ context.Context) wazero.ModuleConfig {
 		WithStdout(p.stdout)
 
 	// Inject environment variables based on granted capabilities
-	if len(p.capabilities) > 0 {
+	if p.capabilities != nil && p.capabilities.Env != nil && len(p.capabilities.Env.Variables) > 0 {
 		config = p.injectEnvironmentVariables(config)
 	}
 
@@ -211,17 +226,11 @@ func (p *Plugin) createModuleConfig(_ context.Context) wazero.ModuleConfig {
 
 // injectEnvironmentVariables filters host environment variables based on granted capabilities
 func (p *Plugin) injectEnvironmentVariables(config wazero.ModuleConfig) wazero.ModuleConfig {
-	// Get all granted env capabilities for this plugin
-	envCapabilities := []capabilities.Capability{}
-	for _, cap := range p.capabilities {
-		if cap.Kind == "env" {
-			envCapabilities = append(envCapabilities, cap)
-		}
-	}
-
-	if len(envCapabilities) == 0 {
+	if p.capabilities == nil || p.capabilities.Env == nil || len(p.capabilities.Env.Variables) == 0 {
 		return config // No env capabilities granted
 	}
+
+	envPatterns := p.capabilities.Env.Variables
 
 	// Use frozen environment snapshot from runtime initialization
 	// This prevents runtime environment changes from leaking to plugins
@@ -237,14 +246,14 @@ func (p *Plugin) injectEnvironmentVariables(config wazero.ModuleConfig) wazero.M
 		}
 		key := parts[0]
 
-		// Check if this key is allowed by any granted capability
-		for _, cap := range envCapabilities {
-			if capabilities.MatchEnvironmentPattern(key, cap.Pattern) {
+		// Check if this key is allowed by any granted pattern
+		for _, pattern := range envPatterns {
+			if matchEnvironmentPattern(key, pattern) {
 				allowedEnv = append(allowedEnv, envVar)
 				slog.Debug("injecting environment variable",
 					"plugin", p.name,
 					"key", key,
-					"capability", cap.String())
+					"pattern", pattern)
 				break
 			}
 		}
@@ -259,6 +268,19 @@ func (p *Plugin) injectEnvironmentVariables(config wazero.ModuleConfig) wazero.M
 	}
 
 	return config
+}
+
+// matchEnvironmentPattern checks if an environment variable key matches a capability pattern.
+// Supports exact match ("AWS_REGION"), prefix match ("AWS_*"), and wildcard ("*").
+func matchEnvironmentPattern(key, pattern string) bool {
+	if pattern == "*" {
+		return true
+	}
+	if strings.HasSuffix(pattern, "*") {
+		prefix := strings.TrimSuffix(pattern, "*")
+		return strings.HasPrefix(key, prefix)
+	}
+	return key == pattern
 }
 
 // defaultPoolSize is the number of pre-instantiated WASM instances to keep ready.
@@ -682,21 +704,65 @@ func parsePluginInfo(data []byte) (*PluginInfo, error) {
 		info.Description = description
 	}
 
-	// Parse capabilities array
-	if caps, ok := raw["capabilities"].([]interface{}); ok {
-		for _, capRaw := range caps {
-			if capMap, ok := capRaw.(map[string]interface{}); ok {
-				var capability capabilities.Capability
-				if kind, ok := capMap["kind"].(string); ok {
-					capability.Kind = kind
-				}
-				if pattern, ok := capMap["pattern"].(string); ok {
-					capability.Pattern = pattern
-				}
-				info.Capabilities = append(info.Capabilities, capability)
+	// Parse capabilities - now returns a GrantSet
+	info.Capabilities = parseCapabilitiesToGrantSet(raw)
+
+	return info, nil
+}
+
+// parseCapabilitiesToGrantSet converts the legacy capabilities array to a GrantSet.
+func parseCapabilitiesToGrantSet(raw map[string]interface{}) *entities.GrantSet {
+	caps, ok := raw["capabilities"].([]interface{})
+	if !ok || len(caps) == 0 {
+		return nil
+	}
+
+	grantSet := &entities.GrantSet{}
+
+	for _, capRaw := range caps {
+		capMap, ok := capRaw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		kind, _ := capMap["kind"].(string)
+		pattern, _ := capMap["pattern"].(string)
+
+		switch kind {
+		case "fs":
+			if grantSet.FS == nil {
+				grantSet.FS = &entities.FileSystemCapability{}
 			}
+			// Parse pattern like "read:/path" or "write:/path"
+			if strings.HasPrefix(pattern, "read:") {
+				path := strings.TrimPrefix(pattern, "read:")
+				grantSet.FS.Rules = append(grantSet.FS.Rules, entities.FileSystemRule{Read: []string{path}})
+			} else if strings.HasPrefix(pattern, "write:") {
+				path := strings.TrimPrefix(pattern, "write:")
+				grantSet.FS.Rules = append(grantSet.FS.Rules, entities.FileSystemRule{Write: []string{path}})
+			} else {
+				// Default to read if no prefix
+				grantSet.FS.Rules = append(grantSet.FS.Rules, entities.FileSystemRule{Read: []string{pattern}})
+			}
+		case "network":
+			if grantSet.Network == nil {
+				grantSet.Network = &entities.NetworkCapability{}
+			}
+			// Parse pattern like "outbound:443" or "outbound:*"
+			port := strings.TrimPrefix(pattern, "outbound:")
+			grantSet.Network.Rules = append(grantSet.Network.Rules, entities.NetworkRule{Hosts: []string{"*"}, Ports: []string{port}})
+		case "env":
+			if grantSet.Env == nil {
+				grantSet.Env = &entities.EnvironmentCapability{}
+			}
+			grantSet.Env.Variables = append(grantSet.Env.Variables, pattern)
+		case "exec":
+			if grantSet.Exec == nil {
+				grantSet.Exec = &entities.ExecCapability{}
+			}
+			grantSet.Exec.Commands = append(grantSet.Exec.Commands, pattern)
 		}
 	}
 
-	return info, nil
+	return grantSet
 }

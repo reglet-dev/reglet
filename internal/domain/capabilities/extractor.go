@@ -2,14 +2,16 @@ package capabilities
 
 import (
 	"sync"
+
+	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
 )
 
 // Extractor is an interface for extracting capabilities from a plugin configuration.
 // Implementations of this interface contain plugin-specific logic for determining
 // required permissions based on the user's configuration.
 type Extractor interface {
-	// Extract analyzes the configuration and returns a list of required capabilities.
-	Extract(config map[string]interface{}) []Capability
+	// Extract analyzes the configuration and returns a GrantSet of required capabilities.
+	Extract(config map[string]interface{}) *entities.GrantSet
 }
 
 // Registry manages the registration and retrieval of capability extractors.
