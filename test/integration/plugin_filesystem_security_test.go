@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/reglet-dev/reglet/internal/domain/capabilities"
+	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
 	"github.com/reglet-dev/reglet/internal/infrastructure/build"
 	"github.com/reglet-dev/reglet/internal/infrastructure/wasm"
 	"github.com/stretchr/testify/assert"
@@ -33,9 +33,11 @@ func TestPluginFilesystemIsolation(t *testing.T) {
 	require.NoError(t, os.WriteFile(forbiddenFile, []byte("secret content"), 0o644))
 
 	// Grant access only to allowedDir, not forbiddenDir
-	caps := map[string][]capabilities.Capability{
+	caps := map[string]*entities.GrantSet{
 		"file": {
-			{Kind: "fs", Pattern: "read:" + allowedDir + "/**"},
+			FS: &entities.FileSystemCapability{
+				Rules: []entities.FileSystemRule{{Read: []string{allowedDir + "/**"}}},
+			},
 		},
 	}
 
@@ -89,7 +91,7 @@ func TestPluginNoCapabilitiesNoAccess(t *testing.T) {
 	ctx := context.Background()
 
 	// Create runtime with NO capabilities for the plugin
-	caps := map[string][]capabilities.Capability{
+	caps := map[string]*entities.GrantSet{
 		"file": {}, // Empty capabilities - no filesystem access
 	}
 
@@ -143,9 +145,11 @@ func TestPluginSpecificFileAccess(t *testing.T) {
 	require.NoError(t, os.WriteFile(deniedFile, []byte("secret-api-key-12345"), 0o644))
 
 	// Grant access only to config directory
-	caps := map[string][]capabilities.Capability{
+	caps := map[string]*entities.GrantSet{
 		"file": {
-			{Kind: "fs", Pattern: "read:" + filepath.Join(tmpDir, "config") + "/**"},
+			FS: &entities.FileSystemCapability{
+				Rules: []entities.FileSystemRule{{Read: []string{filepath.Join(tmpDir, "config") + "/**"}}},
+			},
 		},
 	}
 
@@ -195,9 +199,11 @@ func TestPluginRootAccess(t *testing.T) {
 	ctx := context.Background()
 
 	// Grant root filesystem access (should log warning)
-	caps := map[string][]capabilities.Capability{
+	caps := map[string]*entities.GrantSet{
 		"file": {
-			{Kind: "fs", Pattern: "read:/**"},
+			FS: &entities.FileSystemCapability{
+				Rules: []entities.FileSystemRule{{Read: []string{"/**"}}},
+			},
 		},
 	}
 
@@ -240,9 +246,11 @@ func TestPluginReadOnlyVsReadWrite(t *testing.T) {
 	require.NoError(t, os.WriteFile(testFile, []byte("initial content"), 0o644))
 
 	// Grant read-only access
-	caps := map[string][]capabilities.Capability{
+	caps := map[string]*entities.GrantSet{
 		"file": {
-			{Kind: "fs", Pattern: "read:" + tmpDir + "/**"},
+			FS: &entities.FileSystemCapability{
+				Rules: []entities.FileSystemRule{{Read: []string{tmpDir + "/**"}}},
+			},
 		},
 	}
 

@@ -4,8 +4,8 @@ import (
 	"context"
 	"io"
 
+	sdkEntities "github.com/reglet-dev/reglet-sdk/go/domain/entities"
 	"github.com/reglet-dev/reglet/internal/application/dto"
-	"github.com/reglet-dev/reglet/internal/domain/capabilities"
 	"github.com/reglet-dev/reglet/internal/domain/entities"
 	"github.com/reglet-dev/reglet/internal/domain/execution"
 )
@@ -18,7 +18,7 @@ type ExecutionEngine interface {
 
 // EngineFactory creates execution engines with capabilities.
 type EngineFactory interface {
-	CreateEngine(ctx context.Context, profile entities.ProfileReader, grantedCaps map[string][]capabilities.Capability, pluginDir string, filters dto.FilterOptions, execution dto.ExecutionOptions, skipSchemaValidation bool) (ExecutionEngine, error)
+	CreateEngine(ctx context.Context, profile entities.ProfileReader, grantedCaps map[string]*sdkEntities.GrantSet, pluginDir string, filters dto.FilterOptions, execution dto.ExecutionOptions, skipSchemaValidation bool) (ExecutionEngine, error)
 }
 
 // OutputFormatter formats execution results.

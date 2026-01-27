@@ -84,23 +84,6 @@ redaction:
 	assert.Equal(t, "test-salt", cfg.Redaction.HashMode.Salt)
 }
 
-func TestConfig_ToHostFuncsCapabilities(t *testing.T) {
-	cfg := &Config{
-		Capabilities: []CapabilityConfig{
-			{Kind: "fs:read", Pattern: "/etc/hosts"},
-			{Kind: "network:outbound", Pattern: "*.example.com:443"},
-		},
-	}
-
-	caps := cfg.ToHostFuncsCapabilities()
-
-	require.Len(t, caps, 2)
-	assert.Equal(t, "fs:read", caps[0].Kind)
-	assert.Equal(t, "/etc/hosts", caps[0].Pattern)
-	assert.Equal(t, "network:outbound", caps[1].Kind)
-	assert.Equal(t, "*.example.com:443", caps[1].Pattern)
-}
-
 func TestSecurityConfig_GetSecurityLevel(t *testing.T) {
 	tests := []struct {
 		name     string

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/reglet-dev/reglet-sdk/go/wireformat"
+	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
 )
 
 // FuzzHTTPRequestParsing fuzzes HTTP request wire format parsing
@@ -14,7 +14,7 @@ import (
 // EXPECTED FAILURES: Invalid base64, malformed JSON, URL parse errors
 func FuzzHTTPRequestParsing(f *testing.F) {
 	// Seed with valid and invalid HTTP request structures
-	validReq := wireformat.HTTPRequestWire{
+	validReq := entities.HTTPRequest{
 		Method: "GET",
 		URL:    "https://example.com/path",
 		Headers: map[string][]string{
@@ -39,7 +39,7 @@ func FuzzHTTPRequestParsing(f *testing.F) {
 			}
 		}()
 
-		var req wireformat.HTTPRequestWire
+		var req entities.HTTPRequest
 		_ = json.Unmarshal(jsonData, &req)
 		// Just ensure no panic on parsing
 	})

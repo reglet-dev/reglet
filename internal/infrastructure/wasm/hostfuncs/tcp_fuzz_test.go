@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/reglet-dev/reglet-sdk/go/wireformat"
+	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
 )
 
 // FuzzTCPRequestParsing fuzzes TCP request wire format parsing
@@ -13,7 +13,7 @@ import (
 // EXPECTED FAILURES: Malformed JSON, invalid ports
 func FuzzTCPRequestParsing(f *testing.F) {
 	// Seed with valid request
-	validReq := wireformat.TCPRequestWire{
+	validReq := entities.TCPRequest{
 		Host: "example.com",
 		Port: "80",
 		TLS:  false,
@@ -35,7 +35,7 @@ func FuzzTCPRequestParsing(f *testing.F) {
 			}
 		}()
 
-		var req wireformat.TCPRequestWire
+		var req entities.TCPRequest
 		_ = json.Unmarshal(jsonData, &req)
 		// Just ensure no panic on parsing
 	})

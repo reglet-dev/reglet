@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
+	sdkEntities "github.com/reglet-dev/reglet-sdk/go/domain/entities"
 	"github.com/reglet-dev/reglet/internal/application/services"
-	"github.com/reglet-dev/reglet/internal/domain/capabilities"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -157,9 +157,11 @@ func TestProfileTrustService_FormatNonInteractiveError(t *testing.T) {
 
 	svc := services.NewProfileTrustService()
 
-	caps := map[string][]capabilities.Capability{
+	caps := map[string]*sdkEntities.GrantSet{
 		"file": {
-			{Kind: "fs", Pattern: "read:/etc/passwd"},
+			FS: &sdkEntities.FileSystemCapability{
+				Rules: []sdkEntities.FileSystemRule{{Read: []string{"/etc/passwd"}}},
+			},
 		},
 	}
 
@@ -169,5 +171,5 @@ func TestProfileTrustService_FormatNonInteractiveError(t *testing.T) {
 	assert.Contains(t, err.Error(), "Remote profile requires trust approval")
 	assert.Contains(t, err.Error(), "https://example.com/profile.yaml")
 	assert.Contains(t, err.Error(), "--trust-source")
-	assert.Contains(t, err.Error(), "fs:read:/etc/passwd")
+	assert.Contains(t, err.Error(), "/etc/passwd")
 }

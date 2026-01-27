@@ -3,6 +3,7 @@ package hostfuncs
 import (
 	"testing"
 
+	"github.com/reglet-dev/reglet-sdk/go/hostfuncs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -11,7 +12,7 @@ import (
 // when the output exceeds the limit.
 func Test_BoundedBuffer_Truncation_ExceedsLimit(t *testing.T) {
 	limit := 10 // small limit for testing
-	buffer := NewBoundedBuffer(limit)
+	buffer := hostfuncs.NewBoundedBuffer(limit)
 
 	input := []byte("123456789012345") // 15 bytes, exceeds 10 byte limit
 	n, err := buffer.Write(input)
@@ -26,7 +27,7 @@ func Test_BoundedBuffer_Truncation_ExceedsLimit(t *testing.T) {
 // when the output is within the limit.
 func Test_BoundedBuffer_Truncation_WithinLimit(t *testing.T) {
 	limit := 20
-	buffer := NewBoundedBuffer(limit)
+	buffer := hostfuncs.NewBoundedBuffer(limit)
 
 	input := []byte("1234567890") // 10 bytes
 	n, err := buffer.Write(input)
@@ -41,7 +42,7 @@ func Test_BoundedBuffer_Truncation_WithinLimit(t *testing.T) {
 // when the output is exactly at the limit.
 func Test_BoundedBuffer_Truncation_ExactlyAtLimit(t *testing.T) {
 	limit := 10
-	buffer := NewBoundedBuffer(limit)
+	buffer := hostfuncs.NewBoundedBuffer(limit)
 
 	input := []byte("1234567890") // 10 bytes
 	n, err := buffer.Write(input)

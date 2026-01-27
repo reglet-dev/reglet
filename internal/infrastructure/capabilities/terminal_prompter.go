@@ -6,15 +6,19 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/huh"
-	"github.com/reglet-dev/reglet/internal/domain/capabilities"
+	sdkEntities "github.com/reglet-dev/reglet-sdk/go/domain/entities"
 )
 
 // TerminalPrompter provides interactive terminal prompting for capability grants.
-type TerminalPrompter struct{}
+type TerminalPrompter struct {
+	riskAssessor *sdkEntities.RiskAssessor
+}
 
 // NewTerminalPrompter creates a new TerminalPrompter.
 func NewTerminalPrompter() *TerminalPrompter {
-	return &TerminalPrompter{}
+	return &TerminalPrompter{
+		riskAssessor: sdkEntities.NewRiskAssessor(),
+	}
 }
 
 // IsInteractive checks if we're running in an interactive terminal.
@@ -28,22 +32,64 @@ func (p *TerminalPrompter) IsInteractive() bool {
 	return (fileInfo.Mode() & os.ModeCharDevice) != 0
 }
 
-// PromptForCapability asks the user whether to grant a capability.
-func (p *TerminalPrompter) PromptForCapability(capability capabilities.Capability) (granted bool, always bool, err error) {
-	return p.PromptForCapabilityWithInfo(capability, false, nil)
+// PromptForCapability asks the user to grant a capability.
+func (p *TerminalPrompter) PromptForCapability(req sdkEntities.CapabilityRequest) (granted bool, always bool, err error) {
+	return p.PromptForCapabilityString(req.Description, req.IsBroad)
 }
 
-// PromptForCapabilityWithInfo asks the user whether to grant a capability with security warnings.
-func (p *TerminalPrompter) PromptForCapabilityWithInfo(
-	capability capabilities.Capability,
-	isBroad bool,
-	profileSpecific *capabilities.Capability,
-) (granted bool, always bool, err error) {
-	desc := p.describeCapability(capability)
+// PromptForCapabilities prompts for multiple capabilities at once.
+func (p *TerminalPrompter) PromptForCapabilities(reqs []sdkEntities.CapabilityRequest) (*sdkEntities.GrantSet, error) {
+	grants := &sdkEntities.GrantSet{}
+	for _, req := range reqs {
+		granted, _, err := p.PromptForCapability(req)
+		if err != nil {
+			return nil, err
+		}
+		if granted {
+			switch req.Kind {
+			case "network":
+				if rule, ok := req.Rule.(sdkEntities.NetworkRule); ok {
+					if grants.Network == nil {
+						grants.Network = &sdkEntities.NetworkCapability{}
+					}
+					grants.Network.Rules = append(grants.Network.Rules, rule)
+				}
+			case "fs":
+				if rule, ok := req.Rule.(sdkEntities.FileSystemRule); ok {
+					if grants.FS == nil {
+						grants.FS = &sdkEntities.FileSystemCapability{}
+					}
+					grants.FS.Rules = append(grants.FS.Rules, rule)
+				}
+			case "env":
+				if v, ok := req.Rule.(string); ok {
+					if grants.Env == nil {
+						grants.Env = &sdkEntities.EnvironmentCapability{}
+					}
+					grants.Env.Variables = append(grants.Env.Variables, v)
+				}
+			case "exec":
+				if cmd, ok := req.Rule.(string); ok {
+					if grants.Exec == nil {
+						grants.Exec = &sdkEntities.ExecCapability{}
+					}
+					grants.Exec.Commands = append(grants.Exec.Commands, cmd)
+				}
+			}
+		}
+	}
+	return grants, nil
+}
 
+// PromptForCapabilityString asks the user whether to grant a capability described by a string.
+func (p *TerminalPrompter) PromptForCapabilityString(desc string, isBroad bool) (granted bool, always bool, err error) {
 	// Show security warning for broad capabilities
 	if isBroad {
-		p.displayBroadCapabilityWarning(capability, profileSpecific)
+		fmt.Fprintf(os.Stderr, "\n")
+		fmt.Fprintf(os.Stderr, "\033[1;33mSecurity Warning: Broad Permission Requested\033[0m\n\n")
+		fmt.Fprintf(os.Stderr, "  %s\n", desc)
+		fmt.Fprintf(os.Stderr, "  Recommendation: Review if this broad access is necessary.\n")
+		fmt.Fprintf(os.Stderr, "\n")
 	}
 
 	// Define choices
@@ -57,7 +103,7 @@ func (p *TerminalPrompter) PromptForCapabilityWithInfo(
 
 	err = huh.NewSelect[string]().
 		Title("Plugin Requesting Permission").
-		Description(fmt.Sprintf("✓ %s", desc)).
+		Description(desc).
 		Options(
 			huh.NewOption(OptionYes, OptionYes),
 			huh.NewOption(OptionAlways, OptionAlways),
@@ -80,132 +126,72 @@ func (p *TerminalPrompter) PromptForCapabilityWithInfo(
 	}
 }
 
-// displayBroadCapabilityWarning shows a security warning for overly broad capabilities.
-func (p *TerminalPrompter) displayBroadCapabilityWarning(
-	broad capabilities.Capability,
-	profileSpecific *capabilities.Capability,
-) {
-	fmt.Fprintf(os.Stderr, "\n")
-	fmt.Fprintf(os.Stderr, "⚠️  \033[1;33mSecurity Warning: Broad Permission Requested\033[0m\n\n")
-
-	// Show what's being requested
-	fmt.Fprintf(os.Stderr, "  Requested: %s\n", p.describeCapability(broad))
-
-	// Explain the risk
-	risk := p.describeBroadRisk(broad)
-	if risk != "" {
-		fmt.Fprintf(os.Stderr, "  Risk: %s\n", risk)
-	}
-
-	// Show profile-specific alternative if available
-	if profileSpecific != nil {
-		fmt.Fprintf(os.Stderr, "\n  ✓ Profile only needs: %s\n", p.describeCapability(*profileSpecific))
-		fmt.Fprintf(os.Stderr, "  Recommendation: Consider granting only what the profile needs.\n")
-	} else {
-		fmt.Fprintf(os.Stderr, "  Recommendation: Review if this broad access is necessary.\n")
-	}
-
-	fmt.Fprintf(os.Stderr, "\n")
-}
-
-// describeBroadRisk explains the security implications of a broad capability.
-func (p *TerminalPrompter) describeBroadRisk(capability capabilities.Capability) string {
-	switch capability.Kind {
-	case "fs":
-		if strings.Contains(capability.Pattern, "/**") || strings.Contains(capability.Pattern, "**") {
-			return "Plugin can access ALL files on the system"
-		}
-		if strings.Contains(capability.Pattern, "/etc") {
-			return "Plugin can access sensitive system configuration"
-		}
-		if strings.Contains(capability.Pattern, "/root") || strings.Contains(capability.Pattern, "/home") {
-			return "Plugin can access user home directories and private files"
-		}
-	case "exec":
-		if capability.Pattern == "bash" || capability.Pattern == "sh" || strings.Contains(capability.Pattern, "/bin/") {
-			return "Plugin can execute arbitrary shell commands"
-		}
-	case "network":
-		if capability.Pattern == "*" || capability.Pattern == "outbound:*" {
-			return "Plugin can connect to any host on the internet"
-		}
-	}
-	return "Plugin has broad access beyond what may be necessary"
-}
-
-// describeCapability returns a human-readable description of a capability.
-func (p *TerminalPrompter) describeCapability(capability capabilities.Capability) string {
-	switch capability.Kind {
-	case "network":
-		if capability.Pattern == "outbound:*" {
-			return "Network access to any port"
-		}
-		if capability.Pattern == "outbound:private" {
-			return "Network access to private/reserved IPs (localhost, 192.168.x.x, 10.x.x.x, 169.254.169.254, etc.)"
-		}
-		if strings.HasPrefix(capability.Pattern, "outbound:") {
-			ports := strings.TrimPrefix(capability.Pattern, "outbound:")
-			return fmt.Sprintf("Network access to port %s", ports)
-		}
-		return fmt.Sprintf("Network: %s", capability.Pattern)
-	case "fs":
-		if strings.HasPrefix(capability.Pattern, "read:") {
-			path := strings.TrimPrefix(capability.Pattern, "read:")
-			return fmt.Sprintf("Read files: %s", path)
-		}
-		if strings.HasPrefix(capability.Pattern, "write:") {
-			path := strings.TrimPrefix(capability.Pattern, "write:")
-			return fmt.Sprintf("Write files: %s", path)
-		}
-		return fmt.Sprintf("Filesystem: %s", capability.Pattern)
-	case "exec":
-		if capability.Pattern == "/bin/sh" {
-			return "Shell execution (executes shell commands)"
-		}
-		return fmt.Sprintf("Execute commands: %s", capability.Pattern)
-	case "env":
-		return fmt.Sprintf("Read environment variables: %s", capability.Pattern)
-	default:
-		return fmt.Sprintf("%s: %s", capability.Kind, capability.Pattern)
-	}
-}
-
 // FormatNonInteractiveError creates a helpful error message for non-interactive mode.
-func (p *TerminalPrompter) FormatNonInteractiveError(missing capabilities.Grant) error {
+func (p *TerminalPrompter) FormatNonInteractiveError(missing *sdkEntities.GrantSet) error {
 	var msg strings.Builder
 	msg.WriteString("Plugins require additional permissions (running in non-interactive mode)\n\n")
 	msg.WriteString("Required permissions:\n")
 
-	for _, capability := range missing {
-		msg.WriteString(fmt.Sprintf("  - %s\n", p.describeCapability(capability)))
+	// Describe network capabilities
+	if missing.Network != nil {
+		for _, rule := range missing.Network.Rules {
+			if len(rule.Hosts) > 0 && len(rule.Ports) > 0 {
+				msg.WriteString(fmt.Sprintf("  - Network: hosts=%v, ports=%v\n", rule.Hosts, rule.Ports))
+			}
+		}
+	}
+
+	// Describe filesystem capabilities
+	if missing.FS != nil {
+		for _, rule := range missing.FS.Rules {
+			if len(rule.Read) > 0 {
+				msg.WriteString(fmt.Sprintf("  - Read files: %v\n", rule.Read))
+			}
+			if len(rule.Write) > 0 {
+				msg.WriteString(fmt.Sprintf("  - Write files: %v\n", rule.Write))
+			}
+		}
+	}
+
+	// Describe environment capabilities
+	if missing.Env != nil && len(missing.Env.Variables) > 0 {
+		msg.WriteString(fmt.Sprintf("  - Environment variables: %v\n", missing.Env.Variables))
+	}
+
+	// Describe exec capabilities
+	if missing.Exec != nil && len(missing.Exec.Commands) > 0 {
+		msg.WriteString(fmt.Sprintf("  - Execute commands: %v\n", missing.Exec.Commands))
 	}
 
 	msg.WriteString("\nTo grant these permissions:\n")
 	msg.WriteString("  1. Run interactively and approve when prompted\n")
 	msg.WriteString("  2. Use --trust-plugins flag (grants all permissions)\n")
-	msg.WriteString("  3. Manually edit: ~/.reglet/config.yaml\n") // Hardcode for now, will be dynamic later
+	msg.WriteString("  3. Manually edit: ~/.reglet/config.yaml\n")
 
 	return fmt.Errorf("%s", msg.String())
 }
 
-// PromptForProfileTrust prompts the user to trust a remote profile source.
+// PromptForProfileTrustWithGrantSet prompts the user to trust a remote profile source.
 // Displays the profile URL and required capabilities for informed decision.
-func (p *TerminalPrompter) PromptForProfileTrust(
+func (p *TerminalPrompter) PromptForProfileTrustWithGrantSet(
 	url string,
-	requiredCaps map[string][]capabilities.Capability,
+	requiredCaps map[string]*sdkEntities.GrantSet,
 ) (bool, error) {
 	// Build capability description
 	var capDescriptions []string
-	for plugin, caps := range requiredCaps {
-		for _, cap := range caps {
-			desc := fmt.Sprintf("[%s] %s", plugin, p.describeCapability(cap))
-			capDescriptions = append(capDescriptions, desc)
+	for plugin, gs := range requiredCaps {
+		if gs == nil {
+			continue
+		}
+		descs := p.describeGrantSet(gs)
+		for _, desc := range descs {
+			capDescriptions = append(capDescriptions, fmt.Sprintf("[%s] %s", plugin, desc))
 		}
 	}
 
 	// Display warning
 	fmt.Fprintf(os.Stderr, "\n")
-	fmt.Fprintf(os.Stderr, "⚠️  \033[1;33mRemote Profile Trust Required\033[0m\n\n")
+	fmt.Fprintf(os.Stderr, "\033[1;33mRemote Profile Trust Required\033[0m\n\n")
 	fmt.Fprintf(os.Stderr, "  Source: %s\n\n", url)
 
 	if len(capDescriptions) > 0 {
@@ -238,4 +224,36 @@ func (p *TerminalPrompter) PromptForProfileTrust(
 	}
 
 	return selection == OptionYes, nil
+}
+
+// describeGrantSet returns human-readable descriptions of a GrantSet.
+func (p *TerminalPrompter) describeGrantSet(gs *sdkEntities.GrantSet) []string {
+	var descriptions []string
+
+	if gs.Network != nil {
+		for _, rule := range gs.Network.Rules {
+			descriptions = append(descriptions, fmt.Sprintf("Network: hosts=%v, ports=%v", rule.Hosts, rule.Ports))
+		}
+	}
+
+	if gs.FS != nil {
+		for _, rule := range gs.FS.Rules {
+			if len(rule.Read) > 0 {
+				descriptions = append(descriptions, fmt.Sprintf("Read files: %v", rule.Read))
+			}
+			if len(rule.Write) > 0 {
+				descriptions = append(descriptions, fmt.Sprintf("Write files: %v", rule.Write))
+			}
+		}
+	}
+
+	if gs.Env != nil && len(gs.Env.Variables) > 0 {
+		descriptions = append(descriptions, fmt.Sprintf("Environment variables: %v", gs.Env.Variables))
+	}
+
+	if gs.Exec != nil && len(gs.Exec.Commands) > 0 {
+		descriptions = append(descriptions, fmt.Sprintf("Execute commands: %v", gs.Exec.Commands))
+	}
+
+	return descriptions
 }

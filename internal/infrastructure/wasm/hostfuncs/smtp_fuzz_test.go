@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/reglet-dev/reglet-sdk/go/wireformat"
+	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
 )
 
 // FuzzSMTPRequestParsing fuzzes SMTP request wire format parsing
@@ -13,7 +13,7 @@ import (
 // EXPECTED FAILURES: Malformed JSON, invalid ports
 func FuzzSMTPRequestParsing(f *testing.F) {
 	// Seed with valid request
-	validReq := wireformat.SMTPRequestWire{
+	validReq := entities.SMTPRequest{
 		Host:     "smtp.example.com",
 		Port:     "25",
 		TLS:      false,
@@ -35,7 +35,7 @@ func FuzzSMTPRequestParsing(f *testing.F) {
 			}
 		}()
 
-		var req wireformat.SMTPRequestWire
+		var req entities.SMTPRequest
 		_ = json.Unmarshal(jsonData, &req)
 		// Just ensure no panic on parsing
 	})

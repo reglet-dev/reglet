@@ -6,9 +6,10 @@ package system
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/goccy/go-yaml"
-	"github.com/reglet-dev/reglet/internal/domain/capabilities"
+	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
 )
 
 // Config represents the global configuration file (~/.reglet/config.yaml).
@@ -170,14 +171,50 @@ func (l *ConfigLoader) Load(path string) (*Config, error) {
 	return &config, nil
 }
 
-// ToHostFuncsCapabilities converts the config capability format to the internal hostfuncs format.
-func (c *Config) ToHostFuncsCapabilities() []capabilities.Capability {
-	caps := make([]capabilities.Capability, 0, len(c.Capabilities))
-	for _, capability := range c.Capabilities {
-		caps = append(caps, capabilities.Capability{
-			Kind:    capability.Kind,
-			Pattern: capability.Pattern,
-		})
+// ToGrantSet converts the config capability format to a GrantSet.
+func (c *Config) ToGrantSet() *entities.GrantSet {
+	if len(c.Capabilities) == 0 {
+		return &entities.GrantSet{}
 	}
-	return caps
+
+	grantSet := &entities.GrantSet{}
+
+	for _, cap := range c.Capabilities {
+		switch cap.Kind {
+		case "fs":
+			if grantSet.FS == nil {
+				grantSet.FS = &entities.FileSystemCapability{}
+			}
+			// Parse pattern like "read:/path" or "write:/path"
+			if strings.HasPrefix(cap.Pattern, "read:") {
+				path := strings.TrimPrefix(cap.Pattern, "read:")
+				grantSet.FS.Rules = append(grantSet.FS.Rules, entities.FileSystemRule{Read: []string{path}})
+			} else if strings.HasPrefix(cap.Pattern, "write:") {
+				path := strings.TrimPrefix(cap.Pattern, "write:")
+				grantSet.FS.Rules = append(grantSet.FS.Rules, entities.FileSystemRule{Write: []string{path}})
+			} else {
+				// Default to read if no prefix
+				grantSet.FS.Rules = append(grantSet.FS.Rules, entities.FileSystemRule{Read: []string{cap.Pattern}})
+			}
+		case "network":
+			if grantSet.Network == nil {
+				grantSet.Network = &entities.NetworkCapability{}
+			}
+			// Parse pattern like "outbound:443"
+			port := strings.TrimPrefix(cap.Pattern, "outbound:")
+			grantSet.Network.Rules = append(grantSet.Network.Rules, entities.NetworkRule{Hosts: []string{"*"}, Ports: []string{port}})
+		case "env":
+			if grantSet.Env == nil {
+				grantSet.Env = &entities.EnvironmentCapability{}
+			}
+			grantSet.Env.Variables = append(grantSet.Env.Variables, cap.Pattern)
+		case "exec":
+			if grantSet.Exec == nil {
+				grantSet.Exec = &entities.ExecCapability{}
+			}
+			grantSet.Exec.Commands = append(grantSet.Exec.Commands, cap.Pattern)
+		}
+	}
+
+	return grantSet
 }

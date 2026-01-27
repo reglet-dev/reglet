@@ -3,7 +3,7 @@
 package wasm
 
 import (
-	"github.com/reglet-dev/reglet/internal/domain/capabilities"
+	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
 	"github.com/reglet-dev/reglet/internal/domain/execution"
 )
 
@@ -13,7 +13,7 @@ type PluginInfo struct {
 	Name         string
 	Version      string
 	Description  string
-	Capabilities []capabilities.Capability
+	Capabilities *entities.GrantSet
 }
 
 // Config represents plugin configuration

@@ -5,7 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/reglet-dev/reglet-sdk/go/wireformat"
+	"github.com/reglet-dev/reglet-sdk/go/hostfuncs"
+
+	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
 )
 
 // FuzzExecRequestParsing fuzzes exec request wire format parsing
@@ -13,7 +15,7 @@ import (
 // EXPECTED FAILURES: Malformed JSON, invalid UTF-8, extreme field sizes
 func FuzzExecRequestParsing(f *testing.F) {
 	// Seed with valid exec request structures
-	validReq := wireformat.ExecRequestWire{
+	validReq := entities.ExecRequest{
 		Command: "/usr/bin/ls",
 		Args:    []string{"-la", "/tmp"},
 		Dir:     "/home/user",
@@ -68,23 +70,21 @@ func FuzzExecRequestParsing(f *testing.F) {
 			}
 		}()
 
-		var req wireformat.ExecRequestWire
+		var req entities.ExecRequest
 		if err := json.Unmarshal(jsonData, &req); err != nil {
 			return // Invalid JSON is expected, not a bug
 		}
 
-		// Exercise the security-sensitive detection functions (unexported but accessible in test)
-		_ = detectExecutionType(req.Command, req.Args)
-		_ = isShellExecution(req.Command)
-		_ = isKnownInterpreter(req.Command)
-		_ = hasCodeExecutionFlags(req.Command, req.Args)
-		_ = hasSuspiciousFlags(req.Args)
-		_ = getBasename(req.Command)
+		// Exercise the security-sensitive detection functions via SDK
+		_ = hostfuncs.GetExecutionTypeDescription(req.Command, req.Args)
+		_ = hostfuncs.IsShellExecution(req.Command)
+		_ = hostfuncs.IsKnownInterpreter(req.Command)
+		_ = hostfuncs.IsDangerousExecution(req.Command, req.Args)
 	})
 }
 
 // FuzzExecutionTypeDetection specifically targets the execution type detection logic
-// TARGETS: detectExecutionType, isShellExecution, hasCodeExecutionFlags, hasSuspiciousFlags
+// TARGETS: DetectExecutionType, IsShellExecution, IsDangerousExecution
 // EXPECTED FAILURES: None - these should handle any input gracefully
 func FuzzExecutionTypeDetection(f *testing.F) {
 	// Valid commands
@@ -123,18 +123,15 @@ func FuzzExecutionTypeDetection(f *testing.F) {
 
 		args := []string{firstArg}
 
-		// Exercise all detection functions - none should panic
-		_ = detectExecutionType(command, args)
-		_ = isShellExecution(command)
-		_ = isKnownInterpreter(command)
-		_ = hasCodeExecutionFlags(command, args)
-		_ = hasSuspiciousFlags(args)
-		_ = getBasename(command)
+		// Exercise all detection functions via SDK - none should panic
+		_ = hostfuncs.GetExecutionTypeDescription(command, args)
+		_ = hostfuncs.IsShellExecution(command)
+		_ = hostfuncs.IsKnownInterpreter(command)
+		_ = hostfuncs.IsDangerousExecution(command, args)
 
 		// Also test with empty and nil-like args
-		_ = detectExecutionType(command, nil)
-		_ = detectExecutionType(command, []string{})
-		_ = hasCodeExecutionFlags(command, nil)
-		_ = hasSuspiciousFlags(nil)
+		_ = hostfuncs.GetExecutionTypeDescription(command, nil)
+		_ = hostfuncs.GetExecutionTypeDescription(command, []string{})
+		_ = hostfuncs.IsDangerousExecution(command, nil)
 	})
 }

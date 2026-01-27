@@ -3,7 +3,7 @@ package dto
 import (
 	"time"
 
-	"github.com/reglet-dev/reglet/internal/domain/capabilities"
+	sdkEntities "github.com/reglet-dev/reglet-sdk/go/domain/entities"
 	"github.com/reglet-dev/reglet/internal/domain/entities"
 	"github.com/reglet-dev/reglet/internal/domain/execution"
 )
@@ -31,10 +31,10 @@ type Diagnostics struct {
 // CapabilityDiagnostics contains capability-related diagnostics.
 type CapabilityDiagnostics struct {
 	// Required capabilities by plugin
-	Required map[string][]capabilities.Capability
+	Required map[string]*sdkEntities.GrantSet
 
 	// Granted capabilities by plugin
-	Granted map[string][]capabilities.Capability
+	Granted map[string]*sdkEntities.GrantSet
 }
 
 // LoadProfileResponse contains the result of loading a profile.
@@ -50,10 +50,10 @@ type LoadProfileResponse struct {
 // CollectCapabilitiesResponse contains the result of capability collection.
 type CollectCapabilitiesResponse struct {
 	// Required capabilities by plugin name
-	Required map[string][]capabilities.Capability
+	Required map[string]*sdkEntities.GrantSet
 
 	// Granted capabilities by plugin name
-	Granted map[string][]capabilities.Capability
+	Granted map[string]*sdkEntities.GrantSet
 }
 
 // ExecuteProfileResponse contains the result of profile execution.

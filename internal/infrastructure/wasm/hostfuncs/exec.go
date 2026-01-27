@@ -1,128 +1,26 @@
 package hostfuncs
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
-	"os/exec"
-	"slices"
-	"strings"
-	"time"
 
+	"github.com/reglet-dev/reglet-sdk/go/hostfuncs"
 	"github.com/reglet-dev/reglet/internal/domain/constants"
 	"github.com/tetratelabs/wazero/api"
 )
 
-// Environment variable security tiers
-// Tier 1: Always blocked - no capability can grant these (linker injection vectors)
-// Tier 2: Capability-gated - require explicit exec:env:<VAR> capability
-var (
-	// alwaysBlockedEnvPrefixes are prefixes for variables that are NEVER allowed.
-	// These are primarily used for shared library injection attacks.
-	alwaysBlockedEnvPrefixes = []string{
-		"LD_",   // Linux dynamic linker (LD_PRELOAD, LD_LIBRARY_PATH, LD_AUDIT, etc.)
-		"DYLD_", // macOS dynamic linker (DYLD_INSERT_LIBRARIES, etc.)
-	}
-
-	// alwaysBlockedEnvExact are exact variable names that are NEVER allowed.
-	alwaysBlockedEnvExact = []string{
-		"IFS",      // Shell internal field separator - can alter parsing
-		"LOCPATH",  // Custom locale path - can execute code via locale files
-		"BASH_ENV", // Executed by non-interactive bash shells
-		"ENV",      // Executed by POSIX sh
-	}
-
-	// capabilityGatedEnv are variables that require explicit capability grant.
-	// A plugin needs exec:env:<VARNAME> capability to set these.
-	capabilityGatedEnv = []string{
-		"PATH",          // Command resolution path
-		"HOME",          // User home directory
-		"PYTHONPATH",    // Python module search path
-		"PYTHONSTARTUP", // Python startup script
-		"PYTHONHOME",    // Python installation path
-		"NODE_OPTIONS",  // Node.js CLI options
-		"NODE_PATH",     // Node.js module search path
-		"RUBYLIB",       // Ruby library path
-		"PERL5LIB",      // Perl library path
-		"LUA_PATH",      // Lua module search path
-		"LUA_CPATH",     // Lua C module search path
-		"CDPATH",        // Shell cd search path
-		"PS4",           // Shell debug prompt (can execute code in some shells)
-	}
-)
-
-// sanitizeEnv filters environment variables according to security tiers.
-// Tier 1 (always blocked): Variables like LD_PRELOAD that are never allowed.
-// Tier 2 (capability-gated): Variables like PATH that require exec:env:<VAR> capability.
-// Returns the sanitized environment slice.
-func sanitizeEnv(ctx context.Context, env []string, pluginName string, checker *CapabilityChecker) []string {
-	if len(env) == 0 {
-		return env
-	}
-
-	sanitized := make([]string, 0, len(env))
-
-	for _, e := range env {
-		// Parse "KEY=value" format
-		eqIdx := strings.Index(e, "=")
-		if eqIdx == -1 {
-			// Malformed env var (no =), skip it
-			slog.WarnContext(ctx, "malformed environment variable skipped",
-				"env", e,
-				"plugin", pluginName)
-			continue
-		}
-
-		key := e[:eqIdx]
-		upperKey := strings.ToUpper(key)
-
-		// Tier 1: Check always-blocked prefixes
-		if isAlwaysBlockedEnv(upperKey) {
-			slog.WarnContext(ctx, "blocked dangerous environment variable",
-				"env_var", key,
-				"plugin", pluginName,
-				"reason", "always_blocked")
-			continue
-		}
-
-		// Tier 2: Check capability-gated variables
-		if slices.Contains(capabilityGatedEnv, upperKey) {
-			if err := checker.Check(pluginName, "exec", "env:"+upperKey); err != nil {
-				slog.WarnContext(ctx, "blocked environment variable (missing capability)",
-					"env_var", key,
-					"plugin", pluginName,
-					"required_capability", "exec:env:"+upperKey)
-				continue
-			}
-			slog.DebugContext(ctx, "capability-gated environment variable allowed",
-				"env_var", key,
-				"plugin", pluginName)
-		}
-
-		sanitized = append(sanitized, e)
-	}
-
-	return sanitized
-}
-
-// isAlwaysBlockedEnv checks if an environment variable key is always blocked.
-func isAlwaysBlockedEnv(upperKey string) bool {
-	// Check prefixes (LD_*, DYLD_*)
-	for _, prefix := range alwaysBlockedEnvPrefixes {
-		if strings.HasPrefix(upperKey, prefix) {
-			return true
-		}
-	}
-
-	// Check exact matches
-	return slices.Contains(alwaysBlockedEnvExact, upperKey)
-}
-
-// ExecCommand executes a command on the host
-// signature: exec_command(reqPtr, reqLen) -> resPtr
+// ExecCommand executes a command on the host.
+// It receives a packed uint64 (ptr+len) pointing to a JSON-encoded ExecRequestWire.
+// It returns a packed uint64 (ptr+len) pointing to a JSON-encoded ExecResponseWire.
+//
+// This handler:
+// 1. Reads request from guest memory
+// 2. Checks capability (exec:<command>) with shell/interpreter detection
+// 3. Delegates to SDK's PerformSecureExecCommand for actual execution
+// 4. Writes response to guest memory
 func ExecCommand(ctx context.Context, mod api.Module, stack []uint64, checker *CapabilityChecker) {
 	request, err := readExecRequest(ctx, mod, stack[0])
 	if err != nil {
@@ -143,11 +41,55 @@ func ExecCommand(ctx context.Context, mod api.Module, stack []uint64, checker *C
 		return // Response already written
 	}
 
-	// SECURITY: Sanitize environment variables before execution
-	request.Env = sanitizeEnv(ctx, request.Env, pluginName, checker)
+	// Create SDK request
+	sdkReq := hostfuncs.ExecCommandRequest{
+		Command: request.Command,
+		Args:    request.Args,
+		Dir:     request.Dir,
+		Env:     request.Env,
+	}
 
-	// Execute and write response
-	response := executeCommand(ctx, execCtx, request)
+	// Apply timeout from wire context if present
+	if request.Context.TimeoutMs > 0 {
+		sdkReq.Timeout = int(request.Context.TimeoutMs)
+	}
+
+	// Delegate to SDK's secure exec with capability getter
+	capGetter := checker.ToCapabilityGetter(pluginName)
+	sdkResp := hostfuncs.PerformSecureExecCommand(execCtx, sdkReq, pluginName, capGetter)
+
+	// Convert SDK response to wire format
+	response := ExecResponseWire{
+		Stdout:     sdkResp.Stdout,
+		Stderr:     sdkResp.Stderr,
+		ExitCode:   sdkResp.ExitCode,
+		DurationMs: sdkResp.DurationMs,
+		IsTimeout:  sdkResp.IsTimeout,
+	}
+
+	if sdkResp.Error != nil {
+		response.Error = &ErrorDetail{
+			Message: sdkResp.Error.Message,
+			Type:    "execution",
+			Code:    sdkResp.Error.Code,
+		}
+	}
+
+	// Log truncation if it occurred
+	if sdkResp.StdoutTruncated || sdkResp.StderrTruncated {
+		slog.WarnContext(ctx, "command output truncated",
+			"command", request.Command,
+			"stdout_truncated", sdkResp.StdoutTruncated,
+			"stderr_truncated", sdkResp.StderrTruncated)
+	}
+
+	slog.DebugContext(ctx, "executed command",
+		"command", request.Command,
+		"args", request.Args,
+		"exit_code", response.ExitCode,
+		"duration_ms", response.DurationMs,
+		"error", sdkResp.Error)
+
 	stack[0] = hostWriteResponse(ctx, mod, response)
 }
 
@@ -192,36 +134,14 @@ func getPluginName(ctx context.Context, mod api.Module) string {
 	return mod.Name()
 }
 
-// executionType represents the type of command execution.
-type executionType string
-
-const (
-	execTypeSafe        executionType = "safe"
-	execTypeShell       executionType = "shell"
-	execTypeInterpreter executionType = "interpreter code execution"
-	execTypeSuspicious  executionType = "suspicious execution"
-)
-
-// detectExecutionType determines if the command is dangerous and what type.
-func detectExecutionType(command string, args []string) executionType {
-	if isShellExecution(command) && len(args) > 0 {
-		return execTypeShell
-	}
-	if hasCodeExecutionFlags(command, args) {
-		return execTypeInterpreter
-	}
-	if hasSuspiciousFlags(args) {
-		return execTypeSuspicious
-	}
-	return execTypeSafe
-}
-
 // checkExecCapability verifies the plugin has permission to execute the command.
+// Uses SDK's DetectExecutionType for shell/interpreter detection.
 // Returns nil on success, writes error response and returns error on failure.
 func checkExecCapability(ctx context.Context, checker *CapabilityChecker, pluginName string, request *ExecRequestWire, stack []uint64, mod api.Module) error {
-	execType := detectExecutionType(request.Command, request.Args)
+	// Use SDK's execution type detection
+	execType := hostfuncs.GetExecutionTypeDescription(request.Command, request.Args)
 
-	if execType != execTypeSafe {
+	if hostfuncs.IsDangerousExecution(request.Command, request.Args) {
 		return checkDangerousExec(ctx, checker, pluginName, request, execType, stack, mod)
 	}
 
@@ -239,7 +159,7 @@ func checkExecCapability(ctx context.Context, checker *CapabilityChecker, plugin
 }
 
 // checkDangerousExec handles capability check for dangerous execution modes.
-func checkDangerousExec(ctx context.Context, checker *CapabilityChecker, pluginName string, request *ExecRequestWire, execType executionType, stack []uint64, mod api.Module) error {
+func checkDangerousExec(ctx context.Context, checker *CapabilityChecker, pluginName string, request *ExecRequestWire, execType string, stack []uint64, mod api.Module) error {
 	if err := checker.Check(pluginName, "exec", request.Command); err != nil {
 		errMsg := fmt.Sprintf(
 			"%s requires 'exec:%s' capability (prevents arbitrary code execution)",
@@ -247,7 +167,7 @@ func checkDangerousExec(ctx context.Context, checker *CapabilityChecker, pluginN
 		slog.WarnContext(ctx, errMsg,
 			"command", request.Command,
 			"args", request.Args,
-			"type", string(execType),
+			"type", execType,
 			"plugin", pluginName)
 		stack[0] = hostWriteResponse(ctx, mod, ExecResponseWire{
 			Error: &ErrorDetail{Message: errMsg, Type: "capability"},
@@ -258,243 +178,8 @@ func checkDangerousExec(ctx context.Context, checker *CapabilityChecker, pluginN
 	slog.InfoContext(ctx, "dangerous execution granted",
 		"command", request.Command,
 		"args", request.Args,
-		"type", string(execType),
+		"type", execType,
 		"plugin", pluginName)
 
 	return nil
-}
-
-// executeCommand runs the command and returns the response.
-func executeCommand(ctx, execCtx context.Context, request *ExecRequestWire) ExecResponseWire {
-	//nolint:gosec // G204: capability system validates commands; no shell interpretation
-	cmd := exec.CommandContext(execCtx, request.Command, request.Args...)
-
-	if request.Dir != "" {
-		cmd.Dir = request.Dir
-	}
-
-	// SECURITY: Always set cmd.Env explicitly to prevent host environment leakage.
-	// Note: request.Env is pre-sanitized by sanitizeEnv() to block dangerous variables.
-	if len(request.Env) > 0 {
-		cmd.Env = request.Env
-	} else {
-		cmd.Env = []string{}
-	}
-
-	// Limit stdout/stderr to prevent OOM DoS
-	// Uses constants.DefaultMaxCommandOutputSize - configurable via RuntimeConfig in future
-	const MaxOutputSize = constants.DefaultMaxCommandOutputSize
-	stdout := NewBoundedBuffer(MaxOutputSize)
-	stderr := NewBoundedBuffer(MaxOutputSize)
-	cmd.Stdout = stdout
-	cmd.Stderr = stderr
-
-	start := time.Now()
-	err := cmd.Run()
-	duration := time.Since(start)
-
-	response := buildExecResponse(execCtx, err, stdout, stderr, duration)
-
-	if stdout.Truncated || stderr.Truncated {
-		slog.WarnContext(ctx, "command output truncated",
-			"command", request.Command,
-			"stdout_truncated", stdout.Truncated,
-			"stderr_truncated", stderr.Truncated)
-	}
-
-	slog.DebugContext(ctx, "executed command",
-		"command", request.Command,
-		"args", request.Args,
-		"exit_code", response.ExitCode,
-		"duration", duration,
-		"error", err)
-
-	return response
-}
-
-// buildExecResponse constructs the response from command execution results.
-func buildExecResponse(execCtx context.Context, err error, stdout, stderr *BoundedBuffer, duration time.Duration) ExecResponseWire {
-	response := ExecResponseWire{
-		Stdout:     stdout.String(),
-		Stderr:     stderr.String(),
-		ExitCode:   0,
-		DurationMs: duration.Milliseconds(),
-	}
-
-	if err == nil {
-		return response
-	}
-
-	var exitErr *exec.ExitError
-	if errors.As(err, &exitErr) {
-		response.ExitCode = exitErr.ExitCode()
-		return response
-	}
-
-	// Other error (not found, timeout, etc.)
-	response.Error = toErrorDetail(err)
-	if execCtx.Err() == context.DeadlineExceeded {
-		response.Error.Type = "timeout"
-		response.Error.Code = "ETIMEDOUT"
-		response.IsTimeout = true
-	} else {
-		response.Error.Type = "execution"
-	}
-
-	return response
-}
-
-// BoundedBuffer is a bytes.Buffer wrapper that limits the size of written data.
-type BoundedBuffer struct {
-	buffer    bytes.Buffer
-	limit     int
-	Truncated bool
-}
-
-// NewBoundedBuffer creates a new BoundedBuffer with the specified limit.
-func NewBoundedBuffer(limit int) *BoundedBuffer {
-	return &BoundedBuffer{
-		limit: limit,
-	}
-}
-
-// Write implements io.Writer.
-func (b *BoundedBuffer) Write(p []byte) (n int, err error) {
-	if b.buffer.Len() >= b.limit {
-		b.Truncated = true
-		return len(p), nil // Pretend we wrote it all to satisfy io.Writer contract
-	}
-
-	remaining := b.limit - b.buffer.Len()
-	if len(p) > remaining {
-		b.Truncated = true
-		n, err = b.buffer.Write(p[:remaining])
-		if err != nil {
-			return n, err
-		}
-		return len(p), nil // Return len(p) to avoid short write error
-	}
-
-	return b.buffer.Write(p)
-}
-
-// String returns the buffer contents as a string.
-func (b *BoundedBuffer) String() string {
-	return b.buffer.String()
-}
-
-// isShellExecution detects if a command is a shell invocation.
-// Common shells: sh, bash, dash, zsh, ksh, csh, tcsh, fish
-func isShellExecution(command string) bool {
-	base := getBasename(command)
-	shells := []string{"sh", "bash", "dash", "zsh", "ksh", "csh", "tcsh", "fish"}
-	for _, shell := range shells {
-		if base == shell {
-			return true
-		}
-	}
-	return false
-}
-
-// getBasename extracts the binary name from a path.
-func getBasename(command string) string {
-	if idx := strings.LastIndex(command, "/"); idx >= 0 {
-		return command[idx+1:]
-	}
-	return command
-}
-
-// isKnownInterpreter detects if a command is a known scripting interpreter.
-func isKnownInterpreter(command string) bool {
-	base := getBasename(command)
-	interpreters := []string{
-		"python", "python2", "python3",
-		"python2.7", "python3.6", "python3.7", "python3.8", "python3.9", "python3.10", "python3.11", "python3.12",
-		"perl", "perl5",
-		"ruby", "irb",
-		"node", "nodejs",
-		"php", "php7", "php8",
-		"lua", "lua5.1", "lua5.2", "lua5.3", "lua5.4",
-		"awk", "gawk", "mawk", "nawk",
-		"tclsh", "wish",
-		"expect",
-	}
-	for _, interp := range interpreters {
-		if base == interp {
-			return true
-		}
-	}
-	return false
-}
-
-// hasCodeExecutionFlags detects if interpreter is being invoked with code execution flags.
-func hasCodeExecutionFlags(command string, args []string) bool {
-	base := getBasename(command)
-
-	// AWK special case: BEGIN/END blocks execute arbitrary code
-	if isAwkWithBlocks(base, args) {
-		return true
-	}
-
-	return hasDangerousFlags(base, args)
-}
-
-// isAwkWithBlocks checks for AWK commands with BEGIN/END blocks.
-func isAwkWithBlocks(base string, args []string) bool {
-	if base != "awk" && base != "gawk" && base != "mawk" && base != "nawk" {
-		return false
-	}
-	for _, arg := range args {
-		trimmed := strings.TrimSpace(arg)
-		if strings.HasPrefix(trimmed, "BEGIN{") ||
-			strings.HasPrefix(trimmed, "BEGIN {") ||
-			strings.HasPrefix(trimmed, "END{") ||
-			strings.HasPrefix(trimmed, "END {") {
-			return true
-		}
-	}
-	return false
-}
-
-// hasDangerousFlags checks if any arguments match dangerous flags for the given interpreter.
-func hasDangerousFlags(base string, args []string) bool {
-	dangerousFlags := map[string][]string{
-		"python": {"-c", "--command"}, "python2": {"-c", "--command"}, "python3": {"-c", "--command"},
-		"python2.7": {"-c", "--command"}, "python3.6": {"-c", "--command"}, "python3.7": {"-c", "--command"},
-		"python3.8": {"-c", "--command"}, "python3.9": {"-c", "--command"}, "python3.10": {"-c", "--command"},
-		"python3.11": {"-c", "--command"}, "python3.12": {"-c", "--command"},
-		"perl": {"-e", "-E"}, "perl5": {"-e", "-E"},
-		"ruby": {"-e"}, "irb": {"-e"},
-		"node": {"-e", "--eval"}, "nodejs": {"-e", "--eval"},
-		"php": {"-r"}, "php7": {"-r"}, "php8": {"-r"},
-		"lua": {"-e"}, "lua5.1": {"-e"}, "lua5.2": {"-e"}, "lua5.3": {"-e"}, "lua5.4": {"-e"},
-		"tclsh": {"-c"}, "wish": {"-c"},
-	}
-
-	flags, isTracked := dangerousFlags[base]
-	if !isTracked {
-		return false
-	}
-
-	for _, arg := range args {
-		for _, flag := range flags {
-			if arg == flag || strings.HasPrefix(arg, flag+"=") {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// hasSuspiciousFlags detects code-execution flags in unrecognized commands.
-func hasSuspiciousFlags(args []string) bool {
-	suspiciousFlags := []string{"-c", "-e", "-E", "-r", "--eval", "--command"}
-	for _, arg := range args {
-		for _, flag := range suspiciousFlags {
-			if arg == flag {
-				return true
-			}
-		}
-	}
-	return false
 }

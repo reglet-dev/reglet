@@ -3,7 +3,7 @@ package ports
 import (
 	"context"
 
-	"github.com/reglet-dev/reglet/internal/domain/capabilities"
+	sdkEntities "github.com/reglet-dev/reglet-sdk/go/domain/entities"
 )
 
 // PluginInfo contains metadata about a plugin.
@@ -12,7 +12,7 @@ type PluginInfo struct {
 	Name         string
 	Version      string
 	Description  string
-	Capabilities []capabilities.Capability
+	Capabilities *sdkEntities.GrantSet
 }
 
 // Plugin represents a loaded WASM plugin that can be inspected and executed.

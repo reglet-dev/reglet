@@ -8,8 +8,8 @@ import (
 	"time"
 
 	regletsdk "github.com/reglet-dev/reglet-sdk/go"
+	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
 	regletnet "github.com/reglet-dev/reglet-sdk/go/net"
-	"github.com/reglet-dev/reglet-sdk/go/wireformat"
 )
 
 // dnsPlugin implements the sdk.Plugin interface.
@@ -61,7 +61,7 @@ func (p *dnsPlugin) Check(ctx context.Context, config regletsdk.Config) (reglets
 
 	start := time.Now()
 	resolver := &regletnet.WasmResolver{Nameserver: cfg.Nameserver}
-	dnsResponseWire, sdkErr := resolver.Lookup(ctx, cfg.Hostname, cfg.RecordType) // sdkErr is *wireformat.ErrorDetail or other Go error type
+	dnsResponseWire, sdkErr := resolver.Lookup(ctx, cfg.Hostname, cfg.RecordType) // sdkErr is *entities.ErrorDetail or other Go error type
 	queryTime := time.Since(start).Milliseconds()
 
 	// Prepare data for evidence.
@@ -72,11 +72,11 @@ func (p *dnsPlugin) Check(ctx context.Context, config regletsdk.Config) (reglets
 	}
 
 	var evidence regletsdk.Evidence
-	var finalErrorDetail *wireformat.ErrorDetail
+	var finalErrorDetail *entities.ErrorDetail
 
 	if sdkErr != nil {
 		// If SDK returned a Go error, it signifies a problem with the Host call or its processing.
-		// sdkErr is *wireformat.ErrorDetail (due to SDK's LookupRaw function mapping it).
+		// sdkErr is *entities.ErrorDetail (due to SDK's LookupRaw function mapping it).
 		if errors.As(sdkErr, &finalErrorDetail) {
 			if finalErrorDetail.Type == "config" {
 				evidence = regletsdk.Evidence{
@@ -94,8 +94,8 @@ func (p *dnsPlugin) Check(ctx context.Context, config regletsdk.Config) (reglets
 				}
 			}
 		} else {
-			// Generic Go error from SDK, not specific wireformat error.
-			finalErrorDetail = &wireformat.ErrorDetail{
+			// Generic Go error from SDK, not specific entities error.
+			finalErrorDetail = &entities.ErrorDetail{
 				Message: sdkErr.Error(),
 				Type:    "internal",
 			}

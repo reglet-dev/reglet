@@ -4,7 +4,7 @@ package dto
 import (
 	"time"
 
-	"github.com/reglet-dev/reglet/internal/domain/capabilities"
+	sdkEntities "github.com/reglet-dev/reglet-sdk/go/domain/entities"
 )
 
 // CheckProfileRequest encapsulates all inputs needed to check a profile.
@@ -88,7 +88,7 @@ type CollectCapabilitiesRequest struct {
 
 // ExecuteProfileRequest encapsulates inputs for profile execution.
 type ExecuteProfileRequest struct {
-	GrantedCapabilities  map[string][]capabilities.Capability
+	GrantedCapabilities  map[string]*sdkEntities.GrantSet
 	ProfilePath          string
 	Filters              FilterOptions
 	Execution            ExecutionOptions
