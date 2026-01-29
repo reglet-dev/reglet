@@ -5,13 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.5-alpha] - 2026-01-29
+
+### Added
+- **cli:** Add CLI variable overrides (--set, --set-file, --set-env)
+- Implement remote profile fetching with check command (mvp)
+- **remote-profiles:** Add profile trust, pull, list, prune and outdated
+
+### Changed
+- Move logic to sdk
+- Lint errors
+- Fix plugins to use sdk properly
+- Convert config over to grants
+
+### Documentation
+- Update CHANGELOG for v0.4.0-alpha
+- Update readme
+
+### Fixed
+- Dns plugin expecting int instead of string for port caused capabilities to fail
+- Remove replace in go.mod
+
+### Maintenance
+- Fix spelling mistakes
+
+### Testing
+- Skip 3 tests while still in feature development
 ## [0.4.0-alpha] - 2026-01-17
 
 ### Added
 - Enable remote plugin distribution using OCI registries
 - Add env variable security tiers and capability grants
 - Add dry-run validation with plan
-- Implement reglet validate command for pre-flight validation
+- Impelement reglet validate command for pre-flight validation
 - **loops:** Add loop functionality with shared utilities and test optimizations
 - Add watch mode for continuous monitoring
 - **cli:** Add reglet init command with interactive wizard
@@ -50,10 +76,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix race condition in redactor.go walkthrough
 - Fix another race condition in redactor
 - Stack overflow risk in cycle detection
-- Ssrf vulnerability 0.0.0.0
+- Ssrf vulnerabilty 0.0.0.0
 - Enforce max request size before mem allocation
 - Ensure correct cache invalidation for secret matcher
-- Address integer overflow issue in secret matching
+- Address integer overlow issue in secret matching
 - Command plugin error
 - Observation total, details flag not working properly
 - Loop items and regular items had different evidence settings
@@ -173,7 +199,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **cli:** Move from flags to cobra
 - **plugins:** Swap plugins to use go sdk
 - **engine:** Update engine values and add capabilities
-- **engine:** Failures take precedence over errors
+- **engine:** Failures take precendence over errors
 - **plugin:** Add maxbodysize exceeded, de-dupe types
 - Remove un-needed locking
 - Lint error fixes
@@ -195,7 +221,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Style (gofmt), move valueobjects to values, move status
 - Valueobjects to values
 - Move version to infrastructure/build and inject into runtime
-- Clean up inefficient loop for filters
+- Clean up ineffiecient loop for filters
 - **terminal:** Move to huh prompt library
 - Move to hmac hash
 - Move files around, create interfaces
@@ -363,6 +389,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initialize project structure and tooling
 ---
 
+[0.4.5-alpha]: https://github.com/reglet-dev/reglet/compare/v0.4.0-alpha...v0.4.5-alpha
 [0.4.0-alpha]: https://github.com/reglet-dev/reglet/compare/v0.3.0-alpha...v0.4.0-alpha
 [0.3.0-alpha]: https://github.com/reglet-dev/reglet/compare/v0.2.0-alpha...v0.3.0-alpha
 [0.2.0-alpha]: https://github.com/reglet-dev/reglet/compare/v0.0.0-alpha...v0.2.0-alpha
