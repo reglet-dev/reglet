@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	regletsdk "github.com/reglet-dev/reglet-sdk/go"
+	"github.com/reglet-dev/reglet-sdk/go/application/config"
 )
 
 func TestFilePlugin_Check_Exists(t *testing.T) {
@@ -18,7 +18,7 @@ func TestFilePlugin_Check_Exists(t *testing.T) {
 	}
 
 	plugin := &filePlugin{}
-	config := regletsdk.Config{
+	config := config.Config{
 		"path": tmpFile,
 	}
 
@@ -27,7 +27,7 @@ func TestFilePlugin_Check_Exists(t *testing.T) {
 		t.Fatalf("Check returned error: %v", err)
 	}
 
-	if !evidence.Status {
+	if !evidence.IsSuccess() {
 		t.Errorf("Expected status true, got false. Error: %v", evidence.Error)
 	}
 
@@ -53,7 +53,7 @@ func TestFilePlugin_Check_Content(t *testing.T) {
 	}
 
 	plugin := &filePlugin{}
-	config := regletsdk.Config{
+	config := config.Config{
 		"path":         tmpFile,
 		"read_content": true,
 	}
@@ -63,7 +63,7 @@ func TestFilePlugin_Check_Content(t *testing.T) {
 		t.Fatalf("Check returned error: %v", err)
 	}
 
-	if !evidence.Status {
+	if !evidence.IsSuccess() {
 		t.Errorf("Expected status true, got false")
 	}
 
@@ -86,7 +86,7 @@ func TestFilePlugin_Check_Hash(t *testing.T) {
 	}
 
 	plugin := &filePlugin{}
-	config := regletsdk.Config{
+	config := config.Config{
 		"path": tmpFile,
 		"hash": true,
 	}
@@ -96,7 +96,7 @@ func TestFilePlugin_Check_Hash(t *testing.T) {
 		t.Fatalf("Check returned error: %v", err)
 	}
 
-	if !evidence.Status {
+	if !evidence.IsSuccess() {
 		t.Errorf("Expected status true, got false")
 	}
 
@@ -118,7 +118,7 @@ func TestFilePlugin_Check_NonExistent(t *testing.T) {
 	tmpFile := filepath.Join(tmpDir, "missing")
 
 	plugin := &filePlugin{}
-	config := regletsdk.Config{
+	config := config.Config{
 		"path": tmpFile,
 	}
 
@@ -128,7 +128,7 @@ func TestFilePlugin_Check_NonExistent(t *testing.T) {
 	}
 
 	// Status should be TRUE (success), but exists=false
-	if !evidence.Status {
+	if !evidence.IsSuccess() {
 		t.Errorf("Expected status true for non-existent file check, got false. Error: %v", evidence.Error)
 	}
 
@@ -139,15 +139,15 @@ func TestFilePlugin_Check_NonExistent(t *testing.T) {
 
 func TestFilePlugin_Check_MissingPath(t *testing.T) {
 	plugin := &filePlugin{}
-	config := regletsdk.Config{}
+	config := config.Config{}
 
 	evidence, err := plugin.Check(context.Background(), config)
 	if err != nil {
 		t.Fatalf("Check returned unexpected error: %v", err)
 	}
 
-	if evidence.Status {
-		t.Error("Expected status false for missing path config")
+	if evidence.IsSuccess() {
+		t.Errorf("Expected status failure/error for missing path config, got success. Data: %+v", evidence.Data)
 	}
 	if evidence.Error == nil || evidence.Error.Type != "config" {
 		t.Errorf("Expected config error, got %v", evidence.Error)

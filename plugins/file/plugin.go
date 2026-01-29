@@ -11,22 +11,24 @@ import (
 	"syscall"
 	"time"
 
-	regletsdk "github.com/reglet-dev/reglet-sdk/go"
+	"github.com/reglet-dev/reglet-sdk/go/application/config"
+	"github.com/reglet-dev/reglet-sdk/go/application/schema"
+	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
 )
 
 // filePlugin implements the sdk.Plugin interface for file system operations.
 type filePlugin struct{}
 
 // Describe provides the file plugin's metadata and capabilities.
-func (p *filePlugin) Describe(ctx context.Context) (regletsdk.Metadata, error) {
-	return regletsdk.Metadata{
+func (p *filePlugin) Describe(ctx context.Context) (entities.Metadata, error) {
+	return entities.Metadata{
 		Name:        "file",
 		Version:     "1.1.0",
 		Description: "File existence, content, and hash checks",
-		Capabilities: []regletsdk.Capability{
+		Capabilities: []entities.Capability{
 			{
-				Kind:    "fs",
-				Pattern: "read:**",
+				Category: "fs",
+				Resource: "read:**",
 			},
 		},
 	}, nil
@@ -40,61 +42,96 @@ type FileConfig struct {
 
 // Schema generates the JSON schema for the plugin's configuration.
 func (p *filePlugin) Schema(ctx context.Context) ([]byte, error) {
-	return regletsdk.GenerateSchema(FileConfig{})
+	return schema.GenerateSchema(FileConfig{})
 }
 
 // Check executes file system validation based on the provided configuration.
-func (p *filePlugin) Check(ctx context.Context, config regletsdk.Config) (regletsdk.Evidence, error) {
+func (p *filePlugin) Check(ctx context.Context, cfgRaw config.Config) (entities.Result, error) {
 	var cfg FileConfig
-	if err := regletsdk.ValidateConfig(config, &cfg); err != nil {
-		return regletsdk.Evidence{
-			Status: false,
-			Error:  regletsdk.ToErrorDetail(&regletsdk.ConfigError{Err: err}),
-		}, nil
+	if err := config.Validate(cfgRaw, &cfg); err != nil {
+		return entities.ResultError(entities.NewErrorDetail("config", err.Error())), nil
 	}
-
+	if cfg.Path == "" {
+		return entities.ResultError(entities.NewErrorDetail("config", "path is required")), nil
+	}
 	return checkFile(cfg)
 }
 
 // checkFile performs the actual file check logic.
-func checkFile(cfg FileConfig) (regletsdk.Evidence, error) {
-	result := map[string]interface{}{
+func checkFile(cfg FileConfig) (entities.Result, error) {
+	resultData := map[string]interface{}{
 		"path": cfg.Path,
 	}
+
+	start := time.Now()
+	// Meta helper to wrap returns
+	makeResult := func(status bool, errDetail *entities.ErrorDetail) (entities.Result, error) {
+		metadata := entities.NewRunMetadata(start, time.Now())
+		if errDetail != nil {
+			if status {
+				// Should not happen: success with error? assume failure logic intended
+				return entities.ResultFailure(errDetail.Message, resultData).WithMetadata(metadata), nil
+			}
+			// Failure or Error
+			if errDetail.Type == "fs" {
+				// Treat FS errors (permission, not found) as failures in context of check?
+				// Actually "not found" is mostly success=false in evidence terms, i.e. ResultFailure.
+				// But let's stick to ResultFailure for operational checks that return false.
+				// Wait, if file doesn't exist, is it an error or just result["exists"]=false?
+				// Logic below sets result["exists"]=false.
+				// If we return ResultError, it means "check failed to execute".
+				// If we return ResultSuccess with data["exists"]=false, that means check executed and found file missing.
+				// The original code returned Success(result) for "Not Exist".
+				return entities.ResultSuccess("File check completed", resultData).WithMetadata(metadata), nil
+			}
+			return entities.ResultError(errDetail).WithMetadata(metadata), nil
+		}
+		return entities.ResultSuccess("File check successful", resultData).WithMetadata(metadata), nil
+	}
+
+	_ = makeResult // suppress unused if I change logic
 
 	// 1. Open file and get metadata
 	f, info, err := openAndStat(cfg.Path)
 	if err != nil {
-		return handleOpenError(err, cfg.Path, result)
+		// handleOpenError logic
+		if os.IsNotExist(err) {
+			resultData["exists"] = false
+			resultData["readable"] = false
+			return entities.ResultSuccess("File does not exist", resultData).WithMetadata(entities.NewRunMetadata(start, time.Now())), nil
+		}
+		// True error
+		return entities.ResultError(entities.NewErrorDetail("fs", err.Error())).WithMetadata(entities.NewRunMetadata(start, time.Now())), nil
 	}
+
 	if f != nil {
 		defer f.Close()
-		result["readable"] = true
+		resultData["readable"] = true
 	} else {
-		result["readable"] = false
+		resultData["readable"] = false
 	}
 
 	// 2. Populate metadata
-	populateMetadata(result, info)
+	populateMetadata(resultData, info)
 
 	// 3. Check for symlink
-	checkSymlink(result, cfg.Path)
+	checkSymlink(resultData, cfg.Path)
 
 	// 4. Read content if requested
 	if cfg.ReadContent && !info.IsDir() {
-		if err := readContent(f, result); err != nil {
-			return err.(regletsdk.Evidence), nil
+		if errStr := readContent(f, resultData); errStr != "" {
+			return entities.ResultFailure(errStr, resultData).WithMetadata(entities.NewRunMetadata(start, time.Now())), nil
 		}
 	}
 
 	// 5. Calculate hash if requested
 	if cfg.Hash && !info.IsDir() {
-		if err := calculateHash(f, result); err != nil {
-			return err.(regletsdk.Evidence), nil
+		if errStr := calculateHash(f, resultData); errStr != "" {
+			return entities.ResultFailure(errStr, resultData).WithMetadata(entities.NewRunMetadata(start, time.Now())), nil
 		}
 	}
 
-	return regletsdk.Success(result), nil
+	return entities.ResultSuccess("File check successful", resultData).WithMetadata(entities.NewRunMetadata(start, time.Now())), nil
 }
 
 // openAndStat attempts to open the file and get its metadata.
@@ -122,16 +159,6 @@ func openAndStat(path string) (*os.File, os.FileInfo, error) {
 
 	// File exists but is unreadable
 	return nil, info, nil
-}
-
-// handleOpenError handles errors from openAndStat.
-func handleOpenError(err error, path string, result map[string]interface{}) (regletsdk.Evidence, error) {
-	if os.IsNotExist(err) {
-		result["exists"] = false
-		result["readable"] = false
-		return regletsdk.Success(result), nil
-	}
-	return regletsdk.Failure("fs", err.Error()), nil
 }
 
 // populateMetadata fills in file metadata fields.
@@ -168,41 +195,41 @@ func checkSymlink(result map[string]interface{}, path string) {
 	}
 }
 
-// readContent reads file content into result. Returns Evidence on error.
-func readContent(f *os.File, result map[string]interface{}) interface{} {
+// readContent reads file content into result. Returns error string if failed, empty otherwise.
+func readContent(f *os.File, result map[string]interface{}) string {
 	if f == nil {
-		return regletsdk.Failure("fs", "read failed: file not readable")
+		return "read failed: file not readable"
 	}
 
 	if _, err := f.Seek(0, 0); err != nil {
-		return regletsdk.Failure("fs", fmt.Sprintf("seek failed: %v", err))
+		return fmt.Sprintf("seek failed: %v", err)
 	}
 
 	content, err := io.ReadAll(f)
 	if err != nil {
-		return regletsdk.Failure("fs", fmt.Sprintf("read failed: %v", err))
+		return fmt.Sprintf("read failed: %v", err)
 	}
 
 	result["content_b64"] = base64.StdEncoding.EncodeToString(content)
 	result["encoding"] = "base64"
-	return nil
+	return ""
 }
 
-// calculateHash calculates SHA256 hash of file content. Returns Evidence on error.
-func calculateHash(f *os.File, result map[string]interface{}) interface{} {
+// calculateHash calculates SHA256 hash of file content. Returns error string if failed, empty otherwise.
+func calculateHash(f *os.File, result map[string]interface{}) string {
 	if f == nil {
-		return regletsdk.Failure("fs", "hash calculation failed: file not readable")
+		return "hash calculation failed: file not readable"
 	}
 
 	if _, err := f.Seek(0, 0); err != nil {
-		return regletsdk.Failure("fs", fmt.Sprintf("seek for hash failed: %v", err))
+		return fmt.Sprintf("seek for hash failed: %v", err)
 	}
 
 	hasher := sha256.New()
 	if _, err := io.Copy(hasher, f); err != nil {
-		return regletsdk.Failure("fs", fmt.Sprintf("hash calculation failed: %v", err))
+		return fmt.Sprintf("hash calculation failed: %v", err)
 	}
 
 	result["sha256"] = hex.EncodeToString(hasher.Sum(nil))
-	return nil
+	return ""
 }

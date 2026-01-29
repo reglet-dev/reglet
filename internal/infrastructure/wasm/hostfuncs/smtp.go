@@ -46,7 +46,8 @@ func SMTPConnect(ctx context.Context, mod api.Module, stack []uint64, checker *C
 		pluginName = name
 	}
 
-	if err := checker.Check(pluginName, "network", fmt.Sprintf("outbound:%s", request.Port)); err != nil {
+	port, _ := strconv.Atoi(request.Port) // Wire format uses string port
+	if err := checker.CheckNetworkConnection(pluginName, request.Host, port); err != nil {
 		errMsg := fmt.Sprintf("permission denied: %v", err)
 		slog.WarnContext(ctx, errMsg, "host", request.Host, "port", request.Port)
 		stack[0] = hostWriteResponse(ctx, mod, SMTPResponseWire{
@@ -56,7 +57,6 @@ func SMTPConnect(ctx context.Context, mod api.Module, stack []uint64, checker *C
 	}
 
 	// 2. Build SDK request
-	port, _ := strconv.Atoi(request.Port) // Wire format uses string port, SDK uses int
 	sdkReq := hostfuncs.SMTPConnectRequest{
 		Host:        request.Host,
 		Port:        port,

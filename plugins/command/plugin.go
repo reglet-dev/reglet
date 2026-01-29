@@ -6,23 +6,29 @@ import (
 	"strings"
 	"time"
 
-	regletsdk "github.com/reglet-dev/reglet-sdk/go"
+	"github.com/reglet-dev/reglet-sdk/go/application/config"
+	"github.com/reglet-dev/reglet-sdk/go/application/schema"
+	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
+
+	"github.com/reglet-dev/reglet-sdk/go/domain/ports"
 	"github.com/reglet-dev/reglet-sdk/go/exec"
 )
 
 // commandPlugin implements the sdk.Plugin interface.
-type commandPlugin struct{}
+type commandPlugin struct {
+	runner ports.CommandRunner
+}
 
 // Describe returns plugin metadata.
-func (p *commandPlugin) Describe(ctx context.Context) (regletsdk.Metadata, error) {
-	return regletsdk.Metadata{
+func (p *commandPlugin) Describe(ctx context.Context) (entities.Metadata, error) {
+	return entities.Metadata{
 		Name:        "command",
 		Version:     "1.0.0",
 		Description: "Execute commands and validate output",
-		Capabilities: []regletsdk.Capability{
+		Capabilities: []entities.Capability{
 			{
-				Kind:    "exec",
-				Pattern: "**", // Plugin requests general exec permission; user grants specific
+				Category: "exec",
+				Resource: "**", // Plugin requests general exec permission; user grants specific
 			},
 		},
 	}, nil
@@ -44,17 +50,14 @@ type CommandConfig struct {
 
 // Schema returns the JSON schema for the plugin's configuration.
 func (p *commandPlugin) Schema(ctx context.Context) ([]byte, error) {
-	return regletsdk.GenerateSchema(CommandConfig{})
+	return schema.GenerateSchema(CommandConfig{})
 }
 
 // Check executes the command observation.
-func (p *commandPlugin) Check(ctx context.Context, config regletsdk.Config) (regletsdk.Evidence, error) {
+func (p *commandPlugin) Check(ctx context.Context, cfgRaw config.Config) (entities.Result, error) {
 	var cfg CommandConfig
-	if err := regletsdk.ValidateConfig(config, &cfg); err != nil {
-		return regletsdk.Evidence{
-			Status: false,
-			Error:  regletsdk.ToErrorDetail(&regletsdk.ConfigError{Err: err}),
-		}, nil
+	if err := config.Validate(cfgRaw, &cfg); err != nil {
+		return entities.ResultError(entities.NewErrorDetail("config", err.Error())), nil
 	}
 
 	// Derive the effective timeout as a time.Duration.
@@ -65,20 +68,10 @@ func (p *commandPlugin) Check(ctx context.Context, config regletsdk.Config) (reg
 
 	// Validate mutual exclusivity
 	if cfg.Run == "" && cfg.Command == "" {
-		return regletsdk.Evidence{
-			Status: false,
-			Error: regletsdk.ToErrorDetail(&regletsdk.ConfigError{
-				Err: fmt.Errorf("either 'run' or 'command' must be specified"),
-			}),
-		}, nil
+		return entities.ResultError(entities.NewErrorDetail("config", "either 'run' or 'command' must be specified")), nil
 	}
 	if cfg.Run != "" && cfg.Command != "" {
-		return regletsdk.Evidence{
-			Status: false,
-			Error: regletsdk.ToErrorDetail(&regletsdk.ConfigError{
-				Err: fmt.Errorf("cannot specify both 'run' and 'command' - choose one"),
-			}),
-		}, nil
+		return entities.ResultError(entities.NewErrorDetail("config", "cannot specify both 'run' and 'command' - choose one")), nil
 	}
 
 	var cmd string
@@ -91,9 +84,6 @@ func (p *commandPlugin) Check(ctx context.Context, config regletsdk.Config) (reg
 		// - Requires explicit "exec:/bin/sh" capability (user must grant shell access)
 		// - Vulnerable to command injection if Run contains untrusted input
 		// - For untrusted input, use "command" mode with explicit args instead
-		//
-		// Safe:   run: "systemctl is-active sshd"
-		// Unsafe: run: "echo " + userInput  (if userInput can contain shell metacharacters)
 		cmd = "/bin/sh"
 		args = []string{"-c", cfg.Run}
 		execMode = "shell"
@@ -104,15 +94,25 @@ func (p *commandPlugin) Check(ctx context.Context, config regletsdk.Config) (reg
 		execMode = "direct"
 	}
 
+	start := time.Now()
+
+	// Prepare options
+	opts := []exec.RunOption{}
+	if p.runner != nil {
+		opts = append(opts, exec.WithRunner(p.runner))
+	}
+
 	resp, err := exec.Run(ctx, exec.CommandRequest{
 		Command: cmd,
 		Args:    args,
 		Dir:     cfg.Dir,
 		Env:     cfg.Env,
 		Timeout: int(cfg.Timeout / time.Second), // Convert Duration to seconds
-	})
+	}, opts...)
+	metadata := entities.NewRunMetadata(start, time.Now())
+
 	if err != nil {
-		return regletsdk.Failure("exec", fmt.Sprintf("execution failed: %v", err)), nil
+		return entities.ResultFailure(fmt.Sprintf("execution failed: %v", err), nil).WithMetadata(metadata), nil
 	}
 
 	// Clean output (trim whitespace)
@@ -122,7 +122,7 @@ func (p *commandPlugin) Check(ctx context.Context, config regletsdk.Config) (reg
 	// Determine status based on exit code
 	statusPass := resp.ExitCode == 0
 
-	result := map[string]interface{}{
+	resultData := map[string]interface{}{
 		// Output streams
 		"stdout":     stdoutTrimmed,
 		"stderr":     stderrTrimmed,
@@ -144,16 +144,15 @@ func (p *commandPlugin) Check(ctx context.Context, config regletsdk.Config) (reg
 
 	// Add original command for clarity
 	if execMode == "shell" {
-		result["shell_command"] = cfg.Run
+		resultData["shell_command"] = cfg.Run
 	} else {
-		result["command_path"] = cfg.Command
-		result["command_args"] = cfg.Args
+		resultData["command_path"] = cfg.Command
+		resultData["command_args"] = cfg.Args
 	}
 
-	// Return Evidence with Status based on exit code
-	return regletsdk.Evidence{
-		Status:    statusPass,
-		Data:      result,
-		Timestamp: time.Now(),
-	}, nil
+	if statusPass {
+		return entities.ResultSuccess("Command executed successfully", resultData).WithMetadata(metadata), nil
+	}
+
+	return entities.ResultFailure(fmt.Sprintf("Command exited with code %d", resp.ExitCode), resultData).WithMetadata(metadata), nil
 }

@@ -12,7 +12,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/owenrumney/go-sarif/v3 v3.3.0
-	github.com/reglet-dev/reglet-sdk/go v0.2.2
+	github.com/reglet-dev/reglet-sdk/go v0.2.3
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
 	github.com/sigstore/cosign/v2 v2.6.2
 	github.com/spf13/cast v1.10.0
@@ -192,3 +192,5 @@ require (
 	google.golang.org/grpc v1.78.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )
+
+replace github.com/reglet-dev/reglet-sdk/go => ../go

@@ -1,21 +1,11 @@
-// Package main provides a TCP plugin for Reglet.
-// This is compiled to WASM and loaded by the Reglet runtime.
-//go:build wasip1
-
 package main
 
 import (
-	"log/slog"
-
-	regletsdk "github.com/reglet-dev/reglet-sdk/go"
-	regletnet "github.com/reglet-dev/reglet-sdk/go/net"
+	"github.com/reglet-dev/reglet-sdk/go/application/plugin"
 )
 
 func init() {
-	slog.Info("TCP plugin init() started")
-	regletsdk.Register(&tcpPlugin{DialTCP: regletnet.DialTCP})
-	slog.Info("TCP plugin init() registered")
+	plugin.Register(&tcpPlugin{})
 }
 
-// main function for the WASM plugin.
 func main() {}

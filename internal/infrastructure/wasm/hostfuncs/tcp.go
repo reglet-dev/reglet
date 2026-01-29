@@ -47,14 +47,10 @@ func TCPConnect(ctx context.Context, mod api.Module, stack []uint64, checker *Ca
 		pluginName = name
 	}
 
-	// Check host capability first (e.g. outbound:google.com), then port (e.g. outbound:443)
-	// This matches what the NetworkExtractor produces (outbound:<host>)
-	err := checker.Check(pluginName, "network", fmt.Sprintf("outbound:%s", request.Host))
-	if err != nil {
-		// Fallback to checking port
-		err = checker.Check(pluginName, "network", fmt.Sprintf("outbound:%s", request.Port))
-	}
-
+	// Check specific connection capability using the new unified method.
+	// This creates a specific request (Host+Port) and checks if ANY rule allows it.
+	port, _ := strconv.Atoi(request.Port) // Error check handled by capability check or SDK later
+	err := checker.CheckNetworkConnection(pluginName, request.Host, port)
 	if err != nil {
 		errMsg := fmt.Sprintf("permission denied: %v", err)
 		slog.WarnContext(ctx, errMsg, "host", request.Host, "port", request.Port)
@@ -65,8 +61,6 @@ func TCPConnect(ctx context.Context, mod api.Module, stack []uint64, checker *Ca
 	}
 
 	// 2. Prepare SDK request
-	port, _ := strconv.Atoi(request.Port) // Error check not strictly needed as earlier checks might catch it, or SDK will
-
 	sdkReq := hostfuncs.TCPConnectRequest{
 		Host:    request.Host,
 		Port:    port,

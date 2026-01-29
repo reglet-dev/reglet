@@ -1,15 +1,69 @@
-//go:build wasip1
-
 package main
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	regletsdk "github.com/reglet-dev/reglet-sdk/go"
+	regletsdk "github.com/reglet-dev/reglet-sdk/go/application/config"
+	"github.com/reglet-dev/reglet-sdk/go/domain/ports"
 )
+
+type testHTTPClient struct {
+	client *http.Client
+}
+
+func (c *testHTTPClient) Do(ctx context.Context, req ports.HTTPRequest) (*ports.HTTPResponse, error) {
+	stdReq, err := http.NewRequestWithContext(ctx, req.Method, req.URL, bytes.NewReader(req.Body))
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range req.Headers {
+		stdReq.Header.Set(k, v)
+	}
+
+	resp, err := c.client.Do(stdReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	headers := make(map[string][]string)
+	for k, v := range resp.Header {
+		headers[k] = v
+	}
+
+	return &ports.HTTPResponse{
+		StatusCode: resp.StatusCode,
+		Headers:    headers,
+		Body:       body,
+		Proto:      resp.Proto,
+	}, nil
+}
+
+func (c *testHTTPClient) Get(ctx context.Context, url string) (*ports.HTTPResponse, error) {
+	return c.Do(ctx, ports.HTTPRequest{Method: "GET", URL: url})
+}
+
+func (c *testHTTPClient) Post(ctx context.Context, url string, contentType string, body []byte) (*ports.HTTPResponse, error) {
+	return c.Do(ctx, ports.HTTPRequest{
+		Method: "POST",
+		URL:    url,
+		Headers: map[string]string{
+			"Content-Type": contentType,
+		},
+		Body: body,
+	})
+}
 
 func TestHTTPPlugin_Check_Success(t *testing.T) {
 	// Create a mock HTTP server
@@ -19,7 +73,7 @@ func TestHTTPPlugin_Check_Success(t *testing.T) {
 	}))
 	defer server.Close()
 
-	plugin := &httpPlugin{client: server.Client()}
+	plugin := &httpPlugin{client: &testHTTPClient{client: server.Client()}}
 	config := regletsdk.Config{
 		"url": server.URL,
 	}
@@ -29,7 +83,7 @@ func TestHTTPPlugin_Check_Success(t *testing.T) {
 		t.Fatalf("Check returned error: %v", err)
 	}
 
-	if !evidence.Status {
+	if !evidence.IsSuccess() {
 		t.Errorf("Expected status true, got false. Error: %v", evidence.Error)
 	}
 
@@ -44,7 +98,7 @@ func TestHTTPPlugin_Check_ExpectedStatus_Pass(t *testing.T) {
 	}))
 	defer server.Close()
 
-	plugin := &httpPlugin{client: server.Client()}
+	plugin := &httpPlugin{client: &testHTTPClient{client: server.Client()}}
 	config := regletsdk.Config{
 		"url":             server.URL,
 		"expected_status": 201,
@@ -55,8 +109,8 @@ func TestHTTPPlugin_Check_ExpectedStatus_Pass(t *testing.T) {
 		t.Fatalf("Check returned error: %v", err)
 	}
 
-	if evidence.Data["expectation_failed"] == true {
-		t.Errorf("Expected expectation to pass")
+	if evidence.IsFailure() {
+		t.Errorf("Expected expectation to pass, got failure: %v", evidence.Status)
 	}
 }
 
@@ -66,7 +120,7 @@ func TestHTTPPlugin_Check_ExpectedStatus_Fail(t *testing.T) {
 	}))
 	defer server.Close()
 
-	plugin := &httpPlugin{client: server.Client()}
+	plugin := &httpPlugin{client: &testHTTPClient{client: server.Client()}}
 	config := regletsdk.Config{
 		"url":             server.URL,
 		"expected_status": 201,
@@ -77,8 +131,13 @@ func TestHTTPPlugin_Check_ExpectedStatus_Fail(t *testing.T) {
 		t.Fatalf("Check returned error: %v", err)
 	}
 
-	if evidence.Data["expectation_failed"] != true {
-		t.Errorf("Expected expectation_failed to be true")
+	// Expect Failure status, not "expectation_failed" key
+	if !evidence.IsFailure() {
+		t.Errorf("Expected status Failure, got %v", evidence.Status)
+	}
+
+	if actual, ok := evidence.Data["actual_status"].(int); !ok || actual != 200 {
+		t.Errorf("Expected actual_status 200, got %v", actual)
 	}
 }
 
@@ -88,7 +147,7 @@ func TestHTTPPlugin_Check_ExpectedBody_Pass(t *testing.T) {
 	}))
 	defer server.Close()
 
-	plugin := &httpPlugin{client: server.Client()}
+	plugin := &httpPlugin{client: &testHTTPClient{client: server.Client()}}
 	config := regletsdk.Config{
 		"url":                    server.URL,
 		"expected_body_contains": "bar",
@@ -99,8 +158,8 @@ func TestHTTPPlugin_Check_ExpectedBody_Pass(t *testing.T) {
 		t.Fatalf("Check returned error: %v", err)
 	}
 
-	if evidence.Data["expectation_failed"] == true {
-		t.Errorf("Expected expectation to pass")
+	if evidence.IsFailure() {
+		t.Errorf("Expected expectation to pass, got failure")
 	}
 }
 
@@ -110,7 +169,7 @@ func TestHTTPPlugin_Check_ExpectedBody_Fail(t *testing.T) {
 	}))
 	defer server.Close()
 
-	plugin := &httpPlugin{client: server.Client()}
+	plugin := &httpPlugin{client: &testHTTPClient{client: server.Client()}}
 	config := regletsdk.Config{
 		"url":                    server.URL,
 		"expected_body_contains": "qux",
@@ -121,8 +180,8 @@ func TestHTTPPlugin_Check_ExpectedBody_Fail(t *testing.T) {
 		t.Fatalf("Check returned error: %v", err)
 	}
 
-	if evidence.Data["expectation_failed"] != true {
-		t.Errorf("Expected expectation_failed to be true")
+	if !evidence.IsFailure() {
+		t.Errorf("Expected status Failure, got %v", evidence.Status)
 	}
 }
 
@@ -136,7 +195,7 @@ func TestHTTPPlugin_Check_Method(t *testing.T) {
 	}))
 	defer server.Close()
 
-	plugin := &httpPlugin{client: server.Client()}
+	plugin := &httpPlugin{client: &testHTTPClient{client: server.Client()}}
 	config := regletsdk.Config{
 		"url":    server.URL,
 		"method": "POST",

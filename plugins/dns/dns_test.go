@@ -1,29 +1,86 @@
-//go:build wasip1
-
 package main
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
-	regletsdk "github.com/reglet-dev/reglet-sdk/go"
+	"github.com/reglet-dev/reglet-sdk/go/application/config"
+	"github.com/reglet-dev/reglet-sdk/go/domain/ports"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+// Mock DNSResolver
+type mockDNSResolver struct {
+	LookupHostFunc  func(ctx context.Context, host string) ([]string, error)
+	LookupMXFunc    func(ctx context.Context, host string) ([]ports.MXRecord, error)
+	LookupCNAMEFunc func(ctx context.Context, host string) (string, error)
+	LookupTXTFunc   func(ctx context.Context, host string) ([]string, error)
+	LookupNSFunc    func(ctx context.Context, host string) ([]string, error)
+}
+
+func (m *mockDNSResolver) LookupHost(ctx context.Context, host string) ([]string, error) {
+	if m.LookupHostFunc != nil {
+		return m.LookupHostFunc(ctx, host)
+	}
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (m *mockDNSResolver) LookupMX(ctx context.Context, host string) ([]ports.MXRecord, error) {
+	if m.LookupMXFunc != nil {
+		return m.LookupMXFunc(ctx, host)
+	}
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (m *mockDNSResolver) LookupCNAME(ctx context.Context, host string) (string, error) {
+	if m.LookupCNAMEFunc != nil {
+		return m.LookupCNAMEFunc(ctx, host)
+	}
+	return "", fmt.Errorf("not implemented")
+}
+
+func (m *mockDNSResolver) LookupTXT(ctx context.Context, host string) ([]string, error) {
+	if m.LookupTXTFunc != nil {
+		return m.LookupTXTFunc(ctx, host)
+	}
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (m *mockDNSResolver) LookupNS(ctx context.Context, host string) ([]string, error) {
+	if m.LookupNSFunc != nil {
+		return m.LookupNSFunc(ctx, host)
+	}
+	return nil, fmt.Errorf("not implemented")
+}
+
 func TestDNSPlugin_Check_ConfigValidation(t *testing.T) {
-	plugin := &dnsPlugin{}
+	// Config validation tests don't necessarily reach the network layer if valid,
+	// but if they are valid, they try to execute lookup.
+	// We need a mock resolver that returns minimal success to avoid panics.
+
+	mockResolver := &mockDNSResolver{
+		LookupHostFunc: func(ctx context.Context, host string) ([]string, error) {
+			return []string{"1.2.3.4"}, nil // Default A record success
+		},
+		LookupMXFunc: func(ctx context.Context, host string) ([]ports.MXRecord, error) {
+			return []ports.MXRecord{{Host: "mail.example.com", Pref: 10}}, nil
+		},
+	}
+
+	plugin := &dnsPlugin{resolver: mockResolver}
 	ctx := context.Background()
 
 	tests := []struct {
 		name      string
-		config    regletsdk.Config
+		config    config.Config
 		wantError bool
 		errMsg    string // Expected part of error message for invalid configs
 	}{
 		{
 			name: "Valid A record config",
-			config: regletsdk.Config{
+			config: config.Config{
 				"hostname":    "example.com",
 				"record_type": "A",
 			},
@@ -31,7 +88,7 @@ func TestDNSPlugin_Check_ConfigValidation(t *testing.T) {
 		},
 		{
 			name: "Valid MX record config",
-			config: regletsdk.Config{
+			config: config.Config{
 				"hostname":    "gmail.com",
 				"record_type": "MX",
 			},
@@ -39,7 +96,7 @@ func TestDNSPlugin_Check_ConfigValidation(t *testing.T) {
 		},
 		{
 			name: "Valid config with nameserver",
-			config: regletsdk.Config{
+			config: config.Config{
 				"hostname":    "example.com",
 				"record_type": "A",
 				"nameserver":  "8.8.8.8:53",
@@ -48,26 +105,26 @@ func TestDNSPlugin_Check_ConfigValidation(t *testing.T) {
 		},
 		{
 			name: "Missing hostname",
-			config: regletsdk.Config{
+			config: config.Config{
 				"record_type": "A",
 			},
 			wantError: true,
-			errMsg:    "Hostname' failed on the 'required' tag",
+			errMsg:    "validation failed for field 'hostname'",
 		},
 		{
 			name: "Invalid record type",
-			config: regletsdk.Config{
+			config: config.Config{
 				"hostname":    "example.com",
 				"record_type": "INVALID",
 			},
 			wantError: true,
-			errMsg:    "RecordType' failed on the 'oneof' tag",
+			errMsg:    "unsupported record type",
 		},
 		{
 			name:      "Empty config (missing hostname)",
-			config:    regletsdk.Config{},
+			config:    config.Config{},
 			wantError: true,
-			errMsg:    "Hostname' failed on the 'required' tag",
+			errMsg:    "validation failed for field 'hostname'",
 		},
 	}
 
@@ -77,16 +134,14 @@ func TestDNSPlugin_Check_ConfigValidation(t *testing.T) {
 			require.NoError(t, err, "Check should not return a Go error directly, but evidence with status/error info")
 
 			if tt.wantError {
-				assert.False(t, evidence.Status, "Expected status to be false for config error")
+				assert.True(t, evidence.IsFailure() || evidence.IsError(), "Expected status failure or error for config error")
 				require.NotNil(t, evidence.Error, "Expected evidence to contain an error")
 				assert.Contains(t, evidence.Error.Message, tt.errMsg)
-				assert.Equal(t, "config", evidence.Error.Type)
+				// Allow both config and network errors (validation vs execution failure)
+				assert.Contains(t, []string{"config", "network"}, evidence.Error.Type)
 			} else {
-				// For valid configs, we expect status true from the config validation part.
-				// Actual network lookup success/failure is handled by the SDK and reflected
-				// in the evidence data, but for these unit tests, we're only testing that
-				// config validation passes and doesn't immediately yield a config error.
-				assert.True(t, evidence.Status || evidence.Error != nil, "Expected status to be true or an error from network lookup")
+				// For valid configs, we expect status success now that we have a mock
+				assert.True(t, evidence.IsSuccess(), "Expected success for valid config backed by mock")
 			}
 		})
 	}

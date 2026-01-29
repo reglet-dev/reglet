@@ -6,9 +6,22 @@ import (
 	"context"
 	"testing"
 
+	"github.com/reglet-dev/reglet-sdk/go/domain/ports"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type mockCommandRunner struct {
+	RunFunc func(ctx context.Context, req ports.CommandRequest) (*ports.CommandResult, error)
+}
+
+func (m *mockCommandRunner) Run(ctx context.Context, req ports.CommandRequest) (*ports.CommandResult, error) {
+	if m.RunFunc != nil {
+		return m.RunFunc(ctx, req)
+	}
+	// Default success
+	return &ports.CommandResult{ExitCode: 0}, nil
+}
 
 func TestCommandPlugin_Describe(t *testing.T) {
 	plugin := &commandPlugin{}
@@ -21,8 +34,8 @@ func TestCommandPlugin_Describe(t *testing.T) {
 	assert.Equal(t, "1.0.0", meta.Version)
 	assert.NotEmpty(t, meta.Description)
 	assert.Len(t, meta.Capabilities, 1)
-	assert.Equal(t, "exec", meta.Capabilities[0].Kind)
-	assert.Equal(t, "**", meta.Capabilities[0].Pattern)
+	assert.Equal(t, "exec", meta.Capabilities[0].Category)
+	assert.Equal(t, "**", meta.Capabilities[0].Resource)
 }
 
 func TestCommandPlugin_Schema(t *testing.T) {
@@ -101,21 +114,17 @@ func TestCommandConfig_Validation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			plugin := &commandPlugin{}
+			plugin := &commandPlugin{runner: &mockCommandRunner{}}
 			ctx := context.Background()
 
 			evidence, err := plugin.Check(ctx, tt.config)
 			require.NoError(t, err, "Check should not return error (errors go in evidence)")
 
 			if tt.wantError {
-				assert.False(t, evidence.Status, "Expected evidence.Status to be false")
+				assert.True(t, evidence.IsFailure() || evidence.IsError(), "Expected evidence.Status to be failure or error")
 				if tt.errMsg != "" && evidence.Error != nil {
 					assert.Contains(t, evidence.Error.Message, tt.errMsg)
 				}
-			} else {
-				// In real execution, this would call the host function
-				// In test mode (non-WASM), the exec.Run call may fail
-				// We're mainly testing config validation here
 			}
 		})
 	}
@@ -123,26 +132,24 @@ func TestCommandConfig_Validation(t *testing.T) {
 
 func TestCommandConfig_ShellMode(t *testing.T) {
 	// Test that run mode constructs shell command correctly
-	plugin := &commandPlugin{}
+	plugin := &commandPlugin{runner: &mockCommandRunner{}}
 	ctx := context.Background()
 
 	config := map[string]interface{}{
 		"run": "echo 'hello world'",
 	}
 
-	// This will attempt to call exec.Run which requires WASM environment
-	// In a non-WASM build, this will fail, but we can still validate config parsing
+	// This will call exec.Run but use our mock adapter
 	evidence, err := plugin.Check(ctx, config)
 	require.NoError(t, err)
 
-	// The evidence will contain an error since we're not in WASM
-	// But the config validation should have passed
-	_ = evidence
+	// Since mock returns success, we expect success
+	assert.True(t, evidence.IsSuccess(), "Expected success from mock execution")
 }
 
 func TestCommandConfig_DirectMode(t *testing.T) {
 	// Test that command mode constructs direct execution correctly
-	plugin := &commandPlugin{}
+	plugin := &commandPlugin{runner: &mockCommandRunner{}}
 	ctx := context.Background()
 
 	config := map[string]interface{}{
@@ -153,10 +160,5 @@ func TestCommandConfig_DirectMode(t *testing.T) {
 	evidence, err := plugin.Check(ctx, config)
 	require.NoError(t, err)
 
-	// Similar to shell mode, this requires WASM environment
-	_ = evidence
+	assert.True(t, evidence.IsSuccess(), "Expected success from mock execution")
 }
-
-// Note: Full execution tests require WASM runtime
-// These tests focus on configuration validation and structure
-// Integration tests in the main test suite will cover actual execution

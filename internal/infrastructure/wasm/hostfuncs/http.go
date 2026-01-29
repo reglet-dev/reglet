@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/reglet-dev/reglet-sdk/go/hostfuncs"
@@ -93,6 +94,7 @@ func HTTPRequest(ctx context.Context, mod api.Module, stack []uint64, checker *C
 		Headers:       sdkResp.Headers,
 		Body:          encodedRespBody,
 		BodyTruncated: sdkResp.BodyTruncated,
+		Proto:         sdkResp.Proto,
 	}
 
 	if sdkResp.Error != nil {
@@ -129,11 +131,7 @@ func readHTTPRequest(ctx context.Context, mod api.Module, requestPacked uint64) 
 // checkHTTPCapability validates URL and checks network capability.
 func checkHTTPCapability(ctx context.Context, checker *CapabilityChecker, pluginName string, request *HTTPRequestWire) error {
 	// Simple wrapper around checker logic, matching previous behavior
-	// Try checking the specific URL first
-	if err := checker.Check(pluginName, "network", "outbound:"+request.URL); err == nil {
-		return nil
-	}
-
+	// Check specific host/port capability
 	parsedURL, err := url.Parse(request.URL)
 	if err != nil {
 		return fmt.Errorf("invalid URL: %w", err)
@@ -148,6 +146,6 @@ func checkHTTPCapability(ctx context.Context, checker *CapabilityChecker, plugin
 		}
 	}
 
-	capabilityPattern := fmt.Sprintf("outbound:%s", port)
-	return checker.Check(pluginName, "network", capabilityPattern)
+	portInt, _ := strconv.Atoi(port)
+	return checker.CheckNetworkConnection(pluginName, parsedURL.Hostname(), portInt)
 }

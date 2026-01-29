@@ -11,8 +11,10 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
+	"github.com/reglet-dev/reglet/internal/domain/execution"
 	"github.com/reglet-dev/reglet/internal/infrastructure/wasm/hostfuncs"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
@@ -585,10 +587,53 @@ func (p *Plugin) Observe(ctx context.Context, cfg Config) (*PluginObservationRes
 		return nil, fmt.Errorf("failed to read observe() result: %w", err)
 	}
 
-	// Parse JSON result directly into internal/wasm/types.Evidence
-	var hostEvidence Evidence
-	if err := json.Unmarshal(resultData, &hostEvidence); err != nil {
-		return nil, fmt.Errorf("failed to parse observe() result into internal/wasm/types.Evidence: %w", err)
+	// SDK Result Adaptation:
+	// The SDK returns a Result with a string Status ("success", "failure", "error"),
+	// but the Host's Evidence struct expects a boolean Status.
+	// We unmarshal into an intermediate struct and adapt it.
+	type sdkErrorDetail struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	}
+	type sdkResult struct {
+		Timestamp time.Time              `json:"timestamp"`
+		Data      map[string]interface{} `json:"data"`
+		Error     *sdkErrorDetail        `json:"error"`
+		Status    string                 `json:"status"`
+		Message   string                 `json:"message"`
+	}
+
+	var result sdkResult
+	if err := json.Unmarshal(resultData, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse observe() result into sdkResult: %w", err)
+	}
+
+	// strict mapping: Only "success" is true. "failure" and "error" are false.
+	statusBool := (result.Status == "success")
+
+	var pluginErr *execution.PluginError
+	if result.Error != nil {
+		pluginErr = &execution.PluginError{
+			Code:    result.Error.Code,
+			Message: result.Error.Message,
+		}
+	} else if result.Status == "error" {
+		// Fallback if error status but no error detail (shouldn't happen with valid SDK)
+		pluginErr = &execution.PluginError{
+			Code:    "UNKNOWN_ERROR",
+			Message: result.Message,
+		}
+	} else if result.Status == "failure" && result.Message != "" {
+		// Populate error for failure if message is present, though typically failures are operational
+		// In legacy system, failures often didn't have an error object unless it was an execution error.
+		// For now, let's keep pluginErr nil for failures to avoid misclassifying them as errors.
+	}
+
+	hostEvidence := Evidence{
+		Timestamp: result.Timestamp,
+		Data:      result.Data,
+		Error:     pluginErr,
+		Status:    statusBool,
 	}
 
 	// Construct and return PluginObservationResult
@@ -596,10 +641,9 @@ func (p *Plugin) Observe(ctx context.Context, cfg Config) (*PluginObservationRes
 	// PluginObservationResult.Error represents WASM execution errors (panics, plugin failures)
 	// Don't propagate Evidence.Error to PluginObservationResult.Error - they serve different purposes
 	return &PluginObservationResult{
-			Evidence: &hostEvidence,
-			Error:    nil, // Plugin executed successfully, errors are in Evidence
-		},
-		nil
+		Evidence: &hostEvidence,
+		Error:    nil, // Plugin executed successfully, errors are in Evidence
+	}, nil
 }
 
 // Close performs any necessary cleanup including draining the instance pool.

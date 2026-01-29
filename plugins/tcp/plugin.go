@@ -1,125 +1,94 @@
-//go:build wasip1
-
 package main
 
 import (
 	"context"
 	"fmt"
-	"time"
 
-	regletsdk "github.com/reglet-dev/reglet-sdk/go"
-	regletnet "github.com/reglet-dev/reglet-sdk/go/net"
+	"github.com/reglet-dev/reglet-sdk/go/application/config"
+	"github.com/reglet-dev/reglet-sdk/go/application/schema"
+	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
+	"github.com/reglet-dev/reglet-sdk/go/domain/ports"
+	sdknet "github.com/reglet-dev/reglet-sdk/go/net"
 )
 
 // tcpPlugin implements the sdk.Plugin interface.
 type tcpPlugin struct {
-	// DialTCP allows dependency injection for testing
-	DialTCP func(ctx context.Context, host, port string, timeoutMs int, useTLS bool) (*regletnet.TCPConnectResult, error)
+	dialer ports.TCPDialer
 }
 
 // Describe returns plugin metadata.
-func (p *tcpPlugin) Describe(ctx context.Context) (regletsdk.Metadata, error) {
-	return regletsdk.Metadata{
+func (p *tcpPlugin) Describe(ctx context.Context) (entities.Metadata, error) {
+	return entities.Metadata{
 		Name:        "tcp",
 		Version:     "1.0.0",
 		Description: "TCP connection testing and TLS validation",
-		Capabilities: []regletsdk.Capability{
+		Capabilities: []entities.Capability{
 			{
-				Kind:    "network",
-				Pattern: "outbound:*",
+				Category: "network",
+				Resource: "outbound:*",
 			},
 		},
 	}, nil
 }
 
 type TCPConfig struct {
-	Host               string `json:"host" validate:"required" description:"Target host (hostname or IP)"`
-	Port               string `json:"port" validate:"required" description:"Target port"`
-	TimeoutMs          int    `json:"timeout_ms" default:"5000" description:"Connection timeout in milliseconds"`
-	TLS                bool   `json:"tls,omitempty" description:"Use TLS/SSL connection"`
-	ExpectedTLSVersion string `json:"expected_tls_version,omitempty" description:"Expected minimum TLS version (e.g., 'TLS 1.2')"`
+	Host               string      `json:"host" validate:"required" description:"Target host (hostname or IP)"`
+	Port               interface{} `json:"port" validate:"required" description:"Target port (number or string)"`
+	TimeoutMs          int         `json:"timeout_ms" default:"5000" description:"Connection timeout in milliseconds"`
+	TLS                bool        `json:"tls,omitempty" description:"Use TLS/SSL connection"`
+	ExpectedTLSVersion string      `json:"expected_tls_version,omitempty" description:"Expected minimum TLS version (e.g., 'TLS 1.2')"`
 }
 
 // Schema returns the JSON schema for the plugin's configuration.
 func (p *tcpPlugin) Schema(ctx context.Context) ([]byte, error) {
-	return regletsdk.GenerateSchema(TCPConfig{})
+	return schema.GenerateSchema(TCPConfig{})
 }
 
 // Check executes the TCP observation.
-func (p *tcpPlugin) Check(ctx context.Context, config regletsdk.Config) (regletsdk.Evidence, error) {
-	// Set defaults
-	if _, ok := config["timeout_ms"]; !ok {
-		config["timeout_ms"] = 5000
-	}
-
+func (p *tcpPlugin) Check(ctx context.Context, cfgRaw config.Config) (entities.Result, error) {
 	var cfg TCPConfig
-	if err := regletsdk.ValidateConfig(config, &cfg); err != nil {
-		return regletsdk.Evidence{
-			Status: false,
-			Error: regletsdk.ToErrorDetail(
-				&regletsdk.ConfigError{
-					Err: err,
-				},
-			),
-		}, nil
+	if err := config.Validate(cfgRaw, &cfg); err != nil {
+		return entities.ResultError(entities.NewErrorDetail("config", err.Error())), nil
+	}
+	// Ensure port is passed as an integer to the SDK
+	// This helps when YAML/JSON config passes port as a string ("443")
+	var portInt int
+	switch v := cfg.Port.(type) {
+	case float64:
+		portInt = int(v)
+	case int:
+		portInt = v
+	case string:
+		var err error
+		if _, err = fmt.Sscanf(v, "%d", &portInt); err != nil {
+			return entities.ResultError(entities.NewErrorDetail("config", "invalid port format: must be integer")), nil
+		}
+	default:
+		return entities.ResultError(entities.NewErrorDetail("config", fmt.Sprintf("invalid port type: %T", cfg.Port))), nil
 	}
 
-	address := fmt.Sprintf("%s:%s", cfg.Host, cfg.Port) // Add this line
+	// Update the raw config with the integer port
+	// SDK RunTCPCheck expects 'port' key to be parseable as int via config.GetInt
+	// which handles string-to-int conversion, BUT config validation above would fail
+	// if struct field was strictly int. Now struct is interface{}, validation passes.
+	cfgRaw["port"] = portInt
 
-	if p.DialTCP == nil {
-		return regletsdk.Failure("internal", "DialTCP not initialized"), nil
-	}
-
-	result, err := p.DialTCP(ctx, cfg.Host, cfg.Port, cfg.TimeoutMs, cfg.TLS)
+	// RunTCPCheck expects config map, which cfgRaw is.
+	result, err := sdknet.RunTCPCheck(ctx, cfgRaw, sdknet.WithTCPDialer(p.dialer))
 	if err != nil {
-		return regletsdk.Evidence{
-			Status: false,
-			Error: regletsdk.ToErrorDetail(
-				&regletsdk.NetworkError{
-					Operation: "tcp_connect",
-					Target:    address,
-					Err:       err,
-				},
-			),
-		}, nil
+		return result, err
 	}
 
-	// Prepare evidence data from result
-	data := map[string]interface{}{
-		"connected":        result.Connected,
-		"address":          result.Address,
-		"response_time_ms": result.ResponseTimeMs,
-		"remote_addr":      result.RemoteAddr,
-		"local_addr":       result.LocalAddr,
-	}
-
-	if result.TLS {
-		data["tls"] = true
-		data["tls_version"] = result.TLSVersion
-		data["tls_cipher_suite"] = result.TLSCipherSuite
-		data["tls_server_name"] = result.TLSServerName
-		if result.TLSCertSubject != "" {
-			data["tls_cert_subject"] = result.TLSCertSubject
-			data["tls_cert_issuer"] = result.TLSCertIssuer
-		}
-		if result.TLSCertNotAfter != nil {
-			data["tls_cert_not_after"] = result.TLSCertNotAfter.Format(time.RFC3339)
-			// Calculate days remaining
-			days := int(time.Until(*result.TLSCertNotAfter).Hours() / 24)
-			data["tls_cert_days_remaining"] = days
+	// Post-check: TLS version expectation (plugin-specific logic)
+	expectedTLS := cfg.ExpectedTLSVersion
+	if expectedTLS != "" && result.IsSuccess() {
+		actualTLS, _ := result.Data["tls_version"].(string)
+		if !isTLSVersionAtLeast(actualTLS, expectedTLS) {
+			result.Data["expectation_failed"] = true
+			result.Data["expectation_error"] = fmt.Sprintf("expected TLS version >= %s, got %s", expectedTLS, actualTLS)
 		}
 	}
-
-	// Check TLS version expectation
-	if cfg.ExpectedTLSVersion != "" {
-		if !isTLSVersionAtLeast(result.TLSVersion, cfg.ExpectedTLSVersion) {
-			data["expectation_failed"] = true
-			data["expectation_error"] = fmt.Sprintf("expected TLS version >= %s, got %s", cfg.ExpectedTLSVersion, result.TLSVersion)
-			return regletsdk.Success(data), nil
-		}
-	}
-
-	return regletsdk.Success(data), nil
+	return result, nil
 }
 
 // isTLSVersionAtLeast checks if actual TLS version meets the minimum requirement
