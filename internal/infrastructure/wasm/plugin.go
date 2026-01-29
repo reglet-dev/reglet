@@ -612,21 +612,18 @@ func (p *Plugin) Observe(ctx context.Context, cfg Config) (*PluginObservationRes
 	statusBool := (result.Status == "success")
 
 	var pluginErr *execution.PluginError
-	if result.Error != nil {
+	switch {
+	case result.Error != nil:
 		pluginErr = &execution.PluginError{
 			Code:    result.Error.Code,
 			Message: result.Error.Message,
 		}
-	} else if result.Status == "error" {
+	case result.Status == "error":
 		// Fallback if error status but no error detail (shouldn't happen with valid SDK)
 		pluginErr = &execution.PluginError{
 			Code:    "UNKNOWN_ERROR",
 			Message: result.Message,
 		}
-	} else if result.Status == "failure" && result.Message != "" {
-		// Populate error for failure if message is present, though typically failures are operational
-		// In legacy system, failures often didn't have an error object unless it was an execution error.
-		// For now, let's keep pluginErr nil for failures to avoid misclassifying them as errors.
 	}
 
 	hostEvidence := Evidence{

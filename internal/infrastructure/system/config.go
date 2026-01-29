@@ -6,7 +6,6 @@ package system
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/goccy/go-yaml"
 	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
@@ -19,7 +18,10 @@ type Config struct {
 	Limits        *LimitsConfig       `yaml:"limits,omitempty"`
 	Redaction     RedactionConfig     `yaml:"redaction"`
 	Security      SecurityConfig      `yaml:"security"`
-	Capabilities  []CapabilityConfig  `yaml:"capabilities"`
+
+	// Embed GrantSet for direct capability configuration
+	// This maps network, fs, exec, env, kv blocks directly
+	entities.GrantSet `yaml:",inline"`
 
 	// TrustedProfileSources contains glob patterns for trusted remote profile sources.
 	// Profiles from URLs matching these patterns bypass interactive trust prompts.
@@ -28,12 +30,6 @@ type Config struct {
 
 	WasmMemoryLimitMB    int `yaml:"wasm_memory_limit_mb"`
 	MaxEvidenceSizeBytes int `yaml:"max_evidence_size_bytes"`
-}
-
-// CapabilityConfig represents a capability grant in the system configuration.
-type CapabilityConfig struct {
-	Kind    string `yaml:"kind"`
-	Pattern string `yaml:"pattern"`
 }
 
 // SensitiveDataConfig configures secret resolution and protection.
@@ -139,7 +135,6 @@ func DefaultConfig() *Config {
 			Level:               string(SecurityLevelStandard),
 			CustomBroadPatterns: []string{},
 		},
-		Capabilities:          []CapabilityConfig{},
 		TrustedProfileSources: []string{},
 		WasmMemoryLimitMB:     0, // 0 means use runtime default
 		MaxEvidenceSizeBytes:  0, // 0 means no limit
@@ -169,53 +164,4 @@ func (l *ConfigLoader) Load(path string) (*Config, error) {
 	}
 
 	return &config, nil
-}
-
-// ToGrantSet converts the config capability format to a GrantSet.
-func (c *Config) ToGrantSet() *entities.GrantSet {
-	if len(c.Capabilities) == 0 {
-		return &entities.GrantSet{}
-	}
-
-	grantSet := &entities.GrantSet{}
-
-	for _, cap := range c.Capabilities {
-		switch cap.Kind {
-		case "fs":
-			if grantSet.FS == nil {
-				grantSet.FS = &entities.FileSystemCapability{}
-			}
-			// Parse pattern like "read:/path" or "write:/path"
-			switch {
-			case strings.HasPrefix(cap.Pattern, "read:"):
-				path := strings.TrimPrefix(cap.Pattern, "read:")
-				grantSet.FS.Rules = append(grantSet.FS.Rules, entities.FileSystemRule{Read: []string{path}})
-			case strings.HasPrefix(cap.Pattern, "write:"):
-				path := strings.TrimPrefix(cap.Pattern, "write:")
-				grantSet.FS.Rules = append(grantSet.FS.Rules, entities.FileSystemRule{Write: []string{path}})
-			default:
-				// Default to read if no prefix
-				grantSet.FS.Rules = append(grantSet.FS.Rules, entities.FileSystemRule{Read: []string{cap.Pattern}})
-			}
-		case "network":
-			if grantSet.Network == nil {
-				grantSet.Network = &entities.NetworkCapability{}
-			}
-			// Parse pattern like "outbound:443"
-			port := strings.TrimPrefix(cap.Pattern, "outbound:")
-			grantSet.Network.Rules = append(grantSet.Network.Rules, entities.NetworkRule{Hosts: []string{"*"}, Ports: []string{port}})
-		case "env":
-			if grantSet.Env == nil {
-				grantSet.Env = &entities.EnvironmentCapability{}
-			}
-			grantSet.Env.Variables = append(grantSet.Env.Variables, cap.Pattern)
-		case "exec":
-			if grantSet.Exec == nil {
-				grantSet.Exec = &entities.ExecCapability{}
-			}
-			grantSet.Exec.Commands = append(grantSet.Exec.Commands, cap.Pattern)
-		}
-	}
-
-	return grantSet
 }

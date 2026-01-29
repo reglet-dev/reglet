@@ -15,7 +15,7 @@ func TestDefaultConfig(t *testing.T) {
 	require.NotNil(t, cfg)
 
 	// Verify all fields have sensible defaults
-	assert.Empty(t, cfg.Capabilities)
+	assert.True(t, cfg.GrantSet.IsEmpty())
 	assert.Empty(t, cfg.Redaction.Patterns)
 	assert.Empty(t, cfg.Redaction.Paths)
 	assert.False(t, cfg.Redaction.HashMode.Enabled)
@@ -38,7 +38,7 @@ func TestConfigLoader_Load_FileNotExists(t *testing.T) {
 	assert.NotNil(t, cfg)
 
 	// Verify it returns DefaultConfig()
-	assert.Empty(t, cfg.Capabilities)
+	assert.True(t, cfg.GrantSet.IsEmpty())
 	assert.Equal(t, string(SecurityLevelStandard), cfg.Security.Level)
 
 	// Verify maps are initialized (can be used immediately)
@@ -51,11 +51,16 @@ func TestConfigLoader_Load_ValidConfig(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.yaml")
 
 	yaml := `
-capabilities:
-  - kind: fs:read
-    pattern: /etc/hosts
-  - kind: network:outbound
-    pattern: "*.example.com:443"
+fs:
+  rules:
+    - read:
+        - /etc/hosts
+network:
+  rules:
+    - hosts:
+        - "*.example.com"
+      ports:
+        - "443"
 
 redaction:
   patterns:
@@ -67,16 +72,21 @@ redaction:
     enabled: true
     salt: "test-salt"
 `
-	err := os.WriteFile(configPath, []byte(yaml), 0644)
+	err := os.WriteFile(configPath, []byte(yaml), 0o644)
 	require.NoError(t, err)
 
 	loader := NewConfigLoader()
 	cfg, err := loader.Load(configPath)
 
 	require.NoError(t, err)
-	assert.Len(t, cfg.Capabilities, 2)
-	assert.Equal(t, "fs:read", cfg.Capabilities[0].Kind)
-	assert.Equal(t, "/etc/hosts", cfg.Capabilities[0].Pattern)
+	assert.NotNil(t, cfg.FS)
+	assert.Len(t, cfg.FS.Rules, 1)
+	assert.Equal(t, "/etc/hosts", cfg.FS.Rules[0].Read[0])
+
+	assert.NotNil(t, cfg.Network)
+	assert.Len(t, cfg.Network.Rules, 1)
+	assert.Equal(t, "*.example.com", cfg.Network.Rules[0].Hosts[0])
+	assert.Equal(t, "443", cfg.Network.Rules[0].Ports[0])
 
 	assert.Len(t, cfg.Redaction.Patterns, 1)
 	assert.Len(t, cfg.Redaction.Paths, 2)
@@ -138,7 +148,7 @@ security:
     - "fs:write:/tmp/**"
     - "network:outbound:*"
 `
-	err := os.WriteFile(configPath, []byte(yaml), 0644)
+	err := os.WriteFile(configPath, []byte(yaml), 0o644)
 	require.NoError(t, err)
 
 	loader := NewConfigLoader()

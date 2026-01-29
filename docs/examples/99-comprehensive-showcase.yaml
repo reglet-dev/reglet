@@ -163,6 +163,20 @@ controls:
             - data.status_code == 200
             - data.protocol == "HTTP/1.1" || data.protocol == "HTTP/2.0"
 
+    - id: https-this-should-fail
+      name: HTTPS endpoint accessible
+      description: Verify TLS/SSL works correctly
+      severity: high
+      tags: [security, network, tls]
+      observations:
+        - plugin: http
+          config:
+            url: https://this.should.fail.com
+            method: GET
+          expect:
+            - data.status_code == 200
+            - data.protocol == "HTTP/1.1" || data.protocol == "HTTP/2.0"
+
     # API health check with response validation
     - id: api-health
       name: API is responsive

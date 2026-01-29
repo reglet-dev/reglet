@@ -112,7 +112,7 @@ func (p *commandPlugin) Check(ctx context.Context, cfgRaw config.Config) (entiti
 	metadata := entities.NewRunMetadata(start, time.Now())
 
 	if err != nil {
-		return entities.ResultFailure(fmt.Sprintf("execution failed: %v", err), nil).WithMetadata(metadata), nil
+		return entities.ResultError(entities.NewErrorDetail("execution_failed", fmt.Sprintf("execution failed: %v", err))).WithMetadata(metadata), nil
 	}
 
 	// Clean output (trim whitespace)
