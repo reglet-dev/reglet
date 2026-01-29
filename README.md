@@ -501,16 +501,16 @@ Reglet is in active development. Core features work, but expect breaking changes
 - [x] `--watch` mode (live feedback on file changes)
 - [x] Looping (`loop: { items: "{{ .vars.list }}" }`)
 
-**v0.4.5-alpha** (current)
+**v0.4.5-alpha** (Released)
 - [x] CLI vars (`--set`, `--set-file`, `--set-env`)
 - [x] Remote profiles (`reglet check https://...`)
 - [x] Profile cache management (`reglet profile list/pull/prune/outdated`)
 - [x] Trusted sources configuration
 - [x] Version pinning (`#v1.2.0`, `@sha256:...`)
 - [x] Plugin SDK (Go) Enhanced
-- [ ] integrate Enhanced SDK into Reglet
+- [x] integrate Enhanced SDK into Reglet
 
-**v0.5.0-alpha** (Infrastructure & IaC Plugins)
+**v0.5.0-alpha** (Current)
 - [ ] AWS plugin
 - [ ] GCP plugin
 - [ ] Azure plugin

@@ -18,19 +18,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix plugins to use sdk properly
 - Convert config over to grants
 
-### Documentation
-- Update CHANGELOG for v0.4.0-alpha
-- Update readme
-
-### Fixed
-- Dns plugin expecting int instead of string for port caused capabilities to fail
-- Remove replace in go.mod
-
-### Maintenance
-- Fix spelling mistakes
-
-### Testing
-- Skip 3 tests while still in feature development
 ## [0.4.0-alpha] - 2026-01-17
 
 ### Added
@@ -65,11 +52,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add func options to profile loader for fs
 - More func options updates
 - Consolidate constants into package
-
-### Documentation
-- Update CHANGELOG for v0.3.0-alpha
-- Update CHANGELOG for v0.3.5-alpha
-- Update README
 
 ### Fixed
 - Prevent path traversal in plugin config
