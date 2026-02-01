@@ -2,54 +2,71 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
 
-	"github.com/reglet-dev/reglet-sdk/go/application/config"
-	"github.com/reglet-dev/reglet-sdk/go/application/schema"
+	"github.com/reglet-dev/reglet-sdk/go/application/plugin"
 	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
 	"github.com/reglet-dev/reglet-sdk/go/domain/ports"
-	sdknet "github.com/reglet-dev/reglet-sdk/go/net"
+	"github.com/reglet-dev/reglet-sdk/go/infrastructure/wasm"
+	"github.com/reglet-dev/reglet/plugins/http/core"
+
+	// Import services to trigger auto-registration
+	_ "github.com/reglet-dev/reglet/plugins/http/services"
 )
 
-// httpPlugin implements the sdk.Plugin interface.
 type httpPlugin struct {
 	client ports.HTTPClient
 }
 
-// Describe returns HTTP plugin metadata.
-func (p *httpPlugin) Describe(ctx context.Context) (entities.Metadata, error) {
-	return entities.Metadata{
-		Name:        "http",
-		Version:     "1.0.0",
-		Description: "HTTP/HTTPS request checking and validation",
-		Capabilities: []entities.Capability{
-			{
-				Category: "network",
-				Resource: "outbound:80,443",
-			},
-		},
-	}, nil
+func (p *httpPlugin) Manifest(ctx context.Context) (*entities.Manifest, error) {
+	return core.Plugin.Manifest(), nil
 }
 
-type HTTPConfig struct {
-	URL                  string `json:"url" validate:"required,url" description:"URL to request"`
-	Method               string `json:"method" validate:"oneof=GET POST PUT DELETE HEAD OPTIONS PATCH" default:"GET" description:"HTTP method"`
-	Body                 string `json:"body,omitempty" description:"Request body"`
-	ExpectedStatus       int    `json:"expected_status,omitempty" description:"Expected HTTP status code (optional)"`
-	ExpectedBodyContains string `json:"expected_body_contains,omitempty" description:"String that should be present in response body (optional)"`
-	BodyPreviewLength    int    `json:"body_preview_length,omitempty" default:"200" description:"Number of characters to include from response body (0 = hash only, -1 = full body)"`
-}
-
-// Schema returns config schema.
-func (p *httpPlugin) Schema(ctx context.Context) ([]byte, error) {
-	return schema.GenerateSchema(HTTPConfig{})
-}
-
-// Check executes HTTP request.
-func (p *httpPlugin) Check(ctx context.Context, cfgRaw config.Config) (entities.Result, error) {
-	var cfg HTTPConfig
-	if err := config.Validate(cfgRaw, &cfg); err != nil {
-		return entities.ResultError(entities.NewErrorDetail("config", err.Error())), nil
+func (p *httpPlugin) Check(ctx context.Context, configBytes []byte) (*entities.Result, error) {
+	// Parse config
+	var cfgStruct core.HTTPConfig
+	if err := json.Unmarshal(configBytes, &cfgStruct); err != nil {
+		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
-	// Note: RunHTTPCheck expects untyped config.Config, but validation ensures correctness.
-	return sdknet.RunHTTPCheck(ctx, cfgRaw, sdknet.WithHTTPClient(p.client))
+	cfg := &cfgStruct
+
+	opName := "check_status" // Default
+	method := strings.ToUpper(cfg.Method)
+	switch method {
+	case "GET":
+		opName = "get"
+	case "POST":
+		opName = "post"
+	case "HEAD":
+		opName = "head"
+	}
+
+	handler, ok := core.Plugin.GetHandler("http", opName)
+	if !ok {
+		return entities.ResultErrorPtr("configuration",
+			fmt.Sprintf("Unknown operation for method: %s", method)), nil
+	}
+
+	// Use the provided client or a default one (though in WASM we rely on imports)
+	client := p.client
+	if client == nil {
+		// In WASM, we should use the SDK's default client which wraps host functions
+		client = wasm.NewHTTPAdapter(0)
+	}
+
+	req := &plugin.Request{
+		Client: client,
+		Config: cfg,
+		Raw:    configBytes,
+	}
+
+	return handler(ctx, req)
+}
+
+func main() {
+	plugin.Register(&httpPlugin{
+		client: wasm.NewHTTPAdapter(0),
+	})
 }
