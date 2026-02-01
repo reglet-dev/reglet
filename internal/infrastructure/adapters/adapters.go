@@ -108,18 +108,9 @@ type PluginAdapter struct {
 	plugin *wasm.Plugin
 }
 
-// Describe returns plugin metadata.
-func (p *PluginAdapter) Describe(ctx context.Context) (*ports.PluginInfo, error) {
-	info, err := p.plugin.Describe(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return &ports.PluginInfo{
-		Name:         info.Name,
-		Version:      info.Version,
-		Description:  info.Description,
-		Capabilities: info.Capabilities,
-	}, nil
+// Manifest returns plugin metadata.
+func (p *PluginAdapter) Manifest(ctx context.Context) (*sdkEntities.Manifest, error) {
+	return p.plugin.Manifest(ctx)
 }
 
 // ProfileLoaderAdapter adapts infrastructure profile loader to port interface.

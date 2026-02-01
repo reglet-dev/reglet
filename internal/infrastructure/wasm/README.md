@@ -2,6 +2,18 @@
 
 This package provides the WebAssembly runtime infrastructure for Reglet plugins using [wazero](https://github.com/tetratelabs/wazero).
 
+## WASM Compilation
+
+**IMPORTANT: We use standard Go (1.21+), NOT TinyGo.**
+
+Plugins are compiled to WASM using:
+
+```bash
+GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -o plugin.wasm .
+```
+
+TinyGo has limited reflection support which breaks the SDK's service registration pattern.
+
 ## Overview
 
 All Reglet plugins are WASM modules (including embedded ones). This package:
@@ -21,9 +33,9 @@ Runtime
 
 Plugin
   ├── CompiledModule (WASM bytecode)
-  ├── Instance (running module)
-  ├── Cached PluginInfo (from describe())
-  └── Cached ConfigSchema (from schema())
+  ├── Instance pool (pre-warmed instances)
+  ├── Cached Manifest (from Manifest())
+  └── GrantSet (capabilities converted from Manifest)
 ```
 
 ## Key Types
@@ -33,88 +45,73 @@ Main runtime manager. Create one per Reglet execution:
 
 ```go
 ctx := context.Background()
-runtime, err := wasm.NewRuntime(ctx)
-defer runtime.Close()
+runtime, err := wasm.NewRuntime(ctx, buildInfo)
+defer runtime.Close(ctx)
 ```
 
 ### `Plugin`
-Wrapper around a WASM module. Provides methods to call WIT interface functions:
+Wrapper around a WASM module. Provides methods to call plugin interface functions:
 
 ```go
 // Load plugin
-plugin, err := runtime.LoadPlugin("file", wasmBytes)
+plugin, err := runtime.LoadPlugin(ctx, "file", wasmBytes)
 
-// Get metadata
-info, err := plugin.Describe()
-
-// Get config schema
-schema, err := plugin.Schema()
+// Get manifest (includes name, version, capabilities, config schema, services)
+manifest, err := plugin.Manifest(ctx)
 
 // Execute observation
-result, err := plugin.Observe(config)
+result, err := plugin.Observe(ctx, config)
 ```
 
 ### Type Mappings
 
-Go types map to WIT interface types:
+Go types map to SDK entity types:
 
-| Go Type | WIT Type |
+| Go Type | SDK Type |
 |---------|----------|
-| `PluginInfo` | `plugin-info` |
-| `Capability` | `capability` |
-| `Config` | `config` |
-| `Evidence` | `evidence` |
-| `PluginError` | `error` |
-| `ConfigSchema` | `config-schema` |
+| `entities.Manifest` | Plugin metadata (name, version, capabilities, schema, services) |
+| `entities.Capability` | Single capability declaration |
+| `entities.GrantSet` | Structured capability set for enforcement |
+| `Config` | Plugin configuration |
+| `Evidence` | Observation result with status and data |
+| `PluginError` | Error details from plugin |
 
 ## Current Status
 
-**Phase 1a - Basic Infrastructure:**
+**Complete:**
 
 ✅ Runtime initialization with wazero
 ✅ Plugin loading and module compilation
-✅ Type definitions matching WIT interface
-✅ Basic tests
+✅ `Manifest()` method for plugin metadata
+✅ `Observe()` method for plugin execution
+✅ Capability-to-GrantSet conversion
+✅ Instance pooling for concurrent execution
+✅ Host functions with capability enforcement
+✅ Comprehensive tests including race detection
 
-**TODO - WIT Bindings:**
+## Host Functions
 
-The current implementation has placeholder TODOs for WIT bindings:
+Host functions provide sandboxed access to system resources (see `hostfuncs/`):
 
-1. **Marshal/Unmarshal**: Need to implement proper data serialization between Go and WASM memory
-2. **Host Functions**: Need to implement capability-enforced host functions
-3. **Memory Management**: Need to handle WASM linear memory for passing complex data structures
-
-This will be completed after we build a simple plugin to validate the approach.
-
-## Host Functions (Planned)
-
-Host functions will provide sandboxed access to system resources:
-
-### Filesystem
-- `fs_read(path: string) -> result<bytes, error>`
-- `fs_write(path: string, data: bytes) -> result<void, error>`
-- Enforces `fs:read:<glob>` and `fs:write:<glob>` capabilities
-
-### Network
-- `net_connect(host: string, port: u16) -> result<connection, error>`
-- Enforces `network:outbound:<ports>` capability
-
-### Environment
-- `env_get(name: string) -> result<string, error>`
-- Enforces `env:<pattern>` capability
-
-### Execution
-- `exec_run(command: string, args: []string) -> result<output, error>`
-- Enforces `exec:<commands>` capability
+| Function | Capability | Description |
+|----------|------------|-------------|
+| HTTP | `network:outbound` | HTTP client with TLS |
+| DNS | `network:outbound` | DNS resolution |
+| TCP | `network:outbound` | Raw TCP connections |
+| SMTP | `network:outbound` | SMTP client |
+| Exec | `exec:<command>` | Command execution |
+| Filesystem | `fs:read`, `fs:write` | File access via WASI |
+| Environment | `env:<pattern>` | Environment variable access |
 
 ## Security Model
 
 ### Capability Enforcement
 
-1. Plugin declares required capabilities in `describe()`
+1. Plugin declares required capabilities in `Manifest().Capabilities`
 2. System config grants capabilities to plugins
-3. Runtime checks capabilities on every host function call
-4. Unauthorized access is denied with clear error
+3. Runtime converts capabilities to `GrantSet` for enforcement
+4. Host functions check capabilities on every call
+5. Unauthorized access is denied with clear error
 
 ### Sandboxing
 
@@ -127,25 +124,35 @@ Host functions will provide sandboxed access to system resources:
 
 Run tests:
 ```bash
-make test
+go test ./internal/infrastructure/wasm/... -v
 ```
 
-Current test coverage:
-- Runtime initialization
-- Plugin loading with invalid WASM
-- Plugin cache/retrieval
-
-TODO: Add tests with actual WASM plugins once we build the file plugin.
+Test coverage includes:
+- Runtime initialization and configuration
+- Plugin loading and caching
+- `Manifest()` and `Observe()` integration tests
+- Concurrent execution with race detection
+- Host function capability enforcement
+- Fuzz testing for wire format parsing
 
 ## Dependencies
 
-- `github.com/tetratelabs/wazero` - Pure Go WASM runtime
+- `github.com/tetratelabs/wazero` - Pure Go WASM runtime (no CGO)
+- `github.com/reglet-dev/reglet-sdk` - Plugin SDK entities
 - `github.com/stretchr/testify` - Testing framework
 
-## Next Steps
+## Plugin Interface
 
-1. Build a simple file plugin in Go that compiles to WASM
-2. Implement WIT bindings for data marshaling
-3. Test end-to-end: load plugin, call describe/observe
-4. Implement host functions with capability checking
-5. Add comprehensive tests with real plugins
+Plugins must implement two exported functions:
+
+```go
+// Returns plugin manifest as JSON (packed ptr|len)
+//go:wasmexport manifest
+func _manifest() uint64
+
+// Executes observation with config, returns result as JSON (packed ptr|len)
+//go:wasmexport observe
+func _observe(configPtr uint32, configLen uint32) uint64
+```
+
+The SDK handles these exports automatically when using `plugin.Register()`.

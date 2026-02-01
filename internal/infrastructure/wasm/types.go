@@ -3,18 +3,8 @@
 package wasm
 
 import (
-	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
 	"github.com/reglet-dev/reglet/internal/domain/execution"
 )
-
-// PluginInfo contains metadata about a plugin
-// Maps to the WIT plugin-info record
-type PluginInfo struct {
-	Capabilities *entities.GrantSet
-	Name         string
-	Version      string
-	Description  string
-}
 
 // Config represents plugin configuration
 // Maps to the WIT config record
@@ -29,22 +19,6 @@ type Evidence = execution.Evidence
 // PluginError is re-exported from domain for backward compatibility in this package.
 // Use execution.PluginError from domain layer.
 type PluginError = execution.PluginError
-
-// ConfigSchema represents the JSON Schema for plugin configuration
-// Maps to the WIT config-schema record
-type ConfigSchema struct {
-	Fields    []FieldDef
-	RawSchema []byte // Raw JSON Schema data from plugin
-}
-
-// FieldDef represents a configuration field definition
-// Maps to the WIT field-def record
-type FieldDef struct {
-	Name        string
-	FieldType   string
-	Description string
-	Required    bool
-}
 
 // PluginObservationResult is the result of running an observation through a WASM plugin.
 // This is a low-level boundary type.

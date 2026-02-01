@@ -285,18 +285,18 @@ func (r *Runtime) GetPluginSchema(ctx context.Context, pluginName string) ([]byt
 		return nil, fmt.Errorf("plugin %s not found or not loaded", pluginName)
 	}
 
-	// Get the schema from the plugin
-	schema, err := plugin.Schema(ctx)
+	// Get the manifest from the plugin
+	manifest, err := plugin.Manifest(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get schema for plugin %s: %w", pluginName, err)
+		return nil, fmt.Errorf("failed to get manifest for plugin %s: %w", pluginName, err)
 	}
 
-	if schema == nil || len(schema.RawSchema) == 0 {
+	if len(manifest.ConfigSchema) == 0 {
 		// Plugin doesn't provide a schema
 		return nil, nil
 	}
 
-	return schema.RawSchema, nil
+	return manifest.ConfigSchema, nil
 }
 
 // Close closes the runtime and cleans up resources

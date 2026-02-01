@@ -6,20 +6,11 @@ import (
 	sdkEntities "github.com/reglet-dev/reglet-sdk/go/domain/entities"
 )
 
-// PluginInfo contains metadata about a plugin.
-// This is the application-layer representation of plugin metadata.
-type PluginInfo struct {
-	Capabilities *sdkEntities.GrantSet
-	Name         string
-	Version      string
-	Description  string
-}
-
 // Plugin represents a loaded WASM plugin that can be inspected and executed.
 // This interface abstracts the concrete wasm.Plugin implementation.
 type Plugin interface {
-	// Describe returns plugin metadata including declared capabilities.
-	Describe(ctx context.Context) (*PluginInfo, error)
+	// Manifest returns plugin metadata including declared capabilities.
+	Manifest(ctx context.Context) (*sdkEntities.Manifest, error)
 }
 
 // PluginRuntime abstracts the WASM runtime for plugin loading and management.

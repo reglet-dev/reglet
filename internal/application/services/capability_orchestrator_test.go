@@ -34,11 +34,11 @@ func (m *mockPluginRuntime) Close(_ context.Context) error {
 // mockPlugin is a test double for Plugin.
 type mockPlugin struct{}
 
-func (m *mockPlugin) Describe(_ context.Context) (*ports.PluginInfo, error) {
-	return &ports.PluginInfo{
+func (m *mockPlugin) Manifest(_ context.Context) (*sdkEntities.Manifest, error) {
+	return &sdkEntities.Manifest{
 		Name:         "mock",
 		Version:      "1.0.0",
-		Capabilities: nil,
+		Capabilities: []sdkEntities.Capability{},
 	}, nil
 }
 

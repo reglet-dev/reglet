@@ -18,9 +18,9 @@ import (
 func TestPlugin_Observe_Concurrent(t *testing.T) {
 	ctx := context.Background()
 
-	// Grant file plugin access to current directory for temp files
+	// Grant fixture plugin access to current directory for temp files
 	caps := map[string]*entities.GrantSet{
-		"file": {
+		"fixture": {
 			FS: &entities.FileSystemCapability{
 				Rules: []entities.FileSystemRule{{Read: []string{"/**"}}},
 			},
@@ -31,11 +31,11 @@ func TestPlugin_Observe_Concurrent(t *testing.T) {
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
-	// Load file plugin
-	wasmBytes, err := os.ReadFile("../../../plugins/file/file.wasm")
+	// Load fixture plugin
+	wasmBytes, err := os.ReadFile("testdata/fixture.wasm")
 	require.NoError(t, err)
 
-	plugin, err := runtime.LoadPlugin(ctx, "file", wasmBytes)
+	plugin, err := runtime.LoadPlugin(ctx, "fixture", wasmBytes)
 	require.NoError(t, err)
 
 	// Create multiple temp files with unique content
@@ -72,8 +72,8 @@ func TestPlugin_Observe_Concurrent(t *testing.T) {
 
 			config := Config{
 				Values: map[string]interface{}{
-					"path": expectedPaths[idx],
-					"mode": "exists",
+					"action": "echo",
+					"input":  expectedPaths[idx],
 				},
 			}
 
@@ -87,14 +87,14 @@ func TestPlugin_Observe_Concurrent(t *testing.T) {
 
 	// Verify all results are correct (no cross-contamination)
 	for i, result := range results {
-		assert.NotNil(t, result, "Result %d should not be nil", i)
+		require.NotNil(t, result, "Result %d should not be nil", i)
 		assert.NotNil(t, result.Evidence, "Evidence for result %d should not be nil", i)
 
 		// Verify Evidence status
 		assert.True(t, result.Evidence.Status, "Result %d Evidence.Status should be true", i)
 		require.Nil(t, result.Evidence.Error, "Result %d Evidence.Error should be nil", i)
 
-		path, ok := result.Evidence.Data["path"].(string)
+		path, ok := result.Evidence.Data["echo"].(string)
 		require.True(t, ok, "Result %d should have path field", i)
 		assert.Equal(t, expectedPaths[i], path, "Result %d path should match", i)
 	}
@@ -113,9 +113,9 @@ func TestPlugin_Observe_RaceDetector(t *testing.T) {
 func TestPlugin_ConcurrentDifferentMethods(t *testing.T) {
 	ctx := context.Background()
 
-	// Grant file plugin access to current directory for temp files
+	// Grant fixture plugin access to current directory for temp files
 	caps := map[string]*entities.GrantSet{
-		"file": {
+		"fixture": {
 			FS: &entities.FileSystemCapability{
 				Rules: []entities.FileSystemRule{{Read: []string{"/**"}}},
 			},
@@ -126,11 +126,11 @@ func TestPlugin_ConcurrentDifferentMethods(t *testing.T) {
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
-	// Load file plugin
-	wasmBytes, err := os.ReadFile("../../../plugins/file/file.wasm")
+	// Load fixture plugin
+	wasmBytes, err := os.ReadFile("testdata/fixture.wasm")
 	require.NoError(t, err)
 
-	plugin, err := runtime.LoadPlugin(ctx, "file", wasmBytes)
+	plugin, err := runtime.LoadPlugin(ctx, "fixture", wasmBytes)
 	require.NoError(t, err)
 
 	// Create a test file
@@ -143,19 +143,19 @@ func TestPlugin_ConcurrentDifferentMethods(t *testing.T) {
 	var wg sync.WaitGroup
 	errors := make([]error, 3)
 
-	// Call Describe() in goroutine
+	// Call Manifest() in goroutine
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		_, err := plugin.Describe(ctx)
+		_, err := plugin.Manifest(ctx)
 		errors[0] = err
 	}()
 
-	// Call Schema() in goroutine
+	// Call Manifest() again in goroutine (simulating concurrent metadata access)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		_, err := plugin.Schema(ctx)
+		_, err := plugin.Manifest(ctx)
 		errors[1] = err
 	}()
 
@@ -165,8 +165,8 @@ func TestPlugin_ConcurrentDifferentMethods(t *testing.T) {
 		defer wg.Done()
 		config := Config{
 			Values: map[string]interface{}{
-				"path": tmpFile.Name(),
-				"mode": "exists",
+				"action": "echo",
+				"input":  tmpFile.Name(),
 			},
 		}
 		_, err := plugin.Observe(ctx, config)

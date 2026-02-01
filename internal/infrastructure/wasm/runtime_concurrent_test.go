@@ -26,13 +26,13 @@ func TestRuntime_ConcurrentPluginAccess(t *testing.T) {
 	}()
 
 	// Load a real WASM plugin file for testing
-	pluginPath := filepath.Join("..", "..", "..", "plugins", "file", "file.wasm")
+	pluginPath := filepath.Join("testdata", "fixture.wasm")
 	wasmBytes, err := os.ReadFile(pluginPath)
-	require.NoError(t, err, "Failed to read file plugin. Run 'cd plugins/file && make build' first")
+	require.NoError(t, err, "Failed to read fixture plugin. Run 'make -C internal/infrastructure/wasm/testdata/fixture' first")
 
 	const (
 		numGoroutines = 50
-		pluginName    = "file"
+		pluginName    = "fixture"
 	)
 
 	// Test concurrent LoadPlugin calls (should only compile once)
@@ -96,7 +96,7 @@ func TestRuntime_ConcurrentPluginAccess(t *testing.T) {
 
 	// Test mixed concurrent operations
 	t.Run("mixed concurrent operations", func(t *testing.T) {
-		const mixedPluginName = "file-concurrent"
+		const mixedPluginName = "fixture-concurrent"
 		var wg sync.WaitGroup
 		wg.Add(numGoroutines * 3) // 3 types of operations
 

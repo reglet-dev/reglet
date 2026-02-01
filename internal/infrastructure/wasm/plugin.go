@@ -27,9 +27,9 @@ type Plugin struct {
 	stderr       io.Writer
 	module       wazero.CompiledModule
 	moduleConfig wazero.ModuleConfig
-	info         *PluginInfo
+	manifest     *entities.Manifest
 	instancePool chan api.Module
-	schema       *ConfigSchema
+
 	capabilities *entities.GrantSet
 	name         string
 	frozenEnv    []string
@@ -401,16 +401,16 @@ func (p *Plugin) newInstance(ctx context.Context) (api.Module, error) {
 	return instance, nil
 }
 
-// Describe executes the plugin's 'describe' function to retrieve metadata.
-func (p *Plugin) Describe(ctx context.Context) (*PluginInfo, error) {
+// Manifest retrieves the plugin's metadata including capabilities and config schema.
+func (p *Plugin) Manifest(ctx context.Context) (*entities.Manifest, error) {
 	// Wrap context with plugin name for host functions
 	ctx = hostfuncs.WithPluginName(ctx, p.name)
 
 	p.mu.Lock()
-	if p.info != nil {
-		info := p.info
+	if p.manifest != nil {
+		manifest := p.manifest
 		p.mu.Unlock()
-		return info, nil
+		return manifest, nil
 	}
 	p.mu.Unlock()
 
@@ -420,18 +420,18 @@ func (p *Plugin) Describe(ctx context.Context) (*PluginInfo, error) {
 	}
 	defer p.releaseInstance(ctx, instance)
 
-	describeFn := instance.ExportedFunction("describe")
-	if describeFn == nil {
-		return nil, fmt.Errorf("plugin %s does not export describe() function", p.name)
+	manifestFn := instance.ExportedFunction("_manifest")
+	if manifestFn == nil {
+		return nil, fmt.Errorf("plugin %s does not export _manifest() function", p.name)
 	}
 
-	results, err := describeFn.Call(ctx)
+	results, err := manifestFn.Call(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to call describe(): %w", err)
+		return nil, fmt.Errorf("failed to call _manifest(): %w", err)
 	}
 
 	if len(results) == 0 {
-		return nil, fmt.Errorf("describe() returned no results")
+		return nil, fmt.Errorf("_manifest() returned no results")
 	}
 
 	packed := results[0]
@@ -439,82 +439,79 @@ func (p *Plugin) Describe(ctx context.Context) (*PluginInfo, error) {
 	size := uint32(packed & 0xFFFFFFFF) //nolint:gosec // G115: WASM32 lengths are always 32-bit
 
 	if ptr == 0 || size == 0 {
-		return nil, fmt.Errorf("describe() returned null pointer or zero length")
+		return nil, fmt.Errorf("_manifest() returned null pointer or zero length")
 	}
 
 	data, err := p.readString(ctx, instance, ptr, size)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read describe() result: %w", err)
+		return nil, fmt.Errorf("failed to read _manifest() result: %w", err)
 	}
 
-	info, err := parsePluginInfo(data)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse plugin info: %w", err)
+	manifest := &entities.Manifest{}
+	if err := json.Unmarshal(data, manifest); err != nil {
+		return nil, fmt.Errorf("failed to parse manifest JSON: %w", err)
 	}
+
+	// Extract capabilities into GrantSet for runtime configuration
+	grantSet := capabilitiesToGrantSet(manifest.Capabilities)
 
 	p.mu.Lock()
-	p.info = info
+	p.manifest = manifest
+	p.capabilities = grantSet
 	p.mu.Unlock()
 
-	return info, nil
+	return manifest, nil
 }
 
-// Schema executes the plugin's 'schema' function to retrieve configuration definitions.
-func (p *Plugin) Schema(ctx context.Context) (*ConfigSchema, error) {
-	ctx = hostfuncs.WithPluginName(ctx, p.name)
-
-	p.mu.Lock()
-	if p.schema != nil {
-		schema := p.schema
-		p.mu.Unlock()
-		return schema, nil
+// capabilitiesToGrantSet converts []Capability to *GrantSet
+func capabilitiesToGrantSet(caps []entities.Capability) *entities.GrantSet {
+	gs := &entities.GrantSet{}
+	for _, cap := range caps {
+		switch cap.Category {
+		case "network", "http":
+			host := cap.Resource
+			port := "*" // default
+			// Basic parsing if needed, but for now treating resource as host
+			if strings.Contains(host, ":") {
+				parts := strings.SplitN(host, ":", 2)
+				host = parts[0]
+				port = parts[1]
+			}
+			if gs.Network == nil {
+				gs.Network = &entities.NetworkCapability{}
+			}
+			gs.Network.Rules = append(gs.Network.Rules, entities.NetworkRule{
+				Hosts: []string{host},
+				Ports: []string{port},
+			})
+		case "fs":
+			if gs.FS == nil {
+				gs.FS = &entities.FileSystemCapability{}
+			}
+			read := []string{}
+			write := []string{}
+			if cap.Action == "write" {
+				write = append(write, cap.Resource)
+			} else {
+				read = append(read, cap.Resource)
+			}
+			gs.FS.Rules = append(gs.FS.Rules, entities.FileSystemRule{
+				Read:  read,
+				Write: write,
+			})
+		case "exec":
+			if gs.Exec == nil {
+				gs.Exec = &entities.ExecCapability{}
+			}
+			gs.Exec.Commands = append(gs.Exec.Commands, cap.Resource)
+		case "env":
+			if gs.Env == nil {
+				gs.Env = &entities.EnvironmentCapability{}
+			}
+			gs.Env.Variables = append(gs.Env.Variables, cap.Resource)
+		}
 	}
-	p.mu.Unlock()
-
-	instance, err := p.acquireInstance(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer p.releaseInstance(ctx, instance)
-
-	schemaFn := instance.ExportedFunction("schema")
-	if schemaFn == nil {
-		return nil, fmt.Errorf("plugin %s does not export schema() function", p.name)
-	}
-
-	results, err := schemaFn.Call(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to call schema(): %w", err)
-	}
-
-	if len(results) == 0 {
-		return nil, fmt.Errorf("schema() returned no results")
-	}
-
-	packed := results[0]
-	ptr := uint32(packed >> 32)         //nolint:gosec // G115: WASM32 pointers are always 32-bit
-	size := uint32(packed & 0xFFFFFFFF) //nolint:gosec // G115: WASM32 lengths are always 32-bit
-
-	if ptr == 0 || size == 0 {
-		return nil, fmt.Errorf("schema() returned null pointer or zero length")
-	}
-
-	data, err := p.readString(ctx, instance, ptr, size)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read schema() result: %w", err)
-	}
-
-	// Store raw JSON schema for now.
-	schema := &ConfigSchema{
-		Fields:    []FieldDef{},
-		RawSchema: data,
-	}
-
-	p.mu.Lock()
-	p.schema = schema
-	p.mu.Unlock()
-
-	return schema, nil
+	return gs
 }
 
 // Observe executes the main validation logic of the plugin.
@@ -531,9 +528,9 @@ func (p *Plugin) Observe(ctx context.Context, cfg Config) (*PluginObservationRes
 	defer p.releaseInstance(ctx, instance)
 
 	// Get the observe function
-	observeFn := instance.ExportedFunction("observe")
+	observeFn := instance.ExportedFunction("_observe")
 	if observeFn == nil {
-		return nil, fmt.Errorf("plugin %s does not export observe() function", p.name)
+		return nil, fmt.Errorf("plugin %s does not export _observe() function", p.name)
 	}
 
 	// Marshal config to JSON
@@ -721,90 +718,4 @@ func (p *Plugin) writeToMemory(ctx context.Context, instance api.Module, data []
 	// fmt.Printf("DEBUG writeToMemory: Wrote %d bytes to ptr %d. Readback hex: %% x\n", len(data), ptr, readBack)
 
 	return ptr, nil
-}
-
-// parsePluginInfo decodes the JSON metadata returned by the plugin.
-func parsePluginInfo(data []byte) (*PluginInfo, error) {
-	var raw map[string]interface{}
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return nil, fmt.Errorf("invalid JSON: %w", err)
-	}
-
-	info := &PluginInfo{}
-
-	// Parse required fields
-	if name, ok := raw["name"].(string); ok {
-		info.Name = name
-	}
-
-	if version, ok := raw["version"].(string); ok {
-		info.Version = version
-	}
-
-	if description, ok := raw["description"].(string); ok {
-		info.Description = description
-	}
-
-	// Parse capabilities - now returns a GrantSet
-	info.Capabilities = parseCapabilitiesToGrantSet(raw)
-
-	return info, nil
-}
-
-// parseCapabilitiesToGrantSet converts the legacy capabilities array to a GrantSet.
-func parseCapabilitiesToGrantSet(raw map[string]interface{}) *entities.GrantSet {
-	caps, ok := raw["capabilities"].([]interface{})
-	if !ok || len(caps) == 0 {
-		return nil
-	}
-
-	grantSet := &entities.GrantSet{}
-
-	for _, capRaw := range caps {
-		capMap, ok := capRaw.(map[string]interface{})
-		if !ok {
-			continue
-		}
-
-		kind, _ := capMap["kind"].(string)
-		pattern, _ := capMap["pattern"].(string)
-
-		switch kind {
-		case "fs":
-			if grantSet.FS == nil {
-				grantSet.FS = &entities.FileSystemCapability{}
-			}
-			// Parse pattern like "read:/path" or "write:/path"
-			switch {
-			case strings.HasPrefix(pattern, "read:"):
-				path := strings.TrimPrefix(pattern, "read:")
-				grantSet.FS.Rules = append(grantSet.FS.Rules, entities.FileSystemRule{Read: []string{path}})
-			case strings.HasPrefix(pattern, "write:"):
-				path := strings.TrimPrefix(pattern, "write:")
-				grantSet.FS.Rules = append(grantSet.FS.Rules, entities.FileSystemRule{Write: []string{path}})
-			default:
-				// Default to read if no prefix
-				grantSet.FS.Rules = append(grantSet.FS.Rules, entities.FileSystemRule{Read: []string{pattern}})
-			}
-		case "network":
-			if grantSet.Network == nil {
-				grantSet.Network = &entities.NetworkCapability{}
-			}
-			// Parse pattern like "outbound:443" or "outbound:*"
-			port := strings.TrimPrefix(pattern, "outbound:")
-			grantSet.Network.Rules = append(grantSet.Network.Rules, entities.NetworkRule{Hosts: []string{"*"}, Ports: []string{port}})
-		case "env":
-			if grantSet.Env == nil {
-				grantSet.Env = &entities.EnvironmentCapability{}
-			}
-			grantSet.Env.Variables = append(grantSet.Env.Variables, pattern)
-		case "exec":
-			if grantSet.Exec == nil {
-				grantSet.Exec = &entities.ExecCapability{}
-			}
-			grantSet.Exec.Commands = append(grantSet.Exec.Commands, pattern)
-		}
-	}
-
-	return grantSet
 }
