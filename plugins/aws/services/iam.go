@@ -8,15 +8,26 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/reglet-dev/reglet-sdk/go/application/plugin"
 	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
 	"github.com/reglet-dev/reglet/plugins/aws/core"
 )
 
+// IAMService handles IAM compliance checks.
+// Auto-registers on package import via the var below.
+// IAMService handles IAM compliance checks.
+// Auto-registers on package import via the var below.
+type IAMService struct {
+	plugin.Service `name:"iam" desc:"IAM identity and access management checks"`
+
+	GetAccountSummary        plugin.Op `desc:"Check if root account has MFA enabled" method:"GetAccountSummaryHandler"`
+	GetAccountPasswordPolicy plugin.Op `desc:"Verify IAM password policy meets requirements" method:"GetAccountPasswordPolicyHandler"`
+	ListAccessKeysWithUsage  plugin.Op `desc:"Find access keys unused for 90+ days" method:"ListAccessKeysWithUsageHandler"`
+}
+
+// Auto-register on package import
 func init() {
-	// Register IAM handlers
-	core.RegisterServiceHandler("iam", "get_account_summary", handleGetAccountSummary)
-	core.RegisterServiceHandler("iam", "get_account_password_policy", handleGetAccountPasswordPolicy)
-	core.RegisterServiceHandler("iam", "list_access_keys_with_usage", handleListAccessKeysWithUsage)
+	plugin.MustRegisterService(core.Plugin, &IAMService{})
 }
 
 // =============================================================================
@@ -36,20 +47,19 @@ type GetAccountSummaryResponse struct {
 	} `xml:"GetAccountSummaryResult"`
 }
 
-func handleGetAccountSummary(ctx context.Context, client *core.AWSClient, cfg *core.AWSConfig) (entities.Result, error) {
+func (s *IAMService) GetAccountSummaryHandler(ctx context.Context, req *plugin.Request) (*entities.Result, error) {
+	client := req.Client.(*core.AWSClient)
+
 	// Call AWS API
 	body, err := client.Call(ctx, "iam", "GetAccountSummary", nil)
 	if err != nil {
-		return entities.Result{}, err
+		return nil, err
 	}
 
 	// Parse response
 	var resp GetAccountSummaryResponse
 	if err := xml.Unmarshal(body, &resp); err != nil {
-		return entities.ResultError(&entities.ErrorDetail{
-			Type:    "internal",
-			Message: fmt.Sprintf("Failed to parse AWS response: %v", err),
-		}), nil
+		return entities.ResultErrorPtr("internal", fmt.Sprintf("Failed to parse AWS response: %v", err)), nil
 	}
 
 	// Extract summary values
@@ -76,9 +86,9 @@ func handleGetAccountSummary(ctx context.Context, client *core.AWSClient, cfg *c
 	}
 
 	if rootMFAEnabled {
-		return entities.ResultSuccess("Root account has MFA enabled", data), nil
+		return entities.ResultSuccessPtr("Root account has MFA enabled", data), nil
 	}
-	return entities.ResultFailure("Root account does NOT have MFA enabled", data), nil
+	return entities.ResultFailurePtr("Root account does NOT have MFA enabled", data), nil
 }
 
 // =============================================================================
@@ -104,30 +114,29 @@ type GetAccountPasswordPolicyResponse struct {
 	} `xml:"GetAccountPasswordPolicyResult"`
 }
 
-func handleGetAccountPasswordPolicy(ctx context.Context, client *core.AWSClient, cfg *core.AWSConfig) (entities.Result, error) {
+func (s *IAMService) GetAccountPasswordPolicyHandler(ctx context.Context, req *plugin.Request) (*entities.Result, error) {
+	client := req.Client.(*core.AWSClient)
+
 	// Call AWS API
 	body, err := client.Call(ctx, "iam", "GetAccountPasswordPolicy", nil)
 	if err != nil {
 		// Check if no password policy exists
 		var awsErr *core.AWSError
 		if errors.As(err, &awsErr) && awsErr.Code == "NoSuchEntity" {
-			return entities.ResultFailure("No password policy configured", map[string]any{
+			return entities.ResultFailurePtr("No password policy configured", map[string]any{
 				"service":         "iam",
 				"operation":       "get_account_password_policy",
 				"policy_exists":   false,
 				"password_policy": nil,
 			}), nil
 		}
-		return entities.Result{}, err
+		return nil, err
 	}
 
 	// Parse response
 	var resp GetAccountPasswordPolicyResponse
 	if err := xml.Unmarshal(body, &resp); err != nil {
-		return entities.ResultError(&entities.ErrorDetail{
-			Type:    "internal",
-			Message: fmt.Sprintf("Failed to parse AWS response: %v", err),
-		}), nil
+		return entities.ResultErrorPtr("internal", fmt.Sprintf("Failed to parse AWS response: %v", err)), nil
 	}
 
 	policy := resp.Result.PasswordPolicy
@@ -164,9 +173,9 @@ func handleGetAccountPasswordPolicy(ctx context.Context, client *core.AWSClient,
 		policy.RequireLowercaseCharacters
 
 	if compliant {
-		return entities.ResultSuccess("Password policy meets security requirements", data), nil
+		return entities.ResultSuccessPtr("Password policy meets security requirements", data), nil
 	}
-	return entities.ResultFailure("Password policy does not meet security requirements", data), nil
+	return entities.ResultFailurePtr("Password policy does not meet security requirements", data), nil
 }
 
 // =============================================================================
@@ -227,11 +236,13 @@ type AccessKeyInfo struct {
 	NeverUsed     bool   `json:"never_used,omitempty"`
 }
 
-func handleListAccessKeysWithUsage(ctx context.Context, client *core.AWSClient, cfg *core.AWSConfig) (entities.Result, error) {
+func (s *IAMService) ListAccessKeysWithUsageHandler(ctx context.Context, req *plugin.Request) (*entities.Result, error) {
+	client := req.Client.(*core.AWSClient)
+
 	// Step 1: List all users
 	users, err := listAllUsers(ctx, client)
 	if err != nil {
-		return entities.Result{}, err
+		return nil, err
 	}
 
 	// Step 2: For each user, list access keys and check usage
@@ -295,9 +306,9 @@ func handleListAccessKeysWithUsage(ctx context.Context, client *core.AWSClient, 
 	}
 
 	if len(unusedKeysOver90Days) == 0 {
-		return entities.ResultSuccess("No access keys unused for more than 90 days", data), nil
+		return entities.ResultSuccessPtr("No access keys unused for more than 90 days", data), nil
 	}
-	return entities.ResultFailure(
+	return entities.ResultFailurePtr(
 		fmt.Sprintf("%d access key(s) unused for more than 90 days", len(unusedKeysOver90Days)),
 		data,
 	), nil

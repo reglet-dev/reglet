@@ -6,14 +6,22 @@ import (
 	"encoding/xml"
 	"fmt"
 
+	"github.com/reglet-dev/reglet-sdk/go/application/plugin"
 	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
 	"github.com/reglet-dev/reglet/plugins/aws/core"
 )
 
+// EC2Service handles EC2 compliance checks.
+type EC2Service struct {
+	plugin.Service `name:"ec2" desc:"EC2 compute instance security checks"`
+
+	DescribeSecurityGroups    plugin.Op `desc:"Find security groups with open SSH/RDP to 0.0.0.0/0" method:"DescribeSecurityGroupsHandler"`
+	DescribeInstancesMetadata plugin.Op `desc:"Verify IMDSv2 enforcement on EC2 instances" method:"DescribeInstancesMetadataHandler"`
+}
+
+// Auto-register on package import
 func init() {
-	// Register EC2 handlers
-	core.RegisterServiceHandler("ec2", "describe_security_groups", handleDescribeSecurityGroups)
-	core.RegisterServiceHandler("ec2", "describe_instances_metadata", handleDescribeInstancesMetadata)
+	plugin.MustRegisterService(core.Plugin, &EC2Service{})
 }
 
 // =============================================================================
@@ -83,7 +91,10 @@ type IngressRule struct {
 	ToPort         int      `json:"to_port"`
 }
 
-func handleDescribeSecurityGroups(ctx context.Context, client *core.AWSClient, cfg *core.AWSConfig) (entities.Result, error) {
+func (s *EC2Service) DescribeSecurityGroupsHandler(ctx context.Context, req *plugin.Request) (*entities.Result, error) {
+	client := req.Client.(*core.AWSClient)
+	cfg := req.Config.(*core.AWSConfig)
+
 	// Build parameters
 	params := make(map[string]string)
 
@@ -100,22 +111,19 @@ func handleDescribeSecurityGroups(ctx context.Context, client *core.AWSClient, c
 	// Call AWS API
 	body, err := client.Call(ctx, "ec2", "DescribeSecurityGroups", params)
 	if err != nil {
-		return entities.Result{}, err
+		return nil, err
 	}
 
 	// Parse response
 	var resp DescribeSecurityGroupsResponse
 	if err := xml.Unmarshal(body, &resp); err != nil {
-		return entities.ResultError(&entities.ErrorDetail{
-			Type:    "internal",
-			Message: fmt.Sprintf("Failed to parse AWS response: %v", err),
-		}), nil
+		return entities.ResultErrorPtr("internal", fmt.Sprintf("Failed to parse AWS response: %v", err)), nil
 	}
 
 	return processSecurityGroups(client.Creds.Region, &resp)
 }
 
-func processSecurityGroups(region string, resp *DescribeSecurityGroupsResponse) (entities.Result, error) {
+func processSecurityGroups(region string, resp *DescribeSecurityGroupsResponse) (*entities.Result, error) {
 	var securityGroups []SecurityGroupInfo
 	var openSSHGroups []SecurityGroupInfo
 	var openRDPGroups []SecurityGroupInfo
@@ -157,12 +165,12 @@ func processSecurityGroups(region string, resp *DescribeSecurityGroupsResponse) 
 	}
 
 	if len(openSSHGroups) == 0 && len(openRDPGroups) == 0 {
-		return entities.ResultSuccess("No security groups with open SSH or RDP", data), nil
+		return entities.ResultSuccessPtr("No security groups with open SSH or RDP", data), nil
 	}
 
 	msg := fmt.Sprintf("%d security group(s) with open SSH, %d with open RDP",
 		len(openSSHGroups), len(openRDPGroups))
-	return entities.ResultFailure(msg, data), nil
+	return entities.ResultFailurePtr(msg, data), nil
 }
 
 func processIngressRules(sgInfo *SecurityGroupInfo, sg *SecurityGroupXML) (bool, bool) {
@@ -264,7 +272,10 @@ type MetadataOptions struct {
 	HTTPEndpoint string `json:"http_endpoint"`
 }
 
-func handleDescribeInstancesMetadata(ctx context.Context, client *core.AWSClient, cfg *core.AWSConfig) (entities.Result, error) {
+func (s *EC2Service) DescribeInstancesMetadataHandler(ctx context.Context, req *plugin.Request) (*entities.Result, error) {
+	client := req.Client.(*core.AWSClient)
+	cfg := req.Config.(*core.AWSConfig)
+
 	// Build parameters - filter for running instances
 	params := map[string]string{
 		"Filter.1.Name":    "instance-state-name",
@@ -284,16 +295,13 @@ func handleDescribeInstancesMetadata(ctx context.Context, client *core.AWSClient
 	// Call AWS API
 	body, err := client.Call(ctx, "ec2", "DescribeInstances", params)
 	if err != nil {
-		return entities.Result{}, err
+		return nil, err
 	}
 
 	// Parse response
 	var resp DescribeInstancesResponse
 	if err := xml.Unmarshal(body, &resp); err != nil {
-		return entities.ResultError(&entities.ErrorDetail{
-			Type:    "internal",
-			Message: fmt.Sprintf("Failed to parse AWS response: %v", err),
-		}), nil
+		return entities.ResultErrorPtr("internal", fmt.Sprintf("Failed to parse AWS response: %v", err)), nil
 	}
 
 	// Process instances
@@ -338,9 +346,9 @@ func handleDescribeInstancesMetadata(ctx context.Context, client *core.AWSClient
 	}
 
 	if len(nonCompliantInstances) == 0 {
-		return entities.ResultSuccess("All instances enforce IMDSv2", data), nil
+		return entities.ResultSuccessPtr("All instances enforce IMDSv2", data), nil
 	}
 
 	msg := fmt.Sprintf("%d instance(s) do not enforce IMDSv2", len(nonCompliantInstances))
-	return entities.ResultFailure(msg, data), nil
+	return entities.ResultFailurePtr(msg, data), nil
 }

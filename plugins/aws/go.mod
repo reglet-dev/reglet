@@ -3,7 +3,7 @@ module github.com/reglet-dev/reglet/plugins/aws
 go 1.25.5
 
 require (
-	github.com/reglet-dev/reglet-sdk/go v0.2.5
+	github.com/reglet-dev/reglet-sdk/go v0.3.2
 	github.com/stretchr/testify v1.11.1
 )
 
@@ -17,5 +17,3 @@ require (
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/reglet-dev/reglet-sdk/go => ../../../reglet-sdk/go

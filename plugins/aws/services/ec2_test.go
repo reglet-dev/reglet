@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/reglet-dev/reglet-sdk/go/application/plugin"
 	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
 	"github.com/reglet-dev/reglet-sdk/go/domain/ports"
 	"github.com/reglet-dev/reglet/plugins/aws/core"
@@ -46,7 +47,13 @@ func TestHandleDescribeSecurityGroups_Secure(t *testing.T) {
 
 	cfg := &core.AWSConfig{Service: "ec2", Operation: "describe_security_groups"}
 
-	result, err := handleDescribeSecurityGroups(context.Background(), client, cfg)
+	svc := &EC2Service{}
+	req := &plugin.Request{
+		Client: client,
+		Config: cfg,
+	}
+
+	result, err := svc.DescribeSecurityGroupsHandler(context.Background(), req)
 	require.NoError(t, err)
 
 	assert.Equal(t, entities.ResultStatusSuccess, result.Status)
@@ -87,7 +94,13 @@ func TestHandleDescribeSecurityGroups_OpenSSH(t *testing.T) {
 
 	cfg := &core.AWSConfig{Service: "ec2", Operation: "describe_security_groups"}
 
-	result, err := handleDescribeSecurityGroups(context.Background(), client, cfg)
+	svc := &EC2Service{}
+	req := &plugin.Request{
+		Client: client,
+		Config: cfg,
+	}
+
+	result, err := svc.DescribeSecurityGroupsHandler(context.Background(), req)
 	require.NoError(t, err)
 
 	assert.Equal(t, entities.ResultStatusFailure, result.Status)
@@ -125,7 +138,13 @@ func TestHandleDescribeInstancesMetadata_Compliant(t *testing.T) {
 
 	cfg := &core.AWSConfig{Service: "ec2", Operation: "describe_instances_metadata"}
 
-	result, err := handleDescribeInstancesMetadata(context.Background(), client, cfg)
+	svc := &EC2Service{}
+	req := &plugin.Request{
+		Client: client,
+		Config: cfg,
+	}
+
+	result, err := svc.DescribeInstancesMetadataHandler(context.Background(), req)
 	require.NoError(t, err)
 
 	assert.Equal(t, entities.ResultStatusSuccess, result.Status)
@@ -163,7 +182,13 @@ func TestHandleDescribeInstancesMetadata_NonCompliant(t *testing.T) {
 
 	cfg := &core.AWSConfig{Service: "ec2", Operation: "describe_instances_metadata"}
 
-	result, err := handleDescribeInstancesMetadata(context.Background(), client, cfg)
+	svc := &EC2Service{}
+	req := &plugin.Request{
+		Client: client,
+		Config: cfg,
+	}
+
+	result, err := svc.DescribeInstancesMetadataHandler(context.Background(), req)
 	require.NoError(t, err)
 
 	assert.Equal(t, entities.ResultStatusFailure, result.Status)

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/reglet-dev/reglet-sdk/go/application/plugin"
 	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
 	"github.com/reglet-dev/reglet-sdk/go/domain/ports"
 	"github.com/reglet-dev/reglet/plugins/aws/core"
@@ -60,7 +61,13 @@ func TestHandleGetAccountSummary_MFAEnabled(t *testing.T) {
 
 	cfg := &core.AWSConfig{Service: "iam", Operation: "get_account_summary"}
 
-	result, err := handleGetAccountSummary(context.Background(), client, cfg)
+	svc := &IAMService{}
+	req := &plugin.Request{
+		Client: client,
+		Config: cfg,
+	}
+
+	result, err := svc.GetAccountSummaryHandler(context.Background(), req)
 	require.NoError(t, err)
 
 	assert.Equal(t, entities.ResultStatusSuccess, result.Status)
@@ -88,7 +95,13 @@ func TestHandleGetAccountSummary_MFADisabled(t *testing.T) {
 	client := core.NewAWSClient(creds, 30)
 	client.HTTPClient = mockClient
 
-	result, err := handleGetAccountSummary(context.Background(), client, &core.AWSConfig{})
+	req := &plugin.Request{
+		Client: client,
+		Config: &core.AWSConfig{},
+	}
+	svc := &IAMService{}
+
+	result, err := svc.GetAccountSummaryHandler(context.Background(), req)
 	require.NoError(t, err)
 
 	assert.Equal(t, entities.ResultStatusFailure, result.Status)
