@@ -2,157 +2,94 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"strings"
-	"time"
 
-	"github.com/reglet-dev/reglet-sdk/go/application/config"
-	"github.com/reglet-dev/reglet-sdk/go/application/schema"
+	"github.com/reglet-dev/reglet-sdk/go/application/plugin"
 	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
+	"github.com/reglet-dev/reglet-sdk/go/infrastructure/wasm"
+	"github.com/reglet-dev/reglet/plugins/command/core"
 
-	"github.com/reglet-dev/reglet-sdk/go/domain/ports"
-	"github.com/reglet-dev/reglet-sdk/go/exec"
+	// Import services to trigger auto-registration
+	_ "github.com/reglet-dev/reglet/plugins/command/services"
 )
 
-// commandPlugin implements the sdk.Plugin interface.
-type commandPlugin struct {
-	runner ports.CommandRunner
+type commandPlugin struct{}
+
+func (p *commandPlugin) Manifest(ctx context.Context) (*entities.Manifest, error) {
+	return core.Plugin.Manifest(), nil
 }
 
-// Describe returns plugin metadata.
-func (p *commandPlugin) Describe(ctx context.Context) (entities.Metadata, error) {
-	return entities.Metadata{
-		Name:        "command",
-		Version:     "1.0.0",
-		Description: "Execute commands and validate output",
-		Capabilities: []entities.Capability{
-			{
-				Category: "exec",
-				Resource: "**", // Plugin requests general exec permission; user grants specific
-			},
-		},
-	}, nil
-}
+func (p *commandPlugin) Check(ctx context.Context, configBytes []byte) (*entities.Result, error) {
+	// Parse config
+	var cfgStruct core.CommandConfig
+	if err := json.Unmarshal(configBytes, &cfgStruct); err != nil {
+		return nil, fmt.Errorf("failed to parse config: %w", err)
+	}
+	cfg := &cfgStruct
 
-// CommandConfig represents the configuration for the command plugin.
-type CommandConfig struct {
-	Run     string   `json:"run,omitempty" description:"Command string to execute via shell"`
-	Command string   `json:"command,omitempty" description:"Executable path"`
-	Args    []string `json:"args,omitempty" description:"Arguments"`
-	Dir     string   `json:"dir,omitempty" description:"Working directory"`
-	Env     []string `json:"env,omitempty" description:"Environment variables"`
-	// Timeout is the effective execution timeout.
-	// It is derived from TimeoutSeconds (in seconds) after configuration validation.
-	Timeout time.Duration `json:"-" description:"Execution timeout"`
-	// TimeoutSeconds is the JSON-configurable timeout in seconds.
-	TimeoutSeconds int `json:"timeout,omitempty" default:"30" description:"Execution timeout in seconds"`
-}
-
-// Schema returns the JSON schema for the plugin's configuration.
-func (p *commandPlugin) Schema(ctx context.Context) ([]byte, error) {
-	return schema.GenerateSchema(CommandConfig{})
-}
-
-// Check executes the command observation.
-func (p *commandPlugin) Check(ctx context.Context, cfgRaw config.Config) (entities.Result, error) {
-	var cfg CommandConfig
-	if err := config.Validate(cfgRaw, &cfg); err != nil {
-		return entities.ResultError(entities.NewErrorDetail("config", err.Error())), nil
+	// Determine operation
+	opName := "run" // Default op
+	if cfg.ExpectedOutput != "" {
+		opName = "output"
+	} else if cfg.ExpectedExit != 0 || cfg.Run != "" || cfg.Command != "" {
+		// If explicit check is requested, maybe map to specific op?
+		// But "run" also checks exit code 0 by default if we want strictness?
+		// services/command.go checks exit code for 'run' too if implementing legacy logic which defaulted to exit code 0 check for success.
+		// Let's rely on services.runCommand logic.
+		opName = "run"
 	}
 
-	// Derive the effective timeout as a time.Duration.
-	if cfg.TimeoutSeconds <= 0 {
-		cfg.TimeoutSeconds = 30
-	}
-	cfg.Timeout = time.Duration(cfg.TimeoutSeconds) * time.Second
+	// However, services.command.go defines: Run matches "RunHandler", ValidateExit -> "ValidateExitHandler", ValidateOutput -> "ValidateOutputHandler".
+	// Core plugin defines generic "command" service with ops.
+	// Let's map strict intentions if possible, or fallback to Run.
+	// If expected_output is set, clearly output validation.
+	// If expected_exit != 0 (non-default), maybe ValidateExit?
+	// But legacy checked generic success (exit 0) unless configured otherwise.
 
-	// Validate mutual exclusivity
-	if cfg.Run == "" && cfg.Command == "" {
-		return entities.ResultError(entities.NewErrorDetail("config", "either 'run' or 'command' must be specified")), nil
-	}
-	if cfg.Run != "" && cfg.Command != "" {
-		return entities.ResultError(entities.NewErrorDetail("config", "cannot specify both 'run' and 'command' - choose one")), nil
-	}
-
-	var cmd string
-	var args []string
-	var execMode string
-
-	// "run" mode: execute via shell
-	if cfg.Run != "" {
-		// ⚠️  SECURITY WARNING: Shell execution can be dangerous!
-		// - Requires explicit "exec:/bin/sh" capability (user must grant shell access)
-		// - Vulnerable to command injection if Run contains untrusted input
-		// - For untrusted input, use "command" mode with explicit args instead
-		cmd = "/bin/sh"
-		args = []string{"-c", cfg.Run}
-		execMode = "shell"
+	if cfg.ExpectedOutput != "" {
+		opName = "output"
+	} else if cfg.ExpectedExit != 0 {
+		opName = "exit_code"
 	} else {
-		// "command" mode: direct execution (safer - no shell interpretation)
-		cmd = cfg.Command
-		args = cfg.Args
-		execMode = "direct"
+		opName = "run"
 	}
 
-	start := time.Now()
+	// Map to actual op names in service
+	// Service Op desc:
+	// Run -> Run
+	// ValidateExit -> ValidateExit
+	// ValidateOutput -> ValidateOutput
 
-	// Prepare options
-	opts := []exec.RunOption{}
-	if p.runner != nil {
-		opts = append(opts, exec.WithRunner(p.runner))
+	// Wait, runCommand takes 'mode' string "run", "exit_code", "output".
+	// The handlers are: RunHandler, ValidateExitHandler, ValidateOutputHandler.
+
+	var handlerName string
+	switch opName {
+	case "output":
+		handlerName = "validate_output"
+	case "exit_code":
+		handlerName = "validate_exit"
+	default:
+		handlerName = "run"
 	}
 
-	resp, err := exec.Run(ctx, exec.CommandRequest{
-		Command: cmd,
-		Args:    args,
-		Dir:     cfg.Dir,
-		Env:     cfg.Env,
-		Timeout: int(cfg.Timeout / time.Second), // Convert Duration to seconds
-	}, opts...)
-	metadata := entities.NewRunMetadata(start, time.Now())
-
-	if err != nil {
-		return entities.ResultError(entities.NewErrorDetail("execution_failed", fmt.Sprintf("execution failed: %v", err))).WithMetadata(metadata), nil
+	handler, ok := core.Plugin.GetHandler("execution", handlerName)
+	if !ok {
+		return entities.ResultErrorPtr("configuration", fmt.Sprintf("Unknown operation: %s (service: execution)", handlerName)), nil
 	}
 
-	// Clean output (trim whitespace)
-	stdoutTrimmed := strings.TrimSpace(resp.Stdout)
-	stderrTrimmed := strings.TrimSpace(resp.Stderr)
-
-	// Determine status based on exit code
-	statusPass := resp.ExitCode == 0
-
-	resultData := map[string]interface{}{
-		// Output streams
-		"stdout":     stdoutTrimmed,
-		"stderr":     stderrTrimmed,
-		"stdout_raw": resp.Stdout, // Keep raw for regex matching if needed
-		"stderr_raw": resp.Stderr,
-
-		// Execution results
-		"exit_code":   resp.ExitCode,
-		"duration_ms": resp.DurationMs,
-		"is_timeout":  resp.IsTimeout,
-
-		// Command metadata (for debugging and auditing)
-		"exec_mode":      execMode, // "shell" or "direct"
-		"command":        cmd,      // Actual command executed
-		"args":           args,     // Actual arguments used
-		"working_dir":    cfg.Dir,
-		"timeout_config": cfg.Timeout,
+	req := &plugin.Request{
+		Client: wasm.NewExecAdapter(),
+		Config: cfg,
+		Raw:    configBytes,
 	}
 
-	// Add original command for clarity
-	if execMode == "shell" {
-		resultData["shell_command"] = cfg.Run
-	} else {
-		resultData["command_path"] = cfg.Command
-		resultData["command_args"] = cfg.Args
-	}
-
-	if statusPass {
-		return entities.ResultSuccess("Command executed successfully", resultData).WithMetadata(metadata), nil
-	}
-
-	return entities.ResultFailure(fmt.Sprintf("Command exited with code %d", resp.ExitCode), resultData).WithMetadata(metadata), nil
+	return handler(ctx, req)
 }
+
+func init() {
+	plugin.Register(&commandPlugin{})
+}
+
+func main() {}

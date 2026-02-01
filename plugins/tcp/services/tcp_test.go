@@ -1,4 +1,4 @@
-package main
+package services
 
 import (
 	"context"
@@ -6,8 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/reglet-dev/reglet-sdk/go/application/config"
+	"github.com/reglet-dev/reglet-sdk/go/application/plugin"
+	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
 	"github.com/reglet-dev/reglet-sdk/go/domain/ports"
+	"github.com/reglet-dev/reglet/plugins/tcp/core"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Mock TCPConnection
@@ -56,7 +60,7 @@ func (m *mockTCPDialer) DialSecure(ctx context.Context, address string, timeoutM
 	return nil, errors.New("dial function not implemented")
 }
 
-func TestTCPPlugin_Check_Success(t *testing.T) {
+func TestTCPService_Connect_Success(t *testing.T) {
 	mockDialer := &mockTCPDialer{
 		DialSecureFunc: func(ctx context.Context, address string, timeoutMs int, tls bool) (ports.TCPConnection, error) {
 			return &mockTCPConnection{
@@ -66,82 +70,68 @@ func TestTCPPlugin_Check_Success(t *testing.T) {
 		},
 	}
 
-	plugin := &tcpPlugin{dialer: mockDialer}
-	config := config.Config{
-		"host": "example.com",
-		"port": 80,
+	svc := &TCPService{}
+	cfg := &core.TCPConfig{
+		Host: "example.com",
+		Port: 80,
+	}
+	req := &plugin.Request{
+		Client: mockDialer,
+		Config: cfg,
 	}
 
-	evidence, err := plugin.Check(context.Background(), config)
-	if err != nil {
-		t.Fatalf("Check returned error: %v", err)
-	}
-
-	if !evidence.IsSuccess() {
-		t.Errorf("Expected status success, got %v. Error: %+v", evidence.Status, evidence.Error)
-	}
+	result, err := svc.ConnectHandler(context.Background(), req)
+	require.NoError(t, err)
+	assert.Equal(t, entities.ResultStatusSuccess, result.Status)
 }
 
-func TestTCPPlugin_Check_ConnectionRefused(t *testing.T) {
+func TestTCPService_Connect_Fail(t *testing.T) {
 	mockDialer := &mockTCPDialer{
 		DialSecureFunc: func(ctx context.Context, address string, timeoutMs int, tls bool) (ports.TCPConnection, error) {
-			return nil, errors.New("connection refused")
+			return nil, errors.New("connection failed")
 		},
 	}
 
-	plugin := &tcpPlugin{dialer: mockDialer}
-	config := config.Config{
-		"host": "localhost",
-		"port": 12345,
+	svc := &TCPService{}
+	cfg := &core.TCPConfig{
+		Host: "example.com",
+		Port: 80,
+	}
+	req := &plugin.Request{
+		Client: mockDialer,
+		Config: cfg,
 	}
 
-	evidence, err := plugin.Check(context.Background(), config)
-
-	// Since SDK returns error on connection failure, we accept non-nil err if status matches
-	if err == nil && evidence.IsSuccess() {
-		t.Fatalf("Expected error or failure status, got success and nil error")
-	}
-
-	if evidence.IsSuccess() {
-		t.Errorf("Expected status failure/error, got success")
-	}
-	// Check error type if available in evidence, or assume SDK returns it
-	if evidence.Error != nil && evidence.Error.Type != "network" {
-		t.Errorf("Expected network error, got: %+v", evidence.Error)
-	}
+	result, err := svc.ConnectHandler(context.Background(), req)
+	require.NoError(t, err)
+	assert.Equal(t, entities.ResultStatusFailure, result.Status)
 }
 
-func TestTCPPlugin_Check_TLS_Version_Pass(t *testing.T) {
+func TestTCPService_Connect_TLS_Version_Fail(t *testing.T) {
 	mockDialer := &mockTCPDialer{
 		DialSecureFunc: func(ctx context.Context, address string, timeoutMs int, tls bool) (ports.TCPConnection, error) {
 			return &mockTCPConnection{
 				connected:  true,
 				isTLS:      true,
-				tlsVersion: "TLS 1.2",
+				tlsVersion: "TLS 1.0",
 			}, nil
 		},
 	}
 
-	plugin := &tcpPlugin{dialer: mockDialer}
-	config := config.Config{
-		"host":                 "example.com",
-		"port":                 443,
-		"tls":                  true,
-		"expected_tls_version": "TLS 1.2",
+	svc := &TCPService{}
+	cfg := &core.TCPConfig{
+		Host:               "example.com",
+		Port:               443,
+		TLS:                true,
+		ExpectedTLSVersion: "TLS 1.2",
+	}
+	req := &plugin.Request{
+		Client: mockDialer,
+		Config: cfg,
 	}
 
-	evidence, err := plugin.Check(context.Background(), config)
-	if err != nil {
-		t.Fatalf("Check returned error: %v", err)
-	}
-
-	if !evidence.IsSuccess() {
-		t.Errorf("Expected status success, got %v. Error: %+v", evidence.Status, evidence.Error)
-	}
-}
-
-func TestTCPPlugin_Check_TLS_Version_Fail(t *testing.T) {
-	// Same here, RunTCPCheck won't fail on version mismatch because it doesn't check it.
-	// We'll skip this test or just check it connects.
-	// For now, removing the expectation check.
+	result, err := svc.ConnectHandler(context.Background(), req)
+	require.NoError(t, err)
+	assert.Equal(t, entities.ResultStatusFailure, result.Status)
+	assert.Contains(t, result.Message, "TLS version mismatch")
 }
