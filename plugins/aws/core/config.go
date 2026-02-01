@@ -6,7 +6,7 @@ type AWSConfig struct {
 	Filters map[string][]string `json:"filters,omitempty" jsonschema:"description=AWS API filters"`
 
 	// Service is the AWS service to query (iam, ec2, s3, rds, vpc, lambda)
-	Service string `json:"service" jsonschema:"required,enum=iam;ec2;s3;rds;vpc;lambda,description=AWS service to query"`
+	Service string `json:"service" jsonschema:"required,enum=iam,enum=ec2,enum=s3,enum=rds,enum=vpc,enum=lambda,description=AWS service to query"`
 
 	// Operation is the service-specific operation to perform
 	Operation string `json:"operation" jsonschema:"required,description=AWS API operation (e.g. describe_security_groups)"`
