@@ -4,11 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/reglet-dev/reglet-sdk/go/application/plugin"
 	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
-	"github.com/reglet-dev/reglet-sdk/go/domain/ports"
 	"github.com/reglet-dev/reglet-sdk/go/infrastructure/wasm"
 	"github.com/reglet-dev/reglet/plugins/http/core"
 
@@ -16,9 +14,7 @@ import (
 	_ "github.com/reglet-dev/reglet/plugins/http/services"
 )
 
-type httpPlugin struct {
-	client ports.HTTPClient
-}
+type httpPlugin struct{}
 
 func (p *httpPlugin) Manifest(ctx context.Context) (*entities.Manifest, error) {
 	return core.Plugin.Manifest(), nil
@@ -32,32 +28,14 @@ func (p *httpPlugin) Check(ctx context.Context, configBytes []byte) (*entities.R
 	}
 	cfg := &cfgStruct
 
-	opName := "check_status" // Default
-	method := strings.ToUpper(cfg.Method)
-	switch method {
-	case "GET":
-		opName = "get"
-	case "POST":
-		opName = "post"
-	case "HEAD":
-		opName = "head"
-	}
-
-	handler, ok := core.Plugin.GetHandler("http", opName)
+	// Determine operation - Always map to "Request"
+	handler, ok := core.Plugin.GetHandler("http", "request")
 	if !ok {
-		return entities.ResultErrorPtr("configuration",
-			fmt.Sprintf("Unknown operation for method: %s", method)), nil
-	}
-
-	// Use the provided client or a default one (though in WASM we rely on imports)
-	client := p.client
-	if client == nil {
-		// In WASM, we should use the SDK's default client which wraps host functions
-		client = wasm.NewHTTPAdapter(0)
+		return entities.ResultErrorPtr("configuration", "Unknown operation"), nil
 	}
 
 	req := &plugin.Request{
-		Client: client,
+		Client: wasm.NewHTTPAdapter(0), // Use default HTTP adapter
 		Config: cfg,
 		Raw:    configBytes,
 	}
@@ -65,8 +43,8 @@ func (p *httpPlugin) Check(ctx context.Context, configBytes []byte) (*entities.R
 	return handler(ctx, req)
 }
 
-func main() {
-	plugin.Register(&httpPlugin{
-		client: wasm.NewHTTPAdapter(0),
-	})
+func init() {
+	plugin.Register(&httpPlugin{})
 }
+
+func main() {}

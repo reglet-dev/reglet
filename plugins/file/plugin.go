@@ -27,35 +27,33 @@ func (p *filePlugin) Check(ctx context.Context, configBytes []byte) (*entities.R
 	}
 	cfg := &cfgStruct
 
-	// Determine operation
-	opName := cfg.Operation
-
-	// Legacy config mapping if operation not set but other fields are?
-	// The new config requires "operation".
-	// If the user uses the old config style { "path": "...", "read_content": true }, we need to map it.
-	// But `core.Config` defined "operation" as required.
-	// Let's assume strict compliance with new schema or attempt fallback.
-	if opName == "" {
-		// Fallbacks based on fields presence (best effort)
+	// Determine operation (fallback logic for legacy compatibility)
+	if cfg.Operation == "" {
 		if cfg.Contains != "" {
-			opName = "content"
+			cfg.Operation = "content"
 		} else if cfg.Checksum != "" {
-			opName = "checksum"
+			cfg.Operation = "checksum"
 		} else if cfg.Permissions != "" {
-			opName = "permissions"
+			cfg.Operation = "permissions"
 		} else {
-			opName = "exists"
+			cfg.Operation = "exists"
 		}
 	}
 
-	handler, ok := core.Plugin.GetHandler("file", opName)
+	// Always use "Check" operation
+	handler, ok := core.Plugin.GetHandler("file", "check")
 	if !ok {
-		return entities.ResultErrorPtr("configuration", fmt.Sprintf("Unknown operation: %s", opName)), nil
+		return entities.ResultErrorPtr("configuration", "Unknown operation"), nil
+	}
+
+	newConfigBytes, err := json.Marshal(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal adjusted config: %w", err)
 	}
 
 	req := &plugin.Request{
 		Config: cfg,
-		Raw:    configBytes,
+		Raw:    newConfigBytes,
 	}
 
 	return handler(ctx, req)

@@ -3,7 +3,7 @@ module github.com/reglet-dev/reglet/plugins/tcp
 go 1.25.5
 
 require (
-	github.com/reglet-dev/reglet-sdk/go v0.3.3
+	github.com/reglet-dev/reglet-sdk/go v0.4.1
 	github.com/stretchr/testify v1.11.1
 )
 

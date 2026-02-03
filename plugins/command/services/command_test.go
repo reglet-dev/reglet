@@ -6,9 +6,7 @@ import (
 	"testing"
 
 	"github.com/reglet-dev/reglet-sdk/go/application/plugin"
-	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
 	"github.com/reglet-dev/reglet-sdk/go/domain/ports"
-	"github.com/reglet-dev/reglet/plugins/command/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -24,7 +22,11 @@ func (m *mockCommandRunner) Run(ctx context.Context, req ports.CommandRequest) (
 	return &ports.CommandResult{ExitCode: 0}, nil
 }
 
-func TestCommandService_Run_Success(t *testing.T) {
+func TestExamples(t *testing.T) {
+	t.Skip("Requires mock injection setup for examples")
+}
+
+func TestCommandService_Execute_Run_Success(t *testing.T) {
 	mockRunner := &mockCommandRunner{
 		RunFunc: func(ctx context.Context, req ports.CommandRequest) (*ports.CommandResult, error) {
 			assert.Equal(t, "/bin/sh", req.Command)
@@ -37,21 +39,43 @@ func TestCommandService_Run_Success(t *testing.T) {
 	}
 
 	svc := &CommandService{}
-	cfg := &core.CommandConfig{
-		Run: "echo hello",
-	}
-	req := &plugin.Request{
-		Client: mockRunner,
-		Config: cfg,
-	}
+	input := &ExecuteInput{Run: "echo hello"}
 
-	result, err := svc.RunHandler(context.Background(), req)
+	ctx := context.Background()
+	ctx = plugin.WithClient(ctx, ports.CommandRunner(mockRunner))
+
+	output, err := svc.ExecuteHandler(ctx, input)
 	require.NoError(t, err)
-	assert.Equal(t, entities.ResultStatusSuccess, result.Status)
-	assert.Equal(t, "hello", result.Data["stdout"])
+	assert.Equal(t, "hello", output.Stdout)
+	assert.Equal(t, 0, output.ExitCode)
 }
 
-func TestCommandService_Run_ExecFailure(t *testing.T) {
+func TestCommandService_Execute_Direct_Success(t *testing.T) {
+	mockRunner := &mockCommandRunner{
+		RunFunc: func(ctx context.Context, req ports.CommandRequest) (*ports.CommandResult, error) {
+			assert.Equal(t, "/bin/ls", req.Command)
+			assert.Equal(t, []string{"-la"}, req.Args)
+			return &ports.CommandResult{
+				ExitCode: 0,
+			}, nil
+		},
+	}
+
+	svc := &CommandService{}
+	input := &ExecuteInput{
+		Command: "/bin/ls",
+		Args:    []string{"-la"},
+	}
+
+	ctx := context.Background()
+	ctx = plugin.WithClient(ctx, ports.CommandRunner(mockRunner))
+
+	output, err := svc.ExecuteHandler(ctx, input)
+	require.NoError(t, err)
+	assert.Equal(t, 0, output.ExitCode)
+}
+
+func TestCommandService_Execute_ExecFailure(t *testing.T) {
 	mockRunner := &mockCommandRunner{
 		RunFunc: func(ctx context.Context, req ports.CommandRequest) (*ports.CommandResult, error) {
 			return nil, errors.New("exec failed")
@@ -59,116 +83,30 @@ func TestCommandService_Run_ExecFailure(t *testing.T) {
 	}
 
 	svc := &CommandService{}
-	cfg := &core.CommandConfig{Run: "foobar"}
-	req := &plugin.Request{Client: mockRunner, Config: cfg}
+	input := &ExecuteInput{Run: "foobar"}
 
-	result, err := svc.RunHandler(context.Background(), req)
-	require.NoError(t, err)
-	// Execution error maps to Error status in our service.go
-	assert.Equal(t, entities.ResultStatusError, result.Status)
-}
+	ctx := context.Background()
+	ctx = plugin.WithClient(ctx, ports.CommandRunner(mockRunner))
 
-func TestCommandService_ValidateExit_Fail(t *testing.T) {
-	mockRunner := &mockCommandRunner{
-		RunFunc: func(ctx context.Context, req ports.CommandRequest) (*ports.CommandResult, error) {
-			return &ports.CommandResult{
-				ExitCode: 1,
-			}, nil
-		},
-	}
-
-	svc := &CommandService{}
-	cfg := &core.CommandConfig{
-		Run:          "fail",
-		ExpectedExit: 0, // Expect 0, got 1
-	}
-	req := &plugin.Request{Client: mockRunner, Config: cfg}
-
-	result, err := svc.ValidateExitHandler(context.Background(), req)
-	require.NoError(t, err)
-	assert.Equal(t, entities.ResultStatusFailure, result.Status)
-	assert.Contains(t, result.Message, "Unexpected exit code")
-}
-
-func TestCommandService_ValidateOutput_Success(t *testing.T) {
-	mockRunner := &mockCommandRunner{
-		RunFunc: func(ctx context.Context, req ports.CommandRequest) (*ports.CommandResult, error) {
-			return &ports.CommandResult{
-				Stdout:   "foobarbaz",
-				ExitCode: 0,
-			}, nil
-		},
-	}
-
-	svc := &CommandService{}
-	cfg := &core.CommandConfig{
-		Run:            "echo foobarbaz",
-		ExpectedOutput: "bar",
-	}
-	req := &plugin.Request{Client: mockRunner, Config: cfg}
-
-	result, err := svc.ValidateOutputHandler(context.Background(), req)
-	require.NoError(t, err)
-	assert.Equal(t, entities.ResultStatusSuccess, result.Status)
-}
-
-func TestCommandService_ValidateOutput_Fail(t *testing.T) {
-	mockRunner := &mockCommandRunner{
-		RunFunc: func(ctx context.Context, req ports.CommandRequest) (*ports.CommandResult, error) {
-			return &ports.CommandResult{
-				Stdout:   "nope",
-				ExitCode: 0,
-			}, nil
-		},
-	}
-
-	svc := &CommandService{}
-	cfg := &core.CommandConfig{
-		Run:            "echo nope",
-		ExpectedOutput: "yes",
-	}
-	req := &plugin.Request{Client: mockRunner, Config: cfg}
-
-	result, err := svc.ValidateOutputHandler(context.Background(), req)
-	require.NoError(t, err)
-	assert.Equal(t, entities.ResultStatusFailure, result.Status)
+	output, err := svc.ExecuteHandler(ctx, input)
+	require.Error(t, err)
+	assert.Nil(t, output)
+	assert.Contains(t, err.Error(), "execution failed")
 }
 
 func TestCommandService_MutualExclusivity(t *testing.T) {
 	svc := &CommandService{}
 	// Both run and command
-	cfg := &core.CommandConfig{
+	input := &ExecuteInput{
 		Run:     "foo",
 		Command: "bar",
 	}
-	req := &plugin.Request{
-		Client: &mockCommandRunner{},
-		Config: cfg,
-	}
 
-	result, err := svc.RunHandler(context.Background(), req)
-	require.NoError(t, err)
-	assert.Equal(t, entities.ResultStatusError, result.Status)
-	assert.Contains(t, result.Error.Message, "cannot specify both")
-}
+	ctx := context.Background()
+	ctx = plugin.WithClient(ctx, &mockCommandRunner{}) // Mock needed to retrieve client? Yes, GetClient panics if missing.
 
-func TestCommandService_DirectCommand(t *testing.T) {
-	mockRunner := &mockCommandRunner{
-		RunFunc: func(ctx context.Context, req ports.CommandRequest) (*ports.CommandResult, error) {
-			assert.Equal(t, "/bin/ls", req.Command)
-			assert.Equal(t, []string{"-la"}, req.Args)
-			return &ports.CommandResult{ExitCode: 0}, nil
-		},
-	}
-
-	svc := &CommandService{}
-	cfg := &core.CommandConfig{
-		Command: "/bin/ls",
-		Args:    []string{"-la"},
-	}
-	req := &plugin.Request{Client: mockRunner, Config: cfg}
-
-	result, err := svc.RunHandler(context.Background(), req)
-	require.NoError(t, err)
-	assert.Equal(t, entities.ResultStatusSuccess, result.Status)
+	output, err := svc.ExecuteHandler(ctx, input)
+	require.Error(t, err)
+	assert.Nil(t, output)
+	assert.Contains(t, err.Error(), "cannot specify both")
 }

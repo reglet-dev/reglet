@@ -10,7 +10,11 @@ var Plugin = plugin.DefinePlugin(plugin.PluginDef{
 	Version:     "1.0.0",
 	Description: "File system checks and validation",
 	Config:      &FileConfig{},
-	Capabilities: []entities.Capability{
-		entities.CapabilityFile,
+	Capabilities: entities.GrantSet{
+		FS: &entities.FileSystemCapability{
+			Rules: []entities.FileSystemRule{
+				{Read: []string{"*"}}, // Requested via manifest for specific paths
+			},
+		},
 	},
 })

@@ -50,3 +50,7 @@ func (p *awsPlugin) Check(ctx context.Context, configBytes []byte) (*entities.Re
 
 	return handler(ctx, req)
 }
+
+func main() {
+	plugin.Register(&awsPlugin{})
+}

@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/reglet-dev/reglet-sdk/go/application/plugin"
-	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
 	"github.com/reglet-dev/reglet-sdk/go/domain/ports"
 	"github.com/reglet-dev/reglet/plugins/tcp/core"
 )
@@ -14,76 +13,63 @@ import (
 type TCPService struct {
 	plugin.Service `name:"tcp" desc:"TCP connectivity checks"`
 
-	Connect plugin.Op `desc:"Verify TCP connection can be established" method:"ConnectHandler"`
-	// PortOpen matches Connect logically but we can expose it if needed.
-	// We'll stick to ConnectHandler for the main check.
+	Connect plugin.Op[ConnectInput, ConnectOutput] `desc:"Verify TCP connection can be established" method:"ConnectHandler"`
 }
 
 func init() {
+	plugin.RegisterOp[ConnectInput, ConnectOutput]("Connect",
+		plugin.Example[ConnectInput, ConnectOutput]{
+			Name:        "simple_connect",
+			Description: "Connect to google.com on port 80",
+			Input:       ConnectInput{Host: "google.com", Port: 80},
+			ExpectedOutput: &ConnectOutput{
+				Host:      "google.com",
+				Port:      80,
+				Connected: true,
+			},
+		},
+		plugin.Example[ConnectInput, ConnectOutput]{
+			Name:        "tls_connect",
+			Description: "Connect to google.com on port 443 with TLS",
+			Input:       ConnectInput{Host: "google.com", Port: 443, TLS: true},
+			ExpectedOutput: &ConnectOutput{
+				Host:      "google.com",
+				Port:      443,
+				Connected: true,
+			},
+		},
+	)
+
 	plugin.MustRegisterService(core.Plugin, &TCPService{})
 }
 
 // ConnectHandler performs the TCP connection check and optional TLS validation.
-func (s *TCPService) ConnectHandler(ctx context.Context, req *plugin.Request) (*entities.Result, error) {
-	cfg := req.Config.(*core.TCPConfig)
-	dialer := req.Client.(ports.TCPDialer)
+func (s *TCPService) ConnectHandler(ctx context.Context, in *ConnectInput) (*ConnectOutput, error) {
+	dialer := plugin.GetClient[ports.TCPDialer](ctx)
 
-	target := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
+	target := fmt.Sprintf("%s:%d", in.Host, in.Port)
+	timeout := in.TimeoutMs
+	if timeout == 0 {
+		timeout = 5000
+	}
 
 	// Use DialSecure which supports timeout and TLS (matches SDK interface)
-	conn, err := dialer.DialSecure(ctx, target, cfg.TimeoutMs, cfg.TLS)
+	conn, err := dialer.DialSecure(ctx, target, timeout, in.TLS)
 	if err != nil {
-		return entities.ResultFailurePtr(fmt.Sprintf("Connection failed: %v", err), map[string]any{
-			"host": cfg.Host,
-			"port": cfg.Port,
-		}), nil
+		return nil, fmt.Errorf("connection failed: %w", err)
 	}
 	defer conn.Close()
 
-	// Gather metadata
-	data := map[string]any{
-		"host":        cfg.Host,
-		"port":        cfg.Port,
-		"connected":   true,
-		"remote_addr": conn.RemoteAddr(),
-		"local_addr":  conn.LocalAddr(),
+	output := &ConnectOutput{
+		Host:      in.Host,
+		Port:      in.Port,
+		Connected: true,
 	}
 
-	if cfg.TLS || conn.IsTLS() {
-		data["tls_version"] = conn.TLSVersion()
-		data["cipher_suite"] = conn.TLSCipherSuite()
-		// conn.PeerCertificates logic removed as interface only exposes specific fields
-
-		// TLS Version Check
-		if cfg.ExpectedTLSVersion != "" {
-			actual := conn.TLSVersion()
-			if !isTLSVersionAtLeast(actual, cfg.ExpectedTLSVersion) {
-				return entities.ResultFailurePtr(
-					fmt.Sprintf("TLS version mismatch: expected >= %s, got %s", cfg.ExpectedTLSVersion, actual),
-					data,
-				), nil
-			}
-		}
+	if in.TLS || conn.IsTLS() {
+		output.TLSVersion = conn.TLSVersion()
+		output.TLSCipherSuite = conn.TLSCipherSuite()
 	}
 
-	return entities.ResultSuccessPtr(fmt.Sprintf("Connected to %s", target), data), nil
-}
-
-// isTLSVersionAtLeast checks if actual TLS version meets the minimum requirement
-func isTLSVersionAtLeast(actual, minimum string) bool {
-	versions := map[string]int{
-		"TLS 1.0": 10,
-		"TLS 1.1": 11,
-		"TLS 1.2": 12,
-		"TLS 1.3": 13,
-	}
-
-	actualVal, okActual := versions[actual]
-	minimumVal, okMinimum := versions[minimum]
-
-	if !okActual || !okMinimum {
-		return false
-	}
-
-	return actualVal >= minimumVal
+	return output, nil
 }

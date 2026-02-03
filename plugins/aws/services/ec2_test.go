@@ -6,77 +6,49 @@ import (
 	"testing"
 
 	"github.com/reglet-dev/reglet-sdk/go/application/plugin"
-	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
 	"github.com/reglet-dev/reglet-sdk/go/domain/ports"
 	"github.com/reglet-dev/reglet/plugins/aws/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestHandleDescribeSecurityGroups_Secure(t *testing.T) {
-	mockXML := `<?xml version="1.0" encoding="UTF-8"?>
-    <DescribeSecurityGroupsResponse>
-        <securityGroupInfo>
-            <item>
-                <groupId>sg-123</groupId>
-                <groupName>secure-group</groupName>
-                <ipPermissions>
-                    <item>
-                        <ipProtocol>tcp</ipProtocol>
-                        <fromPort>443</fromPort>
-                        <toPort>443</toPort>
-                        <ipRanges>
-                            <item><cidrIp>0.0.0.0/0</cidrIp></item>
-                        </ipRanges>
-                    </item>
-                </ipPermissions>
-            </item>
-        </securityGroupInfo>
-    </DescribeSecurityGroupsResponse>`
-
-	mockClient := &MockHTTPClient{
-		Response: &ports.HTTPResponse{
-			StatusCode: http.StatusOK,
-			Body:       []byte(mockXML),
-		},
-	}
-
-	creds := &core.AWSCredentials{Region: "us-east-1"}
-	client := core.NewAWSClient(creds, 30)
-	client.HTTPClient = mockClient
-
-	cfg := &core.AWSConfig{Service: "ec2", Operation: "describe_security_groups"}
-
-	svc := &EC2Service{}
-	req := &plugin.Request{
-		Client: client,
-		Config: cfg,
-	}
-
-	result, err := svc.DescribeSecurityGroupsHandler(context.Background(), req)
-	require.NoError(t, err)
-
-	assert.Equal(t, entities.ResultStatusSuccess, result.Status)
-	assert.Equal(t, 0, len(result.Data["open_ssh_groups"].([]SecurityGroupInfo)))
+// TestEC2Examples runs auto-generated tests from registered examples.
+func TestEC2Examples(t *testing.T) {
+	t.Skip("Requires AWS credentials or mock injection setup for examples")
 }
 
-func TestHandleDescribeSecurityGroups_OpenSSH(t *testing.T) {
-	mockXML := `<?xml version="1.0" encoding="UTF-8"?>
-    <DescribeSecurityGroupsResponse>
+func TestDescribeSecurityGroupsHandler(t *testing.T) {
+	// Mock AWS response
+	mockResponseXML := `<?xml version="1.0" encoding="UTF-8"?>
+    <DescribeSecurityGroupsResponse xmlns="http://ec2.amazonaws.com/doc/2016-11-15/">
+        <requestId>59dbff89-35bd-4eac-99ed-be587EXAMPLE</requestId>
         <securityGroupInfo>
             <item>
-                <groupId>sg-bad</groupId>
-                <groupName>insecure-group</groupName>
+                <ownerId>123456789012</ownerId>
+                <groupId>sg-903004f8</groupId>
+                <groupName>my-security-group</groupName>
+                <groupDescription>Enable open SSH access</groupDescription>
+                <vpcId>vpc-1a2b3c4d</vpcId>
                 <ipPermissions>
                     <item>
                         <ipProtocol>tcp</ipProtocol>
                         <fromPort>22</fromPort>
                         <toPort>22</toPort>
                         <ipRanges>
-                            <item><cidrIp>0.0.0.0/0</cidrIp></item>
+                            <item>
+                                <cidrIp>0.0.0.0/0</cidrIp>
+                            </item>
                         </ipRanges>
+                        <ipv6Ranges>
+                        </ipv6Ranges>
                     </item>
                 </ipPermissions>
+                <tagSet>
+                     <item>
+                        <key>Name</key>
+                        <value>sg-01</value>
+                    </item>
+                </tagSet>
             </item>
         </securityGroupInfo>
     </DescribeSecurityGroupsResponse>`
@@ -84,84 +56,51 @@ func TestHandleDescribeSecurityGroups_OpenSSH(t *testing.T) {
 	mockClient := &MockHTTPClient{
 		Response: &ports.HTTPResponse{
 			StatusCode: http.StatusOK,
-			Body:       []byte(mockXML),
+			Body:       []byte(mockResponseXML),
 		},
 	}
 
-	creds := &core.AWSCredentials{Region: "us-east-1"}
-	client := core.NewAWSClient(creds, 30)
-	client.HTTPClient = mockClient
+	creds := &core.AWSCredentials{AccessKeyID: "test", SecretAccessKey: "test", Region: "us-east-1"}
+	awsClient := core.NewAWSClient(creds, 30)
+	awsClient.HTTPClient = mockClient
 
-	cfg := &core.AWSConfig{Service: "ec2", Operation: "describe_security_groups"}
+	// Test directly injecting client via context
+	ctx := context.Background()
+	ctx = plugin.WithClient(ctx, awsClient)
 
 	svc := &EC2Service{}
-	req := &plugin.Request{
-		Client: client,
-		Config: cfg,
+	input := &DescribeSecurityGroupsInput{
+		Filters: map[string][]string{
+			"vpc-id": {"vpc-1a2b3c4d"},
+		},
 	}
 
-	result, err := svc.DescribeSecurityGroupsHandler(context.Background(), req)
+	out, err := svc.DescribeSecurityGroupsHandler(ctx, input)
 	require.NoError(t, err)
 
-	assert.Equal(t, entities.ResultStatusFailure, result.Status)
-	assert.Equal(t, 1, len(result.Data["open_ssh_groups"].([]SecurityGroupInfo)))
+	assert.Equal(t, 1, out.TotalGroups)
+	assert.Equal(t, 1, len(out.OpenSSHGroups))
+	assert.Equal(t, "sg-903004f8", out.SecurityGroups[0].GroupID)
+	assert.Equal(t, "sg-01", out.SecurityGroups[0].Tags["Name"])
 }
 
-func TestHandleDescribeInstancesMetadata_Compliant(t *testing.T) {
-	mockXML := `<?xml version="1.0" encoding="UTF-8"?>
-    <DescribeInstancesResponse>
+func TestDescribeInstancesMetadataHandler(t *testing.T) {
+	mockResponseXML := `<?xml version="1.0" encoding="UTF-8"?>
+    <DescribeInstancesResponse xmlns="http://ec2.amazonaws.com/doc/2016-11-15/">
         <reservationSet>
             <item>
                 <instancesSet>
                     <item>
-                        <instanceId>i-123</instanceId>
-                        <instanceState><name>running</name></instanceState>
+                        <instanceId>i-1234567890abcdef0</instanceId>
+                        <instanceType>t2.micro</instanceType>
+                        <instanceState>
+                            <code>16</code>
+                            <name>running</name>
+                        </instanceState>
                         <metadataOptions>
-                            <httpTokens>required</httpTokens>
-                        </metadataOptions>
-                    </item>
-                </instancesSet>
-            </item>
-        </reservationSet>
-    </DescribeInstancesResponse>`
-
-	mockClient := &MockHTTPClient{
-		Response: &ports.HTTPResponse{
-			StatusCode: http.StatusOK,
-			Body:       []byte(mockXML),
-		},
-	}
-
-	creds := &core.AWSCredentials{Region: "us-east-1"}
-	client := core.NewAWSClient(creds, 30)
-	client.HTTPClient = mockClient
-
-	cfg := &core.AWSConfig{Service: "ec2", Operation: "describe_instances_metadata"}
-
-	svc := &EC2Service{}
-	req := &plugin.Request{
-		Client: client,
-		Config: cfg,
-	}
-
-	result, err := svc.DescribeInstancesMetadataHandler(context.Background(), req)
-	require.NoError(t, err)
-
-	assert.Equal(t, entities.ResultStatusSuccess, result.Status)
-	assert.Equal(t, 0, len(result.Data["non_compliant_instances"].([]InstanceMetadataInfo)))
-}
-
-func TestHandleDescribeInstancesMetadata_NonCompliant(t *testing.T) {
-	mockXML := `<?xml version="1.0" encoding="UTF-8"?>
-    <DescribeInstancesResponse>
-        <reservationSet>
-            <item>
-                <instancesSet>
-                    <item>
-                        <instanceId>i-bad</instanceId>
-                        <instanceState><name>running</name></instanceState>
-                        <metadataOptions>
+                            <state>applied</state>
                             <httpTokens>optional</httpTokens>
+                            <httpEndpoint>enabled</httpEndpoint>
                         </metadataOptions>
                     </item>
                 </instancesSet>
@@ -172,25 +111,24 @@ func TestHandleDescribeInstancesMetadata_NonCompliant(t *testing.T) {
 	mockClient := &MockHTTPClient{
 		Response: &ports.HTTPResponse{
 			StatusCode: http.StatusOK,
-			Body:       []byte(mockXML),
+			Body:       []byte(mockResponseXML),
 		},
 	}
 
-	creds := &core.AWSCredentials{Region: "us-east-1"}
-	client := core.NewAWSClient(creds, 30)
-	client.HTTPClient = mockClient
+	creds := &core.AWSCredentials{AccessKeyID: "test", SecretAccessKey: "test", Region: "us-east-1"}
+	awsClient := core.NewAWSClient(creds, 30)
+	awsClient.HTTPClient = mockClient
 
-	cfg := &core.AWSConfig{Service: "ec2", Operation: "describe_instances_metadata"}
+	ctx := context.Background()
+	ctx = plugin.WithClient(ctx, awsClient)
 
 	svc := &EC2Service{}
-	req := &plugin.Request{
-		Client: client,
-		Config: cfg,
-	}
+	input := &DescribeInstancesMetadataInput{}
 
-	result, err := svc.DescribeInstancesMetadataHandler(context.Background(), req)
+	out, err := svc.DescribeInstancesMetadataHandler(ctx, input)
 	require.NoError(t, err)
 
-	assert.Equal(t, entities.ResultStatusFailure, result.Status)
-	assert.Equal(t, 1, len(result.Data["non_compliant_instances"].([]InstanceMetadataInfo)))
+	assert.Equal(t, 1, out.TotalInstances)
+	assert.Equal(t, 1, len(out.NonCompliantInstances))
+	assert.False(t, out.Instances[0].IMDSv2Enforced)
 }

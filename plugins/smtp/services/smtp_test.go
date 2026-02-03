@@ -7,9 +7,7 @@ import (
 	"time"
 
 	"github.com/reglet-dev/reglet-sdk/go/application/plugin"
-	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
 	"github.com/reglet-dev/reglet-sdk/go/domain/ports"
-	"github.com/reglet-dev/reglet/plugins/smtp/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -22,6 +20,10 @@ func (m *mockSMTPClient) Connect(ctx context.Context, host, port string, timeout
 	return m.ConnectFunc(ctx, host, port, timeout, useTLS, useStartTLS)
 }
 
+func TestExamples(t *testing.T) {
+	t.Skip("Requires mock injection setup for examples")
+}
+
 func TestSMTPService_Connect_Success(t *testing.T) {
 	mockClient := &mockSMTPClient{
 		ConnectFunc: func(ctx context.Context, host, port string, timeout time.Duration, useTLS, useStartTLS bool) (*ports.SMTPConnectResult, error) {
@@ -29,24 +31,28 @@ func TestSMTPService_Connect_Success(t *testing.T) {
 				Connected:    true,
 				ResponseTime: 10 * time.Millisecond,
 				Banner:       "220 smtp.example.com ESMTP",
+				Extensions:   []string{"STARTTLS", "AUTH LOGIN PLAIN", "SIZE 35882577"},
+				SupportsAuth: true,
 			}, nil
 		},
 	}
 
 	svc := &SMTPService{}
-	cfg := &core.SMTPConfig{
+	input := &ConnectInput{
 		Host: "smtp.example.com",
 		Port: 25,
 	}
-	req := &plugin.Request{
-		Client: mockClient,
-		Config: cfg,
-	}
 
-	result, err := svc.ConnectHandler(context.Background(), req)
+	ctx := context.Background()
+	ctx = plugin.WithClient(ctx, ports.SMTPClient(mockClient))
+
+	output, err := svc.ConnectHandler(ctx, input)
 	require.NoError(t, err)
-	assert.Equal(t, entities.ResultStatusSuccess, result.Status)
-	assert.Contains(t, result.Data["banner"], "220 smtp.example.com ESMTP")
+	assert.Equal(t, "smtp.example.com", output.Host)
+	assert.Equal(t, 25, output.Port)
+	assert.Contains(t, output.Banner, "220 smtp.example.com ESMTP")
+	assert.True(t, output.SupportsAuth)
+	assert.Contains(t, output.Extensions, "STARTTLS")
 }
 
 func TestSMTPService_Connect_Fail(t *testing.T) {
@@ -57,18 +63,18 @@ func TestSMTPService_Connect_Fail(t *testing.T) {
 	}
 
 	svc := &SMTPService{}
-	cfg := &core.SMTPConfig{
+	input := &ConnectInput{
 		Host: "smtp.example.com",
 		Port: 25,
 	}
-	req := &plugin.Request{
-		Client: mockClient,
-		Config: cfg,
-	}
 
-	result, err := svc.ConnectHandler(context.Background(), req)
-	require.NoError(t, err)
-	assert.Equal(t, entities.ResultStatusFailure, result.Status)
+	ctx := context.Background()
+	ctx = plugin.WithClient(ctx, ports.SMTPClient(mockClient))
+
+	output, err := svc.ConnectHandler(ctx, input)
+	require.Error(t, err)
+	assert.Nil(t, output)
+	assert.Contains(t, err.Error(), "connection failed")
 }
 
 func TestSMTPService_Connect_WithTLS(t *testing.T) {
@@ -85,20 +91,18 @@ func TestSMTPService_Connect_WithTLS(t *testing.T) {
 	}
 
 	svc := &SMTPService{}
-	cfg := &core.SMTPConfig{
+	input := &ConnectInput{
 		Host:   "smtp.example.com",
 		Port:   465,
 		UseTLS: true,
 	}
-	req := &plugin.Request{
-		Client: mockClient,
-		Config: cfg,
-	}
 
-	result, err := svc.ConnectHandler(context.Background(), req)
+	ctx := context.Background()
+	ctx = plugin.WithClient(ctx, ports.SMTPClient(mockClient))
+
+	output, err := svc.ConnectHandler(ctx, input)
 	require.NoError(t, err)
-	assert.Equal(t, entities.ResultStatusSuccess, result.Status)
-	assert.Equal(t, "TLS 1.3", result.Data["tls_version"])
+	assert.Equal(t, "TLS 1.3", output.TLSVersion)
 }
 
 func TestSMTPService_Connect_WithStartTLS(t *testing.T) {
@@ -114,17 +118,16 @@ func TestSMTPService_Connect_WithStartTLS(t *testing.T) {
 	}
 
 	svc := &SMTPService{}
-	cfg := &core.SMTPConfig{
-		Host:     "smtp.example.com",
-		Port:     587,
-		StartTLS: true,
-	}
-	req := &plugin.Request{
-		Client: mockClient,
-		Config: cfg,
+	input := &ConnectInput{
+		Host:        "smtp.example.com",
+		Port:        587,
+		UseSTARTTLS: true,
 	}
 
-	result, err := svc.ConnectHandler(context.Background(), req)
+	ctx := context.Background()
+	ctx = plugin.WithClient(ctx, ports.SMTPClient(mockClient))
+
+	output, err := svc.ConnectHandler(ctx, input)
 	require.NoError(t, err)
-	assert.Equal(t, entities.ResultStatusSuccess, result.Status)
+	assert.Equal(t, "TLS 1.2", output.TLSVersion)
 }

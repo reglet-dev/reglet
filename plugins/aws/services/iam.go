@@ -9,24 +9,63 @@ import (
 	"time"
 
 	"github.com/reglet-dev/reglet-sdk/go/application/plugin"
-	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
 	"github.com/reglet-dev/reglet/plugins/aws/core"
 )
 
 // IAMService handles IAM compliance checks.
 // Auto-registers on package import via the var below.
-// IAMService handles IAM compliance checks.
-// Auto-registers on package import via the var below.
 type IAMService struct {
 	plugin.Service `name:"iam" desc:"IAM identity and access management checks"`
 
-	GetAccountSummary        plugin.Op `desc:"Check if root account has MFA enabled" method:"GetAccountSummaryHandler"`
-	GetAccountPasswordPolicy plugin.Op `desc:"Verify IAM password policy meets requirements" method:"GetAccountPasswordPolicyHandler"`
-	ListAccessKeysWithUsage  plugin.Op `desc:"Find access keys unused for 90+ days" method:"ListAccessKeysWithUsageHandler"`
+	GetAccountSummary        plugin.Op[GetAccountSummaryInput, GetAccountSummaryOutput]               `desc:"Check if root account has MFA enabled" method:"GetAccountSummaryHandler"`
+	GetAccountPasswordPolicy plugin.Op[GetAccountPasswordPolicyInput, GetAccountPasswordPolicyOutput] `desc:"Verify IAM password policy meets requirements" method:"GetAccountPasswordPolicyHandler"`
+	ListAccessKeysWithUsage  plugin.Op[ListAccessKeysWithUsageInput, ListAccessKeysWithUsageOutput]   `desc:"Find access keys unused for specified days" method:"ListAccessKeysWithUsageHandler"`
 }
 
 // Auto-register on package import
 func init() {
+	// Register operation types with examples
+	plugin.RegisterOp[GetAccountSummaryInput, GetAccountSummaryOutput]("GetAccountSummary",
+		plugin.Example[GetAccountSummaryInput, GetAccountSummaryOutput]{
+			Name:        "root_mfa_check",
+			Description: "Check if root account has MFA enabled",
+			Input:       GetAccountSummaryInput{},
+			ExpectedOutput: &GetAccountSummaryOutput{
+				RootMFAEnabled: true,
+			},
+		},
+	)
+
+	plugin.RegisterOp[GetAccountPasswordPolicyInput, GetAccountPasswordPolicyOutput]("GetAccountPasswordPolicy",
+		plugin.Example[GetAccountPasswordPolicyInput, GetAccountPasswordPolicyOutput]{
+			Name:        "password_policy_check",
+			Description: "Verify password policy meets CIS benchmarks",
+			Input:       GetAccountPasswordPolicyInput{},
+			ExpectedOutput: &GetAccountPasswordPolicyOutput{
+				PolicyExists: true,
+			},
+		},
+		plugin.Example[GetAccountPasswordPolicyInput, GetAccountPasswordPolicyOutput]{
+			Name:          "no_policy",
+			Description:   "Error case: no password policy configured",
+			Input:         GetAccountPasswordPolicyInput{},
+			ExpectedError: "No password policy configured",
+		},
+	)
+
+	plugin.RegisterOp[ListAccessKeysWithUsageInput, ListAccessKeysWithUsageOutput]("ListAccessKeysWithUsage",
+		plugin.Example[ListAccessKeysWithUsageInput, ListAccessKeysWithUsageOutput]{
+			Name:        "unused_keys_90_days",
+			Description: "Find access keys unused for 90+ days",
+			Input:       ListAccessKeysWithUsageInput{ThresholdDays: 90},
+		},
+		plugin.Example[ListAccessKeysWithUsageInput, ListAccessKeysWithUsageOutput]{
+			Name:        "unused_keys_30_days",
+			Description: "Find access keys unused for 30+ days",
+			Input:       ListAccessKeysWithUsageInput{ThresholdDays: 30},
+		},
+	)
+
 	plugin.MustRegisterService(core.Plugin, &IAMService{})
 }
 
@@ -47,8 +86,9 @@ type GetAccountSummaryResponse struct {
 	} `xml:"GetAccountSummaryResult"`
 }
 
-func (s *IAMService) GetAccountSummaryHandler(ctx context.Context, req *plugin.Request) (*entities.Result, error) {
-	client := req.Client.(*core.AWSClient)
+// GetAccountSummaryHandler checks if root account has MFA enabled.
+func (s *IAMService) GetAccountSummaryHandler(ctx context.Context, in *GetAccountSummaryInput) (*GetAccountSummaryOutput, error) {
+	client := plugin.GetClient[*core.AWSClient](ctx)
 
 	// Call AWS API
 	body, err := client.Call(ctx, "iam", "GetAccountSummary", nil)
@@ -59,7 +99,7 @@ func (s *IAMService) GetAccountSummaryHandler(ctx context.Context, req *plugin.R
 	// Parse response
 	var resp GetAccountSummaryResponse
 	if err := xml.Unmarshal(body, &resp); err != nil {
-		return entities.ResultErrorPtr("internal", fmt.Sprintf("Failed to parse AWS response: %v", err)), nil
+		return nil, fmt.Errorf("failed to parse AWS response: %w", err)
 	}
 
 	// Extract summary values
@@ -68,27 +108,16 @@ func (s *IAMService) GetAccountSummaryHandler(ctx context.Context, req *plugin.R
 		summary[entry.Key] = entry.Value
 	}
 
-	// Check root MFA status
-	// AccountMFAEnabled = 1 means root account has MFA enabled
-	rootMFAEnabled := summary["AccountMFAEnabled"] == 1
-
-	data := map[string]any{
-		"service":                    "iam",
-		"operation":                  "get_account_summary",
-		"root_mfa_enabled":           rootMFAEnabled,
-		"users":                      summary["Users"],
-		"groups":                     summary["Groups"],
-		"roles":                      summary["Roles"],
-		"policies":                   summary["Policies"],
-		"mfa_devices":                summary["MFADevices"],
-		"mfa_devices_in_use":         summary["MFADevicesInUse"],
-		"access_keys_per_user_quota": summary["AccessKeysPerUserQuota"],
-	}
-
-	if rootMFAEnabled {
-		return entities.ResultSuccessPtr("Root account has MFA enabled", data), nil
-	}
-	return entities.ResultFailurePtr("Root account does NOT have MFA enabled", data), nil
+	return &GetAccountSummaryOutput{
+		RootMFAEnabled:         summary["AccountMFAEnabled"] == 1,
+		Users:                  summary["Users"],
+		Groups:                 summary["Groups"],
+		Roles:                  summary["Roles"],
+		Policies:               summary["Policies"],
+		MFADevices:             summary["MFADevices"],
+		MFADevicesInUse:        summary["MFADevicesInUse"],
+		AccessKeysPerUserQuota: summary["AccessKeysPerUserQuota"],
+	}, nil
 }
 
 // =============================================================================
@@ -114,8 +143,9 @@ type GetAccountPasswordPolicyResponse struct {
 	} `xml:"GetAccountPasswordPolicyResult"`
 }
 
-func (s *IAMService) GetAccountPasswordPolicyHandler(ctx context.Context, req *plugin.Request) (*entities.Result, error) {
-	client := req.Client.(*core.AWSClient)
+// GetAccountPasswordPolicyHandler verifies IAM password policy.
+func (s *IAMService) GetAccountPasswordPolicyHandler(ctx context.Context, in *GetAccountPasswordPolicyInput) (*GetAccountPasswordPolicyOutput, error) {
+	client := plugin.GetClient[*core.AWSClient](ctx)
 
 	// Call AWS API
 	body, err := client.Call(ctx, "iam", "GetAccountPasswordPolicy", nil)
@@ -123,12 +153,7 @@ func (s *IAMService) GetAccountPasswordPolicyHandler(ctx context.Context, req *p
 		// Check if no password policy exists
 		var awsErr *core.AWSError
 		if errors.As(err, &awsErr) && awsErr.Code == "NoSuchEntity" {
-			return entities.ResultFailurePtr("No password policy configured", map[string]any{
-				"service":         "iam",
-				"operation":       "get_account_password_policy",
-				"policy_exists":   false,
-				"password_policy": nil,
-			}), nil
+			return nil, fmt.Errorf("no password policy configured")
 		}
 		return nil, err
 	}
@@ -136,50 +161,30 @@ func (s *IAMService) GetAccountPasswordPolicyHandler(ctx context.Context, req *p
 	// Parse response
 	var resp GetAccountPasswordPolicyResponse
 	if err := xml.Unmarshal(body, &resp); err != nil {
-		return entities.ResultErrorPtr("internal", fmt.Sprintf("Failed to parse AWS response: %v", err)), nil
+		return nil, fmt.Errorf("failed to parse AWS response: %w", err)
 	}
 
 	policy := resp.Result.PasswordPolicy
 
-	// Build policy data
-	policyData := map[string]any{
-		"minimum_length":            policy.MinimumPasswordLength,
-		"require_symbols":           policy.RequireSymbols,
-		"require_numbers":           policy.RequireNumbers,
-		"require_uppercase":         policy.RequireUppercaseCharacters,
-		"require_lowercase":         policy.RequireLowercaseCharacters,
-		"allow_users_to_change":     policy.AllowUsersToChangePassword,
-		"max_age_days":              policy.MaxPasswordAge,
-		"password_reuse_prevention": policy.PasswordReusePrevention,
-		"hard_expiry":               policy.HardExpiry,
-		"expire_passwords":          policy.ExpirePasswords,
-	}
-
-	data := map[string]any{
-		"service":         "iam",
-		"operation":       "get_account_password_policy",
-		"policy_exists":   true,
-		"password_policy": policyData,
-	}
-
-	// Check compliance (CIS Benchmark recommendations)
-	// - Minimum 14 characters
-	// - Require symbols, numbers, uppercase, lowercase
-	// - Password expiration enabled
-	compliant := policy.MinimumPasswordLength >= 14 &&
-		policy.RequireSymbols &&
-		policy.RequireNumbers &&
-		policy.RequireUppercaseCharacters &&
-		policy.RequireLowercaseCharacters
-
-	if compliant {
-		return entities.ResultSuccessPtr("Password policy meets security requirements", data), nil
-	}
-	return entities.ResultFailurePtr("Password policy does not meet security requirements", data), nil
+	return &GetAccountPasswordPolicyOutput{
+		PolicyExists: true,
+		PasswordPolicy: &PasswordPolicyDetails{
+			MinimumLength:           policy.MinimumPasswordLength,
+			RequireSymbols:          policy.RequireSymbols,
+			RequireNumbers:          policy.RequireNumbers,
+			RequireUppercase:        policy.RequireUppercaseCharacters,
+			RequireLowercase:        policy.RequireLowercaseCharacters,
+			AllowUsersToChange:      policy.AllowUsersToChangePassword,
+			MaxAgeDays:              policy.MaxPasswordAge,
+			PasswordReusePrevention: policy.PasswordReusePrevention,
+			HardExpiry:              policy.HardExpiry,
+			ExpirePasswords:         policy.ExpirePasswords,
+		},
+	}, nil
 }
 
 // =============================================================================
-// Check 3: Unused Access Keys (>90 days)
+// Check 3: Unused Access Keys (>N days)
 // =============================================================================
 
 // ListUsersResponse represents the AWS ListUsers response.
@@ -225,19 +230,14 @@ type GetAccessKeyLastUsedResponse struct {
 	} `xml:"GetAccessKeyLastUsedResult"`
 }
 
-// AccessKeyInfo holds access key usage information.
-type AccessKeyInfo struct {
-	UserName      string `json:"user_name"`
-	AccessKeyID   string `json:"access_key_id"`
-	Status        string `json:"status"`
-	Created       string `json:"created"`
-	LastUsed      string `json:"last_used,omitempty"`
-	DaysSinceUsed int    `json:"days_since_used,omitempty"`
-	NeverUsed     bool   `json:"never_used,omitempty"`
-}
+// ListAccessKeysWithUsageHandler finds unused access keys.
+func (s *IAMService) ListAccessKeysWithUsageHandler(ctx context.Context, in *ListAccessKeysWithUsageInput) (*ListAccessKeysWithUsageOutput, error) {
+	client := plugin.GetClient[*core.AWSClient](ctx)
 
-func (s *IAMService) ListAccessKeysWithUsageHandler(ctx context.Context, req *plugin.Request) (*entities.Result, error) {
-	client := req.Client.(*core.AWSClient)
+	threshold := in.ThresholdDays
+	if threshold == 0 {
+		threshold = 90
+	}
 
 	// Step 1: List all users
 	users, err := listAllUsers(ctx, client)
@@ -247,13 +247,14 @@ func (s *IAMService) ListAccessKeysWithUsageHandler(ctx context.Context, req *pl
 
 	// Step 2: For each user, list access keys and check usage
 	var allKeys []AccessKeyInfo
-	var unusedKeysOver90Days []AccessKeyInfo
+	var unusedKeys []AccessKeyInfo
 	now := time.Now()
 
 	for _, userName := range users {
 		keys, err := listAccessKeys(ctx, client, userName)
 		if err != nil {
 			// Log but continue
+			fmt.Printf("Warning: Failed to list access keys for user %s: %v\n", userName, err)
 			continue
 		}
 
@@ -265,7 +266,7 @@ func (s *IAMService) ListAccessKeysWithUsageHandler(ctx context.Context, req *pl
 				Created:     key.CreateDate,
 			}
 
-			// Only check active keys
+			// Only check active keys for usage
 			if key.Status == "Active" {
 				lastUsed, err := getAccessKeyLastUsed(ctx, client, key.AccessKeyID)
 				if err == nil && lastUsed != "" {
@@ -274,19 +275,19 @@ func (s *IAMService) ListAccessKeysWithUsageHandler(ctx context.Context, req *pl
 					if t, err := time.Parse(time.RFC3339, lastUsed); err == nil {
 						daysSince := int(now.Sub(t).Hours() / 24)
 						keyInfo.DaysSinceUsed = daysSince
-						if daysSince > 90 {
-							unusedKeysOver90Days = append(unusedKeysOver90Days, keyInfo)
+						if daysSince > threshold {
+							unusedKeys = append(unusedKeys, keyInfo)
 						}
 					}
 				} else {
 					// Key has never been used
 					keyInfo.NeverUsed = true
-					// Check creation date - if created > 90 days ago, it's unused
+					// Check creation date - if created > threshold days ago, it's unused
 					if t, err := time.Parse(time.RFC3339, key.CreateDate); err == nil {
 						daysSinceCreated := int(now.Sub(t).Hours() / 24)
-						if daysSinceCreated > 90 {
-							keyInfo.DaysSinceUsed = daysSinceCreated
-							unusedKeysOver90Days = append(unusedKeysOver90Days, keyInfo)
+						keyInfo.DaysSinceUsed = daysSinceCreated
+						if daysSinceCreated > threshold {
+							unusedKeys = append(unusedKeys, keyInfo)
 						}
 					}
 				}
@@ -296,22 +297,12 @@ func (s *IAMService) ListAccessKeysWithUsageHandler(ctx context.Context, req *pl
 		}
 	}
 
-	data := map[string]any{
-		"service":                  "iam",
-		"operation":                "list_access_keys_with_usage",
-		"total_users":              len(users),
-		"total_access_keys":        len(allKeys),
-		"access_keys":              allKeys,
-		"unused_keys_over_90_days": unusedKeysOver90Days,
-	}
-
-	if len(unusedKeysOver90Days) == 0 {
-		return entities.ResultSuccessPtr("No access keys unused for more than 90 days", data), nil
-	}
-	return entities.ResultFailurePtr(
-		fmt.Sprintf("%d access key(s) unused for more than 90 days", len(unusedKeysOver90Days)),
-		data,
-	), nil
+	return &ListAccessKeysWithUsageOutput{
+		TotalUsers:              len(users),
+		TotalAccessKeys:         len(allKeys),
+		AccessKeys:              allKeys,
+		UnusedKeysOverThreshold: unusedKeys,
+	}, nil
 }
 
 // listAllUsers returns all IAM user names (handles pagination).

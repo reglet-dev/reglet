@@ -10,7 +10,11 @@ var Plugin = plugin.DefinePlugin(plugin.PluginDef{
 	Version:     "1.0.0",
 	Description: "HTTP/HTTPS request checking and validation",
 	Config:      &HTTPConfig{},
-	Capabilities: []entities.Capability{
-		entities.CapabilityHTTP,
+	Capabilities: entities.GrantSet{
+		Network: &entities.NetworkCapability{
+			Rules: []entities.NetworkRule{
+				{Hosts: []string{"*"}, Ports: []string{"80", "443", "*"}},
+			},
+		},
 	},
 })

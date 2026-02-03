@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/reglet-dev/reglet-sdk/go/application/plugin"
-	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
 	"github.com/reglet-dev/reglet/plugins/aws/core"
 )
 
@@ -15,12 +14,28 @@ import (
 type EC2Service struct {
 	plugin.Service `name:"ec2" desc:"EC2 compute instance security checks"`
 
-	DescribeSecurityGroups    plugin.Op `desc:"Find security groups with open SSH/RDP to 0.0.0.0/0" method:"DescribeSecurityGroupsHandler"`
-	DescribeInstancesMetadata plugin.Op `desc:"Verify IMDSv2 enforcement on EC2 instances" method:"DescribeInstancesMetadataHandler"`
+	DescribeSecurityGroups    plugin.Op[DescribeSecurityGroupsInput, DescribeSecurityGroupsOutput]       `desc:"Find security groups with open SSH/RDP to 0.0.0.0/0" method:"DescribeSecurityGroupsHandler"`
+	DescribeInstancesMetadata plugin.Op[DescribeInstancesMetadataInput, DescribeInstancesMetadataOutput] `desc:"Verify IMDSv2 enforcement on EC2 instances" method:"DescribeInstancesMetadataHandler"`
 }
 
 // Auto-register on package import
 func init() {
+	plugin.RegisterOp[DescribeSecurityGroupsInput, DescribeSecurityGroupsOutput]("DescribeSecurityGroups",
+		plugin.Example[DescribeSecurityGroupsInput, DescribeSecurityGroupsOutput]{
+			Name:        "open_ssh_check",
+			Description: "Check for security groups causing open SSH",
+			Input:       DescribeSecurityGroupsInput{},
+		},
+	)
+
+	plugin.RegisterOp[DescribeInstancesMetadataInput, DescribeInstancesMetadataOutput]("DescribeInstancesMetadata",
+		plugin.Example[DescribeInstancesMetadataInput, DescribeInstancesMetadataOutput]{
+			Name:        "imdsv2_check",
+			Description: "Verify IMDSv2 is enforced on running instances",
+			Input:       DescribeInstancesMetadataInput{},
+		},
+	)
+
 	plugin.MustRegisterService(core.Plugin, &EC2Service{})
 }
 
@@ -72,35 +87,15 @@ type TagXML struct {
 	Value string `xml:"value"`
 }
 
-// SecurityGroupInfo is the evidence format for a security group.
-type SecurityGroupInfo struct {
-	Tags         map[string]string `json:"tags"`
-	GroupID      string            `json:"group_id"`
-	GroupName    string            `json:"group_name"`
-	VpcID        string            `json:"vpc_id"`
-	Description  string            `json:"description"`
-	IngressRules []IngressRule     `json:"ingress_rules"`
-}
-
-type IngressRule struct {
-	Description    string   `json:"description,omitempty"`
-	Protocol       string   `json:"protocol"`
-	CidrBlocks     []string `json:"cidr_blocks"`
-	Ipv6CidrBlocks []string `json:"ipv6_cidr_blocks,omitempty"`
-	FromPort       int      `json:"from_port"`
-	ToPort         int      `json:"to_port"`
-}
-
-func (s *EC2Service) DescribeSecurityGroupsHandler(ctx context.Context, req *plugin.Request) (*entities.Result, error) {
-	client := req.Client.(*core.AWSClient)
-	cfg := req.Config.(*core.AWSConfig)
+func (s *EC2Service) DescribeSecurityGroupsHandler(ctx context.Context, in *DescribeSecurityGroupsInput) (*DescribeSecurityGroupsOutput, error) {
+	client := plugin.GetClient[*core.AWSClient](ctx)
 
 	// Build parameters
 	params := make(map[string]string)
 
 	// Add filters if provided
 	filterIdx := 1
-	for name, values := range cfg.Filters {
+	for name, values := range in.Filters {
 		params[fmt.Sprintf("Filter.%d.Name", filterIdx)] = name
 		for i, v := range values {
 			params[fmt.Sprintf("Filter.%d.Value.%d", filterIdx, i+1)] = v
@@ -117,13 +112,20 @@ func (s *EC2Service) DescribeSecurityGroupsHandler(ctx context.Context, req *plu
 	// Parse response
 	var resp DescribeSecurityGroupsResponse
 	if err := xml.Unmarshal(body, &resp); err != nil {
-		return entities.ResultErrorPtr("internal", fmt.Sprintf("Failed to parse AWS response: %v", err)), nil
+		return nil, fmt.Errorf("failed to parse AWS response: %w", err)
 	}
 
-	return processSecurityGroups(client.Creds.Region, &resp)
+	// Region override?
+	region := client.Creds.Region
+	if in.Region != "" {
+		region = in.Region
+		// TODO: Actually switch client region if needed, but for now reporting
+	}
+
+	return processSecurityGroups(region, &resp)
 }
 
-func processSecurityGroups(region string, resp *DescribeSecurityGroupsResponse) (*entities.Result, error) {
+func processSecurityGroups(region string, resp *DescribeSecurityGroupsResponse) (*DescribeSecurityGroupsOutput, error) {
 	var securityGroups []SecurityGroupInfo
 	var openSSHGroups []SecurityGroupInfo
 	var openRDPGroups []SecurityGroupInfo
@@ -154,23 +156,13 @@ func processSecurityGroups(region string, resp *DescribeSecurityGroupsResponse) 
 		}
 	}
 
-	data := map[string]any{
-		"service":         "ec2",
-		"operation":       "describe_security_groups",
-		"region":          region,
-		"security_groups": securityGroups,
-		"total_groups":    len(securityGroups),
-		"open_ssh_groups": openSSHGroups,
-		"open_rdp_groups": openRDPGroups,
-	}
-
-	if len(openSSHGroups) == 0 && len(openRDPGroups) == 0 {
-		return entities.ResultSuccessPtr("No security groups with open SSH or RDP", data), nil
-	}
-
-	msg := fmt.Sprintf("%d security group(s) with open SSH, %d with open RDP",
-		len(openSSHGroups), len(openRDPGroups))
-	return entities.ResultFailurePtr(msg, data), nil
+	return &DescribeSecurityGroupsOutput{
+		Region:         region,
+		TotalGroups:    len(securityGroups),
+		SecurityGroups: securityGroups,
+		OpenSSHGroups:  openSSHGroups,
+		OpenRDPGroups:  openRDPGroups,
+	}, nil
 }
 
 func processIngressRules(sgInfo *SecurityGroupInfo, sg *SecurityGroupXML) (bool, bool) {
@@ -257,24 +249,8 @@ type InstanceXML struct {
 	} `xml:"tagSet"`
 }
 
-// InstanceMetadataInfo is the evidence format for instance metadata settings.
-type InstanceMetadataInfo struct {
-	Tags            map[string]string `json:"tags"`
-	InstanceID      string            `json:"instance_id"`
-	InstanceType    string            `json:"instance_type"`
-	State           string            `json:"state"`
-	MetadataOptions MetadataOptions   `json:"metadata_options"`
-	IMDSv2Enforced  bool              `json:"imdsv2_enforced"`
-}
-
-type MetadataOptions struct {
-	HTTPTokens   string `json:"http_tokens"`
-	HTTPEndpoint string `json:"http_endpoint"`
-}
-
-func (s *EC2Service) DescribeInstancesMetadataHandler(ctx context.Context, req *plugin.Request) (*entities.Result, error) {
-	client := req.Client.(*core.AWSClient)
-	cfg := req.Config.(*core.AWSConfig)
+func (s *EC2Service) DescribeInstancesMetadataHandler(ctx context.Context, in *DescribeInstancesMetadataInput) (*DescribeInstancesMetadataOutput, error) {
+	client := plugin.GetClient[*core.AWSClient](ctx)
 
 	// Build parameters - filter for running instances
 	params := map[string]string{
@@ -284,7 +260,7 @@ func (s *EC2Service) DescribeInstancesMetadataHandler(ctx context.Context, req *
 
 	// Add additional filters if provided
 	filterIdx := 2
-	for name, values := range cfg.Filters {
+	for name, values := range in.Filters {
 		params[fmt.Sprintf("Filter.%d.Name", filterIdx)] = name
 		for i, v := range values {
 			params[fmt.Sprintf("Filter.%d.Value.%d", filterIdx, i+1)] = v
@@ -301,7 +277,7 @@ func (s *EC2Service) DescribeInstancesMetadataHandler(ctx context.Context, req *
 	// Parse response
 	var resp DescribeInstancesResponse
 	if err := xml.Unmarshal(body, &resp); err != nil {
-		return entities.ResultErrorPtr("internal", fmt.Sprintf("Failed to parse AWS response: %v", err)), nil
+		return nil, fmt.Errorf("failed to parse AWS response: %w", err)
 	}
 
 	// Process instances
@@ -336,19 +312,10 @@ func (s *EC2Service) DescribeInstancesMetadataHandler(ctx context.Context, req *
 		}
 	}
 
-	data := map[string]any{
-		"service":                 "ec2",
-		"operation":               "describe_instances_metadata",
-		"region":                  client.Creds.Region,
-		"instances":               instances,
-		"total_instances":         len(instances),
-		"non_compliant_instances": nonCompliantInstances,
-	}
-
-	if len(nonCompliantInstances) == 0 {
-		return entities.ResultSuccessPtr("All instances enforce IMDSv2", data), nil
-	}
-
-	msg := fmt.Sprintf("%d instance(s) do not enforce IMDSv2", len(nonCompliantInstances))
-	return entities.ResultFailurePtr(msg, data), nil
+	return &DescribeInstancesMetadataOutput{
+		Region:                client.Creds.Region,
+		TotalInstances:        len(instances),
+		Instances:             instances,
+		NonCompliantInstances: nonCompliantInstances,
+	}, nil
 }

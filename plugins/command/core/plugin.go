@@ -10,7 +10,9 @@ var Plugin = plugin.DefinePlugin(plugin.PluginDef{
 	Version:     "1.0.0",
 	Description: "Execute commands and validate output",
 	Config:      &CommandConfig{},
-	Capabilities: []entities.Capability{
-		entities.CapabilityExec,
+	Capabilities: entities.GrantSet{
+		Exec: &entities.ExecCapability{
+			Commands: []string{"*"}, // Requested via manifest for specific commands
+		},
 	},
 })

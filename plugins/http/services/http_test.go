@@ -9,9 +9,7 @@ import (
 	"testing"
 
 	"github.com/reglet-dev/reglet-sdk/go/application/plugin"
-	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
 	"github.com/reglet-dev/reglet-sdk/go/domain/ports"
-	"github.com/reglet-dev/reglet/plugins/http/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -70,6 +68,12 @@ func (c *MockHTTPClient) Post(ctx context.Context, url string, contentType strin
 	})
 }
 
+func TestExamples(t *testing.T) {
+	// Example tests require network access to external services
+	// Run with: go test -tags=integration
+	t.Skip("Example tests require network access - run with -tags=integration")
+}
+
 func TestHTTPService_Get_Success(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -79,45 +83,24 @@ func TestHTTPService_Get_Success(t *testing.T) {
 
 	svc := &HTTPService{}
 	mockClient := &MockHTTPClient{client: server.Client()}
-	cfg := &core.HTTPConfig{
-		URL: server.URL,
+	input := &RequestInput{
+		URL:    server.URL,
+		Method: "GET",
 	}
 
-	req := &plugin.Request{
-		Client: mockClient,
-		Config: cfg,
-	}
+	ctx := context.Background()
+	ctx = plugin.WithClient(ctx, ports.HTTPClient(mockClient))
 
-	result, err := svc.GetHandler(context.Background(), req)
+	output, err := svc.RequestHandler(ctx, input)
 	require.NoError(t, err)
 
-	assert.Equal(t, entities.ResultStatusSuccess, result.Status)
-	assert.Equal(t, 200, result.Data["status_code"])
-}
-
-func TestHTTPService_Get_ExpectedStatus_Fail(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer server.Close()
-
-	svc := &HTTPService{}
-	mockClient := &MockHTTPClient{client: server.Client()}
-	cfg := &core.HTTPConfig{
-		URL:            server.URL,
-		ExpectedStatus: 201,
-	}
-
-	req := &plugin.Request{
-		Client: mockClient,
-		Config: cfg,
-	}
-
-	result, err := svc.GetHandler(context.Background(), req)
-	require.NoError(t, err)
-
-	assert.Equal(t, entities.ResultStatusFailure, result.Status)
-	assert.Equal(t, 200, result.Data["status_code"])
+	assert.Equal(t, server.URL, output.URL)
+	assert.Equal(t, "GET", output.Method)
+	assert.Equal(t, 200, output.StatusCode)
+	assert.Contains(t, output.Status, "200")
+	assert.Equal(t, "hello world", output.Body)
+	assert.Equal(t, 11, output.BodySize)
+	assert.GreaterOrEqual(t, output.ResponseTimeMs, int64(0))
 }
 
 func TestHTTPService_Post_Success(t *testing.T) {
@@ -132,127 +115,61 @@ func TestHTTPService_Post_Success(t *testing.T) {
 
 	svc := &HTTPService{}
 	mockClient := &MockHTTPClient{client: server.Client()}
-	cfg := &core.HTTPConfig{
+	input := &RequestInput{
 		URL:    server.URL,
 		Method: "POST",
 	}
 
-	req := &plugin.Request{
-		Client: mockClient,
-		Config: cfg,
-	}
+	ctx := context.Background()
+	ctx = plugin.WithClient(ctx, ports.HTTPClient(mockClient))
 
-	result, err := svc.PostHandler(context.Background(), req)
+	output, err := svc.RequestHandler(ctx, input)
 	require.NoError(t, err)
-
-	assert.Equal(t, entities.ResultStatusSuccess, result.Status)
-	assert.Equal(t, 200, result.Data["status_code"])
+	assert.Equal(t, "POST", output.Method)
+	assert.Equal(t, 200, output.StatusCode)
 }
 
-func TestHTTPService_CheckStatus_MethodOverride(t *testing.T) {
+func TestHTTPService_NotFound(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "HEAD" {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
+		w.WriteHeader(http.StatusNotFound)
 	}))
 	defer server.Close()
 
 	svc := &HTTPService{}
 	mockClient := &MockHTTPClient{client: server.Client()}
-	cfg := &core.HTTPConfig{
+	input := &RequestInput{
 		URL:    server.URL,
-		Method: "HEAD",
+		Method: "GET",
 	}
 
-	req := &plugin.Request{
-		Client: mockClient,
-		Config: cfg,
-	}
+	ctx := context.Background()
+	ctx = plugin.WithClient(ctx, ports.HTTPClient(mockClient))
 
-	result, err := svc.CheckStatusHandler(context.Background(), req)
+	// Handler returns success with 404 code - validation happens via expect expressions
+	output, err := svc.RequestHandler(ctx, input)
 	require.NoError(t, err)
-
-	assert.Equal(t, entities.ResultStatusSuccess, result.Status)
+	assert.Equal(t, 404, output.StatusCode)
+	assert.Contains(t, output.Status, "404")
 }
 
-func TestHTTPService_CheckSSL_Success(t *testing.T) {
-	// CheckSSL uses HEAD method internally
+func TestHTTPService_DefaultMethod(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "HEAD" {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
+		assert.Equal(t, "GET", r.Method)
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
 
 	svc := &HTTPService{}
 	mockClient := &MockHTTPClient{client: server.Client()}
-	cfg := &core.HTTPConfig{
+	input := &RequestInput{
 		URL: server.URL,
+		// Method not specified - should default to GET
 	}
 
-	req := &plugin.Request{
-		Client: mockClient,
-		Config: cfg,
-	}
+	ctx := context.Background()
+	ctx = plugin.WithClient(ctx, ports.HTTPClient(mockClient))
 
-	result, err := svc.CheckSSLHandler(context.Background(), req)
+	output, err := svc.RequestHandler(ctx, input)
 	require.NoError(t, err)
-
-	assert.Equal(t, entities.ResultStatusSuccess, result.Status)
-	assert.Equal(t, "HEAD", result.Data["method"])
-}
-
-func TestHTTPService_Get_BodyContains_Success(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status": "healthy", "version": "1.0.0"}`))
-	}))
-	defer server.Close()
-
-	svc := &HTTPService{}
-	mockClient := &MockHTTPClient{client: server.Client()}
-	cfg := &core.HTTPConfig{
-		URL:                  server.URL,
-		ExpectedBodyContains: "healthy",
-	}
-
-	req := &plugin.Request{
-		Client: mockClient,
-		Config: cfg,
-	}
-
-	result, err := svc.GetHandler(context.Background(), req)
-	require.NoError(t, err)
-
-	assert.Equal(t, entities.ResultStatusSuccess, result.Status)
-}
-
-func TestHTTPService_Get_BodyContains_Failure(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status": "degraded"}`))
-	}))
-	defer server.Close()
-
-	svc := &HTTPService{}
-	mockClient := &MockHTTPClient{client: server.Client()}
-	cfg := &core.HTTPConfig{
-		URL:                  server.URL,
-		ExpectedBodyContains: "healthy",
-	}
-
-	req := &plugin.Request{
-		Client: mockClient,
-		Config: cfg,
-	}
-
-	result, err := svc.GetHandler(context.Background(), req)
-	require.NoError(t, err)
-
-	assert.Equal(t, entities.ResultStatusFailure, result.Status)
-	assert.Contains(t, result.Message, "missing expected content")
+	assert.Equal(t, "GET", output.Method)
 }
