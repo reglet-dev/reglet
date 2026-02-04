@@ -19,14 +19,6 @@ import (
 
 // defaultGlobalCache is the shared compilation cache used when no custom cache is provided.
 // This speeds up compilation across runtimes within a single process AND across runs.
-//
-// Uses disk-based caching (~/.cache/reglet/wasm) for persistence between test runs,
-// significantly speeding up repeated test executions with the -race flag.
-//
-// Cleanup considerations:
-//   - CLI tools: No explicit cleanup needed - OS reclaims memory on exit.
-//   - Servers/Workers: Manage your own cache with WithCompilationCache() option.
-//   - Tests: Benefits from disk cache across runs; use WithCompilationCache() for isolation.
 var defaultGlobalCache = initGlobalCache()
 
 func initGlobalCache() wazero.CompilationCache {
@@ -98,11 +90,6 @@ func WithMemoryLimit(mb int) RuntimeOption {
 }
 
 // WithCompilationCache provides a custom compilation cache for this runtime.
-// This is useful for:
-//   - Tests: Isolate cache between tests to prevent interference
-//   - Servers: Multiple isolated runtime pools with separate caches
-//   - Advanced use cases: Custom cache lifecycle management
-//
 // If not provided, uses the default shared cache for the process.
 func WithCompilationCache(cache wazero.CompilationCache) RuntimeOption {
 	return func(c *runtimeConfig) {
@@ -202,18 +189,6 @@ func NewRuntime(ctx context.Context, version build.Info, opts ...RuntimeOption) 
 }
 
 // LoadPlugin compiles and caches a plugin, and is safe for concurrent use.
-//
-// The first call for a given plugin name compiles the provided WASM bytes,
-// creates a Plugin, and stores it in an internal cache keyed by name. Subsequent
-// calls with the same name return the previously cached Plugin instance; the
-// WASM module is not recompiled.
-//
-// To reduce contention while remaining thread-safe, LoadPlugin uses a
-// double-checked locking pattern around the plugin cache: it first checks the
-// cache under a read lock, and only acquires a write lock if the plugin is
-// not yet present, re-checking the cache under the write lock before compiling.
-// Callers do not need to provide additional synchronization when calling
-// LoadPlugin from multiple goroutines.
 func (r *Runtime) LoadPlugin(ctx context.Context, name string, wasmBytes []byte) (*Plugin, error) {
 	// Fast path: Check if plugin is already loaded
 	r.mu.RLock()

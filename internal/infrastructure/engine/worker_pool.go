@@ -77,9 +77,6 @@ func (q *controlQueue) grow() {
 }
 
 // workerPoolState manages the state of dependency-aware parallel execution.
-// Instead of organizing controls into levels with barriers, this approach
-// maintains a dynamic ready queue and executes controls as soon as their
-// dependencies are satisfied.
 type workerPoolState struct {
 	ctx              context.Context
 	reverseDeps      map[string][]string
@@ -192,10 +189,6 @@ func (state *workerPoolState) enqueueReadyControls() {
 		case state.workChan <- controlID:
 			// Successfully sent to worker, continue to next
 		default:
-			// Channel full (all workers busy), put it back and stop
-			// Note: We need to re-enqueue at the front, but our ring buffer
-			// doesn't support that. Instead, we use a peek-then-dequeue pattern.
-			// Revert: put the controlID back.
 			state.readyQueue.enqueue(controlID)
 			return
 		}

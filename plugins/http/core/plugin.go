@@ -13,7 +13,7 @@ var Plugin = plugin.DefinePlugin(plugin.PluginDef{
 	Capabilities: entities.GrantSet{
 		Network: &entities.NetworkCapability{
 			Rules: []entities.NetworkRule{
-				{Hosts: []string{"*"}, Ports: []string{"80", "443", "*"}},
+				{Hosts: []string{"*"}, Ports: []string{"80", "443"}},
 			},
 		},
 	},

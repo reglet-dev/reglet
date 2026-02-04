@@ -114,15 +114,6 @@ func (l *ProfileLoader) loadProfileRecursive(
 // loadSingleProfile loads a single profile from disk without resolving inheritance.
 func (l *ProfileLoader) loadSingleProfile(path string) (*entities.Profile, error) {
 	if l.fs != nil {
-		// When using a custom filesystem, we bypass os.OpenRoot.
-		// NOTE: paths passed here are already absolute from loadProfileRecursive.
-		// fs.FS implementation must handle this or we need to relativize logic
-		// if we want to support standard fs implementations like os.DirFS.
-		// For now, we assume the fs implementation can handle the path as given
-		// or that we simply pass it through.
-		// However, standard fs.Open usually rejects leading slashes.
-		// Let's strip the volume name/leading slash to be safe for MapFS/DirFS compatibility.
-		// This is a heuristic; consistent usage in tests is expected.
 		relPath := path
 		if filepath.IsAbs(path) {
 			// On unix this strips leading /. On windows stripping volume might be trickier but fs.FS is unix-style paths.

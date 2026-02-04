@@ -65,10 +65,8 @@ func (s *CommandService) ExecuteHandler(ctx context.Context, in *ExecuteInput) (
 		args = in.Args
 	}
 
-	var env []string
-	for k, v := range in.Env {
-		env = append(env, fmt.Sprintf("%s=%s", k, v))
-	}
+	// Env is already []string, passed directly
+	env := in.Env
 
 	reqData := ports.CommandRequest{
 		Command: cmd,

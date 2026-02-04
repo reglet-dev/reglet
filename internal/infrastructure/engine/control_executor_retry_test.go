@@ -43,9 +43,6 @@ func TestExecuteControl_RetrySuccess(t *testing.T) {
 		},
 	}
 
-	// Define transient error (reusing mockTimeoutError from backoff_test.go if available, or define new)
-	// Since we are in the same package 'engine', we can share types if they are in _test.go files?
-	// Yes, usually. But to be safe, I'll redefine or use a local one.
 	transientErr := &mockTimeoutError{}
 
 	// Result 1: Transient Error

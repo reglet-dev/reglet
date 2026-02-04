@@ -453,65 +453,14 @@ func (p *Plugin) Manifest(ctx context.Context) (*entities.Manifest, error) {
 	}
 
 	// Extract capabilities into GrantSet for runtime configuration
-	grantSet := capabilitiesToGrantSet(manifest.Capabilities)
+	// Manifest now directly contains GrantSet (no conversion needed)
 
 	p.mu.Lock()
 	p.manifest = manifest
-	p.capabilities = grantSet
+	p.capabilities = &manifest.Capabilities
 	p.mu.Unlock()
 
 	return manifest, nil
-}
-
-// capabilitiesToGrantSet converts []Capability to *GrantSet
-func capabilitiesToGrantSet(caps []entities.Capability) *entities.GrantSet {
-	gs := &entities.GrantSet{}
-	for _, cap := range caps {
-		switch cap.Category {
-		case "network", "http":
-			host := cap.Resource
-			port := "*" // default
-			// Basic parsing if needed, but for now treating resource as host
-			if strings.Contains(host, ":") {
-				parts := strings.SplitN(host, ":", 2)
-				host = parts[0]
-				port = parts[1]
-			}
-			if gs.Network == nil {
-				gs.Network = &entities.NetworkCapability{}
-			}
-			gs.Network.Rules = append(gs.Network.Rules, entities.NetworkRule{
-				Hosts: []string{host},
-				Ports: []string{port},
-			})
-		case "fs":
-			if gs.FS == nil {
-				gs.FS = &entities.FileSystemCapability{}
-			}
-			read := []string{}
-			write := []string{}
-			if cap.Action == "write" {
-				write = append(write, cap.Resource)
-			} else {
-				read = append(read, cap.Resource)
-			}
-			gs.FS.Rules = append(gs.FS.Rules, entities.FileSystemRule{
-				Read:  read,
-				Write: write,
-			})
-		case "exec":
-			if gs.Exec == nil {
-				gs.Exec = &entities.ExecCapability{}
-			}
-			gs.Exec.Commands = append(gs.Exec.Commands, cap.Resource)
-		case "env":
-			if gs.Env == nil {
-				gs.Env = &entities.EnvironmentCapability{}
-			}
-			gs.Env.Variables = append(gs.Env.Variables, cap.Resource)
-		}
-	}
-	return gs
 }
 
 // Observe executes the main validation logic of the plugin.

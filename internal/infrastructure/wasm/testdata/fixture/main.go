@@ -14,7 +14,7 @@ func init() {
 }
 
 func main() {
-	// Empty main for reactor build
+	// Required for WASM modules but not called in c-shared buildmode
 }
 
 type FixturePlugin struct{}
@@ -24,20 +24,19 @@ func (p *FixturePlugin) Manifest(ctx context.Context) (*entities.Manifest, error
 		Name:        "fixture",
 		Version:     "0.0.1",
 		Description: "Test fixture for Reglet Host integration verify",
-		Capabilities: []entities.Capability{
-			{
-				Category: "fs",
-				Resource: "/tmp",
-				Action:   "read",
+		Capabilities: entities.GrantSet{
+			FS: &entities.FileSystemCapability{
+				Rules: []entities.FileSystemRule{
+					{Read: []string{"/tmp"}},
+				},
 			},
-			{
-				Category: "network",
-				Resource: "*:80",
-				Action:   "connect",
+			Network: &entities.NetworkCapability{
+				Rules: []entities.NetworkRule{
+					{Hosts: []string{"*"}, Ports: []string{"80"}},
+				},
 			},
-			{
-				Category: "env",
-				Resource: "TEST_VAR",
+			Env: &entities.EnvironmentCapability{
+				Variables: []string{"TEST_VAR"},
 			},
 		},
 		ConfigSchema: []byte(`{

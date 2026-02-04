@@ -16,7 +16,7 @@ import (
 type CapabilityGatekeeper struct {
 	grantStore    ports.GrantStore
 	prompter      ports.Prompter // Use interface
-	riskAssessor  *sdkEntities.RiskAssessor
+	riskAssessor  sdkEntities.RiskAnalyzer
 	securityLevel string // Security level: strict, standard, permissive
 }
 
@@ -25,7 +25,7 @@ func NewCapabilityGatekeeper(configPath string, securityLevel string) *Capabilit
 	return &CapabilityGatekeeper{
 		grantStore:    grantstore.NewFileStore(grantstore.WithPath(configPath)),
 		prompter:      infraCapabilities.NewTerminalPrompter(),
-		riskAssessor:  sdkEntities.NewRiskAssessor(),
+		riskAssessor:  sdkEntities.NewSimpleRiskAnalyzer(),
 		securityLevel: securityLevel,
 	}
 }
@@ -66,6 +66,10 @@ func (g *CapabilityGatekeeper) GrantCapabilities(
 		// All capabilities already granted
 		return existingGrants, nil
 	}
+
+	// Deduplicate missing capabilities to avoid prompting user multiple times
+	// for the same permission (e.g., if multiple controls need google.com:443)
+	missing.Deduplicate()
 
 	// Non-interactive mode check
 	if !g.prompter.IsInteractive() {
@@ -127,10 +131,13 @@ func (g *CapabilityGatekeeper) promptForNetwork(
 			return err
 		}
 		if granted {
-			if newGrants.Network == nil {
-				newGrants.Network = &sdkEntities.NetworkCapability{}
+			// Use Merge to deduplicate
+			toMerge := &sdkEntities.GrantSet{
+				Network: &sdkEntities.NetworkCapability{
+					Rules: []sdkEntities.NetworkRule{rule},
+				},
 			}
-			newGrants.Network.Rules = append(newGrants.Network.Rules, rule)
+			newGrants.Merge(toMerge)
 			if always {
 				*shouldSave = true
 			}
@@ -157,10 +164,13 @@ func (g *CapabilityGatekeeper) promptForFS(
 				return err
 			}
 			if granted {
-				if newGrants.FS == nil {
-					newGrants.FS = &sdkEntities.FileSystemCapability{}
+				// Use Merge to deduplicate
+				toMerge := &sdkEntities.GrantSet{
+					FS: &sdkEntities.FileSystemCapability{
+						Rules: []sdkEntities.FileSystemRule{{Read: []string{path}}},
+					},
 				}
-				newGrants.FS.Rules = append(newGrants.FS.Rules, sdkEntities.FileSystemRule{Read: []string{path}})
+				newGrants.Merge(toMerge)
 				if always {
 					*shouldSave = true
 				}
@@ -174,10 +184,13 @@ func (g *CapabilityGatekeeper) promptForFS(
 				return err
 			}
 			if granted {
-				if newGrants.FS == nil {
-					newGrants.FS = &sdkEntities.FileSystemCapability{}
+				// Use Merge to deduplicate
+				toMerge := &sdkEntities.GrantSet{
+					FS: &sdkEntities.FileSystemCapability{
+						Rules: []sdkEntities.FileSystemRule{{Write: []string{path}}},
+					},
 				}
-				newGrants.FS.Rules = append(newGrants.FS.Rules, sdkEntities.FileSystemRule{Write: []string{path}})
+				newGrants.Merge(toMerge)
 				if always {
 					*shouldSave = true
 				}
@@ -204,10 +217,13 @@ func (g *CapabilityGatekeeper) promptForEnv(
 			return err
 		}
 		if granted {
-			if newGrants.Env == nil {
-				newGrants.Env = &sdkEntities.EnvironmentCapability{}
+			// Use Merge to deduplicate
+			toMerge := &sdkEntities.GrantSet{
+				Env: &sdkEntities.EnvironmentCapability{
+					Variables: []string{v},
+				},
 			}
-			newGrants.Env.Variables = append(newGrants.Env.Variables, v)
+			newGrants.Merge(toMerge)
 			if always {
 				*shouldSave = true
 			}
@@ -233,10 +249,13 @@ func (g *CapabilityGatekeeper) promptForExec(
 			return err
 		}
 		if granted {
-			if newGrants.Exec == nil {
-				newGrants.Exec = &sdkEntities.ExecCapability{}
+			// Use Merge to deduplicate
+			toMerge := &sdkEntities.GrantSet{
+				Exec: &sdkEntities.ExecCapability{
+					Commands: []string{cmd},
+				},
 			}
-			newGrants.Exec.Commands = append(newGrants.Exec.Commands, cmd)
+			newGrants.Merge(toMerge)
 			if always {
 				*shouldSave = true
 			}
@@ -265,7 +284,7 @@ func (g *CapabilityGatekeeper) evaluateNetworkRule(
 		IsBroad:     isBroad,
 	}
 
-	return g.evaluateWithSecurityLevel(req, g.riskAssessor.DescribeRisks(gs))
+	return g.evaluateWithSecurityLevel(req, g.riskAssessor.Analyze(gs).RiskFactors)
 }
 
 // evaluateFSPath evaluates a filesystem path and prompts if needed.
@@ -291,7 +310,7 @@ func (g *CapabilityGatekeeper) evaluateFSPath(
 		IsBroad:     isBroad,
 	}
 
-	return g.evaluateWithSecurityLevel(req, g.riskAssessor.DescribeRisks(gs))
+	return g.evaluateWithSecurityLevel(req, g.riskAssessor.Analyze(gs).RiskFactors)
 }
 
 // evaluateEnvVar evaluates an environment variable and prompts if needed.
@@ -309,7 +328,7 @@ func (g *CapabilityGatekeeper) evaluateEnvVar(
 		IsBroad:     isBroad,
 	}
 
-	return g.evaluateWithSecurityLevel(req, g.riskAssessor.DescribeRisks(gs))
+	return g.evaluateWithSecurityLevel(req, g.riskAssessor.Analyze(gs).RiskFactors)
 }
 
 // evaluateExecCmd evaluates an exec command and prompts if needed.
@@ -327,14 +346,14 @@ func (g *CapabilityGatekeeper) evaluateExecCmd(
 		IsBroad:     isBroad,
 	}
 
-	return g.evaluateWithSecurityLevel(req, g.riskAssessor.DescribeRisks(gs))
+	return g.evaluateWithSecurityLevel(req, g.riskAssessor.Analyze(gs).RiskFactors)
 }
 
 // evaluateWithSecurityLevel applies security level policy and prompts if needed.
-func (g *CapabilityGatekeeper) evaluateWithSecurityLevel(req sdkEntities.CapabilityRequest, risks []string) (bool, bool, error) {
+func (g *CapabilityGatekeeper) evaluateWithSecurityLevel(req sdkEntities.CapabilityRequest, riskFactors []sdkEntities.RiskFactor) (bool, bool, error) {
 	riskDesc := ""
-	if len(risks) > 0 {
-		riskDesc = risks[0]
+	if len(riskFactors) > 0 {
+		riskDesc = riskFactors[0].Description
 	}
 
 	if req.IsBroad {

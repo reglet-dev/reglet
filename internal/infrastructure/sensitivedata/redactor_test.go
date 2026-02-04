@@ -121,16 +121,6 @@ func TestRedactor_RaceOnSliceMutation(t *testing.T) {
 }
 
 func TestRedactor_NoMultiPassMutation(t *testing.T) {
-	// This test verifies that the single-pass collection approach works correctly.
-	// Previously, a multi-phase approach could theoretically allow a string to be
-	// partially redacted in phase 1, then the result containing "[REDACTED]" could
-	// match a pattern in phase 2 or 3.
-	//
-	// With single-pass collection, all patterns are matched against the ORIGINAL
-	// input, so this scenario is impossible.
-
-	// Create a provider that specifically looks for "[REDACTED]" as a "secret"
-	// This simulates the attack scenario where phase 1 output could match phase 2
 	mockProvider := &mockSensitiveProvider{
 		values: []string{"[REDACTED]"}, // Adversarial: treating the redaction marker as sensitive
 	}

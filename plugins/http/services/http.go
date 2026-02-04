@@ -85,8 +85,16 @@ func (s *HTTPService) RequestHandler(ctx context.Context, in *RequestInput) (*Re
 
 	start := time.Now()
 	resp, err := client.Do(ctx, httpReq)
+	duration := time.Since(start).Milliseconds()
 	if err != nil {
-		return nil, fmt.Errorf("request failed: %w", err)
+		// Return result with status=0 and error details instead of plugin error
+		return &RequestOutput{
+			URL:            in.URL,
+			Method:         method,
+			StatusCode:     0,
+			Status:         fmt.Sprintf("ERROR: %v", err),
+			ResponseTimeMs: duration,
+		}, nil
 	}
 
 	// Reconstruct Status string since ports.HTTPResponse doesn't have it
@@ -98,6 +106,7 @@ func (s *HTTPService) RequestHandler(ctx context.Context, in *RequestInput) (*Re
 		Method:         method,
 		StatusCode:     resp.StatusCode,
 		Status:         statusStr,
+		Protocol:       resp.Proto,
 		Headers:        resp.Headers,
 		Body:           string(resp.Body),
 		BodySize:       len(resp.Body),

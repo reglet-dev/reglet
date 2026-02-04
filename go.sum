@@ -468,8 +468,8 @@ github.com/prometheus/common v0.67.4 h1:yR3NqWO1/UyO1w2PhUvXlGQs/PtFmoveVO0KZ4+L
 github.com/prometheus/common v0.67.4/go.mod h1:gP0fq6YjjNCLssJCQp0yk4M8W6ikLURwkdd/YKtTbyI=
 github.com/prometheus/procfs v0.19.2 h1:zUMhqEW66Ex7OXIiDkll3tl9a1ZdilUOd/F6ZXw4Vws=
 github.com/prometheus/procfs v0.19.2/go.mod h1:M0aotyiemPhBCM0z5w87kL22CxfcH05ZpYlu+b4J7mw=
-github.com/reglet-dev/reglet-sdk/go v0.3.3 h1:oCa8ySIzlbObxGcxzBiSAKOVHhWxKnmURrSuoJRGjBM=
-github.com/reglet-dev/reglet-sdk/go v0.3.3/go.mod h1:WNhHFG2Y7n2bjV2rezShmztnMgL9l0jZWKV44LSt+O8=
+github.com/reglet-dev/reglet-sdk/go v0.4.2 h1:oKB5e2HvXr0HX0cL2dWOH5s08NYpbm2xCu2QyA8Fd+o=
+github.com/reglet-dev/reglet-sdk/go v0.4.2/go.mod h1:WNhHFG2Y7n2bjV2rezShmztnMgL9l0jZWKV44LSt+O8=
 github.com/rivo/uniseg v0.4.7 h1:WUdvkW8uEhrYfLC4ZzdpI2ztxP1I582+49Oc5Mq64VQ=
 github.com/rivo/uniseg v0.4.7/go.mod h1:FN3SvrM+Zdj16jyLfmOkMNblXMcoc8DfTHruCPUcx88=
 github.com/rogpeppe/go-internal v1.14.1 h1:UQB4HGPB6osV0SQTLymcB4TgvyWu6ZyliaW0tI/otEQ=

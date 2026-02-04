@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
 	"github.com/reglet-dev/reglet-sdk/go/hostfuncs"
 	"github.com/tetratelabs/wazero/api"
 )
@@ -43,13 +44,14 @@ func DNSLookup(ctx context.Context, mod api.Module, stack []uint64, checker *Cap
 		return
 	}
 
-	// Check capability
+	// Check capability - DNS requires network access on port 53
 	pluginName := mod.Name()
 	if name, ok := PluginNameFromContext(ctx); ok {
 		pluginName = name
 	}
 
-	if err := checker.Check(pluginName, "network", "outbound:53"); err != nil {
+	// Check network capability for DNS (port 53)
+	if err := checker.CheckNetwork(pluginName, entities.NetworkRequest{Host: request.Hostname, Port: 53}); err != nil {
 		errMsg := fmt.Sprintf("permission denied: %v", err)
 		slog.WarnContext(ctx, errMsg, "hostname", request.Hostname)
 		stack[0] = hostWriteResponse(ctx, mod, DNSResponseWire{

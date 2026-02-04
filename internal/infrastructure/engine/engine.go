@@ -403,21 +403,6 @@ func (e *Engine) resolveDependencies(profile entities.ProfileReader) (map[string
 	required := make(map[string]bool)
 
 	for _, ctrl := range allControls {
-		// Used pre-calculated decision if possible, but for dependency resolution we just need
-		// to know if it matches the filters. We can use the same logic or reuse `shouldRun` if updated.
-		// Since we haven't calculated runnableIDs here yet (this runs before), we can
-		// temporarily build the filter or just replicate the Select logic efficiently.
-		// Actually, creating a filter here is fine as it runs once.
-		// NOTE: We'll update shouldRun to support being called with nil runnableIDs to mean "check standard logic"
-		// or better: just use the new Select here too!
-
-		// Optimization: Reuse Select here
-		// But Select is on ControlSet. We have allControls (ControlSet).
-		// We can just check if ID is in the "Selected" set.
-		// However, we need to iterate ALL controls to check if dependencies on THEM are required.
-		// Wait, resolveDependencies walks dependencies OF matched controls.
-		// So we primarily need to know which controls ARE matched.
-
 		if should, _ := e.shouldRun(ctrl, nil); should {
 			if deps, ok := allDependencies[ctrl.ID]; ok {
 				for depID := range deps {

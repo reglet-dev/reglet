@@ -23,6 +23,9 @@ type ResolveOutput struct {
 	// Records contains the resolved DNS records
 	Records []string `json:"records" jsonschema:"description=Resolved DNS records"`
 
+	// RecordCount is the number of resolved records
+	RecordCount int `json:"record_count" jsonschema:"description=Number of resolved records"`
+
 	// TTL is the time-to-live in seconds (if available)
 	TTL int `json:"ttl,omitempty" jsonschema:"description=Record TTL in seconds"`
 

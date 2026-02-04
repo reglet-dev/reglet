@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/reglet-dev/reglet-sdk/go/application/plugin"
 	"github.com/reglet-dev/reglet-sdk/go/domain/ports"
@@ -45,7 +46,17 @@ func init() {
 
 // ConnectHandler performs the TCP connection check and optional TLS validation.
 func (s *TCPService) ConnectHandler(ctx context.Context, in *ConnectInput) (*ConnectOutput, error) {
+	// Add logging to debug
+
 	dialer := plugin.GetClient[ports.TCPDialer](ctx)
+	if dialer == nil {
+		return &ConnectOutput{
+			Host:      in.Host,
+			Port:      in.Port,
+			Connected: false,
+			Error:     "Internal error: dialer not initialized",
+		}, nil
+	}
 
 	target := fmt.Sprintf("%s:%d", in.Host, in.Port)
 	timeout := in.TimeoutMs
@@ -53,17 +64,31 @@ func (s *TCPService) ConnectHandler(ctx context.Context, in *ConnectInput) (*Con
 		timeout = 5000
 	}
 
+	start := time.Now()
 	// Use DialSecure which supports timeout and TLS (matches SDK interface)
 	conn, err := dialer.DialSecure(ctx, target, timeout, in.TLS)
+	duration := time.Since(start).Milliseconds()
+	if duration == 0 {
+		duration = 1
+	}
+
 	if err != nil {
-		return nil, fmt.Errorf("connection failed: %w", err)
+		// Return result with Connected=false instead of plugin error
+		return &ConnectOutput{
+			Host:           in.Host,
+			Port:           in.Port,
+			Connected:      false,
+			ResponseTimeMs: duration,
+			Error:          err.Error(),
+		}, nil
 	}
 	defer conn.Close()
 
 	output := &ConnectOutput{
-		Host:      in.Host,
-		Port:      in.Port,
-		Connected: true,
+		Host:           in.Host,
+		Port:           in.Port,
+		Connected:      true,
+		ResponseTimeMs: duration,
 	}
 
 	if in.TLS || conn.IsTLS() {

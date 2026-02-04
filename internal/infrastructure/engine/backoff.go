@@ -55,10 +55,7 @@ func isTransientError(err error) bool {
 		return false
 	}
 
-	// Context errors are never transient in the sense that we should retry blindly
-	// If context is canceled/deadline exceeded, we should stop.
-	// Wait, the plan says:
-	// "Context errors are never transient... stop retrying"
+	// Context errors are never transient - stop retrying immediately
 	if errors.Is(err, context.DeadlineExceeded) ||
 		errors.Is(err, context.Canceled) {
 		return false

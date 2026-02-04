@@ -8,9 +8,14 @@ type ExecuteInput struct {
 	Command string   `json:"command,omitempty" jsonschema:"description=Command to execute directly"`
 	Args    []string `json:"args,omitempty" jsonschema:"description=Command arguments"`
 	// Options
-	Dir            string            `json:"dir,omitempty" jsonschema:"description=Working directory"`
-	Env            map[string]string `json:"env,omitempty" jsonschema:"description=Environment variables"`
-	TimeoutSeconds int               `json:"timeout_seconds,omitempty" jsonschema:"default=60,description=Execution timeout"`
+	// Options
+	Dir            string   `json:"dir,omitempty" jsonschema:"description=Working directory"`
+	Env            []string `json:"env,omitempty" jsonschema:"description=Environment variables (KEY=VAL)"`
+	TimeoutSeconds int      `json:"timeout_seconds,omitempty" jsonschema:"default=60,description=Execution timeout"`
+
+	// Validation
+	ExpectedExit   int    `json:"expected_exit,omitempty" jsonschema:"default=0,description=Expected exit code"`
+	ExpectedOutput string `json:"expected_output,omitempty" jsonschema:"description=Expected string in stdout"`
 }
 
 // ExecuteOutput contains command execution results.

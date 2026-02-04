@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/reglet-dev/reglet-sdk/go/application/plugin"
 	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
@@ -40,7 +41,46 @@ func (p *commandPlugin) Check(ctx context.Context, configBytes []byte) (*entitie
 		Raw:    configBytes,
 	}
 
-	return handler(ctx, req)
+	res, err := handler(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	// Validation
+	if res.Status == entities.ResultStatusSuccess && res.Data != nil {
+		// Exit code check
+		actualExit := 0
+		if val, ok := res.Data["exit_code"]; ok {
+			switch v := val.(type) {
+			case int:
+				actualExit = v
+			case float64:
+				actualExit = int(v)
+			}
+		}
+
+		if actualExit != cfg.ExpectedExit {
+			res.Status = entities.ResultStatusFailure
+			res.Error = &entities.ErrorDetail{
+				Message: fmt.Sprintf("Exit code mismatch: expected %d, got %d", cfg.ExpectedExit, actualExit),
+				Type:    "validation",
+			}
+		}
+
+		// Output check
+		if cfg.ExpectedOutput != "" {
+			stdout, _ := res.Data["stdout"].(string)
+			if !strings.Contains(stdout, cfg.ExpectedOutput) {
+				res.Status = entities.ResultStatusFailure
+				res.Error = &entities.ErrorDetail{
+					Message: fmt.Sprintf("Output mismatch: expected '%s' in stdout", cfg.ExpectedOutput),
+					Type:    "validation",
+				}
+			}
+		}
+	}
+
+	return res, nil
 }
 
 func init() {

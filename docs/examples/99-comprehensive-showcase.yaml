@@ -244,8 +244,8 @@ controls:
         - plugin: tcp
           config:
             host: "{{ .vars.test_domain }}"
-            port: "443"
-            timeout: "5s"
+            port: 443
+            timeout_ms: 5000
           expect:
             - data.connected == true
             - data.response_time_ms > 0

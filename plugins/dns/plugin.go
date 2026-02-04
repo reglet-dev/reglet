@@ -41,6 +41,8 @@ func (p *dnsPlugin) Check(ctx context.Context, configBytes []byte) (*entities.Re
 	return handler(ctx, req)
 }
 
-func main() {
+func init() {
 	plugin.Register(&dnsPlugin{})
 }
+
+func main() {}

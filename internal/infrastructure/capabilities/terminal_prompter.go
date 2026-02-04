@@ -11,13 +11,13 @@ import (
 
 // TerminalPrompter provides interactive terminal prompting for capability grants.
 type TerminalPrompter struct {
-	riskAssessor *sdkEntities.RiskAssessor
+	riskAnalyzer sdkEntities.RiskAnalyzer
 }
 
 // NewTerminalPrompter creates a new TerminalPrompter.
 func NewTerminalPrompter() *TerminalPrompter {
 	return &TerminalPrompter{
-		riskAssessor: sdkEntities.NewRiskAssessor(),
+		riskAnalyzer: sdkEntities.NewSimpleRiskAnalyzer(),
 	}
 }
 

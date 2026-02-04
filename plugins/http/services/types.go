@@ -17,6 +17,7 @@ type RequestOutput struct {
 	Method             string              `json:"method" jsonschema:"description=HTTP method used"`
 	StatusCode         int                 `json:"status_code" jsonschema:"description=HTTP response status code"`
 	Status             string              `json:"status" jsonschema:"description=HTTP status text"`
+	Protocol           string              `json:"protocol" jsonschema:"description=HTTP protocol version"`
 	Headers            map[string][]string `json:"headers" jsonschema:"description=Response headers"`
 	Body               string              `json:"body,omitempty" jsonschema:"description=Response body (truncated if large)"`
 	BodySize           int                 `json:"body_size" jsonschema:"description=Response body size in bytes"`

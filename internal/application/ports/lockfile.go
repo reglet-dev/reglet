@@ -6,10 +6,6 @@ import (
 	"github.com/reglet-dev/reglet/internal/domain/entities"
 )
 
-// VersionResolver resolves semver version constraints to exact versions.
-// This is a PORT - application defines what it needs, infrastructure provides how.
-//
-// SOLID: Interface Segregation - focused only on version resolution
 type VersionResolver interface {
 	// Resolve converts a version constraint to an exact version.
 	// Examples:
@@ -19,10 +15,6 @@ type VersionResolver interface {
 	Resolve(constraint string, available []string) (string, error)
 }
 
-// LockfileRepository handles lockfile persistence.
-// This is a PORT - abstracts file system or other storage.
-//
-// SOLID: Interface Segregation - focused only on lockfile I/O
 type LockfileRepository interface {
 	// Load reads a lockfile from the given path.
 	// Returns nil, nil if lockfile doesn't exist.
@@ -36,7 +28,6 @@ type LockfileRepository interface {
 }
 
 // PluginDigester computes digests for plugins.
-// Separate from VersionResolver per Interface Segregation.
 type PluginDigester interface {
 	// DigestBytes computes SHA-256 of raw bytes.
 	DigestBytes(data []byte) string

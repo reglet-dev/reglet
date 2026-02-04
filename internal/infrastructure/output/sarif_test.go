@@ -273,9 +273,6 @@ func TestSARIFMapper_ArtifactProperties(t *testing.T) {
 }
 
 func TestSARIFMapper_LocationNormalization_Relative(t *testing.T) {
-	// This test relies on CWD, so we need to mock or be careful.
-	// sarifMapper uses os.Getwd(). We can't easily mock that without refactoring.
-	// But we can check if it normalizes to relative path if we pass absolute path in CWD.
 	t.Parallel()
 
 	cwd, err := filepath.Abs(".")
@@ -293,11 +290,6 @@ func TestSARIFMapper_LocationNormalization_Relative(t *testing.T) {
 	report := formatToReport(t, result)
 	loc := report.Runs[0].Results[0].Locations[0]
 
-	// Expect relative path (no file:// prefix, just the file name or relative path)
-	// Actually sarifMapper implementation does: "file://" + filepath.ToSlash(abs) if not relative
-	// If relative, it does filepath.ToSlash(rel).
-	// Since we are in CWD, it should be relative "test-file.txt".
-	// NOTE: sarifMapper logic: if Rel returns no error and !strings.HasPrefix(rel, ".."), use rel.
 	assert.Equal(t, "test-file.txt", *loc.PhysicalLocation.ArtifactLocation.URI)
 }
 

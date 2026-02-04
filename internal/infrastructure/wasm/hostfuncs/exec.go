@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	sdkEntities "github.com/reglet-dev/reglet-sdk/go/domain/entities"
 	"github.com/reglet-dev/reglet-sdk/go/hostfuncs"
 	"github.com/reglet-dev/reglet/internal/domain/constants"
 	"github.com/tetratelabs/wazero/api"
@@ -146,7 +147,7 @@ func checkExecCapability(ctx context.Context, checker *CapabilityChecker, plugin
 	}
 
 	// Direct command execution (safe mode)
-	if err := checker.Check(pluginName, "exec", request.Command); err != nil {
+	if err := checker.CheckExec(pluginName, sdkEntities.ExecCapabilityRequest{Command: request.Command}); err != nil {
 		errMsg := fmt.Sprintf("permission denied: %v", err)
 		slog.WarnContext(ctx, errMsg, "command", request.Command)
 		stack[0] = hostWriteResponse(ctx, mod, ExecResponseWire{
@@ -160,7 +161,7 @@ func checkExecCapability(ctx context.Context, checker *CapabilityChecker, plugin
 
 // checkDangerousExec handles capability check for dangerous execution modes.
 func checkDangerousExec(ctx context.Context, checker *CapabilityChecker, pluginName string, request *ExecRequestWire, execType string, stack []uint64, mod api.Module) error {
-	if err := checker.Check(pluginName, "exec", request.Command); err != nil {
+	if err := checker.CheckExec(pluginName, sdkEntities.ExecCapabilityRequest{Command: request.Command}); err != nil {
 		errMsg := fmt.Sprintf(
 			"%s requires 'exec:%s' capability (prevents arbitrary code execution)",
 			execType, request.Command)

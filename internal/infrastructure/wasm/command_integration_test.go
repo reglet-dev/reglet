@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
@@ -56,7 +57,7 @@ func TestCommandPlugin_Integration(t *testing.T) {
 		assert.True(t, result.Evidence.Status, "Command should succeed")
 
 		stdout, _ := result.Evidence.Data["stdout"].(string)
-		assert.Equal(t, "hello world", stdout)
+		assert.Equal(t, "hello world", strings.TrimSpace(stdout))
 		exitCode, _ := result.Evidence.Data["exit_code"].(float64)
 		assert.Equal(t, float64(0), exitCode)
 	})
@@ -77,7 +78,7 @@ func TestCommandPlugin_Integration(t *testing.T) {
 		assert.True(t, result.Evidence.Status, "Shell command should succeed")
 
 		stdout, _ := result.Evidence.Data["stdout"].(string)
-		assert.Equal(t, "test output", stdout)
+		assert.Equal(t, "test output", strings.TrimSpace(stdout))
 	})
 
 	t.Run("ExitCode_NonZero", func(t *testing.T) {
@@ -115,7 +116,7 @@ func TestCommandPlugin_Integration(t *testing.T) {
 		require.NotNil(t, result.Evidence)
 
 		stderr, _ := result.Evidence.Data["stderr"].(string)
-		assert.Equal(t, "error message", stderr)
+		assert.Equal(t, "error message", strings.TrimSpace(stderr))
 	})
 
 	t.Run("Environment_Variables", func(t *testing.T) {

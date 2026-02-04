@@ -17,4 +17,5 @@ type ConnectOutput struct {
 	TLSCipherSuite string `json:"tls_cipher_suite,omitempty" jsonschema:"description=Negotiated cipher suite"`
 	TLSExpiry      string `json:"tls_expiry,omitempty" jsonschema:"description=Certificate expiry date"`
 	ResponseTimeMs int64  `json:"response_time_ms" jsonschema:"description=Connection time in milliseconds"`
+	Error          string `json:"error,omitempty" jsonschema:"description=Error message if connection failed"`
 }

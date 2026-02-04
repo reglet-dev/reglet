@@ -12,11 +12,6 @@ import (
 // can handle deep dependency chains without causing a stack overflow.
 // This is a regression test for the move from recursive to iterative DFS.
 func Test_CheckForControlDependencyCycles_DeepChain(t *testing.T) {
-	// 50,000 is usually enough to blow the default 1GB stack limit if using inefficient recursion,
-	// but default goroutine stack is small (2KB), growing up to 1GB (64-bit).
-	// deeply nested recursion of 50k frames might exceed limits or just be very slow/memory hungry.
-	// On many systems, default stack max is 8MB or so (ulimit -s). Go handling is dynamic.
-	// 20,000 is often enough to trigger stack issues in some environments or verify robustness.
 	const chainLength = 100000
 
 	config := Profile{

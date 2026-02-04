@@ -74,17 +74,20 @@ func TestHost_Manifest(t *testing.T) {
 
 	assert.Equal(t, "fixture", manifest.Name)
 	assert.Equal(t, "0.0.1", manifest.Version)
-	assert.NotEmpty(t, manifest.Capabilities)
+	assert.False(t, manifest.Capabilities.IsEmpty(), "capabilities should not be empty")
 
-	// Verify specific capability from fixture
-	found := false
-	for _, cap := range manifest.Capabilities {
-		if cap.Category == "env" && cap.Resource == "TEST_VAR" {
-			found = true
-			break
+	// Verify specific capability from fixture (TEST_VAR environment variable)
+	assert.NotNil(t, manifest.Capabilities.Env, "should have environment capabilities")
+	if manifest.Capabilities.Env != nil {
+		found := false
+		for _, v := range manifest.Capabilities.Env.Variables {
+			if v == "TEST_VAR" {
+				found = true
+				break
+			}
 		}
+		assert.True(t, found, "should find TEST_VAR env capability")
 	}
-	assert.True(t, found, "should find TEST_VAR env capability")
 }
 
 func TestHost_Observe_Success(t *testing.T) {
@@ -136,10 +139,6 @@ func TestHost_Observe_Failure(t *testing.T) {
 
 	result, err := plugin.Observe(ctx, config)
 	require.NoError(t, err) // SDK returns success but Evidence has failure status
-	// Wait, Observe wrapper might return error if Evidence.Error is set?
-	// The current plugin.Observe implementation in host (plugin.go) returns *PluginObservationResult.
-	// It doesn't auto-convert Evidence failure to Go error unless internally logic does so.
-	// Let's check result content.
 
 	assert.False(t, result.Evidence.Status, "status should be false")
 	require.NotNil(t, result.Evidence.Error, "evidence error should be set")

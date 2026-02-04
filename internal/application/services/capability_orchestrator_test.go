@@ -38,7 +38,7 @@ func (m *mockPlugin) Manifest(_ context.Context) (*sdkEntities.Manifest, error) 
 	return &sdkEntities.Manifest{
 		Name:         "mock",
 		Version:      "1.0.0",
-		Capabilities: []sdkEntities.Capability{},
+		Capabilities: sdkEntities.GrantSet{}, // Empty GrantSet
 	}, nil
 }
 

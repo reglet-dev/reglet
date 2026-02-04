@@ -49,9 +49,6 @@ controls:
 	ctx := context.Background()
 	req := buildTestRequest(profilePath)
 
-	// We expect execution to fail on engine because plugin "reglet/test" doesn't exist
-	// BUT, Lockfile resolution happens BEFORE engine execution.
-	// So lockfile SHOULD be created even if execution fails later.
 	_, execErr := c.CheckProfileUseCase().Execute(ctx, req)
 	if execErr != nil {
 		t.Logf("Execution error (ignored if expected): %+v", execErr)
@@ -84,10 +81,6 @@ controls:
 
 // Helper to build request (mimics CLI builder)
 func buildTestRequest(path string) dto.CheckProfileRequest {
-	// Since I can't import internal/application/dto easily if it's internal and I am outside
-	// Wait, integration tests in Go can import internal packages if they are under the same module root?
-	// Yes, "internal" is visible to the module itself.
-	// package integration_test is in internal/test/integration which is inside module.
 	return dto.CheckProfileRequest{
 		ProfilePath: path,
 		Metadata: dto.RequestMetadata{

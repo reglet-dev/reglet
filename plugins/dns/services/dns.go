@@ -105,9 +105,10 @@ func (s *DNSService) ResolveHandler(ctx context.Context, in *ResolveInput) (*Res
 	}
 
 	return &ResolveOutput{
-		Hostname:   in.Hostname,
-		RecordType: recordType,
-		Records:    records,
-		Nameserver: in.Nameserver,
+		Hostname:    in.Hostname,
+		RecordType:  recordType,
+		Records:     records,
+		Nameserver:  in.Nameserver,
+		RecordCount: len(records),
 	}, nil
 }

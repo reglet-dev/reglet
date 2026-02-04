@@ -69,11 +69,6 @@ func TestEngineOptions_WithCapabilityManager(t *testing.T) {
 	assert.Nil(t, eng)
 	assert.Contains(t, err.Error(), "requires WithProfile")
 
-	// Should succeed if Profile is present
-	// We need to be careful: NewEngine will try to run the capability flow which calls methods on mockCapMgr
-	// So we can't test NewEngine success easily without a working mock.
-	// But we can check if the option sets the field on the options struct manually.
-
 	opts := defaultEngineOptions()
 	WithCapabilityManager(mockCapMgr)(opts)
 	assert.NotNil(t, opts.capabilityManager)
@@ -96,13 +91,6 @@ func TestEngineOptions_WithPluginDir(t *testing.T) {
 	WithPluginDir("/tmp/plugins")(opts)
 	assert.Equal(t, "/tmp/plugins", opts.pluginDir)
 }
-
-/*
-   We skip full integration tests of WithCapabilityManager in NewEngine here
-   because it requires mocking the entire capability flow which is covered in
-   TestFiltering_EndToEnd (using the real flow) or requires mocks.
-   The validation logic (require WithProfile) is tested above.
-*/
 
 func TestGenerateControlMessage_SinglePass(t *testing.T) {
 	t.Parallel()
@@ -562,23 +550,11 @@ func TestResolveDependencies(t *testing.T) {
 
 	assert.True(t, required["c1"], "c1 should be required as transitive dependency")
 	assert.True(t, required["c2"], "c2 should be required as direct dependency")
-	// c3 is a target, not necessarily a "dependency" of another target,
-	// but the current implementation adds targets to queue so they might end up in map?
-	// Actually, resolveDependencies only returns dependencies found by walking UP.
-	// Wait, let's check logic:
-	// Identify initial targets (c2, c3).
-	// Queue = [c1 (from c2), c2 (from c3)]
-	// Process c1: add to required. Deps: []
-	// Process c2: add to required. Deps: [c1]
-	// Process c1 again: visited.
 
-	// So required map should contain c1 and c2.
-	// c3 is matched by shouldRun, so it will run.
-	// c4 is not matched and not required.
-
+	// resolveDependencies returns only dependencies, not the matched targets themselves
 	assert.True(t, required["c1"])
 	assert.True(t, required["c2"])
-	assert.False(t, required["c3"], "c3 is a target, not a dependency") // c3 runs because shouldRun=true
+	assert.False(t, required["c3"], "c3 is a target, not a dependency")
 	assert.False(t, required["c4"])
 }
 
@@ -744,9 +720,6 @@ func TestWorkerPool_DependencyFailure(t *testing.T) {
 		statusByID[ctrl.ID] = ctrl.Status
 	}
 
-	// 'a' might be Error or Fail depending on how plugin reports nonexistent file with mode=exists
-	// The file plugin usually returns Fail or Error.
-	// As long as it is not Pass, dependencies should skip.
 	assert.NotEqual(t, values.StatusPass, statusByID["a"])
 
 	// If 'a' didn't pass, b and c should be skipped

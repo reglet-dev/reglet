@@ -6,15 +6,11 @@ import (
 )
 
 var Plugin = plugin.DefinePlugin(plugin.PluginDef{
-	Name:        "tcp",
-	Version:     "1.0.0",
-	Description: "TCP connection testing and TLS validation",
-	Config:      &TCPConfig{},
+	Name:         "tcp",
+	Version:      "1.0.0",
+	Description:  "TCP connection testing and TLS validation",
+	Config:       &TCPConfig{},
 	Capabilities: entities.GrantSet{
-		Network: &entities.NetworkCapability{
-			Rules: []entities.NetworkRule{
-				{Hosts: []string{"*"}, Ports: []string{"*"}},
-			},
-		},
+		// Removed wildcard - capabilities should be extracted from profile config
 	},
 })

@@ -199,61 +199,8 @@ func (o *CapabilityOrchestrator) loadSinglePlugin(ctx context.Context, runtime p
 	}
 
 	// Extract capabilities into GrantSet for gatekeeper
-	// We perform manual conversion from Manifest capabilities to GrantSet
-	grantSet := capabilitiesToGrantSet(manifest.Capabilities)
-
-	return grantSet, nil
-}
-
-// capabilitiesToGrantSet converts []Capability to *GrantSet
-func capabilitiesToGrantSet(caps []sdkEntities.Capability) *sdkEntities.GrantSet {
-	gs := &sdkEntities.GrantSet{}
-	for _, cap := range caps {
-		switch cap.Category {
-		case "network", "http":
-			host := cap.Resource
-			port := "*" // default
-			// Basic parsing if needed, but for now treating resource as host
-			if strings.Contains(host, ":") {
-				parts := strings.SplitN(host, ":", 2)
-				host = parts[0]
-				port = parts[1]
-			}
-			if gs.Network == nil {
-				gs.Network = &sdkEntities.NetworkCapability{}
-			}
-			gs.Network.Rules = append(gs.Network.Rules, sdkEntities.NetworkRule{
-				Hosts: []string{host},
-				Ports: []string{port},
-			})
-		case "fs":
-			if gs.FS == nil {
-				gs.FS = &sdkEntities.FileSystemCapability{}
-			}
-			read := []string{}
-			write := []string{}
-			if cap.Action == "write" {
-				write = append(write, cap.Resource)
-			} else {
-				read = append(read, cap.Resource)
-			}
-			gs.FS.Rules = append(gs.FS.Rules, sdkEntities.FileSystemRule{
-				Read:  read,
-				Write: write,
-			})
-		case "exec":
-			if gs.Exec == nil {
-				gs.Exec = &sdkEntities.ExecCapability{}
-			}
-			gs.Exec.Commands = append(gs.Exec.Commands, cap.Resource)
-		case "env":
-			if gs.Env == nil {
-				gs.Env = &sdkEntities.EnvironmentCapability{}
-			}
-			gs.Env.Variables = append(gs.Env.Variables, cap.Resource)
-		}
-	}
-	return gs
+	// Manifest now directly contains GrantSet (no conversion needed)
+	return &manifest.Capabilities, nil
 }
 
 // mergeCapabilities merges profile-extracted capabilities with plugin metadata.

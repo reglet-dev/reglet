@@ -44,6 +44,8 @@ func (p *tcpPlugin) Check(ctx context.Context, configBytes []byte) (*entities.Re
 	return handler(ctx, req)
 }
 
-func main() {
+func init() {
 	plugin.Register(&tcpPlugin{})
 }
+
+func main() {}

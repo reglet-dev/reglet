@@ -51,22 +51,11 @@ func TestParseDigest(t *testing.T) {
 		{"MultipleColons", "sha256:abc:def", true, "sha256", "abc:def"}, // implementation splits N=2
 	}
 
-	// Wait, checkingNewDigest implementation:
-	// switch algorithm { case "sha256", "sha512": ... default: error }
-	// So "" algo will fail.
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := ParseDigest(tt.input)
 			if tt.valid {
 				if err != nil {
-					// Expecting success but got error?
-					// Check if NewDigest validates emptiness.
-					// NewDigest switch does not have casing for "".
-					// So "MissingAlgo" test case expects error effectively if it calls NewDigest("", ...).
-					// But wait, the test definition said `valid: true`.
-					// Let's adjust expectation based on code reading.
-					// If input is ":abcd", parts=["", "abcd"]. NewDigest("", "abcd") -> error "unsupported digest algorithm: "
 					t.Errorf("ParseDigest() unexpected error = %v", err)
 				} else {
 					if got.Algorithm() != tt.wantAlgo {

@@ -2,6 +2,7 @@
 package plugins
 
 import (
+	"net/url"
 	"strconv"
 
 	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
@@ -49,43 +50,122 @@ type NetworkExtractor struct{}
 
 // Extract analyzes observation config and returns required network capabilities.
 func (e *NetworkExtractor) Extract(config map[string]interface{}) *entities.GrantSet {
+	var hosts []string
 	var ports []string
 
-	// Check for "url" (http) - extract port or use default
-	if urlVal, ok := config["url"]; ok {
-		if url, ok := urlVal.(string); ok && url != "" {
-			// For HTTP URLs, default to port 443 (https) or 80 (http)
-			ports = append(ports, "443", "80")
-		}
-	}
+	e.extractFromURL(config, &hosts, &ports)
+	e.extractFromPort(config, &hosts, &ports)
+	e.extractFromNameserver(config, &hosts, &ports)
 
-	// Check for "port" (tcp)
-	if portVal, ok := config["port"]; ok {
-		var portStr string
-		switch v := portVal.(type) {
-		case string:
-			portStr = v
-		case float64:
-			portStr = strconv.FormatFloat(v, 'f', 0, 64)
-		case int:
-			portStr = strconv.Itoa(v)
-		}
-
-		if portStr != "" {
-			ports = append(ports, portStr)
-		}
-	}
-
-	if len(ports) == 0 {
+	if len(ports) == 0 || len(hosts) == 0 {
 		return nil
 	}
 
 	return &entities.GrantSet{
 		Network: &entities.NetworkCapability{
 			Rules: []entities.NetworkRule{
-				{Hosts: []string{"*"}, Ports: ports},
+				{Hosts: hosts, Ports: ports},
 			},
 		},
+	}
+}
+
+// TODO: we probably shouldnt fall back to wildcard here, but it is better than nothing for now.
+// extractFromURL extracts network capabilities from URL config (http/https).
+func (e *NetworkExtractor) extractFromURL(config map[string]interface{}, hosts, ports *[]string) {
+	urlVal, ok := config["url"]
+	if !ok {
+		return
+	}
+
+	urlStr, ok := urlVal.(string)
+	if !ok || urlStr == "" {
+		return
+	}
+
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil || parsedURL.Host == "" {
+		// If URL parsing fails, fall back to wildcard for safety
+		*hosts = append(*hosts, "*")
+		*ports = append(*ports, "443", "80")
+		return
+	}
+
+	// Extract hostname
+	if hostname := parsedURL.Hostname(); hostname != "" {
+		*hosts = append(*hosts, hostname)
+	}
+
+	// Select port based on scheme
+	switch parsedURL.Scheme {
+	case "https":
+		*ports = append(*ports, "443")
+	case "http":
+		*ports = append(*ports, "80")
+	default:
+		// Unknown scheme, default to both
+		*ports = append(*ports, "443", "80")
+	}
+}
+
+// extractFromPort extracts network capabilities from port config (tcp).
+func (e *NetworkExtractor) extractFromPort(config map[string]interface{}, hosts, ports *[]string) {
+	portVal, ok := config["port"]
+	if !ok {
+		return
+	}
+
+	portStr := e.portToString(portVal)
+	if portStr == "" {
+		return
+	}
+
+	// Check if host is specified (for TCP)
+	if hostVal, ok := config["host"]; ok {
+		if hostStr, ok := hostVal.(string); ok && hostStr != "" {
+			*hosts = append(*hosts, hostStr)
+		} else {
+			// Host field exists but is empty, use wildcard
+			*hosts = append(*hosts, "*")
+		}
+	} else {
+		// No host field, use wildcard for backward compatibility
+		*hosts = append(*hosts, "*")
+	}
+	*ports = append(*ports, portStr)
+}
+
+// extractFromNameserver extracts network capabilities from nameserver config (dns).
+func (e *NetworkExtractor) extractFromNameserver(config map[string]interface{}, hosts, ports *[]string) {
+	nsVal, ok := config["nameserver"]
+	if !ok {
+		return
+	}
+
+	nsStr, ok := nsVal.(string)
+	if !ok || nsStr == "" {
+		return
+	}
+
+	*hosts = append(*hosts, nsStr)
+	*ports = append(*ports, "53")
+}
+
+// portToString converts a port value to a string, handling multiple numeric types.
+func (e *NetworkExtractor) portToString(portVal interface{}) string {
+	switch v := portVal.(type) {
+	case string:
+		return v
+	case float64:
+		return strconv.FormatFloat(v, 'f', 0, 64)
+	case int:
+		return strconv.Itoa(v)
+	case int64:
+		return strconv.FormatInt(v, 10)
+	case uint64:
+		return strconv.FormatUint(v, 10)
+	default:
+		return ""
 	}
 }
 

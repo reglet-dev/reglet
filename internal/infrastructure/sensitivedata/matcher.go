@@ -25,9 +25,6 @@ type SensitiveStringMatcher interface {
 }
 
 // ahocorasickMatcher implements SensitiveStringMatcher using the Aho-Corasick algorithm.
-// This allows O(n) multi-pattern matching instead of O(n * patterns).
-//
-// The trie is lazily rebuilt when the number of tracked secrets changes.
 type ahocorasickMatcher struct {
 	provider ports.SensitiveValueProvider
 	trie     *ahocorasick.Trie
@@ -138,9 +135,6 @@ func (m *ahocorasickMatcher) getTrie() *ahocorasick.Trie {
 }
 
 // computeHash calculates a checksum of the secrets list.
-// The order matters, ensuring that if secrets are reordered it is considered a change
-// unless we sorted them first. However, since we want to respond to any change in the provider's
-// returned slice, we'll hash them as returned.
 func computeHash(secrets []string) uint64 {
 	if len(secrets) == 0 {
 		return 0
@@ -149,14 +143,6 @@ func computeHash(secrets []string) uint64 {
 	// Use ECMA polynomial
 	table := crc64.MakeTable(crc64.ECMA)
 	h := crc64.New(table)
-
-	// Sort to ensure consistent hash regardless of provider order,
-	// assuming the matcher doesn't care about order (Aho-Corasick doesn't).
-	// This prevents unnecessary rebuilds if the provider returns randomized order but same set.
-	// But first, let's copy to avoid modifying the input slice which might be owned by provider.
-	// Wait, provider.AllValues() returns a copy or a fresh slice ideally.
-	// The provider contract says "Return a copy".
-	// Let's optimize: sorting secrets is good practice for the hash stability.
 
 	sorted := make([]string, len(secrets))
 	copy(sorted, secrets)

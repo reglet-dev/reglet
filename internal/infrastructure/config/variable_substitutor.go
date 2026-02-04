@@ -29,17 +29,7 @@ func NewVariableSubstitutor(resolver ports.SecretResolver) *VariableSubstitutor 
 }
 
 // Substitute performs simple variable substitution in a profile.
-// It replaces {{ .vars.key }} patterns with values from the profile's vars map.
-// Supports nested paths like {{ .vars.paths.config }}.
-// Returns an error if a referenced variable is not found.
-// Modifies the profile in place.
 func (s *VariableSubstitutor) Substitute(profile *entities.Profile) error {
-	// Always substitute in controls, even if vars is empty, because we might have secrets
-	// However, the original logic checked for empty vars.
-	// For secrets, we don't need profile.Vars.
-	// So we should remove the 'if len(profile.Vars) == 0' check if we want secrets to work without vars.
-	// But let's check if existing logic relied on it.
-
 	// Substitute variables in each control
 	for i := range profile.Controls.Items {
 		ctrl := &profile.Controls.Items[i]

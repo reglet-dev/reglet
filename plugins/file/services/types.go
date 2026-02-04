@@ -22,4 +22,9 @@ type CheckOutput struct {
 	ModTime     string `json:"mod_time,omitempty" jsonschema:"description=Last modification time"`
 	Checksum    string `json:"checksum,omitempty" jsonschema:"description=File checksum"`
 	Contains    bool   `json:"contains,omitempty" jsonschema:"description=Whether file contains search string"`
+	UID         int    `json:"uid" jsonschema:"description=File owner UID"`
+	GID         int    `json:"gid" jsonschema:"description=File group GID"`
+	Readable    bool   `json:"readable" jsonschema:"description=Whether file is readable"`
+	IsSymlink   bool   `json:"is_symlink" jsonschema:"description=Whether file is a symlink"`
+	Mode        string `json:"mode,omitempty" jsonschema:"description=File mode (octal, alias for permissions)"`
 }

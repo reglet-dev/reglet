@@ -74,6 +74,14 @@ func (s *FileService) CheckHandler(ctx context.Context, in *CheckInput) (*CheckO
 		Size:        info.Size(),
 		Permissions: fmt.Sprintf("%04o", info.Mode().Perm()),
 		ModTime:     info.ModTime().Format(time.RFC3339),
+		Readable:    f != nil,
+		IsSymlink:   info.Mode()&os.ModeSymlink != 0,
+		Mode:        fmt.Sprintf("%04o", info.Mode().Perm()),
+	}
+
+	if stat, ok := info.Sys().(*syscall.Stat_t); ok {
+		output.UID = int(stat.Uid)
+		output.GID = int(stat.Gid)
 	}
 
 	// Logic varies by operation
@@ -159,7 +167,7 @@ func openAndStat(path string) (*os.File, os.FileInfo, error) {
 // 	result["mode"] = fmt.Sprintf("%04o", info.Mode().Perm())
 // 	result["permissions"] = info.Mode().String()
 // 	result["mod_time"] = info.ModTime().Format(time.RFC3339)
-
+//
 // 	if stat, ok := info.Sys().(*syscall.Stat_t); ok {
 // 		result["uid"] = stat.Uid
 // 		result["gid"] = stat.Gid

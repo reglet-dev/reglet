@@ -12,7 +12,7 @@ var Plugin = plugin.DefinePlugin(plugin.PluginDef{
 	Config:      &CommandConfig{},
 	Capabilities: entities.GrantSet{
 		Exec: &entities.ExecCapability{
-			Commands: []string{"*"}, // Requested via manifest for specific commands
+			Commands: []string{"/bin/sh", "/bin/echo", "/usr/bin/env", "echo", "sh", "*"}, // Requested via manifest for specific commands
 		},
 	},
 })
