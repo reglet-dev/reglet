@@ -4,7 +4,7 @@ package apperrors
 import (
 	"fmt"
 
-	sdkEntities "github.com/reglet-dev/reglet-sdk/go/domain/entities"
+	sdkEntities "github.com/reglet-dev/reglet-sdk/domain/entities"
 )
 
 // ValidationError indicates profile or filter validation failed.

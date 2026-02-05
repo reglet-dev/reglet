@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
+	"github.com/reglet-dev/reglet-sdk/domain/entities"
 	"github.com/reglet-dev/reglet/internal/domain/capabilities"
 )
 

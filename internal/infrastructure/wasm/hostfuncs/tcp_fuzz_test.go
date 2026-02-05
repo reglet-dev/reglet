@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
+	"github.com/reglet-dev/reglet-sdk/domain/entities"
 )
 
 // FuzzTCPRequestParsing fuzzes TCP request wire format parsing

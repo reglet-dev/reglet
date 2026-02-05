@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	sdkEntities "github.com/reglet-dev/reglet-sdk/go/domain/entities"
-	"github.com/reglet-dev/reglet-sdk/go/hostfuncs"
+	sdkEntities "github.com/reglet-dev/reglet-sdk/domain/entities"
+	"github.com/reglet-dev/reglet-sdk/hostfuncs"
 	"github.com/reglet-dev/reglet/internal/domain/constants"
 	"github.com/tetratelabs/wazero/api"
 )

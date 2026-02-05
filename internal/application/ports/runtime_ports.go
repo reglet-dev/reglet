@@ -3,7 +3,7 @@ package ports
 import (
 	"context"
 
-	sdkEntities "github.com/reglet-dev/reglet-sdk/go/domain/entities"
+	sdkEntities "github.com/reglet-dev/reglet-sdk/domain/entities"
 )
 
 // Plugin represents a loaded WASM plugin that can be inspected and executed.

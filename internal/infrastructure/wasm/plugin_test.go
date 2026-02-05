@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
+	"github.com/reglet-dev/reglet-sdk/domain/entities"
 	"github.com/reglet-dev/reglet/internal/infrastructure/build"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

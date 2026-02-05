@@ -4,8 +4,8 @@ package hostfuncs
 import (
 	"context"
 
-	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
-	"github.com/reglet-dev/reglet-sdk/go/hostfuncs"
+	"github.com/reglet-dev/reglet-sdk/domain/entities"
+	"github.com/reglet-dev/reglet-sdk/hostfuncs"
 )
 
 // CapabilityChecker is an alias to the SDK's CapabilityChecker.

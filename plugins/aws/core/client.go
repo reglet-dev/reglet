@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/reglet-dev/reglet-sdk/go/domain/ports"
-	regletnet "github.com/reglet-dev/reglet-sdk/go/net"
+	"github.com/reglet-dev/reglet-sdk/domain/ports"
+	regletnet "github.com/reglet-dev/reglet-sdk/net"
 )
 
 // AWSClient handles AWS API requests.

@@ -3,7 +3,7 @@ package services
 import (
 	"testing"
 
-	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
+	"github.com/reglet-dev/reglet-sdk/domain/entities"
 	"github.com/reglet-dev/reglet/internal/application/ports"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

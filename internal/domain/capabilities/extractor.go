@@ -3,7 +3,7 @@ package capabilities
 import (
 	"sync"
 
-	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
+	"github.com/reglet-dev/reglet-sdk/domain/entities"
 )
 
 // Extractor is an interface for extracting capabilities from a plugin configuration.

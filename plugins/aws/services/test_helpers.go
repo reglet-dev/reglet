@@ -3,7 +3,7 @@ package services
 import (
 	"context"
 
-	"github.com/reglet-dev/reglet-sdk/go/domain/ports"
+	"github.com/reglet-dev/reglet-sdk/domain/ports"
 )
 
 // MockHTTPClient implements ports.HTTPClient for testing

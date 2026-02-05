@@ -3,7 +3,7 @@ package services
 import (
 	"log/slog"
 
-	sdkEntities "github.com/reglet-dev/reglet-sdk/go/domain/entities"
+	sdkEntities "github.com/reglet-dev/reglet-sdk/domain/entities"
 	"github.com/reglet-dev/reglet/internal/domain/capabilities"
 	"github.com/reglet-dev/reglet/internal/domain/entities"
 	"github.com/reglet-dev/reglet/internal/pkg/loopexpander"

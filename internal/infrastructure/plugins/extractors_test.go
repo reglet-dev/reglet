@@ -3,7 +3,7 @@ package plugins
 import (
 	"testing"
 
-	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
+	"github.com/reglet-dev/reglet-sdk/domain/entities"
 )
 
 func TestNetworkExtractor_Extract(t *testing.T) {

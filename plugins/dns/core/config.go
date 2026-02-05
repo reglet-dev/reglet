@@ -1,8 +1,8 @@
 package core
 
 import (
-	"github.com/reglet-dev/reglet-sdk/go/application/plugin"
-	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
+	"github.com/reglet-dev/reglet-sdk/application/plugin"
+	"github.com/reglet-dev/reglet-sdk/domain/entities"
 )
 
 // DNSConfig defines the plugin-level configuration.

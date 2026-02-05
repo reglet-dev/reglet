@@ -4,7 +4,7 @@ import (
 	"context"
 	"io"
 
-	sdkEntities "github.com/reglet-dev/reglet-sdk/go/domain/entities"
+	sdkEntities "github.com/reglet-dev/reglet-sdk/domain/entities"
 	"github.com/reglet-dev/reglet/internal/application/dto"
 	"github.com/reglet-dev/reglet/internal/domain/entities"
 	"github.com/reglet-dev/reglet/internal/domain/execution"

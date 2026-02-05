@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/reglet-dev/reglet-sdk/go/application/plugin"
+	"github.com/reglet-dev/reglet-sdk/application/plugin"
 	"github.com/reglet-dev/reglet/plugins/aws/core"
 	"github.com/stretchr/testify/assert"
 )

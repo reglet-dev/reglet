@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/reglet-dev/reglet-sdk/go/application/plugin"
-	"github.com/reglet-dev/reglet-sdk/go/domain/ports"
+	"github.com/reglet-dev/reglet-sdk/application/plugin"
+	"github.com/reglet-dev/reglet-sdk/domain/ports"
 	"github.com/reglet-dev/reglet/plugins/aws/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

@@ -3,7 +3,7 @@ package hostfuncs
 import (
 	"context"
 
-	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
+	"github.com/reglet-dev/reglet-sdk/domain/entities"
 	"github.com/reglet-dev/reglet/internal/infrastructure/build"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"

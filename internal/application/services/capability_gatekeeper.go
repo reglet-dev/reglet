@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"os"
 
-	sdkEntities "github.com/reglet-dev/reglet-sdk/go/domain/entities"
-	grantstore "github.com/reglet-dev/reglet-sdk/go/infrastructure/grantstore"
+	sdkEntities "github.com/reglet-dev/reglet-sdk/domain/entities"
+	grantstore "github.com/reglet-dev/reglet-sdk/infrastructure/grantstore"
 	"github.com/reglet-dev/reglet/internal/application/ports"
 	infraCapabilities "github.com/reglet-dev/reglet/internal/infrastructure/capabilities"
 )

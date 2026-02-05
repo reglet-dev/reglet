@@ -3,7 +3,7 @@ package capabilities
 import (
 	"testing"
 
-	sdkEntities "github.com/reglet-dev/reglet-sdk/go/domain/entities"
+	sdkEntities "github.com/reglet-dev/reglet-sdk/domain/entities"
 	"github.com/stretchr/testify/assert"
 )
 

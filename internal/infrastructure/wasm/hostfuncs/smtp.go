@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"strconv"
 
-	"github.com/reglet-dev/reglet-sdk/go/hostfuncs"
+	"github.com/reglet-dev/reglet-sdk/hostfuncs"
 	"github.com/tetratelabs/wazero/api"
 )
 

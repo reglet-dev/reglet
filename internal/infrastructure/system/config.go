@@ -8,7 +8,7 @@ import (
 	"os"
 
 	"github.com/goccy/go-yaml"
-	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
+	"github.com/reglet-dev/reglet-sdk/domain/entities"
 )
 
 // Config represents the global configuration file (~/.reglet/config.yaml).

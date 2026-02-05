@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/reglet-dev/reglet-sdk/go/hostfuncs"
+	"github.com/reglet-dev/reglet-sdk/hostfuncs"
 	"github.com/reglet-dev/reglet/internal/infrastructure/build"
 	"github.com/tetratelabs/wazero/api"
 )

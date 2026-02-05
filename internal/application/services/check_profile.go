@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/expr-lang/expr"
-	sdkEntities "github.com/reglet-dev/reglet-sdk/go/domain/entities"
+	sdkEntities "github.com/reglet-dev/reglet-sdk/domain/entities"
 	"github.com/reglet-dev/reglet/internal/application/dto"
 	apperrors "github.com/reglet-dev/reglet/internal/application/errors"
 	"github.com/reglet-dev/reglet/internal/application/ports"

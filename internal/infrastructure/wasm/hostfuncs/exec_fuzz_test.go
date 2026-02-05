@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/reglet-dev/reglet-sdk/go/hostfuncs"
+	"github.com/reglet-dev/reglet-sdk/hostfuncs"
 
-	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
+	"github.com/reglet-dev/reglet-sdk/domain/entities"
 )
 
 // FuzzExecRequestParsing fuzzes exec request wire format parsing

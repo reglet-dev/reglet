@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
+	"github.com/reglet-dev/reglet-sdk/domain/entities"
 	"github.com/reglet-dev/reglet/internal/domain/execution"
 	"github.com/reglet-dev/reglet/internal/infrastructure/wasm/hostfuncs"
 	"github.com/tetratelabs/wazero"

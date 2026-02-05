@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
-	"github.com/reglet-dev/reglet-sdk/go/hostfuncs"
+	"github.com/reglet-dev/reglet-sdk/domain/entities"
+	"github.com/reglet-dev/reglet-sdk/hostfuncs"
 	"github.com/tetratelabs/wazero/api"
 )
 

@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/reglet-dev/reglet-sdk/go/domain/entities"
+	"github.com/reglet-dev/reglet-sdk/domain/entities"
 	"github.com/tetratelabs/wazero/api"
 )
 
