@@ -17,7 +17,6 @@ import (
 	"github.com/reglet-dev/reglet/internal/infrastructure/filesystem"
 	"github.com/reglet-dev/reglet/internal/infrastructure/output"
 	"github.com/reglet-dev/reglet/internal/infrastructure/plugins"
-	embeddedplugin "github.com/reglet-dev/reglet/internal/infrastructure/plugins/embedded"
 	ociplugin "github.com/reglet-dev/reglet/internal/infrastructure/plugins/oci"
 	pluginrepo "github.com/reglet-dev/reglet/internal/infrastructure/plugins/repository"
 	signingplugin "github.com/reglet-dev/reglet/internal/infrastructure/plugins/signing"
@@ -152,9 +151,6 @@ func New(opts Options) (*Container, error) {
 	// 4. Integrity Verifier
 	integrityVerifier := signingplugin.NewCosignVerifier(nil, nil)
 
-	// 5. Embedded Source
-	embeddedSource := embeddedplugin.NewEmbeddedSource()
-
 	// 6. Domain Services
 	// TODO: Get requireSigning from configuration
 	integrityService := domainservices.NewIntegrityService(false)
@@ -170,14 +166,11 @@ func New(opts Options) (*Container, error) {
 	cachedResolver := services.NewCachedPluginResolver(pluginRepository)
 	cachedResolver.SetNext(registryResolver)
 
-	embeddedResolver := services.NewEmbeddedPluginResolver(embeddedSource)
-	embeddedResolver.SetNext(cachedResolver)
-
 	// 8. Plugin Service (Application Service)
 	pluginService := services.NewPluginService(
 		pluginRepository,
 		registryAdapter,
-		services.WithResolver(embeddedResolver), // Head of the chain
+		services.WithResolver(cachedResolver), // Head of the chain
 		services.WithIntegrityVerifier(integrityVerifier),
 		services.WithIntegrityService(integrityService),
 		services.WithLogger(opts.Logger),

@@ -122,19 +122,6 @@ func (m *MockVerifier) Sign(ctx context.Context, ref values.PluginReference) err
 	return m.SignErr
 }
 
-// MockEmbeddedSource implements ports.EmbeddedPluginSource
-type MockEmbeddedSource struct {
-	Path string
-}
-
-func (m *MockEmbeddedSource) Get(name string) string {
-	return m.Path
-}
-
-func (m *MockEmbeddedSource) List() []string {
-	return []string{}
-}
-
 func NewTestLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }

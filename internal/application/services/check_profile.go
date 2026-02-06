@@ -352,16 +352,6 @@ func (uc *CheckProfileUseCase) validateFilters(profile entities.ProfileReader, f
 	return nil
 }
 
-// builtInPlugins lists plugins that are embedded in the reglet binary.
-var builtInPlugins = map[string]bool{
-	"file":    true,
-	"http":    true,
-	"dns":     true,
-	"tcp":     true,
-	"smtp":    true,
-	"command": true,
-}
-
 // validateDeclaredPlugins validates that declared plugins exist and all used plugins are declared.
 // This enforces explicit dependency declaration during development.
 func (uc *CheckProfileUseCase) validateDeclaredPlugins(profile entities.ProfileReader, pluginDir string) error {
@@ -423,11 +413,6 @@ func (uc *CheckProfileUseCase) verifyPluginExistence(declared []string, pluginDi
 		// Extract plugin name from path if it's a path (e.g., ./plugins/file/file.wasm -> file)
 		pluginName := extractPluginName(rawDecl)
 
-		// Check if it's a built-in plugin
-		if builtInPlugins[pluginName] {
-			continue
-		}
-
 		// Check if external plugin exists on filesystem
 		if pluginDir != "" {
 			pluginPath := filepath.Join(pluginDir, pluginName, pluginName+".wasm")
@@ -441,12 +426,15 @@ func (uc *CheckProfileUseCase) verifyPluginExistence(declared []string, pluginDi
 			if _, err := os.Stat(rawDecl); err == nil {
 				continue
 			}
+			return apperrors.NewValidationError(
+				"plugins",
+				fmt.Sprintf("declared plugin %q not found (not found at %s)", rawDecl, pluginDir),
+			)
 		}
 
-		return apperrors.NewValidationError(
-			"plugins",
-			fmt.Sprintf("declared plugin %q not found (not built-in and not found at %s)", rawDecl, pluginDir),
-		)
+		// If it's not a path, assume it's a named plugin (OCI or simple name)
+		// and let preparePluginEnvironment fail if resolution fails.
+		continue
 	}
 	return nil
 }
@@ -593,13 +581,8 @@ func (uc *CheckProfileUseCase) prepareSinglePlugin(
 		return nil
 	}
 
-	// 4. Built-in (Skip only if not found locally)
-	if builtInPlugins[pluginName] {
-		return nil
-	}
-
 	return apperrors.NewValidationError(
 		"plugins",
-		fmt.Sprintf("plugin %q not found locally or in registry, and is not built-in", decl),
+		fmt.Sprintf("plugin %q not found locally or in registry", decl),
 	)
 }
