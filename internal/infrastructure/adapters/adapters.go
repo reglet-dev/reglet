@@ -13,9 +13,10 @@ import (
 	"time"
 
 	"github.com/expr-lang/expr"
-	sdkEntities "github.com/reglet-dev/reglet-sdk/domain/entities"
+	abi "github.com/reglet-dev/reglet-abi"
 	"github.com/reglet-dev/reglet/internal/application/dto"
 	"github.com/reglet-dev/reglet/internal/application/ports"
+	"github.com/reglet-dev/reglet/internal/domain/capability"
 	"github.com/reglet-dev/reglet/internal/domain/entities"
 	"github.com/reglet-dev/reglet/internal/domain/execution"
 	"github.com/reglet-dev/reglet/internal/infrastructure/build"
@@ -109,7 +110,7 @@ type PluginAdapter struct {
 }
 
 // Manifest returns plugin metadata.
-func (p *PluginAdapter) Manifest(ctx context.Context) (*sdkEntities.Manifest, error) {
+func (p *PluginAdapter) Manifest(ctx context.Context) (*abi.Manifest, error) {
 	return p.plugin.Manifest(ctx)
 }
 
@@ -349,7 +350,7 @@ func NewEngineFactoryAdapter(redactor *sensitivedata.Redactor, runtime *infracon
 func (a *EngineFactoryAdapter) CreateEngine(
 	ctx context.Context,
 	profile entities.ProfileReader,
-	grantedCaps map[string]*sdkEntities.GrantSet,
+	grantedCaps map[string]capability.GrantSet,
 	pluginDir string,
 	filters dto.FilterOptions,
 	exec dto.ExecutionOptions,
@@ -365,6 +366,7 @@ func (a *EngineFactoryAdapter) CreateEngine(
 	eng, err := engine.NewEngine(
 		ctx,
 		build.Get(),
+		engine.WithCapabilities(grantedCaps), // Pass pre-granted capabilities directly
 		engine.WithCapabilityManager(capMgr),
 		engine.WithPluginDir(pluginDir),
 		engine.WithProfile(profile),
@@ -422,7 +424,7 @@ func (a *EngineFactoryAdapter) buildExecutionConfig(filters dto.FilterOptions, e
 
 // staticCapabilityManager provides pre-granted capabilities.
 type staticCapabilityManager struct {
-	granted map[string]*sdkEntities.GrantSet
+	granted map[string]capability.GrantSet
 }
 
 func (m *staticCapabilityManager) CollectRequiredCapabilities(
@@ -430,14 +432,14 @@ func (m *staticCapabilityManager) CollectRequiredCapabilities(
 	_ entities.ProfileReader,
 	_ *wasm.Runtime,
 	_ string,
-) (map[string]*sdkEntities.GrantSet, error) {
+) (map[string]capability.GrantSet, error) {
 	// Return the pre-granted capabilities
 	return m.granted, nil
 }
 
 func (m *staticCapabilityManager) GrantCapabilities(
-	_ map[string]*sdkEntities.GrantSet,
-) (map[string]*sdkEntities.GrantSet, error) {
+	_ map[string]capability.GrantSet,
+) (map[string]capability.GrantSet, error) {
 	// Return what was already granted
 	return m.granted, nil
 }

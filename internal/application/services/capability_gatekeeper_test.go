@@ -3,8 +3,8 @@ package services
 import (
 	"testing"
 
-	"github.com/reglet-dev/reglet-sdk/domain/entities"
 	"github.com/reglet-dev/reglet/internal/application/ports"
+	"github.com/reglet-dev/reglet/internal/domain/capability"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -12,9 +12,9 @@ import (
 func TestCapabilityGatekeeper_TrustAllMode(t *testing.T) {
 	gatekeeper := NewCapabilityGatekeeper("/tmp/test-config.yaml", "standard")
 
-	required := &entities.GrantSet{
-		FS:   &entities.FileSystemCapability{Rules: []entities.FileSystemRule{{Read: []string{"/etc/passwd"}}}},
-		Exec: &entities.ExecCapability{Commands: []string{"/bin/ls"}},
+	required := capability.GrantSet{
+		FS:   &capability.FileSystemCapability{Rules: []capability.FileSystemRule{{Read: []string{"/etc/passwd"}}}},
+		Exec: &capability.ExecCapability{Commands: []string{"/bin/ls"}},
 	}
 
 	capInfo := make(map[string]ports.CapabilityInfo)
@@ -23,24 +23,23 @@ func TestCapabilityGatekeeper_TrustAllMode(t *testing.T) {
 	granted, err := gatekeeper.GrantCapabilities(required, capInfo, true)
 
 	require.NoError(t, err)
-	assert.NotNil(t, granted)
+	// granted is a value, not pointer
 	assert.NotNil(t, granted.FS)
 	assert.NotNil(t, granted.Exec)
 }
 
 func TestCapabilityGatekeeper_FindMissingCapabilities(t *testing.T) {
-	required := &entities.GrantSet{
-		FS:   &entities.FileSystemCapability{Rules: []entities.FileSystemRule{{Read: []string{"/etc/passwd", "/etc/shadow"}}}},
-		Exec: &entities.ExecCapability{Commands: []string{"/bin/ls"}},
+	required := capability.GrantSet{
+		FS:   &capability.FileSystemCapability{Rules: []capability.FileSystemRule{{Read: []string{"/etc/passwd", "/etc/shadow"}}}},
+		Exec: &capability.ExecCapability{Commands: []string{"/bin/ls"}},
 	}
 
-	existing := &entities.GrantSet{
-		FS: &entities.FileSystemCapability{Rules: []entities.FileSystemRule{{Read: []string{"/etc/passwd"}}}},
+	existing := capability.GrantSet{
+		FS: &capability.FileSystemCapability{Rules: []capability.FileSystemRule{{Read: []string{"/etc/passwd"}}}},
 	}
 
-	missing := required.Difference(existing)
+	missing := required.Difference(&existing)
 
-	assert.NotNil(t, missing)
 	// Missing should contain /etc/shadow (not /etc/passwd which is already granted) and /bin/ls
 	assert.NotNil(t, missing.FS)
 	assert.NotNil(t, missing.Exec)
@@ -50,28 +49,28 @@ func TestCapabilityGatekeeper_SecurityLevels(t *testing.T) {
 	tests := []struct {
 		name          string
 		securityLevel string
-		required      *entities.GrantSet
+		required      capability.GrantSet
 		isBroad       bool
 		expectDenied  bool // true if strict mode should deny
 	}{
 		{
 			name:          "Strict denies broad capabilities",
 			securityLevel: "strict",
-			required:      &entities.GrantSet{FS: &entities.FileSystemCapability{Rules: []entities.FileSystemRule{{Read: []string{"**"}}}}},
+			required:      capability.GrantSet{FS: &capability.FileSystemCapability{Rules: []capability.FileSystemRule{{Read: []string{"**"}}}}},
 			isBroad:       true,
 			expectDenied:  true,
 		},
 		{
 			name:          "Standard allows non-broad (would prompt in real scenario)",
 			securityLevel: "standard",
-			required:      &entities.GrantSet{FS: &entities.FileSystemCapability{Rules: []entities.FileSystemRule{{Read: []string{"/etc/passwd"}}}}},
+			required:      capability.GrantSet{FS: &capability.FileSystemCapability{Rules: []capability.FileSystemRule{{Read: []string{"/etc/passwd"}}}}},
 			isBroad:       false,
 			expectDenied:  false,
 		},
 		{
 			name:          "Permissive in trust-all mode",
 			securityLevel: "permissive",
-			required:      &entities.GrantSet{FS: &entities.FileSystemCapability{Rules: []entities.FileSystemRule{{Read: []string{"**"}}}}},
+			required:      capability.GrantSet{FS: &capability.FileSystemCapability{Rules: []capability.FileSystemRule{{Read: []string{"**"}}}}},
 			isBroad:       true,
 			expectDenied:  false,
 		},
@@ -101,7 +100,8 @@ func TestCapabilityGatekeeper_SecurityLevels(t *testing.T) {
 			if tt.securityLevel == "permissive" {
 				granted, err := gatekeeper.GrantCapabilities(tt.required, capInfo, false)
 				require.NoError(t, err)
-				assert.NotNil(t, granted)
+				// granted is value
+				assert.False(t, granted.IsEmpty())
 			}
 		})
 	}
@@ -110,11 +110,11 @@ func TestCapabilityGatekeeper_SecurityLevels(t *testing.T) {
 func TestCapabilityGatekeeper_EmptyRequired(t *testing.T) {
 	gatekeeper := NewCapabilityGatekeeper("/tmp/test-config.yaml", "standard")
 
-	required := &entities.GrantSet{} // Empty
+	required := capability.GrantSet{} // Empty
 	capInfo := make(map[string]ports.CapabilityInfo)
 
 	granted, err := gatekeeper.GrantCapabilities(required, capInfo, false)
 
 	require.NoError(t, err)
-	assert.True(t, granted == nil || granted.IsEmpty())
+	assert.True(t, granted.IsEmpty())
 }

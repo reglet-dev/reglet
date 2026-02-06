@@ -3,7 +3,7 @@ package capabilities
 import (
 	"testing"
 
-	sdkEntities "github.com/reglet-dev/reglet-sdk/domain/entities"
+	"github.com/reglet-dev/reglet/internal/domain/capability"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -25,14 +25,14 @@ func TestTerminalPrompter_describeGrantSet(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		grantSet *sdkEntities.GrantSet
+		grantSet capability.GrantSet
 		expected []string
 	}{
 		{
 			name: "network capability",
-			grantSet: &sdkEntities.GrantSet{
-				Network: &sdkEntities.NetworkCapability{
-					Rules: []sdkEntities.NetworkRule{
+			grantSet: capability.GrantSet{
+				Network: &capability.NetworkCapability{
+					Rules: []capability.NetworkRule{
 						{Hosts: []string{"*"}, Ports: []string{"80"}},
 					},
 				},
@@ -41,9 +41,9 @@ func TestTerminalPrompter_describeGrantSet(t *testing.T) {
 		},
 		{
 			name: "filesystem read capability",
-			grantSet: &sdkEntities.GrantSet{
-				FS: &sdkEntities.FileSystemCapability{
-					Rules: []sdkEntities.FileSystemRule{
+			grantSet: capability.GrantSet{
+				FS: &capability.FileSystemCapability{
+					Rules: []capability.FileSystemRule{
 						{Read: []string{"/var/log"}},
 					},
 				},
@@ -52,8 +52,8 @@ func TestTerminalPrompter_describeGrantSet(t *testing.T) {
 		},
 		{
 			name: "exec capability",
-			grantSet: &sdkEntities.GrantSet{
-				Exec: &sdkEntities.ExecCapability{
+			grantSet: capability.GrantSet{
+				Exec: &capability.ExecCapability{
 					Commands: []string{"/bin/sh"},
 				},
 			},
@@ -61,8 +61,8 @@ func TestTerminalPrompter_describeGrantSet(t *testing.T) {
 		},
 		{
 			name: "env capability",
-			grantSet: &sdkEntities.GrantSet{
-				Env: &sdkEntities.EnvironmentCapability{
+			grantSet: capability.GrantSet{
+				Env: &capability.EnvironmentCapability{
 					Variables: []string{"AWS_ACCESS_KEY"},
 				},
 			},
@@ -82,13 +82,13 @@ func TestTerminalPrompter_FormatNonInteractiveErrorForGrantSet(t *testing.T) {
 	t.Parallel()
 
 	prompter := NewTerminalPrompter()
-	missing := &sdkEntities.GrantSet{
-		FS: &sdkEntities.FileSystemCapability{
-			Rules: []sdkEntities.FileSystemRule{
+	missing := capability.GrantSet{
+		FS: &capability.FileSystemCapability{
+			Rules: []capability.FileSystemRule{
 				{Read: []string{"/etc/shadow"}},
 			},
 		},
-		Exec: &sdkEntities.ExecCapability{
+		Exec: &capability.ExecCapability{
 			Commands: []string{"/usr/bin/sudo"},
 		},
 	}

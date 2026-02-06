@@ -3,14 +3,14 @@ package ports
 import (
 	"context"
 
-	sdkEntities "github.com/reglet-dev/reglet-sdk/domain/entities"
+	abi "github.com/reglet-dev/reglet-abi"
 )
 
 // Plugin represents a loaded WASM plugin that can be inspected and executed.
 // This interface abstracts the concrete wasm.Plugin implementation.
 type Plugin interface {
 	// Manifest returns plugin metadata including declared capabilities.
-	Manifest(ctx context.Context) (*sdkEntities.Manifest, error)
+	Manifest(ctx context.Context) (*abi.Manifest, error)
 }
 
 // PluginRuntime abstracts the WASM runtime for plugin loading and management.

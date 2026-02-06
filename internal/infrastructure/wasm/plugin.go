@@ -13,7 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/reglet-dev/reglet-sdk/domain/entities"
+	abi "github.com/reglet-dev/reglet-abi"
+	"github.com/reglet-dev/reglet-abi/hostfunc"
 	"github.com/reglet-dev/reglet/internal/domain/execution"
 	"github.com/reglet-dev/reglet/internal/infrastructure/wasm/hostfuncs"
 	"github.com/tetratelabs/wazero"
@@ -27,10 +28,10 @@ type Plugin struct {
 	stderr       io.Writer
 	module       wazero.CompiledModule
 	moduleConfig wazero.ModuleConfig
-	manifest     *entities.Manifest
+	manifest     *abi.Manifest
 	instancePool chan api.Module
 
-	capabilities *entities.GrantSet
+	capabilities *hostfunc.GrantSet
 	name         string
 	frozenEnv    []string
 	poolSize     int
@@ -402,7 +403,7 @@ func (p *Plugin) newInstance(ctx context.Context) (api.Module, error) {
 }
 
 // Manifest retrieves the plugin's metadata including capabilities and config schema.
-func (p *Plugin) Manifest(ctx context.Context) (*entities.Manifest, error) {
+func (p *Plugin) Manifest(ctx context.Context) (*abi.Manifest, error) {
 	// Wrap context with plugin name for host functions
 	ctx = hostfuncs.WithPluginName(ctx, p.name)
 
@@ -447,7 +448,7 @@ func (p *Plugin) Manifest(ctx context.Context) (*entities.Manifest, error) {
 		return nil, fmt.Errorf("failed to read _manifest() result: %w", err)
 	}
 
-	manifest := &entities.Manifest{}
+	manifest := &abi.Manifest{}
 	if err := json.Unmarshal(data, manifest); err != nil {
 		return nil, fmt.Errorf("failed to parse manifest JSON: %w", err)
 	}

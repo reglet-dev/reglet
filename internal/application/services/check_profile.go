@@ -11,10 +11,10 @@ import (
 	"time"
 
 	"github.com/expr-lang/expr"
-	sdkEntities "github.com/reglet-dev/reglet-sdk/domain/entities"
 	"github.com/reglet-dev/reglet/internal/application/dto"
 	apperrors "github.com/reglet-dev/reglet/internal/application/errors"
 	"github.com/reglet-dev/reglet/internal/application/ports"
+	"github.com/reglet-dev/reglet/internal/domain/capability"
 	"github.com/reglet-dev/reglet/internal/domain/entities"
 	"github.com/reglet-dev/reglet/internal/domain/execution"
 	"github.com/reglet-dev/reglet/internal/domain/services"
@@ -229,8 +229,8 @@ func (uc *CheckProfileUseCase) prepareEngine(
 	req dto.CheckProfileRequest,
 ) (
 	ports.ExecutionEngine,
-	map[string]*sdkEntities.GrantSet,
-	map[string]*sdkEntities.GrantSet,
+	map[string]capability.GrantSet,
+	map[string]capability.GrantSet,
 	error,
 ) {
 	requiredCaps, tempRuntime, err := uc.capOrchestrator.CollectCapabilities(ctx, profile, pluginDir)
@@ -287,7 +287,7 @@ func (uc *CheckProfileUseCase) buildResponse(
 	req dto.CheckProfileRequest,
 	startTime time.Time,
 	result *execution.ExecutionResult,
-	reqCaps, grantedCaps map[string]*sdkEntities.GrantSet,
+	reqCaps, grantedCaps map[string]capability.GrantSet,
 ) *dto.CheckProfileResponse {
 	return &dto.CheckProfileResponse{
 		ExecutionResult: result,
@@ -473,12 +473,10 @@ func extractPluginName(declared string) string {
 }
 
 // mergeGrantSets merges all GrantSets into a single GrantSet.
-func mergeGrantSets(caps map[string]*sdkEntities.GrantSet) *sdkEntities.GrantSet {
-	merged := &sdkEntities.GrantSet{}
+func mergeGrantSets(caps map[string]capability.GrantSet) *capability.GrantSet {
+	merged := &capability.GrantSet{}
 	for _, gs := range caps {
-		if gs != nil {
-			merged.Merge(gs)
-		}
+		merged.Merge(&gs)
 	}
 	return merged
 }

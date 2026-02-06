@@ -1,10 +1,9 @@
-// Package dto contains data transfer objects for application layer use cases.
 package dto
 
 import (
 	"time"
 
-	sdkEntities "github.com/reglet-dev/reglet-sdk/domain/entities"
+	"github.com/reglet-dev/reglet/internal/domain/capability"
 )
 
 // CheckProfileRequest encapsulates all inputs needed to check a profile.
@@ -88,7 +87,7 @@ type CollectCapabilitiesRequest struct {
 
 // ExecuteProfileRequest encapsulates inputs for profile execution.
 type ExecuteProfileRequest struct {
-	GrantedCapabilities  map[string]*sdkEntities.GrantSet
+	GrantedCapabilities  map[string]capability.GrantSet
 	ProfilePath          string
 	Filters              FilterOptions
 	Execution            ExecutionOptions

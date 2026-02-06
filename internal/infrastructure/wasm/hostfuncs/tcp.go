@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/reglet-dev/reglet-sdk/hostfuncs"
+	"github.com/reglet-dev/reglet-hostlib"
 	"github.com/tetratelabs/wazero/api"
 )
 
@@ -61,7 +61,7 @@ func TCPConnect(ctx context.Context, mod api.Module, stack []uint64, checker *Ca
 	}
 
 	// 2. Prepare SDK request
-	sdkReq := hostfuncs.TCPConnectRequest{
+	sdkReq := hostlib.TCPConnectRequest{
 		Host:    request.Host,
 		Port:    port,
 		Timeout: request.TimeoutMs,
@@ -72,8 +72,8 @@ func TCPConnect(ctx context.Context, mod api.Module, stack []uint64, checker *Ca
 	allowPrivate := checker.AllowsPrivateNetwork(pluginName)
 
 	// Call SDK with SSRF protection
-	sdkResp := hostfuncs.PerformTCPConnect(ctx, sdkReq,
-		hostfuncs.WithTCPSSRFProtection(!allowPrivate),
+	sdkResp := hostlib.PerformTCPConnect(ctx, sdkReq,
+		hostlib.WithTCPSSRFProtection(!allowPrivate),
 	)
 
 	// 3. Convert to wire format

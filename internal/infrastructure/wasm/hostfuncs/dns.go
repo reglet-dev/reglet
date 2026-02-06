@@ -7,7 +7,7 @@ import (
 	"log/slog"
 
 	"github.com/reglet-dev/reglet-sdk/domain/entities"
-	"github.com/reglet-dev/reglet-sdk/hostfuncs"
+	"github.com/reglet-dev/reglet-hostlib"
 	"github.com/tetratelabs/wazero/api"
 )
 
@@ -61,7 +61,7 @@ func DNSLookup(ctx context.Context, mod api.Module, stack []uint64, checker *Cap
 	}
 
 	// Create SDK request and delegate to SDK's PerformDNSLookup
-	sdkReq := hostfuncs.DNSLookupRequest{
+	sdkReq := hostlib.DNSLookupRequest{
 		Hostname:   request.Hostname,
 		RecordType: request.Type,
 		Nameserver: request.Nameserver,
@@ -72,7 +72,7 @@ func DNSLookup(ctx context.Context, mod api.Module, stack []uint64, checker *Cap
 		sdkReq.Timeout = int(request.Context.TimeoutMs)
 	}
 
-	sdkResp := hostfuncs.PerformDNSLookup(ctx, sdkReq)
+	sdkResp := hostlib.PerformDNSLookup(ctx, sdkReq)
 
 	// Convert SDK response to wire format
 	response := DNSResponseWire{

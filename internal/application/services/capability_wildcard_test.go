@@ -3,60 +3,58 @@ package services
 import (
 	"testing"
 
-	"github.com/reglet-dev/reglet-sdk/domain/entities"
+	"github.com/reglet-dev/reglet/internal/domain/capability"
 	"github.com/stretchr/testify/assert"
 )
 
 // TestRiskAssessor_ExecWildcards verifies that exec capabilities are detected as critical risk.
-// Note: SDK's SimpleRiskAnalyzer marks ALL exec as critical - it doesn't distinguish
+// Note: Internal AnalyzeRisk marks ALL exec as critical
 func TestRiskAssessor_ExecWildcards(t *testing.T) {
-	assessor := entities.NewSimpleRiskAnalyzer()
-
 	tests := []struct {
 		name        string
-		grantSet    *entities.GrantSet
-		expectLevel entities.RiskLevel
+		grantSet    capability.GrantSet
+		expectLevel capability.RiskLevel
 	}{
 		{
 			name: "exec:** is critical risk (arbitrary command execution)",
-			grantSet: &entities.GrantSet{
-				Exec: &entities.ExecCapability{Commands: []string{"**"}},
+			grantSet: capability.GrantSet{
+				Exec: &capability.ExecCapability{Commands: []string{"**"}},
 			},
-			expectLevel: entities.RiskCritical,
+			expectLevel: capability.RiskCritical,
 		},
 		{
 			name: "exec:* is critical risk",
-			grantSet: &entities.GrantSet{
-				Exec: &entities.ExecCapability{Commands: []string{"*"}},
+			grantSet: capability.GrantSet{
+				Exec: &capability.ExecCapability{Commands: []string{"*"}},
 			},
-			expectLevel: entities.RiskCritical,
+			expectLevel: capability.RiskCritical,
 		},
 		{
-			name: "specific binary is also critical (SDK doesn't distinguish)",
-			grantSet: &entities.GrantSet{
-				Exec: &entities.ExecCapability{Commands: []string{"/usr/bin/ls"}},
+			name: "specific binary is also critical",
+			grantSet: capability.GrantSet{
+				Exec: &capability.ExecCapability{Commands: []string{"/usr/bin/ls"}},
 			},
-			expectLevel: entities.RiskCritical, // SDK marks all exec as critical
+			expectLevel: capability.RiskCritical,
 		},
 		{
 			name: "shells are critical risk (allows arbitrary commands)",
-			grantSet: &entities.GrantSet{
-				Exec: &entities.ExecCapability{Commands: []string{"/bin/sh"}},
+			grantSet: capability.GrantSet{
+				Exec: &capability.ExecCapability{Commands: []string{"/bin/sh"}},
 			},
-			expectLevel: entities.RiskCritical,
+			expectLevel: capability.RiskCritical,
 		},
 		{
 			name: "interpreters are critical risk (allows code execution via -c)",
-			grantSet: &entities.GrantSet{
-				Exec: &entities.ExecCapability{Commands: []string{"python"}},
+			grantSet: capability.GrantSet{
+				Exec: &capability.ExecCapability{Commands: []string{"python"}},
 			},
-			expectLevel: entities.RiskCritical,
+			expectLevel: capability.RiskCritical,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := assessor.Analyze(tt.grantSet)
+			result := capability.AnalyzeRisk(tt.grantSet)
 			assert.Equal(t, tt.expectLevel, result.Level,
 				"GrantSet should have expected risk level")
 		})
@@ -64,83 +62,80 @@ func TestRiskAssessor_ExecWildcards(t *testing.T) {
 }
 
 // TestRiskAssessor_FilesystemWildcards verifies that fs wildcard patterns are detected.
-// Note: SDK's SimpleRiskAnalyzer marks write as RiskHigh and read as RiskMedium.
 func TestRiskAssessor_FilesystemWildcards(t *testing.T) {
-	assessor := entities.NewSimpleRiskAnalyzer()
-
 	tests := []struct {
 		name        string
-		grantSet    *entities.GrantSet
-		expectLevel entities.RiskLevel
+		grantSet    capability.GrantSet
+		expectLevel capability.RiskLevel
 	}{
 		{
 			name: "fs:read:** is medium risk",
-			grantSet: &entities.GrantSet{
-				FS: &entities.FileSystemCapability{
-					Rules: []entities.FileSystemRule{{Read: []string{"**"}}},
+			grantSet: capability.GrantSet{
+				FS: &capability.FileSystemCapability{
+					Rules: []capability.FileSystemRule{{Read: []string{"**"}}},
 				},
 			},
-			expectLevel: entities.RiskMedium,
+			expectLevel: capability.RiskMedium,
 		},
 		{
 			name: "fs:write:** is high risk",
-			grantSet: &entities.GrantSet{
-				FS: &entities.FileSystemCapability{
-					Rules: []entities.FileSystemRule{{Write: []string{"**"}}},
+			grantSet: capability.GrantSet{
+				FS: &capability.FileSystemCapability{
+					Rules: []capability.FileSystemRule{{Write: []string{"**"}}},
 				},
 			},
-			expectLevel: entities.RiskHigh,
+			expectLevel: capability.RiskHigh,
 		},
 		{
 			name: "root filesystem is medium risk (read)",
-			grantSet: &entities.GrantSet{
-				FS: &entities.FileSystemCapability{
-					Rules: []entities.FileSystemRule{{Read: []string{"/**"}}},
+			grantSet: capability.GrantSet{
+				FS: &capability.FileSystemCapability{
+					Rules: []capability.FileSystemRule{{Read: []string{"/**"}}},
 				},
 			},
-			expectLevel: entities.RiskMedium,
+			expectLevel: capability.RiskMedium,
 		},
 		{
 			name: "specific file is medium risk (read)",
-			grantSet: &entities.GrantSet{
-				FS: &entities.FileSystemCapability{
-					Rules: []entities.FileSystemRule{{Read: []string{"/etc/passwd"}}},
+			grantSet: capability.GrantSet{
+				FS: &capability.FileSystemCapability{
+					Rules: []capability.FileSystemRule{{Read: []string{"/etc/passwd"}}},
 				},
 			},
-			expectLevel: entities.RiskMedium,
+			expectLevel: capability.RiskMedium,
 		},
 		{
 			name: "directory tree with ** is medium risk (read)",
-			grantSet: &entities.GrantSet{
-				FS: &entities.FileSystemCapability{
-					Rules: []entities.FileSystemRule{{Read: []string{"/var/log/**"}}},
+			grantSet: capability.GrantSet{
+				FS: &capability.FileSystemCapability{
+					Rules: []capability.FileSystemRule{{Read: []string{"/var/log/**"}}},
 				},
 			},
-			expectLevel: entities.RiskMedium,
+			expectLevel: capability.RiskMedium,
 		},
 		{
 			name: "/etc/** is medium risk (read - sensitive system config)",
-			grantSet: &entities.GrantSet{
-				FS: &entities.FileSystemCapability{
-					Rules: []entities.FileSystemRule{{Read: []string{"/etc/**"}}},
+			grantSet: capability.GrantSet{
+				FS: &capability.FileSystemCapability{
+					Rules: []capability.FileSystemRule{{Read: []string{"/etc/**"}}},
 				},
 			},
-			expectLevel: entities.RiskMedium,
+			expectLevel: capability.RiskMedium,
 		},
 		{
 			name: "/home/** is medium risk (read - all user data)",
-			grantSet: &entities.GrantSet{
-				FS: &entities.FileSystemCapability{
-					Rules: []entities.FileSystemRule{{Read: []string{"/home/**"}}},
+			grantSet: capability.GrantSet{
+				FS: &capability.FileSystemCapability{
+					Rules: []capability.FileSystemRule{{Read: []string{"/home/**"}}},
 				},
 			},
-			expectLevel: entities.RiskMedium,
+			expectLevel: capability.RiskMedium,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := assessor.Analyze(tt.grantSet)
+			result := capability.AnalyzeRisk(tt.grantSet)
 			assert.Equal(t, tt.expectLevel, result.Level,
 				"GrantSet should have expected risk level")
 		})
@@ -148,41 +143,38 @@ func TestRiskAssessor_FilesystemWildcards(t *testing.T) {
 }
 
 // TestRiskAssessor_EnvironmentWildcards verifies env wildcard detection.
-// Note: SDK's SimpleRiskAnalyzer marks ALL env access as RiskLow.
 func TestRiskAssessor_EnvironmentWildcards(t *testing.T) {
-	assessor := entities.NewSimpleRiskAnalyzer()
-
 	tests := []struct {
 		name        string
-		grantSet    *entities.GrantSet
-		expectLevel entities.RiskLevel
+		grantSet    capability.GrantSet
+		expectLevel capability.RiskLevel
 	}{
 		{
-			name: "env:* is low risk (SDK doesn't distinguish)",
-			grantSet: &entities.GrantSet{
-				Env: &entities.EnvironmentCapability{Variables: []string{"*"}},
+			name: "env:* is low risk",
+			grantSet: capability.GrantSet{
+				Env: &capability.EnvironmentCapability{Variables: []string{"*"}},
 			},
-			expectLevel: entities.RiskLow,
+			expectLevel: capability.RiskLow,
 		},
 		{
-			name: "AWS_* is low risk (SDK doesn't distinguish)",
-			grantSet: &entities.GrantSet{
-				Env: &entities.EnvironmentCapability{Variables: []string{"AWS_*"}},
+			name: "AWS_* is low risk",
+			grantSet: capability.GrantSet{
+				Env: &capability.EnvironmentCapability{Variables: []string{"AWS_*"}},
 			},
-			expectLevel: entities.RiskLow,
+			expectLevel: capability.RiskLow,
 		},
 		{
 			name: "specific variable is low risk",
-			grantSet: &entities.GrantSet{
-				Env: &entities.EnvironmentCapability{Variables: []string{"AWS_REGION"}},
+			grantSet: capability.GrantSet{
+				Env: &capability.EnvironmentCapability{Variables: []string{"AWS_REGION"}},
 			},
-			expectLevel: entities.RiskLow,
+			expectLevel: capability.RiskLow,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := assessor.Analyze(tt.grantSet)
+			result := capability.AnalyzeRisk(tt.grantSet)
 			assert.Equal(t, tt.expectLevel, result.Level,
 				"GrantSet should have expected risk level")
 		})
@@ -190,38 +182,35 @@ func TestRiskAssessor_EnvironmentWildcards(t *testing.T) {
 }
 
 // TestRiskAssessor_NetworkWildcards verifies network wildcard detection.
-// Note: SDK marks wildcard hosts as RiskCritical, specific hosts as RiskMedium.
 func TestRiskAssessor_NetworkWildcards(t *testing.T) {
-	assessor := entities.NewSimpleRiskAnalyzer()
-
 	tests := []struct {
 		name        string
-		grantSet    *entities.GrantSet
-		expectLevel entities.RiskLevel
+		grantSet    capability.GrantSet
+		expectLevel capability.RiskLevel
 	}{
 		{
 			name: "network:* host is critical risk",
-			grantSet: &entities.GrantSet{
-				Network: &entities.NetworkCapability{
-					Rules: []entities.NetworkRule{{Hosts: []string{"*"}, Ports: []string{"443"}}},
+			grantSet: capability.GrantSet{
+				Network: &capability.NetworkCapability{
+					Rules: []capability.NetworkRule{{Hosts: []string{"*"}, Ports: []string{"443"}}},
 				},
 			},
-			expectLevel: entities.RiskCritical,
+			expectLevel: capability.RiskCritical,
 		},
 		{
 			name: "specific host is medium risk",
-			grantSet: &entities.GrantSet{
-				Network: &entities.NetworkCapability{
-					Rules: []entities.NetworkRule{{Hosts: []string{"api.example.com"}, Ports: []string{"443"}}},
+			grantSet: capability.GrantSet{
+				Network: &capability.NetworkCapability{
+					Rules: []capability.NetworkRule{{Hosts: []string{"api.example.com"}, Ports: []string{"443"}}},
 				},
 			},
-			expectLevel: entities.RiskMedium,
+			expectLevel: capability.RiskMedium,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := assessor.Analyze(tt.grantSet)
+			result := capability.AnalyzeRisk(tt.grantSet)
 			assert.Equal(t, tt.expectLevel, result.Level,
 				"GrantSet should have expected risk level")
 		})
@@ -229,80 +218,77 @@ func TestRiskAssessor_NetworkWildcards(t *testing.T) {
 }
 
 // TestRiskAssessor_VersionedInterpreters verifies that interpreters are detected as critical risk.
-// Note: SDK's SimpleRiskAnalyzer marks ALL exec as critical - versioned or not.
 func TestRiskAssessor_VersionedInterpreters(t *testing.T) {
-	assessor := entities.NewSimpleRiskAnalyzer()
-
 	tests := []struct {
 		name     string
-		grantSet *entities.GrantSet
+		grantSet capability.GrantSet
 	}{
-		// Python versions - all should be detected as critical risk
+		// Python versions
 		{
 			name: "python (base) is critical risk",
-			grantSet: &entities.GrantSet{
-				Exec: &entities.ExecCapability{Commands: []string{"python"}},
+			grantSet: capability.GrantSet{
+				Exec: &capability.ExecCapability{Commands: []string{"python"}},
 			},
 		},
 		{
 			name: "python3 is critical risk",
-			grantSet: &entities.GrantSet{
-				Exec: &entities.ExecCapability{Commands: []string{"python3"}},
+			grantSet: capability.GrantSet{
+				Exec: &capability.ExecCapability{Commands: []string{"python3"}},
 			},
 		},
 		{
 			name: "python3.11 is critical risk (versioned)",
-			grantSet: &entities.GrantSet{
-				Exec: &entities.ExecCapability{Commands: []string{"python3.11"}},
+			grantSet: capability.GrantSet{
+				Exec: &capability.ExecCapability{Commands: []string{"python3.11"}},
 			},
 		},
 		// Node.js versions
 		{
 			name: "node is critical risk",
-			grantSet: &entities.GrantSet{
-				Exec: &entities.ExecCapability{Commands: []string{"node"}},
+			grantSet: capability.GrantSet{
+				Exec: &capability.ExecCapability{Commands: []string{"node"}},
 			},
 		},
 		{
 			name: "node18 is critical risk (versioned)",
-			grantSet: &entities.GrantSet{
-				Exec: &entities.ExecCapability{Commands: []string{"node18"}},
+			grantSet: capability.GrantSet{
+				Exec: &capability.ExecCapability{Commands: []string{"node18"}},
 			},
 		},
 		// Ruby versions
 		{
 			name: "ruby is critical risk",
-			grantSet: &entities.GrantSet{
-				Exec: &entities.ExecCapability{Commands: []string{"ruby"}},
+			grantSet: capability.GrantSet{
+				Exec: &capability.ExecCapability{Commands: []string{"ruby"}},
 			},
 		},
 		// AWK variants
 		{
 			name: "awk is critical risk",
-			grantSet: &entities.GrantSet{
-				Exec: &entities.ExecCapability{Commands: []string{"awk"}},
+			grantSet: capability.GrantSet{
+				Exec: &capability.ExecCapability{Commands: []string{"awk"}},
 			},
 		},
 		{
 			name: "gawk is critical risk",
-			grantSet: &entities.GrantSet{
-				Exec: &entities.ExecCapability{Commands: []string{"gawk"}},
+			grantSet: capability.GrantSet{
+				Exec: &capability.ExecCapability{Commands: []string{"gawk"}},
 			},
 		},
-		// Note: SDK doesn't distinguish safe vs dangerous commands
+		// Note: All exec commands are critical risk
 		{
-			name: "specific command is also critical (SDK doesn't distinguish)",
-			grantSet: &entities.GrantSet{
-				Exec: &entities.ExecCapability{Commands: []string{"systemctl"}},
+			name: "specific command is also critical",
+			grantSet: capability.GrantSet{
+				Exec: &capability.ExecCapability{Commands: []string{"systemctl"}},
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := assessor.Analyze(tt.grantSet)
-			assert.Equal(t, entities.RiskCritical, result.Level,
-				"All exec should be critical risk in SDK's SimpleRiskAnalyzer")
+			result := capability.AnalyzeRisk(tt.grantSet)
+			assert.Equal(t, capability.RiskCritical, result.Level,
+				"All exec should be critical risk")
 		})
 	}
 }

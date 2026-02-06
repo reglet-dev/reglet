@@ -2,171 +2,153 @@
 package plugins
 
 import (
-	"net/url"
-	"strconv"
+	"fmt"
+	"strings"
 
-	"github.com/reglet-dev/reglet-sdk/domain/entities"
 	"github.com/reglet-dev/reglet/internal/domain/capabilities"
+	"github.com/reglet-dev/reglet/internal/domain/capability"
 )
 
-// FileExtractor extracts filesystem capabilities.
+// FileExtractor extracts required file system permissions.
 type FileExtractor struct{}
 
-// Extract analyzes observation config and returns required filesystem capabilities.
-func (e *FileExtractor) Extract(config map[string]interface{}) *entities.GrantSet {
-	if pathVal, ok := config["path"]; ok {
-		if path, ok := pathVal.(string); ok && path != "" {
-			return &entities.GrantSet{
-				FS: &entities.FileSystemCapability{
-					Rules: []entities.FileSystemRule{
-						{Read: []string{path}},
-					},
-				},
-			}
-		}
-	}
-	return nil
-}
-
-// CommandExtractor extracts execution capabilities.
-type CommandExtractor struct{}
-
-// Extract analyzes observation config and returns required execution capabilities.
-func (e *CommandExtractor) Extract(config map[string]interface{}) *entities.GrantSet {
-	if cmdVal, ok := config["command"]; ok {
-		if cmd, ok := cmdVal.(string); ok && cmd != "" {
-			return &entities.GrantSet{
-				Exec: &entities.ExecCapability{
-					Commands: []string{cmd},
-				},
-			}
-		}
-	}
-	return nil
-}
-
-// NetworkExtractor extracts network capabilities.
-type NetworkExtractor struct{}
-
-// Extract analyzes observation config and returns required network capabilities.
-func (e *NetworkExtractor) Extract(config map[string]interface{}) *entities.GrantSet {
-	var hosts []string
-	var ports []string
-
-	e.extractFromURL(config, &hosts, &ports)
-	e.extractFromPort(config, &hosts, &ports)
-	e.extractFromNameserver(config, &hosts, &ports)
-
-	if len(ports) == 0 || len(hosts) == 0 {
+func (e *FileExtractor) Extract(config map[string]interface{}) *capability.GrantSet {
+	// Look for common file path fields in standard plugins
+	// - file plugin: "path"
+	path, ok := config["path"].(string)
+	if !ok || path == "" {
 		return nil
 	}
 
-	return &entities.GrantSet{
-		Network: &entities.NetworkCapability{
-			Rules: []entities.NetworkRule{
-				{Hosts: hosts, Ports: ports},
+	return &capability.GrantSet{
+		FS: &capability.FileSystemCapability{
+			Rules: []capability.FileSystemRule{
+				{
+					Read: []string{path},
+				},
 			},
 		},
 	}
 }
 
-// TODO: we probably shouldnt fall back to wildcard here, but it is better than nothing for now.
-// extractFromURL extracts network capabilities from URL config (http/https).
-func (e *NetworkExtractor) extractFromURL(config map[string]interface{}, hosts, ports *[]string) {
-	urlVal, ok := config["url"]
+// CommandExtractor extracts required exec permissions.
+type CommandExtractor struct{}
+
+func (e *CommandExtractor) Extract(config map[string]interface{}) *capability.GrantSet {
+	// - command plugin: "command" or "cmd"
+	cmd, ok := config["command"].(string)
 	if !ok {
-		return
+		cmd, ok = config["cmd"].(string)
+	}
+	if !ok || cmd == "" {
+		return nil
 	}
 
-	urlStr, ok := urlVal.(string)
-	if !ok || urlStr == "" {
-		return
-	}
-
-	parsedURL, err := url.Parse(urlStr)
-	if err != nil || parsedURL.Host == "" {
-		// If URL parsing fails, fall back to wildcard for safety
-		*hosts = append(*hosts, "*")
-		*ports = append(*ports, "443", "80")
-		return
-	}
-
-	// Extract hostname
-	if hostname := parsedURL.Hostname(); hostname != "" {
-		*hosts = append(*hosts, hostname)
-	}
-
-	// Select port based on scheme
-	switch parsedURL.Scheme {
-	case "https":
-		*ports = append(*ports, "443")
-	case "http":
-		*ports = append(*ports, "80")
-	default:
-		// Unknown scheme, default to both
-		*ports = append(*ports, "443", "80")
+	return &capability.GrantSet{
+		Exec: &capability.ExecCapability{
+			Commands: []string{cmd},
+		},
 	}
 }
 
-// extractFromPort extracts network capabilities from port config (tcp).
-func (e *NetworkExtractor) extractFromPort(config map[string]interface{}, hosts, ports *[]string) {
-	portVal, ok := config["port"]
-	if !ok {
-		return
-	}
+// NetworkExtractor extracts required network permissions.
+type NetworkExtractor struct{}
 
-	portStr := e.portToString(portVal)
-	if portStr == "" {
-		return
-	}
+func (e *NetworkExtractor) Extract(config map[string]interface{}) *capability.GrantSet {
+	var hosts []string
+	var ports []string
 
-	// Check if host is specified (for TCP)
-	if hostVal, ok := config["host"]; ok {
-		if hostStr, ok := hostVal.(string); ok && hostStr != "" {
-			*hosts = append(*hosts, hostStr)
-		} else {
-			// Host field exists but is empty, use wildcard
-			*hosts = append(*hosts, "*")
+	// HTTP URL
+	if url, ok := config["url"].(string); ok && url != "" {
+		if host := extractHostFromURL(url); host != "" {
+			hosts = append(hosts, host)
+			if strings.HasPrefix(url, "https://") {
+				ports = append(ports, "443")
+			} else if strings.HasPrefix(url, "http://") {
+				ports = append(ports, "80")
+			}
 		}
-	} else {
-		// No host field, use wildcard for backward compatibility
-		*hosts = append(*hosts, "*")
 	}
-	*ports = append(*ports, portStr)
+
+	// Host/Target field
+	if host, ok := config["host"].(string); ok && host != "" {
+		hosts = append(hosts, host)
+	}
+	if target, ok := config["target"].(string); ok && target != "" {
+		hosts = append(hosts, target)
+	}
+
+	// Nameserver field (dns)
+	if ns, ok := config["nameserver"].(string); ok && ns != "" {
+		hosts = append(hosts, ns)
+		ports = append(ports, "53")
+	}
+
+	// Port field
+	// Port field
+	if port, ok := config["port"]; ok {
+		switch v := port.(type) {
+		case int:
+			if v > 0 {
+				ports = append(ports, fmt.Sprintf("%d", v))
+			}
+		case string:
+			if v != "" {
+				ports = append(ports, v)
+			}
+		case float64:
+			ports = append(ports, fmt.Sprintf("%.0f", v))
+		case uint64:
+			ports = append(ports, fmt.Sprintf("%d", v))
+		case int64:
+			ports = append(ports, fmt.Sprintf("%d", v))
+		case int32:
+			ports = append(ports, fmt.Sprintf("%d", v))
+		}
+	}
+
+	if len(hosts) == 0 {
+		if len(ports) > 0 {
+			// If ports are specified but no host, assume wildcard host
+			hosts = []string{"*"}
+		} else {
+			return nil
+		}
+	}
+
+	// Default ports if not specified
+	if len(ports) == 0 {
+		// Default to wildcard for broad connectivity if host is specified but port is not
+		ports = []string{"*"}
+	}
+
+	return &capability.GrantSet{
+		Network: &capability.NetworkCapability{
+			Rules: []capability.NetworkRule{
+				{
+					Hosts: hosts,
+					Ports: ports,
+				},
+			},
+		},
+	}
 }
 
-// extractFromNameserver extracts network capabilities from nameserver config (dns).
-func (e *NetworkExtractor) extractFromNameserver(config map[string]interface{}, hosts, ports *[]string) {
-	nsVal, ok := config["nameserver"]
-	if !ok {
-		return
-	}
-
-	nsStr, ok := nsVal.(string)
-	if !ok || nsStr == "" {
-		return
-	}
-
-	*hosts = append(*hosts, nsStr)
-	*ports = append(*ports, "53")
-}
-
-// portToString converts a port value to a string, handling multiple numeric types.
-func (e *NetworkExtractor) portToString(portVal interface{}) string {
-	switch v := portVal.(type) {
-	case string:
-		return v
-	case float64:
-		return strconv.FormatFloat(v, 'f', 0, 64)
-	case int:
-		return strconv.Itoa(v)
-	case int64:
-		return strconv.FormatInt(v, 10)
-	case uint64:
-		return strconv.FormatUint(v, 10)
-	default:
+func extractHostFromURL(url string) string {
+	parts := strings.Split(url, "://")
+	if len(parts) < 2 {
 		return ""
 	}
+	remaining := parts[1]
+	// Cut at first slash
+	if idx := strings.Index(remaining, "/"); idx != -1 {
+		remaining = remaining[:idx]
+	}
+	// Cut at port
+	if idx := strings.Index(remaining, ":"); idx != -1 {
+		remaining = remaining[:idx]
+	}
+	return remaining
 }
 
 // Ensure extractors implement the interface.
@@ -179,10 +161,12 @@ var (
 // RegisterDefaultExtractors registers the built-in plugin extractors.
 func RegisterDefaultExtractors(registry *capabilities.Registry) {
 	registry.Register("file", &FileExtractor{})
+	registry.Register("file.managed", &FileExtractor{}) // Alias
 	registry.Register("command", &CommandExtractor{})
 
 	netExtractor := &NetworkExtractor{}
 	registry.Register("http", netExtractor)
 	registry.Register("tcp", netExtractor)
 	registry.Register("dns", netExtractor)
+	registry.Register("smtp", netExtractor) // Add smtp
 }

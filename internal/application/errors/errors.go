@@ -4,7 +4,7 @@ package apperrors
 import (
 	"fmt"
 
-	sdkEntities "github.com/reglet-dev/reglet-sdk/domain/entities"
+	"github.com/reglet-dev/reglet/internal/domain/capability"
 )
 
 // ValidationError indicates profile or filter validation failed.
@@ -36,7 +36,7 @@ func NewValidationError(field, message string, details ...string) *ValidationErr
 
 // CapabilityError indicates capability permission issue.
 type CapabilityError struct {
-	Required *sdkEntities.GrantSet
+	Required *capability.GrantSet
 	Reason   string
 }
 
@@ -45,7 +45,7 @@ func (e *CapabilityError) Error() string {
 }
 
 // NewCapabilityError creates a new capability error.
-func NewCapabilityError(reason string, required *sdkEntities.GrantSet) *CapabilityError {
+func NewCapabilityError(reason string, required *capability.GrantSet) *CapabilityError {
 	return &CapabilityError{
 		Required: required,
 		Reason:   reason,

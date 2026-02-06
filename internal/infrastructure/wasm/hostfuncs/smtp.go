@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"strconv"
 
-	"github.com/reglet-dev/reglet-sdk/hostfuncs"
+	"github.com/reglet-dev/reglet-hostlib"
 	"github.com/tetratelabs/wazero/api"
 )
 
@@ -57,7 +57,7 @@ func SMTPConnect(ctx context.Context, mod api.Module, stack []uint64, checker *C
 	}
 
 	// 2. Build SDK request
-	sdkReq := hostfuncs.SMTPConnectRequest{
+	sdkReq := hostlib.SMTPConnectRequest{
 		Host:        request.Host,
 		Port:        port,
 		UseTLS:      request.TLS,
@@ -69,8 +69,8 @@ func SMTPConnect(ctx context.Context, mod api.Module, stack []uint64, checker *C
 	allowPrivate := checker.AllowsPrivateNetwork(pluginName)
 
 	// Call SDK with SSRF protection
-	sdkResp := hostfuncs.PerformSMTPConnect(ctx, sdkReq,
-		hostfuncs.WithSMTPSSRFProtection(!allowPrivate),
+	sdkResp := hostlib.PerformSMTPConnect(ctx, sdkReq,
+		hostlib.WithSMTPSSRFProtection(!allowPrivate),
 	)
 
 	// 3. Convert to wire format

@@ -8,7 +8,7 @@ import (
 	"os"
 
 	"github.com/goccy/go-yaml"
-	"github.com/reglet-dev/reglet-sdk/domain/entities"
+	"github.com/reglet-dev/reglet/internal/domain/capability"
 )
 
 // Config represents the global configuration file (~/.reglet/config.yaml).
@@ -21,7 +21,7 @@ type Config struct {
 
 	// Embed GrantSet for direct capability configuration
 	// This maps network, fs, exec, env, kv blocks directly
-	entities.GrantSet `yaml:",inline"`
+	capability.GrantSet `yaml:",inline"`
 
 	// TrustedProfileSources contains glob patterns for trusted remote profile sources.
 	// Profiles from URLs matching these patterns bypass interactive trust prompts.

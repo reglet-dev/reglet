@@ -3,8 +3,8 @@ package services
 import (
 	"testing"
 
-	sdkEntities "github.com/reglet-dev/reglet-sdk/domain/entities"
 	"github.com/reglet-dev/reglet/internal/domain/capabilities"
+	"github.com/reglet-dev/reglet/internal/domain/capability"
 	"github.com/reglet-dev/reglet/internal/domain/entities"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -13,12 +13,12 @@ import (
 // Mock extractors for testing (return GrantSet)
 type testFileExtractor struct{}
 
-func (e *testFileExtractor) Extract(config map[string]interface{}) *sdkEntities.GrantSet {
+func (e *testFileExtractor) Extract(config map[string]interface{}) *capability.GrantSet {
 	if pathVal, ok := config["path"]; ok {
 		if path, ok := pathVal.(string); ok && path != "" {
-			return &sdkEntities.GrantSet{
-				FS: &sdkEntities.FileSystemCapability{
-					Rules: []sdkEntities.FileSystemRule{
+			return &capability.GrantSet{
+				FS: &capability.FileSystemCapability{
+					Rules: []capability.FileSystemRule{
 						{Read: []string{path}},
 					},
 				},
@@ -30,11 +30,11 @@ func (e *testFileExtractor) Extract(config map[string]interface{}) *sdkEntities.
 
 type testCommandExtractor struct{}
 
-func (e *testCommandExtractor) Extract(config map[string]interface{}) *sdkEntities.GrantSet {
+func (e *testCommandExtractor) Extract(config map[string]interface{}) *capability.GrantSet {
 	if cmdVal, ok := config["command"]; ok {
 		if cmd, ok := cmdVal.(string); ok && cmd != "" {
-			return &sdkEntities.GrantSet{
-				Exec: &sdkEntities.ExecCapability{
+			return &capability.GrantSet{
+				Exec: &capability.ExecCapability{
 					Commands: []string{cmd},
 				},
 			}
@@ -45,7 +45,7 @@ func (e *testCommandExtractor) Extract(config map[string]interface{}) *sdkEntiti
 
 type testNetworkExtractor struct{}
 
-func (e *testNetworkExtractor) Extract(config map[string]interface{}) *sdkEntities.GrantSet {
+func (e *testNetworkExtractor) Extract(config map[string]interface{}) *capability.GrantSet {
 	var hosts []string
 
 	if urlVal, ok := config["url"]; ok {
@@ -63,9 +63,9 @@ func (e *testNetworkExtractor) Extract(config map[string]interface{}) *sdkEntiti
 		return nil
 	}
 
-	return &sdkEntities.GrantSet{
-		Network: &sdkEntities.NetworkCapability{
-			Rules: []sdkEntities.NetworkRule{
+	return &capability.GrantSet{
+		Network: &capability.NetworkCapability{
+			Rules: []capability.NetworkRule{
 				{Hosts: hosts, Ports: []string{"*"}},
 			},
 		},

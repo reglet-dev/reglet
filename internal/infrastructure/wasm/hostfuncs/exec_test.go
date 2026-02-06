@@ -3,7 +3,7 @@ package hostfuncs
 import (
 	"testing"
 
-	"github.com/reglet-dev/reglet-sdk/hostfuncs"
+	"github.com/reglet-dev/reglet-hostlib"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -43,7 +43,7 @@ func Test_isShellExecution(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := hostfuncs.IsShellExecution(tt.command)
+			got := hostlib.IsShellExecution(tt.command)
 			assert.Equal(t, tt.want, got, "IsShellExecution(%q) = %v, want %v", tt.command, got, tt.want)
 		})
 	}

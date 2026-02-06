@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	sdkEntities "github.com/reglet-dev/reglet-sdk/domain/entities"
+	"github.com/reglet-dev/reglet/internal/domain/capability"
 	"github.com/reglet-dev/reglet/internal/domain/entities"
 	"github.com/reglet-dev/reglet/internal/domain/values"
 )
@@ -18,28 +18,28 @@ type CapabilityInfo struct {
 
 // CapabilityCollector collects required capabilities from plugins.
 type CapabilityCollector interface {
-	CollectRequiredCapabilities(ctx context.Context, profile entities.ProfileReader, runtime PluginRuntime, pluginDir string) (map[string]*sdkEntities.GrantSet, error)
+	CollectRequiredCapabilities(ctx context.Context, profile entities.ProfileReader, runtime PluginRuntime, pluginDir string) (map[string]capability.GrantSet, error)
 }
 
 // CapabilityAnalyzer extracts specific capability requirements from profiles.
 // This allows the orchestrator to be tested with mock analyzers.
 type CapabilityAnalyzer interface {
-	ExtractCapabilities(profile entities.ProfileReader) map[string]*sdkEntities.GrantSet
+	ExtractCapabilities(profile entities.ProfileReader) map[string]capability.GrantSet
 }
 
 // CapabilityGatekeeperPort grants capabilities based on security policy.
 // Named with "Port" suffix to avoid collision with the concrete CapabilityGatekeeper type.
 type CapabilityGatekeeperPort interface {
 	GrantCapabilities(
-		required *sdkEntities.GrantSet,
+		required capability.GrantSet,
 		capabilityInfo map[string]CapabilityInfo,
 		trustAll bool,
-	) (*sdkEntities.GrantSet, error)
+	) (capability.GrantSet, error)
 }
 
 // CapabilityGranter grants capabilities (interactively or automatically).
 type CapabilityGranter interface {
-	GrantCapabilities(ctx context.Context, required map[string]*sdkEntities.GrantSet, trustAll bool) (map[string]*sdkEntities.GrantSet, error)
+	GrantCapabilities(ctx context.Context, required map[string]capability.GrantSet, trustAll bool) (map[string]capability.GrantSet, error)
 }
 
 // DataRedactor scrubs sensitive information from output.
@@ -79,22 +79,22 @@ type ProfileTrustChecker interface {
 	PromptForTrust(
 		ctx context.Context,
 		url string,
-		requiredCaps map[string]*sdkEntities.GrantSet,
+		requiredCaps map[string]capability.GrantSet,
 		trustFlag bool,
 	) (bool, error)
 }
 
 // GrantStore persists and retrieves granted capabilities.
 type GrantStore interface {
-	Load() (*sdkEntities.GrantSet, error)
-	Save(grants *sdkEntities.GrantSet) error
+	Load() (capability.GrantSet, error)
+	Save(grants capability.GrantSet) error
 	ConfigPath() string
 }
 
 // Prompter handles interactive capability authorization.
 type Prompter interface {
 	IsInteractive() bool
-	PromptForCapability(req sdkEntities.CapabilityRequest) (granted bool, always bool, err error)
-	PromptForCapabilities(reqs []sdkEntities.CapabilityRequest) (*sdkEntities.GrantSet, error)
-	FormatNonInteractiveError(missing *sdkEntities.GrantSet) error
+	PromptForCapability(req capability.Request) (granted bool, always bool, err error)
+	PromptForCapabilities(reqs []capability.Request) (capability.GrantSet, error)
+	FormatNonInteractiveError(missing capability.GrantSet) error
 }

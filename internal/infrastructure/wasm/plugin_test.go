@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/reglet-dev/reglet-sdk/domain/entities"
+	"github.com/reglet-dev/reglet/internal/domain/capability"
 	"github.com/reglet-dev/reglet/internal/infrastructure/build"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,10 +19,10 @@ func TestPlugin_Observe_Concurrent(t *testing.T) {
 	ctx := context.Background()
 
 	// Grant fixture plugin access to current directory for temp files
-	caps := map[string]*entities.GrantSet{
+	caps := map[string]capability.GrantSet{
 		"fixture": {
-			FS: &entities.FileSystemCapability{
-				Rules: []entities.FileSystemRule{{Read: []string{"/**"}}},
+			FS: &capability.FileSystemCapability{
+				Rules: []capability.FileSystemRule{{Read: []string{"/**"}}},
 			},
 		},
 	}
@@ -114,10 +114,10 @@ func TestPlugin_ConcurrentDifferentMethods(t *testing.T) {
 	ctx := context.Background()
 
 	// Grant fixture plugin access to current directory for temp files
-	caps := map[string]*entities.GrantSet{
+	caps := map[string]capability.GrantSet{
 		"fixture": {
-			FS: &entities.FileSystemCapability{
-				Rules: []entities.FileSystemRule{{Read: []string{"/**"}}},
+			FS: &capability.FileSystemCapability{
+				Rules: []capability.FileSystemRule{{Read: []string{"/**"}}},
 			},
 		},
 	}
@@ -276,14 +276,14 @@ func TestExtractMountPath_RelativePaths(t *testing.T) {
 func TestPlugin_ExtractFilesystemMounts(t *testing.T) {
 	tests := []struct {
 		name         string
-		capabilities *entities.GrantSet
+		capabilities capability.GrantSet
 		expected     []fsMount
 	}{
 		{
 			name: "read-only file access",
-			capabilities: &entities.GrantSet{
-				FS: &entities.FileSystemCapability{
-					Rules: []entities.FileSystemRule{
+			capabilities: capability.GrantSet{
+				FS: &capability.FileSystemCapability{
+					Rules: []capability.FileSystemRule{
 						{Read: []string{"/etc/hosts"}},
 					},
 				},
@@ -294,9 +294,9 @@ func TestPlugin_ExtractFilesystemMounts(t *testing.T) {
 		},
 		{
 			name: "read-write directory access",
-			capabilities: &entities.GrantSet{
-				FS: &entities.FileSystemCapability{
-					Rules: []entities.FileSystemRule{
+			capabilities: capability.GrantSet{
+				FS: &capability.FileSystemCapability{
+					Rules: []capability.FileSystemRule{
 						{Write: []string{"/var/log/**"}},
 					},
 				},
@@ -307,9 +307,9 @@ func TestPlugin_ExtractFilesystemMounts(t *testing.T) {
 		},
 		{
 			name: "mixed permissions",
-			capabilities: &entities.GrantSet{
-				FS: &entities.FileSystemCapability{
-					Rules: []entities.FileSystemRule{
+			capabilities: capability.GrantSet{
+				FS: &capability.FileSystemCapability{
+					Rules: []capability.FileSystemRule{
 						{Read: []string{"/etc/hosts"}},
 						{Write: []string{"/var/log/app.log"}},
 					},
@@ -322,9 +322,9 @@ func TestPlugin_ExtractFilesystemMounts(t *testing.T) {
 		},
 		{
 			name: "no filesystem capabilities",
-			capabilities: &entities.GrantSet{
-				Network: &entities.NetworkCapability{
-					Rules: []entities.NetworkRule{
+			capabilities: capability.GrantSet{
+				Network: &capability.NetworkCapability{
+					Rules: []capability.NetworkRule{
 						{Hosts: []string{"*"}, Ports: []string{"443"}},
 					},
 				},
@@ -333,9 +333,9 @@ func TestPlugin_ExtractFilesystemMounts(t *testing.T) {
 		},
 		{
 			name: "root access",
-			capabilities: &entities.GrantSet{
-				FS: &entities.FileSystemCapability{
-					Rules: []entities.FileSystemRule{
+			capabilities: capability.GrantSet{
+				FS: &capability.FileSystemCapability{
+					Rules: []capability.FileSystemRule{
 						{Read: []string{"/**"}},
 					},
 				},
@@ -346,9 +346,9 @@ func TestPlugin_ExtractFilesystemMounts(t *testing.T) {
 		},
 		{
 			name: "duplicate mounts filtered",
-			capabilities: &entities.GrantSet{
-				FS: &entities.FileSystemCapability{
-					Rules: []entities.FileSystemRule{
+			capabilities: capability.GrantSet{
+				FS: &capability.FileSystemCapability{
+					Rules: []capability.FileSystemRule{
 						{Read: []string{"/etc/hosts"}},
 						{Read: []string{"/etc/passwd"}},
 					},
@@ -360,9 +360,9 @@ func TestPlugin_ExtractFilesystemMounts(t *testing.T) {
 		},
 		{
 			name: "overlapping mounts not deduplicated",
-			capabilities: &entities.GrantSet{
-				FS: &entities.FileSystemCapability{
-					Rules: []entities.FileSystemRule{
+			capabilities: capability.GrantSet{
+				FS: &capability.FileSystemCapability{
+					Rules: []capability.FileSystemRule{
 						{Read: []string{"/etc/**"}},
 						{Read: []string{"/etc/ssh/**"}},
 					},
@@ -379,7 +379,7 @@ func TestPlugin_ExtractFilesystemMounts(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			plugin := &Plugin{
 				name:         "test-plugin",
-				capabilities: tt.capabilities,
+				capabilities: capability.ToABI(tt.capabilities),
 			}
 
 			mounts := plugin.extractFilesystemMounts()

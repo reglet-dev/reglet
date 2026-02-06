@@ -7,8 +7,8 @@ import (
 	"log/slog"
 	"strings"
 
-	sdkEntities "github.com/reglet-dev/reglet-sdk/domain/entities"
 	"github.com/reglet-dev/reglet/internal/application/ports"
+	"github.com/reglet-dev/reglet/internal/domain/capability"
 	infraCapabilities "github.com/reglet-dev/reglet/internal/infrastructure/capabilities"
 )
 
@@ -162,7 +162,7 @@ func indexOf(s, substr string) int {
 func (s *ProfileTrustService) PromptForTrust(
 	ctx context.Context,
 	url string,
-	requiredCaps map[string]*sdkEntities.GrantSet,
+	requiredCaps map[string]capability.GrantSet,
 	trustFlag bool,
 ) (bool, error) {
 	// If trust flag is set, auto-trust
@@ -189,7 +189,7 @@ func (s *ProfileTrustService) PromptForTrust(
 // FormatNonInteractiveError creates a helpful error message for non-interactive mode.
 func (s *ProfileTrustService) FormatNonInteractiveError(
 	url string,
-	requiredCaps map[string]*sdkEntities.GrantSet,
+	requiredCaps map[string]capability.GrantSet,
 ) error {
 	var msg strings.Builder
 	msg.WriteString(fmt.Sprintf("Remote profile requires trust approval: %s\n\n", url))
@@ -198,9 +198,6 @@ func (s *ProfileTrustService) FormatNonInteractiveError(
 	if len(requiredCaps) > 0 {
 		msg.WriteString("Required capabilities:\n")
 		for plugin, gs := range requiredCaps {
-			if gs == nil {
-				continue
-			}
 			if gs.Network != nil {
 				for _, rule := range gs.Network.Rules {
 					msg.WriteString(fmt.Sprintf("  - [%s] Network: hosts=%v, ports=%v\n", plugin, rule.Hosts, rule.Ports))

@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	sdkEntities "github.com/reglet-dev/reglet-sdk/domain/entities"
 	"github.com/reglet-dev/reglet/internal/application/services"
+	"github.com/reglet-dev/reglet/internal/domain/capability"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -157,10 +157,10 @@ func TestProfileTrustService_FormatNonInteractiveError(t *testing.T) {
 
 	svc := services.NewProfileTrustService()
 
-	caps := map[string]*sdkEntities.GrantSet{
+	caps := map[string]capability.GrantSet{
 		"file": {
-			FS: &sdkEntities.FileSystemCapability{
-				Rules: []sdkEntities.FileSystemRule{{Read: []string{"/etc/passwd"}}},
+			FS: &capability.FileSystemCapability{
+				Rules: []capability.FileSystemRule{{Read: []string{"/etc/passwd"}}},
 			},
 		},
 	}

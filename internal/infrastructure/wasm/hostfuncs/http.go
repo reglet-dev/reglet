@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/reglet-dev/reglet-sdk/hostfuncs"
+	"github.com/reglet-dev/reglet-hostlib"
 	"github.com/reglet-dev/reglet/internal/infrastructure/build"
 	"github.com/tetratelabs/wazero/api"
 )
@@ -67,7 +67,7 @@ func HTTPRequest(ctx context.Context, mod api.Module, stack []uint64, checker *C
 		sdkHeaders["User-Agent"] = userAgent
 	}
 
-	sdkReq := hostfuncs.HTTPRequest{
+	sdkReq := hostlib.HTTPRequest{
 		Method:  request.Method,
 		URL:     request.URL,
 		Headers: sdkHeaders,
@@ -79,8 +79,8 @@ func HTTPRequest(ctx context.Context, mod api.Module, stack []uint64, checker *C
 	allowPrivate := checker.AllowsPrivateNetwork(pluginName)
 
 	// 3. Call SDK
-	sdkResp := hostfuncs.PerformHTTPRequest(ctx, sdkReq,
-		hostfuncs.WithHTTPSSRFProtection(!allowPrivate),
+	sdkResp := hostlib.PerformHTTPRequest(ctx, sdkReq,
+		hostlib.WithHTTPSSRFProtection(!allowPrivate),
 	)
 
 	// 4. Convert to wire format

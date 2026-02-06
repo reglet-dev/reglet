@@ -6,19 +6,15 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/huh"
-	sdkEntities "github.com/reglet-dev/reglet-sdk/domain/entities"
+	"github.com/reglet-dev/reglet/internal/domain/capability"
 )
 
 // TerminalPrompter provides interactive terminal prompting for capability grants.
-type TerminalPrompter struct {
-	riskAnalyzer sdkEntities.RiskAnalyzer
-}
+type TerminalPrompter struct{}
 
 // NewTerminalPrompter creates a new TerminalPrompter.
 func NewTerminalPrompter() *TerminalPrompter {
-	return &TerminalPrompter{
-		riskAnalyzer: sdkEntities.NewSimpleRiskAnalyzer(),
-	}
+	return &TerminalPrompter{}
 }
 
 // IsInteractive checks if we're running in an interactive terminal.
@@ -33,45 +29,45 @@ func (p *TerminalPrompter) IsInteractive() bool {
 }
 
 // PromptForCapability asks the user to grant a capability.
-func (p *TerminalPrompter) PromptForCapability(req sdkEntities.CapabilityRequest) (granted bool, always bool, err error) {
+func (p *TerminalPrompter) PromptForCapability(req capability.Request) (granted bool, always bool, err error) {
 	return p.PromptForCapabilityString(req.Description, req.IsBroad)
 }
 
 // PromptForCapabilities prompts for multiple capabilities at once.
-func (p *TerminalPrompter) PromptForCapabilities(reqs []sdkEntities.CapabilityRequest) (*sdkEntities.GrantSet, error) {
-	grants := &sdkEntities.GrantSet{}
+func (p *TerminalPrompter) PromptForCapabilities(reqs []capability.Request) (capability.GrantSet, error) {
+	grants := capability.GrantSet{}
 	for _, req := range reqs {
 		granted, _, err := p.PromptForCapability(req)
 		if err != nil {
-			return nil, err
+			return capability.GrantSet{}, err
 		}
 		if granted {
 			switch req.Kind {
 			case "network":
-				if rule, ok := req.Rule.(sdkEntities.NetworkRule); ok {
+				if rule, ok := req.Rule.(capability.NetworkRule); ok {
 					if grants.Network == nil {
-						grants.Network = &sdkEntities.NetworkCapability{}
+						grants.Network = &capability.NetworkCapability{}
 					}
 					grants.Network.Rules = append(grants.Network.Rules, rule)
 				}
 			case "fs":
-				if rule, ok := req.Rule.(sdkEntities.FileSystemRule); ok {
+				if rule, ok := req.Rule.(capability.FileSystemRule); ok {
 					if grants.FS == nil {
-						grants.FS = &sdkEntities.FileSystemCapability{}
+						grants.FS = &capability.FileSystemCapability{}
 					}
 					grants.FS.Rules = append(grants.FS.Rules, rule)
 				}
 			case "env":
 				if v, ok := req.Rule.(string); ok {
 					if grants.Env == nil {
-						grants.Env = &sdkEntities.EnvironmentCapability{}
+						grants.Env = &capability.EnvironmentCapability{}
 					}
 					grants.Env.Variables = append(grants.Env.Variables, v)
 				}
 			case "exec":
 				if cmd, ok := req.Rule.(string); ok {
 					if grants.Exec == nil {
-						grants.Exec = &sdkEntities.ExecCapability{}
+						grants.Exec = &capability.ExecCapability{}
 					}
 					grants.Exec.Commands = append(grants.Exec.Commands, cmd)
 				}
@@ -127,7 +123,7 @@ func (p *TerminalPrompter) PromptForCapabilityString(desc string, isBroad bool) 
 }
 
 // FormatNonInteractiveError creates a helpful error message for non-interactive mode.
-func (p *TerminalPrompter) FormatNonInteractiveError(missing *sdkEntities.GrantSet) error {
+func (p *TerminalPrompter) FormatNonInteractiveError(missing capability.GrantSet) error {
 	var msg strings.Builder
 	msg.WriteString("Plugins require additional permissions (running in non-interactive mode)\n\n")
 	msg.WriteString("Required permissions:\n")
@@ -175,14 +171,11 @@ func (p *TerminalPrompter) FormatNonInteractiveError(missing *sdkEntities.GrantS
 // Displays the profile URL and required capabilities for informed decision.
 func (p *TerminalPrompter) PromptForProfileTrustWithGrantSet(
 	url string,
-	requiredCaps map[string]*sdkEntities.GrantSet,
+	requiredCaps map[string]capability.GrantSet,
 ) (bool, error) {
 	// Build capability description
 	var capDescriptions []string
 	for plugin, gs := range requiredCaps {
-		if gs == nil {
-			continue
-		}
 		descs := p.describeGrantSet(gs)
 		for _, desc := range descs {
 			capDescriptions = append(capDescriptions, fmt.Sprintf("[%s] %s", plugin, desc))
@@ -227,7 +220,7 @@ func (p *TerminalPrompter) PromptForProfileTrustWithGrantSet(
 }
 
 // describeGrantSet returns human-readable descriptions of a GrantSet.
-func (p *TerminalPrompter) describeGrantSet(gs *sdkEntities.GrantSet) []string {
+func (p *TerminalPrompter) describeGrantSet(gs capability.GrantSet) []string {
 	var descriptions []string
 
 	if gs.Network != nil {

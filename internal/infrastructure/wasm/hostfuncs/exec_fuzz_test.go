@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/reglet-dev/reglet-sdk/hostfuncs"
+	"github.com/reglet-dev/reglet-hostlib"
 
 	"github.com/reglet-dev/reglet-sdk/domain/entities"
 )
@@ -76,10 +76,10 @@ func FuzzExecRequestParsing(f *testing.F) {
 		}
 
 		// Exercise the security-sensitive detection functions via SDK
-		_ = hostfuncs.GetExecutionTypeDescription(req.Command, req.Args)
-		_ = hostfuncs.IsShellExecution(req.Command)
-		_ = hostfuncs.IsKnownInterpreter(req.Command)
-		_ = hostfuncs.IsDangerousExecution(req.Command, req.Args)
+		_ = hostlib.GetExecutionTypeDescription(req.Command, req.Args)
+		_ = hostlib.IsShellExecution(req.Command)
+		_ = hostlib.IsKnownInterpreter(req.Command)
+		_ = hostlib.IsDangerousExecution(req.Command, req.Args)
 	})
 }
 
@@ -124,14 +124,14 @@ func FuzzExecutionTypeDetection(f *testing.F) {
 		args := []string{firstArg}
 
 		// Exercise all detection functions via SDK - none should panic
-		_ = hostfuncs.GetExecutionTypeDescription(command, args)
-		_ = hostfuncs.IsShellExecution(command)
-		_ = hostfuncs.IsKnownInterpreter(command)
-		_ = hostfuncs.IsDangerousExecution(command, args)
+		_ = hostlib.GetExecutionTypeDescription(command, args)
+		_ = hostlib.IsShellExecution(command)
+		_ = hostlib.IsKnownInterpreter(command)
+		_ = hostlib.IsDangerousExecution(command, args)
 
 		// Also test with empty and nil-like args
-		_ = hostfuncs.GetExecutionTypeDescription(command, nil)
-		_ = hostfuncs.GetExecutionTypeDescription(command, []string{})
-		_ = hostfuncs.IsDangerousExecution(command, nil)
+		_ = hostlib.GetExecutionTypeDescription(command, nil)
+		_ = hostlib.GetExecutionTypeDescription(command, []string{})
+		_ = hostlib.IsDangerousExecution(command, nil)
 	})
 }

@@ -3,23 +3,23 @@ package plugins
 import (
 	"testing"
 
-	"github.com/reglet-dev/reglet-sdk/domain/entities"
+	"github.com/reglet-dev/reglet/internal/domain/capability"
 )
 
 func TestNetworkExtractor_Extract(t *testing.T) {
 	tests := []struct {
 		name     string
 		config   map[string]interface{}
-		expected *entities.GrantSet
+		expected *capability.GrantSet
 	}{
 		{
 			name: "HTTPS URL extracts host and port 443",
 			config: map[string]interface{}{
 				"url": "https://example.com/path",
 			},
-			expected: &entities.GrantSet{
-				Network: &entities.NetworkCapability{
-					Rules: []entities.NetworkRule{
+			expected: &capability.GrantSet{
+				Network: &capability.NetworkCapability{
+					Rules: []capability.NetworkRule{
 						{Hosts: []string{"example.com"}, Ports: []string{"443"}},
 					},
 				},
@@ -30,9 +30,9 @@ func TestNetworkExtractor_Extract(t *testing.T) {
 			config: map[string]interface{}{
 				"url": "http://api.github.com/users",
 			},
-			expected: &entities.GrantSet{
-				Network: &entities.NetworkCapability{
-					Rules: []entities.NetworkRule{
+			expected: &capability.GrantSet{
+				Network: &capability.NetworkCapability{
+					Rules: []capability.NetworkRule{
 						{Hosts: []string{"api.github.com"}, Ports: []string{"80"}},
 					},
 				},
@@ -44,9 +44,9 @@ func TestNetworkExtractor_Extract(t *testing.T) {
 				"host": "example.com",
 				"port": 22,
 			},
-			expected: &entities.GrantSet{
-				Network: &entities.NetworkCapability{
-					Rules: []entities.NetworkRule{
+			expected: &capability.GrantSet{
+				Network: &capability.NetworkCapability{
+					Rules: []capability.NetworkRule{
 						{Hosts: []string{"example.com"}, Ports: []string{"22"}},
 					},
 				},
@@ -58,9 +58,9 @@ func TestNetworkExtractor_Extract(t *testing.T) {
 				"host": "192.168.1.1",
 				"port": 3306,
 			},
-			expected: &entities.GrantSet{
-				Network: &entities.NetworkCapability{
-					Rules: []entities.NetworkRule{
+			expected: &capability.GrantSet{
+				Network: &capability.NetworkCapability{
+					Rules: []capability.NetworkRule{
 						{Hosts: []string{"192.168.1.1"}, Ports: []string{"3306"}},
 					},
 				},
@@ -71,9 +71,9 @@ func TestNetworkExtractor_Extract(t *testing.T) {
 			config: map[string]interface{}{
 				"port": 22,
 			},
-			expected: &entities.GrantSet{
-				Network: &entities.NetworkCapability{
-					Rules: []entities.NetworkRule{
+			expected: &capability.GrantSet{
+				Network: &capability.NetworkCapability{
+					Rules: []capability.NetworkRule{
 						{Hosts: []string{"*"}, Ports: []string{"22"}},
 					},
 				},
@@ -84,9 +84,9 @@ func TestNetworkExtractor_Extract(t *testing.T) {
 			config: map[string]interface{}{
 				"port": "8080",
 			},
-			expected: &entities.GrantSet{
-				Network: &entities.NetworkCapability{
-					Rules: []entities.NetworkRule{
+			expected: &capability.GrantSet{
+				Network: &capability.NetworkCapability{
+					Rules: []capability.NetworkRule{
 						{Hosts: []string{"*"}, Ports: []string{"8080"}},
 					},
 				},
@@ -97,9 +97,9 @@ func TestNetworkExtractor_Extract(t *testing.T) {
 			config: map[string]interface{}{
 				"port": 3306.0,
 			},
-			expected: &entities.GrantSet{
-				Network: &entities.NetworkCapability{
-					Rules: []entities.NetworkRule{
+			expected: &capability.GrantSet{
+				Network: &capability.NetworkCapability{
+					Rules: []capability.NetworkRule{
 						{Hosts: []string{"*"}, Ports: []string{"3306"}},
 					},
 				},
@@ -111,9 +111,9 @@ func TestNetworkExtractor_Extract(t *testing.T) {
 				"host": "example.com",
 				"port": uint64(443),
 			},
-			expected: &entities.GrantSet{
-				Network: &entities.NetworkCapability{
-					Rules: []entities.NetworkRule{
+			expected: &capability.GrantSet{
+				Network: &capability.NetworkCapability{
+					Rules: []capability.NetworkRule{
 						{Hosts: []string{"example.com"}, Ports: []string{"443"}},
 					},
 				},
@@ -125,9 +125,9 @@ func TestNetworkExtractor_Extract(t *testing.T) {
 				"hostname":   "example.com",
 				"nameserver": "8.8.8.8",
 			},
-			expected: &entities.GrantSet{
-				Network: &entities.NetworkCapability{
-					Rules: []entities.NetworkRule{
+			expected: &capability.GrantSet{
+				Network: &capability.NetworkCapability{
+					Rules: []capability.NetworkRule{
 						{Hosts: []string{"8.8.8.8"}, Ports: []string{"53"}},
 					},
 				},
@@ -146,23 +146,17 @@ func TestNetworkExtractor_Extract(t *testing.T) {
 			config: map[string]interface{}{
 				"url": "not-a-valid-url",
 			},
-			expected: &entities.GrantSet{
-				Network: &entities.NetworkCapability{
-					Rules: []entities.NetworkRule{
-						{Hosts: []string{"*"}, Ports: []string{"443", "80"}},
-					},
-				},
-			},
+			expected: nil,
 		},
 		{
 			name: "URL with unknown scheme uses both ports",
 			config: map[string]interface{}{
 				"url": "ftp://example.com/file",
 			},
-			expected: &entities.GrantSet{
-				Network: &entities.NetworkCapability{
-					Rules: []entities.NetworkRule{
-						{Hosts: []string{"example.com"}, Ports: []string{"443", "80"}},
+			expected: &capability.GrantSet{
+				Network: &capability.NetworkCapability{
+					Rules: []capability.NetworkRule{
+						{Hosts: []string{"example.com"}, Ports: []string{"*"}}, // Default ports empty -> *
 					},
 				},
 			},
@@ -197,16 +191,16 @@ func TestFileExtractor_Extract(t *testing.T) {
 	tests := []struct {
 		name     string
 		config   map[string]interface{}
-		expected *entities.GrantSet
+		expected *capability.GrantSet
 	}{
 		{
 			name: "Valid path extracts read capability",
 			config: map[string]interface{}{
 				"path": "/etc/passwd",
 			},
-			expected: &entities.GrantSet{
-				FS: &entities.FileSystemCapability{
-					Rules: []entities.FileSystemRule{
+			expected: &capability.GrantSet{
+				FS: &capability.FileSystemCapability{
+					Rules: []capability.FileSystemRule{
 						{Read: []string{"/etc/passwd"}},
 					},
 				},
@@ -242,15 +236,15 @@ func TestCommandExtractor_Extract(t *testing.T) {
 	tests := []struct {
 		name     string
 		config   map[string]interface{}
-		expected *entities.GrantSet
+		expected *capability.GrantSet
 	}{
 		{
 			name: "Valid command extracts exec capability",
 			config: map[string]interface{}{
 				"command": "/bin/sh",
 			},
-			expected: &entities.GrantSet{
-				Exec: &entities.ExecCapability{
+			expected: &capability.GrantSet{
+				Exec: &capability.ExecCapability{
 					Commands: []string{"/bin/sh"},
 				},
 			},
@@ -282,7 +276,7 @@ func TestCommandExtractor_Extract(t *testing.T) {
 }
 
 // Helper function to compare GrantSets
-func grantSetsEqual(a, b *entities.GrantSet) bool {
+func grantSetsEqual(a, b *capability.GrantSet) bool {
 	if a == nil && b == nil {
 		return true
 	}
@@ -318,7 +312,7 @@ func grantSetsEqual(a, b *entities.GrantSet) bool {
 	return true
 }
 
-func networkCapsEqual(a, b *entities.NetworkCapability) bool {
+func networkCapsEqual(a, b *capability.NetworkCapability) bool {
 	if a == nil && b == nil {
 		return true
 	}
@@ -333,7 +327,7 @@ func networkCapsEqual(a, b *entities.NetworkCapability) bool {
 	return true
 }
 
-func networkRulesEqual(a, b entities.NetworkRule) bool {
+func networkRulesEqual(a, b capability.NetworkRule) bool {
 	if len(a.Hosts) != len(b.Hosts) || len(a.Ports) != len(b.Ports) {
 		return false
 	}
@@ -350,7 +344,7 @@ func networkRulesEqual(a, b entities.NetworkRule) bool {
 	return true
 }
 
-func fsCapsEqual(a, b *entities.FileSystemCapability) bool {
+func fsCapsEqual(a, b *capability.FileSystemCapability) bool {
 	if a == nil && b == nil {
 		return true
 	}
@@ -365,7 +359,7 @@ func fsCapsEqual(a, b *entities.FileSystemCapability) bool {
 	return true
 }
 
-func fsRulesEqual(a, b entities.FileSystemRule) bool {
+func fsRulesEqual(a, b capability.FileSystemRule) bool {
 	if len(a.Read) != len(b.Read) || len(a.Write) != len(b.Write) {
 		return false
 	}
@@ -382,7 +376,7 @@ func fsRulesEqual(a, b entities.FileSystemRule) bool {
 	return true
 }
 
-func envCapsEqual(a, b *entities.EnvironmentCapability) bool {
+func envCapsEqual(a, b *capability.EnvironmentCapability) bool {
 	if a == nil && b == nil {
 		return true
 	}
@@ -397,7 +391,7 @@ func envCapsEqual(a, b *entities.EnvironmentCapability) bool {
 	return true
 }
 
-func execCapsEqual(a, b *entities.ExecCapability) bool {
+func execCapsEqual(a, b *capability.ExecCapability) bool {
 	if a == nil && b == nil {
 		return true
 	}
@@ -412,7 +406,7 @@ func execCapsEqual(a, b *entities.ExecCapability) bool {
 	return true
 }
 
-func kvCapsEqual(a, b *entities.KeyValueCapability) bool {
+func kvCapsEqual(a, b *capability.KeyValueCapability) bool {
 	if a == nil && b == nil {
 		return true
 	}
@@ -427,7 +421,7 @@ func kvCapsEqual(a, b *entities.KeyValueCapability) bool {
 	return true
 }
 
-func kvRulesEqual(a, b entities.KeyValueRule) bool {
+func kvRulesEqual(a, b capability.KeyValueRule) bool {
 	if a.Operation != b.Operation || len(a.Keys) != len(b.Keys) {
 		return false
 	}

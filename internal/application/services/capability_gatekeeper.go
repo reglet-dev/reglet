@@ -5,18 +5,17 @@ import (
 	"log/slog"
 	"os"
 
-	sdkEntities "github.com/reglet-dev/reglet-sdk/domain/entities"
-	grantstore "github.com/reglet-dev/reglet-sdk/infrastructure/grantstore"
 	"github.com/reglet-dev/reglet/internal/application/ports"
+	"github.com/reglet-dev/reglet/internal/domain/capability"
 	infraCapabilities "github.com/reglet-dev/reglet/internal/infrastructure/capabilities"
+	grantstore "github.com/reglet-dev/reglet/internal/infrastructure/capabilities/grantstore"
 )
 
 // CapabilityGatekeeper handles capability granting decisions, user interaction, and persistence.
 // This is an application service responsible for the security boundary between required and granted capabilities.
 type CapabilityGatekeeper struct {
 	grantStore    ports.GrantStore
-	prompter      ports.Prompter // Use interface
-	riskAssessor  sdkEntities.RiskAnalyzer
+	prompter      ports.Prompter
 	securityLevel string // Security level: strict, standard, permissive
 }
 
@@ -25,27 +24,17 @@ func NewCapabilityGatekeeper(configPath string, securityLevel string) *Capabilit
 	return &CapabilityGatekeeper{
 		grantStore:    grantstore.NewFileStore(grantstore.WithPath(configPath)),
 		prompter:      infraCapabilities.NewTerminalPrompter(),
-		riskAssessor:  sdkEntities.NewSimpleRiskAnalyzer(),
 		securityLevel: securityLevel,
 	}
 }
 
 // GrantCapabilities determines which capabilities to grant based on security policy, user input, and saved grants.
 // It handles the complete granting workflow: check saved grants, apply security policy, prompt if needed, persist decisions.
-//
-// Parameters:
-//   - required: capabilities requested by plugins (as GrantSet)
-//   - capabilityInfo: metadata about each capability (is it broad, profile-specific alternative, etc.)
-//   - trustAll: if true, auto-grant all capabilities without prompting
-//
-// Returns:
-//   - granted capabilities (as GrantSet)
-//   - error if user denies or security policy blocks
 func (g *CapabilityGatekeeper) GrantCapabilities(
-	required *sdkEntities.GrantSet,
+	required capability.GrantSet,
 	capabilityInfo map[string]ports.CapabilityInfo,
 	trustAll bool,
-) (*sdkEntities.GrantSet, error) {
+) (capability.GrantSet, error) {
 	// If trustAll flag is set, grant everything
 	if trustAll {
 		slog.Warn("Auto-granting all requested capabilities (--trust-plugins enabled)")
@@ -55,25 +44,24 @@ func (g *CapabilityGatekeeper) GrantCapabilities(
 	// Load existing grants from config file
 	existingGrants, err := g.grantStore.Load()
 	if err != nil {
-		// Config file doesn't exist yet - that's okay
-		existingGrants = &sdkEntities.GrantSet{}
+		// Example: Config file doesn't exist yet - that's okay, start empty
+		existingGrants = capability.GrantSet{}
 	}
 
 	// Determine which capabilities are not already granted
-	missing := required.Difference(existingGrants)
+	missing := required.Difference(&existingGrants)
 
-	if missing == nil || missing.IsEmpty() {
+	if missing.IsEmpty() {
 		// All capabilities already granted
 		return existingGrants, nil
 	}
 
 	// Deduplicate missing capabilities to avoid prompting user multiple times
-	// for the same permission (e.g., if multiple controls need google.com:443)
 	missing.Deduplicate()
 
 	// Non-interactive mode check
 	if !g.prompter.IsInteractive() {
-		return &sdkEntities.GrantSet{}, g.prompter.FormatNonInteractiveError(missing)
+		return capability.GrantSet{}, g.prompter.FormatNonInteractiveError(missing)
 	}
 
 	// Interactive prompting for missing capabilities
@@ -81,8 +69,8 @@ func (g *CapabilityGatekeeper) GrantCapabilities(
 	shouldSave := false
 
 	// Prompt for each type of capability
-	if err := g.promptForCapabilities(missing, capabilityInfo, newGrants, &shouldSave); err != nil {
-		return &sdkEntities.GrantSet{}, err
+	if err := g.promptForCapabilities(&missing, capabilityInfo, &newGrants, &shouldSave); err != nil {
+		return capability.GrantSet{}, err
 	}
 
 	// Save to config if user chose "always" for any capability
@@ -99,9 +87,9 @@ func (g *CapabilityGatekeeper) GrantCapabilities(
 
 // promptForCapabilities prompts the user for each type of missing capability.
 func (g *CapabilityGatekeeper) promptForCapabilities(
-	missing *sdkEntities.GrantSet,
+	missing *capability.GrantSet,
 	capabilityInfo map[string]ports.CapabilityInfo,
-	newGrants *sdkEntities.GrantSet,
+	newGrants *capability.GrantSet,
 	shouldSave *bool,
 ) error {
 	if err := g.promptForNetwork(missing, capabilityInfo, newGrants, shouldSave); err != nil {
@@ -117,9 +105,9 @@ func (g *CapabilityGatekeeper) promptForCapabilities(
 }
 
 func (g *CapabilityGatekeeper) promptForNetwork(
-	missing *sdkEntities.GrantSet,
+	missing *capability.GrantSet,
 	capabilityInfo map[string]ports.CapabilityInfo,
-	newGrants *sdkEntities.GrantSet,
+	newGrants *capability.GrantSet,
 	shouldSave *bool,
 ) error {
 	if missing.Network == nil {
@@ -132,9 +120,9 @@ func (g *CapabilityGatekeeper) promptForNetwork(
 		}
 		if granted {
 			// Use Merge to deduplicate
-			toMerge := &sdkEntities.GrantSet{
-				Network: &sdkEntities.NetworkCapability{
-					Rules: []sdkEntities.NetworkRule{rule},
+			toMerge := &capability.GrantSet{
+				Network: &capability.NetworkCapability{
+					Rules: []capability.NetworkRule{rule},
 				},
 			}
 			newGrants.Merge(toMerge)
@@ -149,9 +137,9 @@ func (g *CapabilityGatekeeper) promptForNetwork(
 }
 
 func (g *CapabilityGatekeeper) promptForFS(
-	missing *sdkEntities.GrantSet,
+	missing *capability.GrantSet,
 	capabilityInfo map[string]ports.CapabilityInfo,
-	newGrants *sdkEntities.GrantSet,
+	newGrants *capability.GrantSet,
 	shouldSave *bool,
 ) error {
 	if missing.FS == nil {
@@ -164,10 +152,9 @@ func (g *CapabilityGatekeeper) promptForFS(
 				return err
 			}
 			if granted {
-				// Use Merge to deduplicate
-				toMerge := &sdkEntities.GrantSet{
-					FS: &sdkEntities.FileSystemCapability{
-						Rules: []sdkEntities.FileSystemRule{{Read: []string{path}}},
+				toMerge := &capability.GrantSet{
+					FS: &capability.FileSystemCapability{
+						Rules: []capability.FileSystemRule{{Read: []string{path}}},
 					},
 				}
 				newGrants.Merge(toMerge)
@@ -184,10 +171,9 @@ func (g *CapabilityGatekeeper) promptForFS(
 				return err
 			}
 			if granted {
-				// Use Merge to deduplicate
-				toMerge := &sdkEntities.GrantSet{
-					FS: &sdkEntities.FileSystemCapability{
-						Rules: []sdkEntities.FileSystemRule{{Write: []string{path}}},
+				toMerge := &capability.GrantSet{
+					FS: &capability.FileSystemCapability{
+						Rules: []capability.FileSystemRule{{Write: []string{path}}},
 					},
 				}
 				newGrants.Merge(toMerge)
@@ -203,9 +189,9 @@ func (g *CapabilityGatekeeper) promptForFS(
 }
 
 func (g *CapabilityGatekeeper) promptForEnv(
-	missing *sdkEntities.GrantSet,
+	missing *capability.GrantSet,
 	capabilityInfo map[string]ports.CapabilityInfo,
-	newGrants *sdkEntities.GrantSet,
+	newGrants *capability.GrantSet,
 	shouldSave *bool,
 ) error {
 	if missing.Env == nil {
@@ -217,9 +203,8 @@ func (g *CapabilityGatekeeper) promptForEnv(
 			return err
 		}
 		if granted {
-			// Use Merge to deduplicate
-			toMerge := &sdkEntities.GrantSet{
-				Env: &sdkEntities.EnvironmentCapability{
+			toMerge := &capability.GrantSet{
+				Env: &capability.EnvironmentCapability{
 					Variables: []string{v},
 				},
 			}
@@ -235,9 +220,9 @@ func (g *CapabilityGatekeeper) promptForEnv(
 }
 
 func (g *CapabilityGatekeeper) promptForExec(
-	missing *sdkEntities.GrantSet,
+	missing *capability.GrantSet,
 	capabilityInfo map[string]ports.CapabilityInfo,
-	newGrants *sdkEntities.GrantSet,
+	newGrants *capability.GrantSet,
 	shouldSave *bool,
 ) error {
 	if missing.Exec == nil {
@@ -249,9 +234,8 @@ func (g *CapabilityGatekeeper) promptForExec(
 			return err
 		}
 		if granted {
-			// Use Merge to deduplicate
-			toMerge := &sdkEntities.GrantSet{
-				Exec: &sdkEntities.ExecCapability{
+			toMerge := &capability.GrantSet{
+				Exec: &capability.ExecCapability{
 					Commands: []string{cmd},
 				},
 			}
@@ -268,23 +252,23 @@ func (g *CapabilityGatekeeper) promptForExec(
 
 // evaluateNetworkRule evaluates a network rule and prompts if needed.
 func (g *CapabilityGatekeeper) evaluateNetworkRule(
-	rule sdkEntities.NetworkRule,
+	rule capability.NetworkRule,
 	capabilityInfo map[string]ports.CapabilityInfo,
 ) (bool, bool, error) {
 	// Check if this is a broad capability
 	isBroad := len(rule.Hosts) == 1 && rule.Hosts[0] == "*" && len(rule.Ports) == 1 && rule.Ports[0] == "*"
 
 	// Get risk description
-	gs := &sdkEntities.GrantSet{Network: &sdkEntities.NetworkCapability{Rules: []sdkEntities.NetworkRule{rule}}}
+	gs := capability.GrantSet{Network: &capability.NetworkCapability{Rules: []capability.NetworkRule{rule}}}
 
-	req := sdkEntities.CapabilityRequest{
+	req := capability.Request{
 		Kind:        "network",
 		Rule:        rule,
 		Description: fmt.Sprintf("network %v:%v", rule.Hosts, rule.Ports),
 		IsBroad:     isBroad,
 	}
 
-	return g.evaluateWithSecurityLevel(req, g.riskAssessor.Analyze(gs).RiskFactors)
+	return g.evaluateWithSecurityLevel(req, capability.AnalyzeRisk(gs).RiskFactors)
 }
 
 // evaluateFSPath evaluates a filesystem path and prompts if needed.
@@ -293,24 +277,24 @@ func (g *CapabilityGatekeeper) evaluateFSPath(
 	capabilityInfo map[string]ports.CapabilityInfo,
 ) (bool, bool, error) {
 	isBroad := path == "/**" || path == "**"
-	gs := &sdkEntities.GrantSet{}
-	var rule sdkEntities.FileSystemRule
+	gs := capability.GrantSet{}
+	var rule capability.FileSystemRule
 	if op == "read" {
-		rule = sdkEntities.FileSystemRule{Read: []string{path}}
-		gs.FS = &sdkEntities.FileSystemCapability{Rules: []sdkEntities.FileSystemRule{rule}}
+		rule = capability.FileSystemRule{Read: []string{path}}
+		gs.FS = &capability.FileSystemCapability{Rules: []capability.FileSystemRule{rule}}
 	} else {
-		rule = sdkEntities.FileSystemRule{Write: []string{path}}
-		gs.FS = &sdkEntities.FileSystemCapability{Rules: []sdkEntities.FileSystemRule{rule}}
+		rule = capability.FileSystemRule{Write: []string{path}}
+		gs.FS = &capability.FileSystemCapability{Rules: []capability.FileSystemRule{rule}}
 	}
 
-	req := sdkEntities.CapabilityRequest{
+	req := capability.Request{
 		Kind:        "fs",
 		Rule:        rule,
 		Description: fmt.Sprintf("fs %s:%s", op, path),
 		IsBroad:     isBroad,
 	}
 
-	return g.evaluateWithSecurityLevel(req, g.riskAssessor.Analyze(gs).RiskFactors)
+	return g.evaluateWithSecurityLevel(req, capability.AnalyzeRisk(gs).RiskFactors)
 }
 
 // evaluateEnvVar evaluates an environment variable and prompts if needed.
@@ -319,16 +303,16 @@ func (g *CapabilityGatekeeper) evaluateEnvVar(
 	capabilityInfo map[string]ports.CapabilityInfo,
 ) (bool, bool, error) {
 	isBroad := v == "*"
-	gs := &sdkEntities.GrantSet{Env: &sdkEntities.EnvironmentCapability{Variables: []string{v}}}
+	gs := capability.GrantSet{Env: &capability.EnvironmentCapability{Variables: []string{v}}}
 
-	req := sdkEntities.CapabilityRequest{
+	req := capability.Request{
 		Kind:        "env",
 		Rule:        v,
 		Description: fmt.Sprintf("env %s", v),
 		IsBroad:     isBroad,
 	}
 
-	return g.evaluateWithSecurityLevel(req, g.riskAssessor.Analyze(gs).RiskFactors)
+	return g.evaluateWithSecurityLevel(req, capability.AnalyzeRisk(gs).RiskFactors)
 }
 
 // evaluateExecCmd evaluates an exec command and prompts if needed.
@@ -337,20 +321,20 @@ func (g *CapabilityGatekeeper) evaluateExecCmd(
 	capabilityInfo map[string]ports.CapabilityInfo,
 ) (bool, bool, error) {
 	isBroad := cmd == "**" || cmd == "*"
-	gs := &sdkEntities.GrantSet{Exec: &sdkEntities.ExecCapability{Commands: []string{cmd}}}
+	gs := capability.GrantSet{Exec: &capability.ExecCapability{Commands: []string{cmd}}}
 
-	req := sdkEntities.CapabilityRequest{
+	req := capability.Request{
 		Kind:        "exec",
 		Rule:        cmd,
 		Description: fmt.Sprintf("exec %s", cmd),
 		IsBroad:     isBroad,
 	}
 
-	return g.evaluateWithSecurityLevel(req, g.riskAssessor.Analyze(gs).RiskFactors)
+	return g.evaluateWithSecurityLevel(req, capability.AnalyzeRisk(gs).RiskFactors)
 }
 
 // evaluateWithSecurityLevel applies security level policy and prompts if needed.
-func (g *CapabilityGatekeeper) evaluateWithSecurityLevel(req sdkEntities.CapabilityRequest, riskFactors []sdkEntities.RiskFactor) (bool, bool, error) {
+func (g *CapabilityGatekeeper) evaluateWithSecurityLevel(req capability.Request, riskFactors []capability.RiskFactor) (bool, bool, error) {
 	riskDesc := ""
 	if len(riskFactors) > 0 {
 		riskDesc = riskFactors[0].Description

@@ -3,7 +3,8 @@ package hostfuncs
 import (
 	"context"
 
-	"github.com/reglet-dev/reglet-sdk/domain/entities"
+	sdkEntities "github.com/reglet-dev/reglet-sdk/domain/entities"
+	"github.com/reglet-dev/reglet/internal/domain/capability"
 	"github.com/reglet-dev/reglet/internal/infrastructure/build"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
@@ -15,8 +16,14 @@ import (
 // 1. Memory operations (read request from guest, write response to guest)
 // 2. Capability checking using the CapabilityChecker
 // 3. Delegation to SDK's PerformXXX functions for the actual work
-func RegisterHostFunctions(ctx context.Context, runtime wazero.Runtime, version build.Info, caps map[string]*entities.GrantSet) error {
-	checker := NewCapabilityChecker(caps)
+func RegisterHostFunctions(ctx context.Context, runtime wazero.Runtime, version build.Info, caps map[string]capability.GrantSet) error {
+	// Convert internal capabilities to SDK entities for the legacy checker
+	sdkCaps := make(map[string]*sdkEntities.GrantSet)
+	for k, v := range caps {
+		sdkCaps[k] = toSDKGrantSet(v)
+	}
+
+	checker := NewCapabilityChecker(sdkCaps)
 
 	// Create host module "reglet_host"
 	builder := runtime.NewHostModuleBuilder("reglet_host")
@@ -66,4 +73,51 @@ func RegisterHostFunctions(ctx context.Context, runtime wazero.Runtime, version 
 	// Instantiate the host module
 	_, err := builder.Instantiate(ctx)
 	return err
+}
+
+func toSDKGrantSet(gs capability.GrantSet) *sdkEntities.GrantSet {
+	out := &sdkEntities.GrantSet{}
+
+	if gs.Network != nil {
+		out.Network = &sdkEntities.NetworkCapability{}
+		for _, r := range gs.Network.Rules {
+			out.Network.Rules = append(out.Network.Rules, sdkEntities.NetworkRule{
+				Hosts: r.Hosts,
+				Ports: r.Ports,
+			})
+		}
+	}
+
+	if gs.FS != nil {
+		out.FS = &sdkEntities.FileSystemCapability{}
+		for _, r := range gs.FS.Rules {
+			out.FS.Rules = append(out.FS.Rules, sdkEntities.FileSystemRule{
+				Read:  r.Read,
+				Write: r.Write,
+			})
+		}
+	}
+
+	if gs.Env != nil {
+		out.Env = &sdkEntities.EnvironmentCapability{
+			Variables: gs.Env.Variables,
+		}
+	}
+
+	if gs.Exec != nil {
+		out.Exec = &sdkEntities.ExecCapability{
+			Commands: gs.Exec.Commands,
+		}
+	}
+
+	if gs.KV != nil {
+		out.KV = &sdkEntities.KeyValueCapability{}
+		for _, r := range gs.KV.Rules {
+			out.KV.Rules = append(out.KV.Rules, sdkEntities.KeyValueRule{
+				Operation: r.Operation,
+				Keys:      r.Keys,
+			})
+		}
+	}
+	return out
 }

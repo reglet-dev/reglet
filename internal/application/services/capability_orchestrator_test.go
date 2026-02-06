@@ -4,9 +4,11 @@ import (
 	"context"
 	"testing"
 
-	sdkEntities "github.com/reglet-dev/reglet-sdk/domain/entities"
+	abi "github.com/reglet-dev/reglet-abi"
+	"github.com/reglet-dev/reglet-abi/hostfunc"
 	"github.com/reglet-dev/reglet/internal/application/ports"
 	"github.com/reglet-dev/reglet/internal/domain/capabilities"
+	"github.com/reglet-dev/reglet/internal/domain/capability"
 	"github.com/reglet-dev/reglet/internal/domain/entities"
 	domainServices "github.com/reglet-dev/reglet/internal/domain/services"
 	"github.com/stretchr/testify/assert"
@@ -34,11 +36,11 @@ func (m *mockPluginRuntime) Close(_ context.Context) error {
 // mockPlugin is a test double for Plugin.
 type mockPlugin struct{}
 
-func (m *mockPlugin) Manifest(_ context.Context) (*sdkEntities.Manifest, error) {
-	return &sdkEntities.Manifest{
+func (m *mockPlugin) Manifest(_ context.Context) (*abi.Manifest, error) {
+	return &abi.Manifest{
 		Name:         "mock",
 		Version:      "1.0.0",
-		Capabilities: sdkEntities.GrantSet{}, // Empty GrantSet
+		Capabilities: hostfunc.GrantSet{}, // Empty GrantSet (ABI)
 	}, nil
 }
 
@@ -72,18 +74,19 @@ func TestCapabilityOrchestrator_UsesGatekeeper(t *testing.T) {
 type mockCapabilityGatekeeper struct {
 	grantCalled bool
 	trustAll    bool
-	grantResult *sdkEntities.GrantSet
+	grantResult capability.GrantSet
 	grantError  error
+	hasResult   bool
 }
 
 func (m *mockCapabilityGatekeeper) GrantCapabilities(
-	required *sdkEntities.GrantSet,
+	required capability.GrantSet,
 	_ map[string]ports.CapabilityInfo,
 	trustAll bool,
-) (*sdkEntities.GrantSet, error) {
+) (capability.GrantSet, error) {
 	m.grantCalled = true
 	m.trustAll = trustAll
-	if m.grantResult != nil {
+	if m.hasResult {
 		return m.grantResult, m.grantError
 	}
 	return required, m.grantError
@@ -97,9 +100,10 @@ func TestCapabilityOrchestrator_WithMockGatekeeper(t *testing.T) {
 
 	// Create mock gatekeeper
 	mockGK := &mockCapabilityGatekeeper{
-		grantResult: &sdkEntities.GrantSet{
-			FS: &sdkEntities.FileSystemCapability{
-				Rules: []sdkEntities.FileSystemRule{
+		hasResult: true,
+		grantResult: capability.GrantSet{
+			FS: &capability.FileSystemCapability{
+				Rules: []capability.FileSystemRule{
 					{Read: []string{"/etc/passwd"}},
 				},
 			},
@@ -114,10 +118,10 @@ func TestCapabilityOrchestrator_WithMockGatekeeper(t *testing.T) {
 	)
 
 	// Test GrantCapabilities delegates to the mock
-	required := map[string]*sdkEntities.GrantSet{
+	required := map[string]capability.GrantSet{
 		"file": {
-			FS: &sdkEntities.FileSystemCapability{
-				Rules: []sdkEntities.FileSystemRule{
+			FS: &capability.FileSystemCapability{
+				Rules: []capability.FileSystemRule{
 					{Read: []string{"/etc/passwd"}},
 				},
 			},
@@ -137,6 +141,7 @@ func TestCapabilityOrchestrator_ErrorPropagation(t *testing.T) {
 
 	// Create mock gatekeeper that returns an error
 	mockGK := &mockCapabilityGatekeeper{
+		hasResult:  true,
 		grantError: assert.AnError, // Use testify's standard error
 	}
 
@@ -146,10 +151,10 @@ func TestCapabilityOrchestrator_ErrorPropagation(t *testing.T) {
 		WithGatekeeper(mockGK),
 	)
 
-	required := map[string]*sdkEntities.GrantSet{
+	required := map[string]capability.GrantSet{
 		"file": {
-			FS: &sdkEntities.FileSystemCapability{
-				Rules: []sdkEntities.FileSystemRule{
+			FS: &capability.FileSystemCapability{
+				Rules: []capability.FileSystemRule{
 					{Read: []string{"/etc/passwd"}},
 				},
 			},
@@ -200,7 +205,8 @@ func TestCapabilityOrchestrator_TrustAllFlagPropagation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			analyzer := domainServices.NewCapabilityAnalyzer(capabilities.NewRegistry())
 			mockGK := &mockCapabilityGatekeeper{
-				grantResult: &sdkEntities.GrantSet{},
+				hasResult:   true,
+				grantResult: capability.GrantSet{},
 			}
 
 			orchestrator := NewCapabilityOrchestrator(
@@ -210,10 +216,10 @@ func TestCapabilityOrchestrator_TrustAllFlagPropagation(t *testing.T) {
 				WithTrustAll(tt.orchestratorTrust),
 			)
 
-			required := map[string]*sdkEntities.GrantSet{
+			required := map[string]capability.GrantSet{
 				"file": {
-					FS: &sdkEntities.FileSystemCapability{
-						Rules: []sdkEntities.FileSystemRule{
+					FS: &capability.FileSystemCapability{
+						Rules: []capability.FileSystemRule{
 							{Read: []string{"/etc/passwd"}},
 						},
 					},
@@ -229,11 +235,11 @@ func TestCapabilityOrchestrator_TrustAllFlagPropagation(t *testing.T) {
 
 // mockCapabilityAnalyzer is a test double for the analyzer interface.
 type mockCapabilityAnalyzer struct {
-	extractedCaps map[string]*sdkEntities.GrantSet
+	extractedCaps map[string]capability.GrantSet
 	extractCalled bool
 }
 
-func (m *mockCapabilityAnalyzer) ExtractCapabilities(_ entities.ProfileReader) map[string]*sdkEntities.GrantSet {
+func (m *mockCapabilityAnalyzer) ExtractCapabilities(_ entities.ProfileReader) map[string]capability.GrantSet {
 	m.extractCalled = true
 	return m.extractedCaps
 }
@@ -243,10 +249,10 @@ func (m *mockCapabilityAnalyzer) ExtractCapabilities(_ entities.ProfileReader) m
 func TestCapabilityOrchestrator_WithMockAnalyzer(t *testing.T) {
 	// Create mock analyzer with predefined capabilities
 	mockAnalyzer := &mockCapabilityAnalyzer{
-		extractedCaps: map[string]*sdkEntities.GrantSet{
+		extractedCaps: map[string]capability.GrantSet{
 			"file": {
-				FS: &sdkEntities.FileSystemCapability{
-					Rules: []sdkEntities.FileSystemRule{
+				FS: &capability.FileSystemCapability{
+					Rules: []capability.FileSystemRule{
 						{Read: []string{"/etc/passwd"}},
 					},
 				},
@@ -255,9 +261,10 @@ func TestCapabilityOrchestrator_WithMockAnalyzer(t *testing.T) {
 	}
 
 	mockGK := &mockCapabilityGatekeeper{
-		grantResult: &sdkEntities.GrantSet{
-			FS: &sdkEntities.FileSystemCapability{
-				Rules: []sdkEntities.FileSystemRule{
+		hasResult: true,
+		grantResult: capability.GrantSet{
+			FS: &capability.FileSystemCapability{
+				Rules: []capability.FileSystemRule{
 					{Read: []string{"/etc/passwd"}},
 				},
 			},

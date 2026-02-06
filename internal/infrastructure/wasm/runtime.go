@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/reglet-dev/reglet-sdk/domain/entities"
+	"github.com/reglet-dev/reglet/internal/domain/capability"
 	"github.com/reglet-dev/reglet/internal/infrastructure/build"
 	"github.com/reglet-dev/reglet/internal/infrastructure/sensitivedata"
 	"github.com/reglet-dev/reglet/internal/infrastructure/wasm/hostfuncs"
@@ -50,7 +50,7 @@ type Runtime struct {
 	runtime             wazero.Runtime
 	plugins             map[string]*Plugin
 	redactor            *sensitivedata.Redactor
-	grantedCapabilities map[string]*entities.GrantSet
+	grantedCapabilities map[string]capability.GrantSet
 	version             build.Info
 	frozenEnv           []string
 	mu                  sync.RWMutex
@@ -62,13 +62,13 @@ type RuntimeOption func(*runtimeConfig)
 // runtimeConfig holds configuration for runtime creation.
 type runtimeConfig struct {
 	cache         wazero.CompilationCache
-	caps          map[string]*entities.GrantSet
+	caps          map[string]capability.GrantSet
 	redactor      *sensitivedata.Redactor
 	memoryLimitMB int
 }
 
-// WithCapabilities sets the granted capabilities using the SDK GrantSet format.
-func WithCapabilities(caps map[string]*entities.GrantSet) RuntimeOption {
+// WithCapabilities sets the granted capabilities using the internal GrantSet format.
+func WithCapabilities(caps map[string]capability.GrantSet) RuntimeOption {
 	return func(c *runtimeConfig) {
 		c.caps = caps
 	}
@@ -228,8 +228,8 @@ func (r *Runtime) LoadPlugin(ctx context.Context, name string, wasmBytes []byte)
 		runtime:      r.runtime,
 		stdout:       stdout,
 		stderr:       stderr,
-		capabilities: r.grantedCapabilities[name], // Extract plugin-specific capabilities
-		frozenEnv:    r.frozenEnv,                 // Pass frozen environment snapshot (prevents runtime env leakage)
+		capabilities: capability.ToABI(r.grantedCapabilities[name]), // Extract plugin-specific capabilities
+		frozenEnv:    r.frozenEnv,                                   // Pass frozen environment snapshot (prevents runtime env leakage)
 	}
 
 	// Cache the plugin

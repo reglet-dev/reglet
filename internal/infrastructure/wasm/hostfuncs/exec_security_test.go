@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/reglet-dev/reglet-sdk/domain/entities"
-	"github.com/reglet-dev/reglet-sdk/hostfuncs"
+	"github.com/reglet-dev/reglet-hostlib"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -45,7 +45,7 @@ func TestIsAlwaysBlockedEnv(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := hostfuncs.IsAlwaysBlockedEnv(tt.key)
+			result := hostlib.IsAlwaysBlockedEnv(tt.key)
 			assert.Equal(t, tt.expected, result, "key: %s", tt.key)
 		})
 	}
@@ -96,7 +96,7 @@ func TestSanitizeEnv_AlwaysBlocked(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := hostfuncs.SanitizeEnv(ctx, tt.input, "test-plugin", capGetter)
+			result := hostlib.SanitizeEnv(ctx, tt.input, "test-plugin", capGetter)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -110,7 +110,7 @@ func TestSanitizeEnv_CapabilityGated(t *testing.T) {
 		// No grants - capGetter always returns false
 		capGetter := func(pluginName, capability string) bool { return false }
 		input := []string{"PATH=/usr/bin", "SAFE=value"}
-		result := hostfuncs.SanitizeEnv(ctx, input, "test-plugin", capGetter)
+		result := hostlib.SanitizeEnv(ctx, input, "test-plugin", capGetter)
 		assert.Equal(t, []string{"SAFE=value"}, result)
 	})
 
@@ -125,14 +125,14 @@ func TestSanitizeEnv_CapabilityGated(t *testing.T) {
 		capGetter := checker.ToCapabilityGetter("test-plugin")
 
 		input := []string{"PATH=/usr/bin", "SAFE=value"}
-		result := hostfuncs.SanitizeEnv(ctx, input, "test-plugin", capGetter)
+		result := hostlib.SanitizeEnv(ctx, input, "test-plugin", capGetter)
 		assert.Equal(t, []string{"PATH=/usr/bin", "SAFE=value"}, result)
 	})
 
 	t.Run("PYTHONPATH blocked without capability", func(t *testing.T) {
 		capGetter := func(pluginName, capability string) bool { return false }
 		input := []string{"PYTHONPATH=/evil", "OK=yes"}
-		result := hostfuncs.SanitizeEnv(ctx, input, "test-plugin", capGetter)
+		result := hostlib.SanitizeEnv(ctx, input, "test-plugin", capGetter)
 		assert.Equal(t, []string{"OK=yes"}, result)
 	})
 
@@ -147,7 +147,7 @@ func TestSanitizeEnv_CapabilityGated(t *testing.T) {
 		capGetter := checker.ToCapabilityGetter("test-plugin")
 
 		input := []string{"PYTHONPATH=/custom/lib", "FOO=bar"}
-		result := hostfuncs.SanitizeEnv(ctx, input, "test-plugin", capGetter)
+		result := hostlib.SanitizeEnv(ctx, input, "test-plugin", capGetter)
 		assert.Equal(t, []string{"PYTHONPATH=/custom/lib", "FOO=bar"}, result)
 	})
 
@@ -163,7 +163,7 @@ func TestSanitizeEnv_CapabilityGated(t *testing.T) {
 		capGetter := checker.ToCapabilityGetter("test-plugin")
 
 		input := []string{"PATH=/bin", "NODE_OPTIONS=--debug", "HOME=/root"}
-		result := hostfuncs.SanitizeEnv(ctx, input, "test-plugin", capGetter)
+		result := hostlib.SanitizeEnv(ctx, input, "test-plugin", capGetter)
 		// PATH allowed (granted), NODE_OPTIONS blocked (not granted), HOME blocked (not granted)
 		assert.Equal(t, []string{"PATH=/bin"}, result)
 	})
@@ -208,7 +208,7 @@ func TestSanitizeEnv_MalformedVars(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := hostfuncs.SanitizeEnv(ctx, tt.input, "test-plugin", capGetter)
+			result := hostlib.SanitizeEnv(ctx, tt.input, "test-plugin", capGetter)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -266,7 +266,7 @@ func TestIsKnownInterpreter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := hostfuncs.IsKnownInterpreter(tt.command)
+			result := hostlib.IsKnownInterpreter(tt.command)
 			assert.Equal(t, tt.expected, result, "command: %s", tt.command)
 		})
 	}
@@ -322,7 +322,7 @@ func TestIsDangerousExecution(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := hostfuncs.IsDangerousExecution(tt.command, tt.args)
+			result := hostlib.IsDangerousExecution(tt.command, tt.args)
 			assert.Equal(t, tt.expected, result,
 				"command: %s, args: %v", tt.command, tt.args)
 		})
@@ -405,7 +405,7 @@ func TestInterpreterBypassAttempts(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			isDangerous := hostfuncs.IsDangerousExecution(tt.command, tt.args)
+			isDangerous := hostlib.IsDangerousExecution(tt.command, tt.args)
 			assert.Equal(t, tt.shouldBlock, isDangerous,
 				"%s - command: %s, args: %v", tt.reason, tt.command, tt.args)
 		})

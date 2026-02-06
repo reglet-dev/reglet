@@ -8,7 +8,7 @@ import (
 	"log/slog"
 
 	sdkEntities "github.com/reglet-dev/reglet-sdk/domain/entities"
-	"github.com/reglet-dev/reglet-sdk/hostfuncs"
+	"github.com/reglet-dev/reglet-hostlib"
 	"github.com/reglet-dev/reglet/internal/domain/constants"
 	"github.com/tetratelabs/wazero/api"
 )
@@ -43,7 +43,7 @@ func ExecCommand(ctx context.Context, mod api.Module, stack []uint64, checker *C
 	}
 
 	// Create SDK request
-	sdkReq := hostfuncs.ExecCommandRequest{
+	sdkReq := hostlib.ExecCommandRequest{
 		Command: request.Command,
 		Args:    request.Args,
 		Dir:     request.Dir,
@@ -57,7 +57,7 @@ func ExecCommand(ctx context.Context, mod api.Module, stack []uint64, checker *C
 
 	// Delegate to SDK's secure exec with capability getter
 	capGetter := checker.ToCapabilityGetter(pluginName)
-	sdkResp := hostfuncs.PerformSecureExecCommand(execCtx, sdkReq, pluginName, capGetter)
+	sdkResp := hostlib.PerformSecureExecCommand(execCtx, sdkReq, pluginName, capGetter)
 
 	// Convert SDK response to wire format
 	response := ExecResponseWire{
@@ -140,9 +140,9 @@ func getPluginName(ctx context.Context, mod api.Module) string {
 // Returns nil on success, writes error response and returns error on failure.
 func checkExecCapability(ctx context.Context, checker *CapabilityChecker, pluginName string, request *ExecRequestWire, stack []uint64, mod api.Module) error {
 	// Use SDK's execution type detection
-	execType := hostfuncs.GetExecutionTypeDescription(request.Command, request.Args)
+	execType := hostlib.GetExecutionTypeDescription(request.Command, request.Args)
 
-	if hostfuncs.IsDangerousExecution(request.Command, request.Args) {
+	if hostlib.IsDangerousExecution(request.Command, request.Args) {
 		return checkDangerousExec(ctx, checker, pluginName, request, execType, stack, mod)
 	}
 
