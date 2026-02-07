@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -121,7 +122,7 @@ func TestRemoteProfile_CachesBetweenRuns(t *testing.T) {
 	}
 
 	// 2. Track fetch count
-	fetchCount := 0
+	var fetchCount int32
 	profileContent := `
 profile:
   name: cache-test
@@ -145,7 +146,7 @@ controls:
 	// 3. Start test server that counts requests
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/cached-profile.yaml" {
-			fetchCount++
+			atomic.AddInt32(&fetchCount, 1)
 			w.Header().Set("Content-Type", "application/yaml")
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(profileContent))
@@ -172,7 +173,7 @@ controls:
 	cmd1.Env = append(os.Environ(), "HOME="+tempHome)
 	out1, err := cmd1.CombinedOutput()
 	require.NoError(t, err, "First run failed: %s", out1)
-	assert.Equal(t, 1, fetchCount, "First run should fetch from network")
+	assert.Equal(t, int32(1), atomic.LoadInt32(&fetchCount), "First run should fetch from network")
 
 	// 6. Second run - should use cache
 	cmd2 := exec.Command(binPath, "check", profileURL,
@@ -183,7 +184,7 @@ controls:
 	cmd2.Env = append(os.Environ(), "HOME="+tempHome)
 	out2, err := cmd2.CombinedOutput()
 	require.NoError(t, err, "Second run failed: %s", out2)
-	assert.Equal(t, 1, fetchCount, "Second run should use cache, not fetch again")
+	assert.Equal(t, int32(1), atomic.LoadInt32(&fetchCount), "Second run should use cache, not fetch again")
 
 	// 7. Third run with --refresh should bypass cache
 	cmd3 := exec.Command(binPath, "check", profileURL,
@@ -195,7 +196,7 @@ controls:
 	cmd3.Env = append(os.Environ(), "HOME="+tempHome)
 	out3, err := cmd3.CombinedOutput()
 	require.NoError(t, err, "Third run with refresh failed: %s", out3)
-	assert.Equal(t, 2, fetchCount, "Third run with --refresh should fetch again")
+	assert.Equal(t, int32(2), atomic.LoadInt32(&fetchCount), "Third run with --refresh should fetch again")
 }
 
 func TestRemoteProfile_InvalidURL(t *testing.T) {
