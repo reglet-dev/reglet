@@ -5,15 +5,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/reglet-dev/reglet-sdk/domain/entities"
+	"github.com/reglet-dev/reglet-abi/hostfunc"
 )
 
 // FuzzDNSRequestParsing fuzzes DNS request wire format parsing
-// TARGETS: JSON unmarshaling of DNSRequestWire
+// TARGETS: JSON unmarshaling of hostfunc.DNSRequest
 // EXPECTED FAILURES: Malformed JSON, invalid hostnames
 func FuzzDNSRequestParsing(f *testing.F) {
 	// Seed with valid request
-	validReq := entities.DNSRequest{
+	validReq := hostfunc.DNSRequest{
 		Hostname: "example.com",
 		Type:     "A",
 	}
@@ -34,7 +34,7 @@ func FuzzDNSRequestParsing(f *testing.F) {
 			}
 		}()
 
-		var req entities.DNSRequest
+		var req hostfunc.DNSRequest
 		_ = json.Unmarshal(jsonData, &req)
 		// Just ensure no panic on parsing
 	})

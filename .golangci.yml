@@ -23,6 +23,7 @@ linters:
     - staticcheck
     - unconvert
     - unused
+    - depguard
   disable:
     # Style/formatting
     - godot
@@ -69,6 +70,23 @@ linters:
         linters:
           - all
   settings:
+    depguard:
+      rules:
+        prevent-sdk-entirely:
+          deny:
+            - pkg: "github.com/reglet-dev/reglet-sdk"
+              desc: "Reglet must not import SDK - use reglet-abi for wire types"
+          files:
+            - "**/internal/**/*.go"
+
+        prevent-abi-in-domain:
+          deny:
+            - pkg: "github.com/reglet-dev/reglet-abi"
+              desc: "Domain layer must not import ABI - convert at WASM boundary"
+            - pkg: "github.com/reglet-dev/reglet-hostlib"
+              desc: "Domain layer must not import hostlib - use only in infrastructure/wasm/"
+          files:
+            - "**/internal/domain/**/*.go"
     errcheck:
       check-type-assertions: false
       check-blank: false

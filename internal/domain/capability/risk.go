@@ -13,14 +13,14 @@ const (
 )
 
 type RiskReport struct {
-	Level       RiskLevel
 	RiskFactors []RiskFactor
+	Level       RiskLevel
 }
 
 type RiskFactor struct {
-	Level       RiskLevel
 	Description string
 	Rule        string
+	Level       RiskLevel
 }
 
 // AnalyzeRisk evaluates the risk level of a GrantSet.

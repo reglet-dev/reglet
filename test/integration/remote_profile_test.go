@@ -14,7 +14,6 @@ import (
 )
 
 func TestRemoteProfile_FetchAndRun(t *testing.T) {
-	t.Skip("skipping until we are finished with 004-remote-profiles")
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
@@ -50,8 +49,8 @@ controls:
             - data.exit_code == 0
 `
 
-	// 3. Start test HTTP server
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	// 3. Start test HTTPS server (must use HTTPS for remote profiles)
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/profile.yaml" {
 			w.Header().Set("Content-Type", "application/yaml")
 			w.WriteHeader(http.StatusOK)
@@ -72,10 +71,12 @@ controls:
 
 	// 5. Run reglet check with remote profile URL
 	// Note: --allow-private-network is needed for localhost test server
+	// Note: --insecure is needed for self-signed httptest certificate
 	checkCmd := exec.Command(binPath, "check", profileURL,
 		"--format", "json",
 		"--trust-plugins",
-		"--allow-private-network")
+		"--allow-private-network",
+		"--insecure")
 	checkCmd.Env = append(os.Environ(), "HOME="+tempHome)
 
 	outputBytes, err := checkCmd.CombinedOutput()
@@ -106,7 +107,6 @@ controls:
 }
 
 func TestRemoteProfile_CachesBetweenRuns(t *testing.T) {
-	t.Skip("skipping until we are finished with 004-remote-profiles")
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
@@ -143,7 +143,7 @@ controls:
 `
 
 	// 3. Start test server that counts requests
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/cached-profile.yaml" {
 			fetchCount++
 			w.Header().Set("Content-Type", "application/yaml")
@@ -167,7 +167,8 @@ controls:
 	cmd1 := exec.Command(binPath, "check", profileURL,
 		"--format", "json",
 		"--trust-plugins",
-		"--allow-private-network")
+		"--allow-private-network",
+		"--insecure")
 	cmd1.Env = append(os.Environ(), "HOME="+tempHome)
 	out1, err := cmd1.CombinedOutput()
 	require.NoError(t, err, "First run failed: %s", out1)
@@ -177,7 +178,8 @@ controls:
 	cmd2 := exec.Command(binPath, "check", profileURL,
 		"--format", "json",
 		"--trust-plugins",
-		"--allow-private-network")
+		"--allow-private-network",
+		"--insecure")
 	cmd2.Env = append(os.Environ(), "HOME="+tempHome)
 	out2, err := cmd2.CombinedOutput()
 	require.NoError(t, err, "Second run failed: %s", out2)
@@ -188,6 +190,7 @@ controls:
 		"--format", "json",
 		"--trust-plugins",
 		"--allow-private-network",
+		"--insecure",
 		"--refresh")
 	cmd3.Env = append(os.Environ(), "HOME="+tempHome)
 	out3, err := cmd3.CombinedOutput()
@@ -256,7 +259,7 @@ controls:
 `
 
 	// Start test server on localhost (private network)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/yaml")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(profileContent))
@@ -269,17 +272,15 @@ controls:
 	checkCmd := exec.Command(binPath, "check", server.URL+"/profile.yaml",
 		"--format", "json",
 		"--trust-plugins",
-		"--fetch-timeout", "2s")
+		"--fetch-timeout", "2s",
+		"--insecure")
 	// Note: NOT passing --allow-private-network
 	checkCmd.Env = append(os.Environ(), "HOME="+tempHome)
 
 	output, err := checkCmd.CombinedOutput()
 	// Should fail because private network access is blocked by default
-	if err == nil {
-		// If it succeeded, check if it was because SSRF protection isn't fully wired yet
-		// This is acceptable for now but should be fixed in production
-		t.Logf("Note: SSRF protection may not be fully wired - output: %s", output)
-	}
+	assert.Error(t, err, "Should fail when fetching from private network without --allow-private-network")
+	assert.Contains(t, string(output), "private IP", "Error message should mention private IP block")
 	// The test documents expected behavior: private network access should be blocked
 	// without --allow-private-network flag
 }
@@ -314,7 +315,6 @@ func TestRemoteProfile_HTTPSOnly(t *testing.T) {
 }
 
 func TestRemoteProfile_WithVariables(t *testing.T) {
-	t.Skip("skipping until we are finished with 004-remote-profiles")
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")
 	}
@@ -351,7 +351,7 @@ controls:
             - data.exit_code == 0
 `
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/vars-profile.yaml" {
 			w.Header().Set("Content-Type", "application/yaml")
 			w.WriteHeader(http.StatusOK)
@@ -373,7 +373,8 @@ controls:
 		"--format", "json",
 		"--trust-plugins",
 		"--allow-private-network",
-		"--var", "message=CLI override message")
+		"--insecure",
+		"--set", "message=CLI override message")
 	checkCmd.Env = append(os.Environ(), "HOME="+tempHome)
 
 	outputBytes, err := checkCmd.CombinedOutput()

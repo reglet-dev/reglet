@@ -5,15 +5,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/reglet-dev/reglet-sdk/domain/entities"
+	"github.com/reglet-dev/reglet-abi/hostfunc"
 )
 
 // FuzzTCPRequestParsing fuzzes TCP request wire format parsing
-// TARGETS: JSON unmarshaling of TCPRequestWire
+// TARGETS: JSON unmarshaling of hostfunc.TCPRequest
 // EXPECTED FAILURES: Malformed JSON, invalid ports
 func FuzzTCPRequestParsing(f *testing.F) {
 	// Seed with valid request
-	validReq := entities.TCPRequest{
+	validReq := hostfunc.TCPRequest{
 		Host: "example.com",
 		Port: "80",
 		TLS:  false,
@@ -35,7 +35,7 @@ func FuzzTCPRequestParsing(f *testing.F) {
 			}
 		}()
 
-		var req entities.TCPRequest
+		var req hostfunc.TCPRequest
 		_ = json.Unmarshal(jsonData, &req)
 		// Just ensure no panic on parsing
 	})

@@ -7,37 +7,41 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/reglet-dev/reglet-sdk/domain/entities"
+	"github.com/reglet-dev/reglet-abi/hostfunc"
 	"github.com/tetratelabs/wazero/api"
 )
 
 type (
-	// ContextWireFormat is an alias for entities.ContextWire
-	ContextWireFormat = entities.ContextWire
-	// DNSRequestWire is an alias for entities.DNSRequest
-	DNSRequestWire = entities.DNSRequest
-	// DNSResponseWire is an alias for entities.DNSResponse
-	DNSResponseWire = entities.DNSResponse
-	// HTTPRequestWire is an alias for entities.HTTPRequest
-	HTTPRequestWire = entities.HTTPRequest
-	// HTTPResponseWire is an alias for entities.HTTPResponse
-	HTTPResponseWire = entities.HTTPResponse
-	// TCPRequestWire is an alias for entities.TCPRequest
-	TCPRequestWire = entities.TCPRequest
-	// TCPResponseWire is an alias for entities.TCPResponse
-	TCPResponseWire = entities.TCPResponse
-	// SMTPRequestWire is an alias for entities.SMTPRequest
-	SMTPRequestWire = entities.SMTPRequest
-	// SMTPResponseWire is an alias for entities.SMTPResponse
-	SMTPResponseWire = entities.SMTPResponse
-	// ExecRequestWire is an alias for entities.ExecRequest
-	ExecRequestWire = entities.ExecRequest
-	// ExecResponseWire is an alias for entities.ExecResponse
-	ExecResponseWire = entities.ExecResponse
-	// ErrorDetail is an alias for entities.ErrorDetail
-	ErrorDetail = entities.ErrorDetail
-	// MXRecordWire is an alias for entities.MXRecord
-	MXRecordWire = entities.MXRecord
+	// ContextWireFormat is an alias for hostfunc.ContextWire
+	ContextWireFormat = hostfunc.ContextWire
+	// DNSRequestWire is an alias for hostfunc.DNSRequest
+	DNSRequestWire = hostfunc.DNSRequest
+	// DNSResponseWire is an alias for hostfunc.DNSResponse
+	DNSResponseWire = hostfunc.DNSResponse
+	// HTTPRequestWire is an alias for hostfunc.HTTPRequest
+	HTTPRequestWire = hostfunc.HTTPRequest
+	// HTTPResponseWire is an alias for hostfunc.HTTPResponse
+	HTTPResponseWire = hostfunc.HTTPResponse
+	// TCPRequestWire is an alias for hostfunc.TCPRequest
+	TCPRequestWire = hostfunc.TCPRequest
+	// TCPResponseWire is an alias for hostfunc.TCPResponse
+	TCPResponseWire = hostfunc.TCPResponse
+	// SMTPRequestWire is an alias for hostfunc.SMTPRequest
+	SMTPRequestWire = hostfunc.SMTPRequest
+	// SMTPResponseWire is an alias for hostfunc.SMTPResponse
+	SMTPResponseWire = hostfunc.SMTPResponse
+	// ExecRequestWire is an alias for hostfunc.ExecRequest
+	ExecRequestWire = hostfunc.ExecRequest
+	// ExecResponseWire is an alias for hostfunc.ExecResponse
+	ExecResponseWire = hostfunc.ExecResponse
+	// ErrorDetail is an alias for hostfunc.ErrorDetail
+	ErrorDetail = hostfunc.ErrorDetail
+	// MXRecordWire is an alias for hostfunc.MXRecord
+	MXRecordWire = hostfunc.MXRecord
+	// LogMessageWire is an alias for hostfunc.LogMessage
+	LogMessageWire = hostfunc.LogMessage
+	// LogAttrWire is an alias for hostfunc.LogAttr
+	LogAttrWire = hostfunc.LogAttr
 )
 
 // createContextFromWire creates a new context from the wire format.

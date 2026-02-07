@@ -192,15 +192,8 @@ func (o *CapabilityOrchestrator) loadSinglePlugin(ctx context.Context, runtime p
 		return capability.GrantSet{}, fmt.Errorf("failed to load plugin %s: %w", name, err)
 	}
 
-	// Get plugin metadata
-	manifest, err := plugin.Manifest(ctx)
-	if err != nil {
-		return capability.GrantSet{}, fmt.Errorf("failed to get capabilities from plugin %s: %w", name, err)
-	}
-
-	// Extract capabilities into GrantSet for gatekeeper
-	// Convert from ABI format
-	return capability.FromABI(&manifest.Capabilities), nil
+	// Get plugin declared capabilities
+	return plugin.RequiredCapabilities(ctx)
 }
 
 // mergeCapabilities merges profile-extracted capabilities with plugin metadata.

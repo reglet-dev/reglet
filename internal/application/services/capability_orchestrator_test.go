@@ -44,6 +44,10 @@ func (m *mockPlugin) Manifest(_ context.Context) (*abi.Manifest, error) {
 	}, nil
 }
 
+func (m *mockPlugin) RequiredCapabilities(_ context.Context) (capability.GrantSet, error) {
+	return capability.GrantSet{}, nil
+}
+
 // TestCapabilityOrchestrator_UsesAnalyzer verifies that the orchestrator
 // delegates capability extraction to the domain service.
 func TestCapabilityOrchestrator_UsesAnalyzer(t *testing.T) {

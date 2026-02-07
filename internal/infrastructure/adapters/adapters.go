@@ -114,6 +114,11 @@ func (p *PluginAdapter) Manifest(ctx context.Context) (*abi.Manifest, error) {
 	return p.plugin.Manifest(ctx)
 }
 
+// RequiredCapabilities returns plugin declared capabilities.
+func (p *PluginAdapter) RequiredCapabilities(ctx context.Context) (capability.GrantSet, error) {
+	return p.plugin.RequiredCapabilities(ctx)
+}
+
 // ProfileLoaderAdapter adapts infrastructure profile loader to port interface.
 type ProfileLoaderAdapter struct {
 	loader        *infraconfig.ProfileLoader

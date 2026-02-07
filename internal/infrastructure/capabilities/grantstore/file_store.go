@@ -11,6 +11,7 @@ import (
 	"github.com/reglet-dev/reglet-abi/hostfunc"
 	"github.com/reglet-dev/reglet/internal/application/ports"
 	"github.com/reglet-dev/reglet/internal/domain/capability"
+	"github.com/reglet-dev/reglet/internal/infrastructure/capabilities"
 	"gopkg.in/yaml.v3"
 )
 
@@ -84,13 +85,13 @@ func (s *FileStore) Load() (capability.GrantSet, error) {
 	if err := yaml.Unmarshal(data, &grants); err != nil {
 		return capability.GrantSet{}, fmt.Errorf("failed to parse grant store: %w", err)
 	}
-	return capability.FromABI(&grants), nil
+	return capabilities.FromABI(&grants), nil
 }
 
 // Save persists the granted capabilities.
 func (s *FileStore) Save(grants capability.GrantSet) error {
 	// Convert to ABI type for serialization
-	abiGrants := capability.ToABI(grants)
+	abiGrants := capabilities.ToABI(grants)
 
 	// Clone and deduplicate grants before saving to ensure the config file
 	// never contains duplicates, even if they accumulated in memory

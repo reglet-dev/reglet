@@ -11,6 +11,7 @@ import (
 
 	"github.com/reglet-dev/reglet/internal/domain/capability"
 	"github.com/reglet-dev/reglet/internal/infrastructure/build"
+	"github.com/reglet-dev/reglet/internal/infrastructure/capabilities"
 	"github.com/reglet-dev/reglet/internal/infrastructure/sensitivedata"
 	"github.com/reglet-dev/reglet/internal/infrastructure/wasm/hostfuncs"
 	"github.com/tetratelabs/wazero"
@@ -228,8 +229,8 @@ func (r *Runtime) LoadPlugin(ctx context.Context, name string, wasmBytes []byte)
 		runtime:      r.runtime,
 		stdout:       stdout,
 		stderr:       stderr,
-		capabilities: capability.ToABI(r.grantedCapabilities[name]), // Extract plugin-specific capabilities
-		frozenEnv:    r.frozenEnv,                                   // Pass frozen environment snapshot (prevents runtime env leakage)
+		capabilities: capabilities.ToABI(r.grantedCapabilities[name]), // Extract plugin-specific capabilities
+		frozenEnv:    r.frozenEnv,                                     // Pass frozen environment snapshot (prevents runtime env leakage)
 	}
 
 	// Cache the plugin

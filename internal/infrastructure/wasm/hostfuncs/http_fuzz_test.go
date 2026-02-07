@@ -6,15 +6,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/reglet-dev/reglet-sdk/domain/entities"
+	"github.com/reglet-dev/reglet-abi/hostfunc"
 )
 
 // FuzzHTTPRequestParsing fuzzes HTTP request wire format parsing
-// TARGETS: JSON unmarshaling of HTTPRequestWire, URL parsing, base64 decoding
+// TARGETS: JSON unmarshaling of hostfunc.HTTPRequest, URL parsing, base64 decoding
 // EXPECTED FAILURES: Invalid base64, malformed JSON, URL parse errors
 func FuzzHTTPRequestParsing(f *testing.F) {
 	// Seed with valid and invalid HTTP request structures
-	validReq := entities.HTTPRequest{
+	validReq := hostfunc.HTTPRequest{
 		Method: "GET",
 		URL:    "https://example.com/path",
 		Headers: map[string][]string{
@@ -39,7 +39,7 @@ func FuzzHTTPRequestParsing(f *testing.F) {
 			}
 		}()
 
-		var req entities.HTTPRequest
+		var req hostfunc.HTTPRequest
 		_ = json.Unmarshal(jsonData, &req)
 		// Just ensure no panic on parsing
 	})

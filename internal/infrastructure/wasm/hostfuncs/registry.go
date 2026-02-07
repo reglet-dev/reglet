@@ -3,7 +3,7 @@ package hostfuncs
 import (
 	"context"
 
-	sdkEntities "github.com/reglet-dev/reglet-sdk/domain/entities"
+	"github.com/reglet-dev/reglet-abi/hostfunc"
 	"github.com/reglet-dev/reglet/internal/domain/capability"
 	"github.com/reglet-dev/reglet/internal/infrastructure/build"
 	"github.com/tetratelabs/wazero"
@@ -17,13 +17,13 @@ import (
 // 2. Capability checking using the CapabilityChecker
 // 3. Delegation to SDK's PerformXXX functions for the actual work
 func RegisterHostFunctions(ctx context.Context, runtime wazero.Runtime, version build.Info, caps map[string]capability.GrantSet) error {
-	// Convert internal capabilities to SDK entities for the legacy checker
-	sdkCaps := make(map[string]*sdkEntities.GrantSet)
+	// Convert internal capabilities to valid ABI hostfunc.GrantSet for the checker
+	abiCaps := make(map[string]*hostfunc.GrantSet)
 	for k, v := range caps {
-		sdkCaps[k] = toSDKGrantSet(v)
+		abiCaps[k] = toABIGrantSet(v)
 	}
 
-	checker := NewCapabilityChecker(sdkCaps)
+	checker := NewCapabilityChecker(abiCaps)
 
 	// Create host module "reglet_host"
 	builder := runtime.NewHostModuleBuilder("reglet_host")
@@ -75,13 +75,13 @@ func RegisterHostFunctions(ctx context.Context, runtime wazero.Runtime, version 
 	return err
 }
 
-func toSDKGrantSet(gs capability.GrantSet) *sdkEntities.GrantSet {
-	out := &sdkEntities.GrantSet{}
+func toABIGrantSet(gs capability.GrantSet) *hostfunc.GrantSet {
+	out := &hostfunc.GrantSet{}
 
 	if gs.Network != nil {
-		out.Network = &sdkEntities.NetworkCapability{}
+		out.Network = &hostfunc.NetworkCapability{}
 		for _, r := range gs.Network.Rules {
-			out.Network.Rules = append(out.Network.Rules, sdkEntities.NetworkRule{
+			out.Network.Rules = append(out.Network.Rules, hostfunc.NetworkRule{
 				Hosts: r.Hosts,
 				Ports: r.Ports,
 			})
@@ -89,9 +89,9 @@ func toSDKGrantSet(gs capability.GrantSet) *sdkEntities.GrantSet {
 	}
 
 	if gs.FS != nil {
-		out.FS = &sdkEntities.FileSystemCapability{}
+		out.FS = &hostfunc.FileSystemCapability{}
 		for _, r := range gs.FS.Rules {
-			out.FS.Rules = append(out.FS.Rules, sdkEntities.FileSystemRule{
+			out.FS.Rules = append(out.FS.Rules, hostfunc.FileSystemRule{
 				Read:  r.Read,
 				Write: r.Write,
 			})
@@ -99,21 +99,21 @@ func toSDKGrantSet(gs capability.GrantSet) *sdkEntities.GrantSet {
 	}
 
 	if gs.Env != nil {
-		out.Env = &sdkEntities.EnvironmentCapability{
+		out.Env = &hostfunc.EnvironmentCapability{
 			Variables: gs.Env.Variables,
 		}
 	}
 
 	if gs.Exec != nil {
-		out.Exec = &sdkEntities.ExecCapability{
+		out.Exec = &hostfunc.ExecCapability{
 			Commands: gs.Exec.Commands,
 		}
 	}
 
 	if gs.KV != nil {
-		out.KV = &sdkEntities.KeyValueCapability{}
+		out.KV = &hostfunc.KeyValueCapability{}
 		for _, r := range gs.KV.Rules {
-			out.KV.Rules = append(out.KV.Rules, sdkEntities.KeyValueRule{
+			out.KV.Rules = append(out.KV.Rules, hostfunc.KeyValueRule{
 				Operation: r.Operation,
 				Keys:      r.Keys,
 			})

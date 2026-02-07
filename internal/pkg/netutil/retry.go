@@ -69,7 +69,10 @@ func (t *RetryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		resp, err := base.RoundTrip(reqClone)
 		if err != nil {
 			lastErr = err
-			// Network errors are retryable
+			// Network errors are retryable, UNLESS they are security/SSRF blocks
+			if IsPrivateIPError(err) {
+				return nil, err
+			}
 			if attempt < maxRetries {
 				waitDuration := t.calculateBackoff(attempt, initialBackoff, maxBackoff, nil)
 				if t.OnRetry != nil {

@@ -6,19 +6,19 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/reglet-dev/reglet-sdk/domain/entities"
-	"github.com/reglet-dev/reglet-hostlib"
+	"github.com/reglet-dev/reglet-abi/hostfunc"
+	hostlib "github.com/reglet-dev/reglet-hostlib"
 	"github.com/tetratelabs/wazero/api"
 )
 
 // DNSLookup performs DNS resolution on behalf of the plugin.
-// It receives a packed uint64 (ptr+len) pointing to a JSON-encoded DNSRequestWire.
-// It returns a packed uint64 (ptr+len) pointing to a JSON-encoded DNSResponseWire.
+// It receives a packed uint64 (ptr+len) pointing to a JSON-encoded hostfunc.DNSRequest.
+// It returns a packed uint64 (ptr+len) pointing to a JSON-encoded hostfunc.DNSResponse.
 //
 // This handler:
 // 1. Reads request from guest memory
 // 2. Checks capability (network:outbound:53)
-// 3. Delegates to SDK's PerformDNSLookup
+// 3. Delegates to hostlib.PerformDNSLookup
 // 4. Writes response to guest memory
 func DNSLookup(ctx context.Context, mod api.Module, stack []uint64, checker *CapabilityChecker) {
 	requestPacked := stack[0]
@@ -28,18 +28,18 @@ func DNSLookup(ctx context.Context, mod api.Module, stack []uint64, checker *Cap
 	if !ok {
 		errMsg := "hostfuncs: failed to read DNS request from Guest memory"
 		slog.ErrorContext(ctx, errMsg)
-		stack[0] = hostWriteResponse(ctx, mod, DNSResponseWire{
-			Error: &ErrorDetail{Message: errMsg, Type: "internal"},
+		stack[0] = hostWriteResponse(ctx, mod, hostfunc.DNSResponse{
+			Error: &hostfunc.ErrorDetail{Message: errMsg, Type: "internal"},
 		})
 		return
 	}
 
-	var request DNSRequestWire
+	var request hostfunc.DNSRequest
 	if err := json.Unmarshal(requestBytes, &request); err != nil {
 		errMsg := fmt.Sprintf("hostfuncs: failed to unmarshal DNS request: %v", err)
 		slog.ErrorContext(ctx, errMsg)
-		stack[0] = hostWriteResponse(ctx, mod, DNSResponseWire{
-			Error: &ErrorDetail{Message: errMsg, Type: "internal"},
+		stack[0] = hostWriteResponse(ctx, mod, hostfunc.DNSResponse{
+			Error: &hostfunc.ErrorDetail{Message: errMsg, Type: "internal"},
 		})
 		return
 	}
@@ -51,16 +51,16 @@ func DNSLookup(ctx context.Context, mod api.Module, stack []uint64, checker *Cap
 	}
 
 	// Check network capability for DNS (port 53)
-	if err := checker.CheckNetwork(pluginName, entities.NetworkRequest{Host: request.Hostname, Port: 53}); err != nil {
+	if err := checker.CheckNetwork(pluginName, hostfunc.NetworkRequest{Host: request.Hostname, Port: 53}); err != nil {
 		errMsg := fmt.Sprintf("permission denied: %v", err)
 		slog.WarnContext(ctx, errMsg, "hostname", request.Hostname)
-		stack[0] = hostWriteResponse(ctx, mod, DNSResponseWire{
-			Error: &ErrorDetail{Message: errMsg, Type: "capability"},
+		stack[0] = hostWriteResponse(ctx, mod, hostfunc.DNSResponse{
+			Error: &hostfunc.ErrorDetail{Message: errMsg, Type: "capability"},
 		})
 		return
 	}
 
-	// Create SDK request and delegate to SDK's PerformDNSLookup
+	// Create hostlib request and delegate to hostlib.PerformDNSLookup
 	sdkReq := hostlib.DNSLookupRequest{
 		Hostname:   request.Hostname,
 		RecordType: request.Type,
@@ -74,13 +74,13 @@ func DNSLookup(ctx context.Context, mod api.Module, stack []uint64, checker *Cap
 
 	sdkResp := hostlib.PerformDNSLookup(ctx, sdkReq)
 
-	// Convert SDK response to wire format
-	response := DNSResponseWire{
+	// Convert hostlib response to wire format
+	response := hostfunc.DNSResponse{
 		Records: sdkResp.Records,
 	}
 
 	if sdkResp.Error != nil {
-		response.Error = &ErrorDetail{
+		response.Error = &hostfunc.ErrorDetail{
 			Message: sdkResp.Error.Message,
 			Type:    "network",
 		}
@@ -88,7 +88,7 @@ func DNSLookup(ctx context.Context, mod api.Module, stack []uint64, checker *Cap
 
 	// Convert MX records if present
 	for _, mx := range sdkResp.MXRecords {
-		response.MXRecords = append(response.MXRecords, MXRecordWire{
+		response.MXRecords = append(response.MXRecords, hostfunc.MXRecord{
 			Host: mx.Host,
 			Pref: mx.Pref,
 		})

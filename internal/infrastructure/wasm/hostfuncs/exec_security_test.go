@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/reglet-dev/reglet-sdk/domain/entities"
-	"github.com/reglet-dev/reglet-hostlib"
+	"github.com/reglet-dev/reglet-abi/hostfunc"
+	hostlib "github.com/reglet-dev/reglet-hostlib"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -115,9 +115,9 @@ func TestSanitizeEnv_CapabilityGated(t *testing.T) {
 	})
 
 	t.Run("PATH allowed with exec:env:PATH capability", func(t *testing.T) {
-		checker := NewCapabilityChecker(map[string]*entities.GrantSet{
+		checker := NewCapabilityChecker(map[string]*hostfunc.GrantSet{
 			"test-plugin": {
-				Exec: &entities.ExecCapability{
+				Exec: &hostfunc.ExecCapability{
 					Commands: []string{"env:PATH"},
 				},
 			},
@@ -137,9 +137,9 @@ func TestSanitizeEnv_CapabilityGated(t *testing.T) {
 	})
 
 	t.Run("PYTHONPATH allowed with capability", func(t *testing.T) {
-		checker := NewCapabilityChecker(map[string]*entities.GrantSet{
+		checker := NewCapabilityChecker(map[string]*hostfunc.GrantSet{
 			"test-plugin": {
-				Exec: &entities.ExecCapability{
+				Exec: &hostfunc.ExecCapability{
 					Commands: []string{"env:PYTHONPATH"},
 				},
 			},
@@ -153,9 +153,9 @@ func TestSanitizeEnv_CapabilityGated(t *testing.T) {
 
 	t.Run("Multiple gated vars with partial grants", func(t *testing.T) {
 		// Only PATH granted
-		checker := NewCapabilityChecker(map[string]*entities.GrantSet{
+		checker := NewCapabilityChecker(map[string]*hostfunc.GrantSet{
 			"test-plugin": {
-				Exec: &entities.ExecCapability{
+				Exec: &hostfunc.ExecCapability{
 					Commands: []string{"env:PATH"},
 				},
 			},

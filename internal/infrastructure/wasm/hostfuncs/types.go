@@ -4,8 +4,8 @@ package hostfuncs
 import (
 	"context"
 
-	"github.com/reglet-dev/reglet-sdk/domain/entities"
-	"github.com/reglet-dev/reglet-hostlib"
+	"github.com/reglet-dev/reglet-abi/hostfunc"
+	hostlib "github.com/reglet-dev/reglet-hostlib"
 )
 
 // CapabilityChecker is an alias to the SDK's CapabilityChecker.
@@ -14,7 +14,7 @@ import (
 type CapabilityChecker = hostlib.CapabilityChecker
 
 // NewCapabilityChecker creates a new capability checker using the SDK implementation.
-func NewCapabilityChecker(caps map[string]*entities.GrantSet) *CapabilityChecker {
+func NewCapabilityChecker(caps map[string]*hostfunc.GrantSet) *CapabilityChecker {
 	return hostlib.NewCapabilityChecker(caps)
 }
 

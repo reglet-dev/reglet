@@ -7,26 +7,26 @@ import (
 	"fmt"
 	"log/slog"
 
-	sdkEntities "github.com/reglet-dev/reglet-sdk/domain/entities"
-	"github.com/reglet-dev/reglet-hostlib"
+	"github.com/reglet-dev/reglet-abi/hostfunc"
+	hostlib "github.com/reglet-dev/reglet-hostlib"
 	"github.com/reglet-dev/reglet/internal/domain/constants"
 	"github.com/tetratelabs/wazero/api"
 )
 
 // ExecCommand executes a command on the host.
-// It receives a packed uint64 (ptr+len) pointing to a JSON-encoded ExecRequestWire.
-// It returns a packed uint64 (ptr+len) pointing to a JSON-encoded ExecResponseWire.
+// It receives a packed uint64 (ptr+len) pointing to a JSON-encoded hostfunc.ExecRequest.
+// It returns a packed uint64 (ptr+len) pointing to a JSON-encoded hostfunc.ExecResponse.
 //
 // This handler:
 // 1. Reads request from guest memory
 // 2. Checks capability (exec:<command>) with shell/interpreter detection
-// 3. Delegates to SDK's PerformSecureExecCommand for actual execution
+// 3. Delegates to hostlib.PerformSecureExecCommand for actual execution
 // 4. Writes response to guest memory
 func ExecCommand(ctx context.Context, mod api.Module, stack []uint64, checker *CapabilityChecker) {
 	request, err := readExecRequest(ctx, mod, stack[0])
 	if err != nil {
-		stack[0] = hostWriteResponse(ctx, mod, ExecResponseWire{
-			Error: &ErrorDetail{Message: err.Error(), Type: "internal"},
+		stack[0] = hostWriteResponse(ctx, mod, hostfunc.ExecResponse{
+			Error: &hostfunc.ErrorDetail{Message: err.Error(), Type: "internal"},
 		})
 		return
 	}
@@ -42,7 +42,7 @@ func ExecCommand(ctx context.Context, mod api.Module, stack []uint64, checker *C
 		return // Response already written
 	}
 
-	// Create SDK request
+	// Create hostlib request
 	sdkReq := hostlib.ExecCommandRequest{
 		Command: request.Command,
 		Args:    request.Args,
@@ -55,12 +55,12 @@ func ExecCommand(ctx context.Context, mod api.Module, stack []uint64, checker *C
 		sdkReq.Timeout = int(request.Context.TimeoutMs)
 	}
 
-	// Delegate to SDK's secure exec with capability getter
+	// Delegate to hostlib's secure exec with capability getter
 	capGetter := checker.ToCapabilityGetter(pluginName)
 	sdkResp := hostlib.PerformSecureExecCommand(execCtx, sdkReq, pluginName, capGetter)
 
-	// Convert SDK response to wire format
-	response := ExecResponseWire{
+	// Convert hostlib response to wire format
+	response := hostfunc.ExecResponse{
 		Stdout:     sdkResp.Stdout,
 		Stderr:     sdkResp.Stderr,
 		ExitCode:   sdkResp.ExitCode,
@@ -69,7 +69,7 @@ func ExecCommand(ctx context.Context, mod api.Module, stack []uint64, checker *C
 	}
 
 	if sdkResp.Error != nil {
-		response.Error = &ErrorDetail{
+		response.Error = &hostfunc.ErrorDetail{
 			Message: sdkResp.Error.Message,
 			Type:    "execution",
 			Code:    sdkResp.Error.Code,
@@ -100,7 +100,7 @@ func ExecCommand(ctx context.Context, mod api.Module, stack []uint64, checker *C
 const MaxRequestSize = constants.MaxRequestSize
 
 // readExecRequest reads and unmarshals the exec request from guest memory.
-func readExecRequest(ctx context.Context, mod api.Module, requestPacked uint64) (*ExecRequestWire, error) {
+func readExecRequest(ctx context.Context, mod api.Module, requestPacked uint64) (*hostfunc.ExecRequest, error) {
 	ptr, length := unpackPtrLen(requestPacked)
 
 	// SECURITY: Enforce request size limit before allocating memory
@@ -117,7 +117,7 @@ func readExecRequest(ctx context.Context, mod api.Module, requestPacked uint64) 
 		return nil, errors.New(errMsg)
 	}
 
-	var request ExecRequestWire
+	var request hostfunc.ExecRequest
 	if err := json.Unmarshal(requestBytes, &request); err != nil {
 		errMsg := fmt.Sprintf("hostfuncs: failed to unmarshal Exec request: %v", err)
 		slog.ErrorContext(ctx, errMsg)
@@ -136,10 +136,10 @@ func getPluginName(ctx context.Context, mod api.Module) string {
 }
 
 // checkExecCapability verifies the plugin has permission to execute the command.
-// Uses SDK's DetectExecutionType for shell/interpreter detection.
+// Uses hostlib's DetectExecutionType for shell/interpreter detection.
 // Returns nil on success, writes error response and returns error on failure.
-func checkExecCapability(ctx context.Context, checker *CapabilityChecker, pluginName string, request *ExecRequestWire, stack []uint64, mod api.Module) error {
-	// Use SDK's execution type detection
+func checkExecCapability(ctx context.Context, checker *CapabilityChecker, pluginName string, request *hostfunc.ExecRequest, stack []uint64, mod api.Module) error {
+	// Use hostlib's execution type detection
 	execType := hostlib.GetExecutionTypeDescription(request.Command, request.Args)
 
 	if hostlib.IsDangerousExecution(request.Command, request.Args) {
@@ -147,11 +147,11 @@ func checkExecCapability(ctx context.Context, checker *CapabilityChecker, plugin
 	}
 
 	// Direct command execution (safe mode)
-	if err := checker.CheckExec(pluginName, sdkEntities.ExecCapabilityRequest{Command: request.Command}); err != nil {
+	if err := checker.CheckExec(pluginName, hostfunc.ExecCapabilityRequest{Command: request.Command}); err != nil {
 		errMsg := fmt.Sprintf("permission denied: %v", err)
 		slog.WarnContext(ctx, errMsg, "command", request.Command)
-		stack[0] = hostWriteResponse(ctx, mod, ExecResponseWire{
-			Error: &ErrorDetail{Message: errMsg, Type: "capability"},
+		stack[0] = hostWriteResponse(ctx, mod, hostfunc.ExecResponse{
+			Error: &hostfunc.ErrorDetail{Message: errMsg, Type: "capability"},
 		})
 		return errors.New(errMsg)
 	}
@@ -160,8 +160,8 @@ func checkExecCapability(ctx context.Context, checker *CapabilityChecker, plugin
 }
 
 // checkDangerousExec handles capability check for dangerous execution modes.
-func checkDangerousExec(ctx context.Context, checker *CapabilityChecker, pluginName string, request *ExecRequestWire, execType string, stack []uint64, mod api.Module) error {
-	if err := checker.CheckExec(pluginName, sdkEntities.ExecCapabilityRequest{Command: request.Command}); err != nil {
+func checkDangerousExec(ctx context.Context, checker *CapabilityChecker, pluginName string, request *hostfunc.ExecRequest, execType string, stack []uint64, mod api.Module) error {
+	if err := checker.CheckExec(pluginName, hostfunc.ExecCapabilityRequest{Command: request.Command}); err != nil {
 		errMsg := fmt.Sprintf(
 			"%s requires 'exec:%s' capability (prevents arbitrary code execution)",
 			execType, request.Command)
@@ -170,8 +170,8 @@ func checkDangerousExec(ctx context.Context, checker *CapabilityChecker, pluginN
 			"args", request.Args,
 			"type", execType,
 			"plugin", pluginName)
-		stack[0] = hostWriteResponse(ctx, mod, ExecResponseWire{
-			Error: &ErrorDetail{Message: errMsg, Type: "capability"},
+		stack[0] = hostWriteResponse(ctx, mod, hostfunc.ExecResponse{
+			Error: &hostfunc.ErrorDetail{Message: errMsg, Type: "capability"},
 		})
 		return errors.New(errMsg)
 	}

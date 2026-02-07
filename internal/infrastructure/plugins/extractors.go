@@ -58,54 +58,10 @@ func (e *NetworkExtractor) Extract(config map[string]interface{}) *capability.Gr
 	var hosts []string
 	var ports []string
 
-	// HTTP URL
-	if url, ok := config["url"].(string); ok && url != "" {
-		if host := extractHostFromURL(url); host != "" {
-			hosts = append(hosts, host)
-			if strings.HasPrefix(url, "https://") {
-				ports = append(ports, "443")
-			} else if strings.HasPrefix(url, "http://") {
-				ports = append(ports, "80")
-			}
-		}
-	}
-
-	// Host/Target field
-	if host, ok := config["host"].(string); ok && host != "" {
-		hosts = append(hosts, host)
-	}
-	if target, ok := config["target"].(string); ok && target != "" {
-		hosts = append(hosts, target)
-	}
-
-	// Nameserver field (dns)
-	if ns, ok := config["nameserver"].(string); ok && ns != "" {
-		hosts = append(hosts, ns)
-		ports = append(ports, "53")
-	}
-
-	// Port field
-	// Port field
-	if port, ok := config["port"]; ok {
-		switch v := port.(type) {
-		case int:
-			if v > 0 {
-				ports = append(ports, fmt.Sprintf("%d", v))
-			}
-		case string:
-			if v != "" {
-				ports = append(ports, v)
-			}
-		case float64:
-			ports = append(ports, fmt.Sprintf("%.0f", v))
-		case uint64:
-			ports = append(ports, fmt.Sprintf("%d", v))
-		case int64:
-			ports = append(ports, fmt.Sprintf("%d", v))
-		case int32:
-			ports = append(ports, fmt.Sprintf("%d", v))
-		}
-	}
+	hosts, ports = e.extractFromURL(config, hosts, ports)
+	hosts, ports = e.extractFromHostTarget(config, hosts, ports)
+	hosts, ports = e.extractFromNameserver(config, hosts, ports)
+	ports = e.extractPort(config, ports)
 
 	if len(hosts) == 0 {
 		if len(ports) > 0 {
@@ -132,6 +88,65 @@ func (e *NetworkExtractor) Extract(config map[string]interface{}) *capability.Gr
 			},
 		},
 	}
+}
+
+func (e *NetworkExtractor) extractFromURL(config map[string]interface{}, hosts, ports []string) ([]string, []string) {
+	if url, ok := config["url"].(string); ok && url != "" {
+		if host := extractHostFromURL(url); host != "" {
+			hosts = append(hosts, host)
+			if strings.HasPrefix(url, "https://") {
+				ports = append(ports, "443")
+			} else if strings.HasPrefix(url, "http://") {
+				ports = append(ports, "80")
+			}
+		}
+	}
+	return hosts, ports
+}
+
+func (e *NetworkExtractor) extractFromHostTarget(config map[string]interface{}, hosts, ports []string) ([]string, []string) {
+	if host, ok := config["host"].(string); ok && host != "" {
+		hosts = append(hosts, host)
+	}
+	if target, ok := config["target"].(string); ok && target != "" {
+		hosts = append(hosts, target)
+	}
+	return hosts, ports
+}
+
+func (e *NetworkExtractor) extractFromNameserver(config map[string]interface{}, hosts, ports []string) ([]string, []string) {
+	if ns, ok := config["nameserver"].(string); ok && ns != "" {
+		hosts = append(hosts, ns)
+		ports = append(ports, "53")
+	}
+	return hosts, ports
+}
+
+func (e *NetworkExtractor) extractPort(config map[string]interface{}, ports []string) []string {
+	port, ok := config["port"]
+	if !ok {
+		return ports
+	}
+
+	switch v := port.(type) {
+	case int:
+		if v > 0 {
+			ports = append(ports, fmt.Sprintf("%d", v))
+		}
+	case string:
+		if v != "" {
+			ports = append(ports, v)
+		}
+	case float64:
+		ports = append(ports, fmt.Sprintf("%.0f", v))
+	case uint64:
+		ports = append(ports, fmt.Sprintf("%d", v))
+	case int64:
+		ports = append(ports, fmt.Sprintf("%d", v))
+	case int32:
+		ports = append(ports, fmt.Sprintf("%d", v))
+	}
+	return ports
 }
 
 func extractHostFromURL(url string) string {

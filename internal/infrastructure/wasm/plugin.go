@@ -15,7 +15,9 @@ import (
 
 	abi "github.com/reglet-dev/reglet-abi"
 	"github.com/reglet-dev/reglet-abi/hostfunc"
+	"github.com/reglet-dev/reglet/internal/domain/capability"
 	"github.com/reglet-dev/reglet/internal/domain/execution"
+	"github.com/reglet-dev/reglet/internal/infrastructure/capabilities"
 	"github.com/reglet-dev/reglet/internal/infrastructure/wasm/hostfuncs"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
@@ -462,6 +464,16 @@ func (p *Plugin) Manifest(ctx context.Context) (*abi.Manifest, error) {
 	p.mu.Unlock()
 
 	return manifest, nil
+}
+
+// RequiredCapabilities returns the capabilities declared in the plugin manifest
+// converted to internal domain types.
+func (p *Plugin) RequiredCapabilities(ctx context.Context) (capability.GrantSet, error) {
+	manifest, err := p.Manifest(ctx)
+	if err != nil {
+		return capability.GrantSet{}, err
+	}
+	return capabilities.FromABI(&manifest.Capabilities), nil
 }
 
 // Observe executes the main validation logic of the plugin.

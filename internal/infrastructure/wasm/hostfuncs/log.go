@@ -15,22 +15,6 @@ type logContextKey string
 
 const requestIDKey logContextKey = "request_id"
 
-// LogMessageWire is the JSON wire format for a log message from Guest to Host.
-type LogMessageWire struct {
-	Timestamp time.Time         `json:"timestamp"`
-	Level     string            `json:"level"`
-	Message   string            `json:"message"`
-	Attrs     []LogAttrWire     `json:"attrs,omitempty"`
-	Context   ContextWireFormat `json:"context"`
-}
-
-// LogAttrWire represents a single slog attribute.
-type LogAttrWire struct {
-	Key   string `json:"key"`
-	Type  string `json:"type"`  // "string", "int64", "bool", "float64", "time", "error", "any"
-	Value string `json:"value"` // String representation of the value
-}
-
 // LogMessage implements the `log_message` host function.
 // It receives a packed uint64 (ptr+len) pointing to a JSON-encoded LogMessageWire.
 // It does not return any value.

@@ -9,6 +9,7 @@ import (
 
 	"github.com/reglet-dev/reglet/internal/domain/capability"
 	"github.com/reglet-dev/reglet/internal/infrastructure/build"
+	"github.com/reglet-dev/reglet/internal/infrastructure/capabilities"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -379,7 +380,7 @@ func TestPlugin_ExtractFilesystemMounts(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			plugin := &Plugin{
 				name:         "test-plugin",
-				capabilities: capability.ToABI(tt.capabilities),
+				capabilities: capabilities.ToABI(tt.capabilities),
 			}
 
 			mounts := plugin.extractFilesystemMounts()

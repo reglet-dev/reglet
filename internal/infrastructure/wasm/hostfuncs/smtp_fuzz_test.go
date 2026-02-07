@@ -5,15 +5,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/reglet-dev/reglet-sdk/domain/entities"
+	"github.com/reglet-dev/reglet-abi/hostfunc"
 )
 
 // FuzzSMTPRequestParsing fuzzes SMTP request wire format parsing
-// TARGETS: JSON unmarshaling of SMTPRequestWire
+// TARGETS: JSON unmarshaling of hostfunc.SMTPRequest
 // EXPECTED FAILURES: Malformed JSON, invalid ports
 func FuzzSMTPRequestParsing(f *testing.F) {
 	// Seed with valid request
-	validReq := entities.SMTPRequest{
+	validReq := hostfunc.SMTPRequest{
 		Host:     "smtp.example.com",
 		Port:     "25",
 		TLS:      false,
@@ -35,7 +35,7 @@ func FuzzSMTPRequestParsing(f *testing.F) {
 			}
 		}()
 
-		var req entities.SMTPRequest
+		var req hostfunc.SMTPRequest
 		_ = json.Unmarshal(jsonData, &req)
 		// Just ensure no panic on parsing
 	})

@@ -138,90 +138,106 @@ func (g *GrantSet) Clone() GrantSet {
 
 // Deduplicate removes duplicate entries within this GrantSet's arrays.
 func (g *GrantSet) Deduplicate() {
-	// Deduplicate network rules
-	if g.Network != nil && len(g.Network.Rules) > 0 {
-		seen := make(map[string]bool)
-		unique := make([]NetworkRule, 0, len(g.Network.Rules))
-		for _, rule := range g.Network.Rules {
-			key := ""
-			for _, h := range rule.Hosts {
-				key += h + ","
-			}
-			key += ":"
-			for _, p := range rule.Ports {
-				key += p + ","
-			}
-			if !seen[key] {
-				seen[key] = true
-				unique = append(unique, rule)
-			}
-		}
-		g.Network.Rules = unique
-	}
+	g.dedupeNetwork()
+	g.dedupeFS()
+	g.dedupeEnv()
+	g.dedupeExec()
+	g.dedupeKV()
+}
 
-	// Deduplicate filesystem rules
-	if g.FS != nil && len(g.FS.Rules) > 0 {
-		seen := make(map[string]bool)
-		unique := make([]FileSystemRule, 0, len(g.FS.Rules))
-		for _, rule := range g.FS.Rules {
-			key := "r:"
-			for _, p := range rule.Read {
-				key += p + ","
-			}
-			key += "|w:"
-			for _, p := range rule.Write {
-				key += p + ","
-			}
-			if !seen[key] {
-				seen[key] = true
-				unique = append(unique, rule)
-			}
-		}
-		g.FS.Rules = unique
+func (g *GrantSet) dedupeNetwork() {
+	if g.Network == nil || len(g.Network.Rules) == 0 {
+		return
 	}
+	seen := make(map[string]bool)
+	unique := make([]NetworkRule, 0, len(g.Network.Rules))
+	for _, rule := range g.Network.Rules {
+		key := ""
+		for _, h := range rule.Hosts {
+			key += h + ","
+		}
+		key += ":"
+		for _, p := range rule.Ports {
+			key += p + ","
+		}
+		if !seen[key] {
+			seen[key] = true
+			unique = append(unique, rule)
+		}
+	}
+	g.Network.Rules = unique
+}
 
-	// Deduplicate environment variables
-	if g.Env != nil && len(g.Env.Variables) > 0 {
-		seen := make(map[string]bool)
-		unique := make([]string, 0, len(g.Env.Variables))
-		for _, v := range g.Env.Variables {
-			if !seen[v] {
-				seen[v] = true
-				unique = append(unique, v)
-			}
-		}
-		g.Env.Variables = unique
+func (g *GrantSet) dedupeFS() {
+	if g.FS == nil || len(g.FS.Rules) == 0 {
+		return
 	}
+	seen := make(map[string]bool)
+	unique := make([]FileSystemRule, 0, len(g.FS.Rules))
+	for _, rule := range g.FS.Rules {
+		key := "r:"
+		for _, p := range rule.Read {
+			key += p + ","
+		}
+		key += "|w:"
+		for _, p := range rule.Write {
+			key += p + ","
+		}
+		if !seen[key] {
+			seen[key] = true
+			unique = append(unique, rule)
+		}
+	}
+	g.FS.Rules = unique
+}
 
-	// Deduplicate exec commands
-	if g.Exec != nil && len(g.Exec.Commands) > 0 {
-		seen := make(map[string]bool)
-		unique := make([]string, 0, len(g.Exec.Commands))
-		for _, cmd := range g.Exec.Commands {
-			if !seen[cmd] {
-				seen[cmd] = true
-				unique = append(unique, cmd)
-			}
-		}
-		g.Exec.Commands = unique
+func (g *GrantSet) dedupeEnv() {
+	if g.Env == nil || len(g.Env.Variables) == 0 {
+		return
 	}
+	seen := make(map[string]bool)
+	unique := make([]string, 0, len(g.Env.Variables))
+	for _, v := range g.Env.Variables {
+		if !seen[v] {
+			seen[v] = true
+			unique = append(unique, v)
+		}
+	}
+	g.Env.Variables = unique
+}
 
-	// Deduplicate KV rules
-	if g.KV != nil && len(g.KV.Rules) > 0 {
-		seen := make(map[string]bool)
-		unique := make([]KeyValueRule, 0, len(g.KV.Rules))
-		for _, rule := range g.KV.Rules {
-			key := rule.Operation + ":"
-			for _, k := range rule.Keys {
-				key += k + ","
-			}
-			if !seen[key] {
-				seen[key] = true
-				unique = append(unique, rule)
-			}
-		}
-		g.KV.Rules = unique
+func (g *GrantSet) dedupeExec() {
+	if g.Exec == nil || len(g.Exec.Commands) == 0 {
+		return
 	}
+	seen := make(map[string]bool)
+	unique := make([]string, 0, len(g.Exec.Commands))
+	for _, cmd := range g.Exec.Commands {
+		if !seen[cmd] {
+			seen[cmd] = true
+			unique = append(unique, cmd)
+		}
+	}
+	g.Exec.Commands = unique
+}
+
+func (g *GrantSet) dedupeKV() {
+	if g.KV == nil || len(g.KV.Rules) == 0 {
+		return
+	}
+	seen := make(map[string]bool)
+	unique := make([]KeyValueRule, 0, len(g.KV.Rules))
+	for _, rule := range g.KV.Rules {
+		key := rule.Operation + ":"
+		for _, k := range rule.Keys {
+			key += k + ","
+		}
+		if !seen[key] {
+			seen[key] = true
+			unique = append(unique, rule)
+		}
+	}
+	g.KV.Rules = unique
 }
 
 // Difference returns capabilities in g that are not covered by other.

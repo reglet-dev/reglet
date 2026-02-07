@@ -10,7 +10,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/reglet-dev/reglet-hostlib"
+	"github.com/reglet-dev/reglet-abi/hostfunc"
+	hostlib "github.com/reglet-dev/reglet-hostlib"
 	"github.com/reglet-dev/reglet/internal/infrastructure/build"
 	"github.com/tetratelabs/wazero/api"
 )
@@ -19,7 +20,7 @@ import (
 func HTTPRequest(ctx context.Context, mod api.Module, stack []uint64, checker *CapabilityChecker, version build.Info) {
 	request, err := readHTTPRequest(ctx, mod, stack[0])
 	if err != nil {
-		stack[0] = hostWriteResponse(ctx, mod, HTTPResponseWire{Error: err})
+		stack[0] = hostWriteResponse(ctx, mod, hostfunc.HTTPResponse{Error: err})
 		return
 	}
 
@@ -32,8 +33,8 @@ func HTTPRequest(ctx context.Context, mod api.Module, stack []uint64, checker *C
 	if err := checkHTTPCapability(ctx, checker, pluginName, request); err != nil {
 		errMsg := fmt.Sprintf("permission denied: %v", err)
 		slog.WarnContext(ctx, errMsg, "url", request.URL)
-		stack[0] = hostWriteResponse(ctx, mod, HTTPResponseWire{
-			Error: &ErrorDetail{Message: errMsg, Type: "capability"},
+		stack[0] = hostWriteResponse(ctx, mod, hostfunc.HTTPResponse{
+			Error: &hostfunc.ErrorDetail{Message: errMsg, Type: "capability"},
 		})
 		return
 	}
@@ -46,8 +47,8 @@ func HTTPRequest(ctx context.Context, mod api.Module, stack []uint64, checker *C
 		if decodeErr != nil {
 			errMsg := fmt.Sprintf("failed to decode request body: %v", decodeErr)
 			slog.ErrorContext(ctx, errMsg, "url", request.URL)
-			stack[0] = hostWriteResponse(ctx, mod, HTTPResponseWire{
-				Error: &ErrorDetail{Message: errMsg, Type: "config"},
+			stack[0] = hostWriteResponse(ctx, mod, hostfunc.HTTPResponse{
+				Error: &hostfunc.ErrorDetail{Message: errMsg, Type: "config"},
 			})
 			return
 		}
@@ -89,7 +90,7 @@ func HTTPRequest(ctx context.Context, mod api.Module, stack []uint64, checker *C
 		encodedRespBody = base64.StdEncoding.EncodeToString(sdkResp.Body)
 	}
 
-	response := HTTPResponseWire{
+	response := hostfunc.HTTPResponse{
 		StatusCode:    sdkResp.StatusCode,
 		Headers:       sdkResp.Headers,
 		Body:          encodedRespBody,
@@ -98,7 +99,7 @@ func HTTPRequest(ctx context.Context, mod api.Module, stack []uint64, checker *C
 	}
 
 	if sdkResp.Error != nil {
-		response.Error = &ErrorDetail{
+		response.Error = &hostfunc.ErrorDetail{
 			Message: sdkResp.Error.Message,
 			Type:    sdkResp.Error.Code,
 		}
@@ -108,28 +109,28 @@ func HTTPRequest(ctx context.Context, mod api.Module, stack []uint64, checker *C
 }
 
 // readHTTPRequest reads and unmarshals the HTTP request from guest memory.
-func readHTTPRequest(ctx context.Context, mod api.Module, requestPacked uint64) (*HTTPRequestWire, *ErrorDetail) {
+func readHTTPRequest(ctx context.Context, mod api.Module, requestPacked uint64) (*hostfunc.HTTPRequest, *hostfunc.ErrorDetail) {
 	ptr, length := unpackPtrLen(requestPacked)
 
 	requestBytes, ok := mod.Memory().Read(ptr, length)
 	if !ok {
 		errMsg := "hostfuncs: failed to read HTTP request from Guest memory"
 		slog.ErrorContext(ctx, errMsg)
-		return nil, &ErrorDetail{Message: errMsg, Type: "internal"}
+		return nil, &hostfunc.ErrorDetail{Message: errMsg, Type: "internal"}
 	}
 
-	var request HTTPRequestWire
+	var request hostfunc.HTTPRequest
 	if err := json.Unmarshal(requestBytes, &request); err != nil {
 		errMsg := fmt.Sprintf("hostfuncs: failed to unmarshal HTTP request: %v", err)
 		slog.ErrorContext(ctx, errMsg)
-		return nil, &ErrorDetail{Message: errMsg, Type: "internal"}
+		return nil, &hostfunc.ErrorDetail{Message: errMsg, Type: "internal"}
 	}
 
 	return &request, nil
 }
 
 // checkHTTPCapability validates URL and checks network capability.
-func checkHTTPCapability(ctx context.Context, checker *CapabilityChecker, pluginName string, request *HTTPRequestWire) error {
+func checkHTTPCapability(ctx context.Context, checker *CapabilityChecker, pluginName string, request *hostfunc.HTTPRequest) error {
 	// Simple wrapper around checker logic, matching previous behavior
 	// Check specific host/port capability
 	parsedURL, err := url.Parse(request.URL)

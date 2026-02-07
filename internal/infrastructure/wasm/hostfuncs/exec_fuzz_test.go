@@ -5,17 +5,16 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/reglet-dev/reglet-hostlib"
-
-	"github.com/reglet-dev/reglet-sdk/domain/entities"
+	"github.com/reglet-dev/reglet-abi/hostfunc"
+	hostlib "github.com/reglet-dev/reglet-hostlib"
 )
 
 // FuzzExecRequestParsing fuzzes exec request wire format parsing
-// TARGETS: JSON unmarshaling of ExecRequestWire, command parsing, args handling
+// TARGETS: JSON unmarshaling of hostfunc.ExecRequest, command parsing, args handling
 // EXPECTED FAILURES: Malformed JSON, invalid UTF-8, extreme field sizes
 func FuzzExecRequestParsing(f *testing.F) {
 	// Seed with valid exec request structures
-	validReq := entities.ExecRequest{
+	validReq := hostfunc.ExecRequest{
 		Command: "/usr/bin/ls",
 		Args:    []string{"-la", "/tmp"},
 		Dir:     "/home/user",
@@ -70,7 +69,7 @@ func FuzzExecRequestParsing(f *testing.F) {
 			}
 		}()
 
-		var req entities.ExecRequest
+		var req hostfunc.ExecRequest
 		if err := json.Unmarshal(jsonData, &req); err != nil {
 			return // Invalid JSON is expected, not a bug
 		}
