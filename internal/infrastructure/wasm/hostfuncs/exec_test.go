@@ -3,7 +3,7 @@ package hostfuncs
 import (
 	"testing"
 
-	"github.com/reglet-dev/reglet-hostlib"
+	"github.com/reglet-dev/reglet-host-sdk"
 	"github.com/stretchr/testify/assert"
 )
 

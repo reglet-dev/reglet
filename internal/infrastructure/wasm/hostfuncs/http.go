@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/reglet-dev/reglet-abi/hostfunc"
-	hostlib "github.com/reglet-dev/reglet-hostlib"
+	hostlib "github.com/reglet-dev/reglet-host-sdk"
 	"github.com/reglet-dev/reglet/internal/infrastructure/build"
 	"github.com/tetratelabs/wazero/api"
 )

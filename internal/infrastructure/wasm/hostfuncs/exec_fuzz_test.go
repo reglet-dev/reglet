@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/reglet-dev/reglet-abi/hostfunc"
-	hostlib "github.com/reglet-dev/reglet-hostlib"
+	hostlib "github.com/reglet-dev/reglet-host-sdk"
 )
 
 // FuzzExecRequestParsing fuzzes exec request wire format parsing

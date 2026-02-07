@@ -13,8 +13,7 @@ require (
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/owenrumney/go-sarif/v3 v3.3.0
 	github.com/reglet-dev/reglet-abi v0.0.0
-	github.com/reglet-dev/reglet-hostlib v0.0.0
-	github.com/reglet-dev/reglet-sdk v0.5.0
+	github.com/reglet-dev/reglet-host-sdk v0.0.0
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
 	github.com/sigstore/cosign/v2 v2.6.2
 	github.com/spf13/cast v1.10.0
@@ -197,6 +196,6 @@ require (
 
 replace github.com/reglet-dev/reglet-abi => ../reglet-abi
 
-replace github.com/reglet-dev/reglet-hostlib => ../reglet-hostlib
+replace github.com/reglet-dev/reglet-host-sdk => ../reglet-host-sdk
 
-replace github.com/reglet-dev/reglet-sdk => ../reglet-sdk
+replace github.com/reglet-dev/reglet-plugin-sdk => ../reglet-plugin-sdk

@@ -2,7 +2,7 @@ module fixture
 
 go 1.25.5
 
-require github.com/reglet-dev/reglet-sdk v0.5.0
+require github.com/reglet-dev/reglet-plugin-sdk v0.5.0
 
 require (
 	github.com/bahlo/generic-list-go v0.2.0 // indirect

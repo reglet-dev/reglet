@@ -5,7 +5,7 @@ import (
 	"context"
 
 	"github.com/reglet-dev/reglet-abi/hostfunc"
-	hostlib "github.com/reglet-dev/reglet-hostlib"
+	hostlib "github.com/reglet-dev/reglet-host-sdk"
 )
 
 // CapabilityChecker is an alias to the SDK's CapabilityChecker.
