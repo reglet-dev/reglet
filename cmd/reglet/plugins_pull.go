@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/reglet-dev/reglet/internal/application/dto"
+	hostdto "github.com/reglet-dev/reglet-host-sdk/plugin/dto"
 	"github.com/spf13/cobra"
 )
 
@@ -26,7 +26,7 @@ func newPluginsPullCmd() *cobra.Command {
 			refStr := args[0]
 
 			// Create spec
-			spec := &dto.PluginSpecDTO{
+			spec := &hostdto.PluginSpecDTO{
 				Name: refStr,
 			}
 

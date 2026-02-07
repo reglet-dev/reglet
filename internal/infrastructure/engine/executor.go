@@ -90,6 +90,11 @@ func autoDetectPluginDir() string {
 	}
 	// 2. Fallback to dev mode logic
 	projectRoot := findProjectRoot()
+	// Try the new structure where plugins are in a sibling module
+	siblingPlugins := filepath.Join(filepath.Dir(projectRoot), "reglet-plugins", "plugins")
+	if _, err := os.Stat(siblingPlugins); err == nil {
+		return siblingPlugins
+	}
 	return filepath.Join(projectRoot, "plugins")
 }
 

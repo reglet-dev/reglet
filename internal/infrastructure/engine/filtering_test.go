@@ -67,7 +67,12 @@ func TestFiltering_EndToEnd(t *testing.T) {
 		}
 		projectRoot = parent
 	}
-	pluginDir := filepath.Join(projectRoot, "plugins")
+	// Try the new structure where plugins are in a sibling module
+	pluginDir := filepath.Join(projectRoot, "..", "reglet-plugins", "plugins")
+	if _, err := os.Stat(pluginDir); err != nil {
+		// Fallback to old structure just in case
+		pluginDir = filepath.Join(projectRoot, "plugins")
+	}
 
 	// Create a temporary file that definitely exists and is accessible
 	tempDir := t.TempDir()

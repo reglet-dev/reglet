@@ -2,11 +2,9 @@ package ports
 
 import (
 	"context"
-	"time"
 
 	"github.com/reglet-dev/reglet/internal/domain/capability"
 	"github.com/reglet-dev/reglet/internal/domain/entities"
-	"github.com/reglet-dev/reglet/internal/domain/values"
 )
 
 // CapabilityInfo contains metadata about a capability request.
@@ -46,24 +44,6 @@ type CapabilityGranter interface {
 // Placed here as it's often used with execution/security components.
 type DataRedactor interface {
 	Redact(input string) string
-}
-
-// IntegrityVerifier verifies cryptographic signatures on plugin artifacts.
-type IntegrityVerifier interface {
-	// VerifySignature checks the signature of a plugin in the registry.
-	VerifySignature(ctx context.Context, ref values.PluginReference) (*SignatureResult, error)
-
-	// Sign signs a plugin artifact (for publishing).
-	Sign(ctx context.Context, ref values.PluginReference) error
-}
-
-// SignatureResult contains signature verification details.
-type SignatureResult struct {
-	SignedAt        time.Time
-	Signer          string
-	TransparencyLog string
-	Certificate     []byte
-	Verified        bool
 }
 
 // ProfileTrustChecker verifies trust for remote profile sources.

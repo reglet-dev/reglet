@@ -1,3 +1,5 @@
+// DEPRECATED: This file is superseded by reglet-host-sdk/capability/risk.go
+// It will be removed in Phase 04 (consolidate-cleanup).
 package capability
 
 import "fmt"

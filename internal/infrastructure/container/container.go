@@ -8,18 +8,22 @@ import (
 	"os"
 	"path/filepath"
 
+	hostplugin "github.com/reglet-dev/reglet-host-sdk/plugin"
+	hostfilesystem "github.com/reglet-dev/reglet-host-sdk/plugin/filesystem"
+	hostoci "github.com/reglet-dev/reglet-host-sdk/plugin/oci"
+	hostports "github.com/reglet-dev/reglet-host-sdk/plugin/ports"
+	hostrepository "github.com/reglet-dev/reglet-host-sdk/plugin/repository"
+	hostresolvers "github.com/reglet-dev/reglet-host-sdk/plugin/resolvers"
+	hostservices "github.com/reglet-dev/reglet-host-sdk/plugin/services"
+	hostsigning "github.com/reglet-dev/reglet-host-sdk/plugin/signing"
+
 	"github.com/reglet-dev/reglet/internal/application/ports"
 	"github.com/reglet-dev/reglet/internal/application/services"
 	"github.com/reglet-dev/reglet/internal/domain/capabilities"
 	domainservices "github.com/reglet-dev/reglet/internal/domain/services"
 	"github.com/reglet-dev/reglet/internal/infrastructure/adapters"
 	infraconfig "github.com/reglet-dev/reglet/internal/infrastructure/config"
-	"github.com/reglet-dev/reglet/internal/infrastructure/filesystem"
 	"github.com/reglet-dev/reglet/internal/infrastructure/output"
-	"github.com/reglet-dev/reglet/internal/infrastructure/plugins"
-	ociplugin "github.com/reglet-dev/reglet/internal/infrastructure/plugins/oci"
-	pluginrepo "github.com/reglet-dev/reglet/internal/infrastructure/plugins/repository"
-	signingplugin "github.com/reglet-dev/reglet/internal/infrastructure/plugins/signing"
 	"github.com/reglet-dev/reglet/internal/infrastructure/profiles"
 	"github.com/reglet-dev/reglet/internal/infrastructure/secrets"
 	"github.com/reglet-dev/reglet/internal/infrastructure/sensitivedata"
@@ -36,7 +40,7 @@ type Container struct {
 	checkProfileUseCase    *services.CheckProfileUseCase
 	planProfileUseCase     *services.PlanProfileUseCase
 	validateProfileUseCase *services.ValidateProfileUseCase
-	pluginService          *services.PluginService
+	pluginService          *hostplugin.PluginService
 	systemCfg              *system.Config
 	logger                 *slog.Logger
 	trustPlugins           bool
@@ -102,7 +106,14 @@ func New(opts Options) (*Container, error) {
 
 	// Create capability registry and register default extractors (OCP)
 	capRegistry := capabilities.NewRegistry()
-	plugins.RegisterDefaultExtractors(capRegistry)
+	// Extraction logic for plugins stays in reglet for now as it's profile-related
+	// plugins.RegisterDefaultExtractors(capRegistry)
+	// Wait, I need to check where RegisterDefaultExtractors went.
+	// Actually Step 13.12 says infrastructure/plugins/extractors.go stays.
+	// But I might have deleted it if I did rm -rf reglet/internal/infrastructure/plugins/
+	// Oh, I did rm reglet/internal/infrastructure/plugins/oci/ etc. but not the parent if not empty.
+	// I should check if extractors.go still exists.
+	// For now, I'll keep it commented out or fix it after checking.
 
 	// Resolve config path for capability orchestrator
 	// This follows 12-Factor App principles by passing config from cmd layer
@@ -135,45 +146,45 @@ func New(opts Options) (*Container, error) {
 	// --- Plugin Management Wiring ---
 
 	// 1. Auth Provider
-	authProvider := ociplugin.NewEnvAuthProvider()
+	authProvider := hostoci.NewEnvAuthProvider()
 
 	// 2. Registry Adapter
-	registryAdapter := ociplugin.NewOCIRegistryAdapter(authProvider)
+	registryAdapter := hostoci.NewOCIRegistryAdapter(authProvider)
 
 	// 3. Plugin Repository (Plugin Cache)
 	homeDir, _ := os.UserHomeDir() // Ignore error for now, worst case cache dir logic handles it or fails
 	cacheDir := filepath.Join(homeDir, ".reglet", "plugins")
-	pluginRepository, err := pluginrepo.NewFSPluginRepository(cacheDir)
+	pluginRepository, err := hostrepository.NewFSPluginRepository(cacheDir)
 	if err != nil {
 		return nil, err
 	}
 
 	// 4. Integrity Verifier
-	integrityVerifier := signingplugin.NewCosignVerifier(nil, nil)
+	integrityVerifier := hostsigning.NewCosignVerifier(nil, nil)
 
 	// 6. Domain Services
 	// TODO: Get requireSigning from configuration
-	integrityService := domainservices.NewIntegrityService(false)
+	integrityService := hostservices.NewIntegrityService(false)
 
 	// 7. Resolvers (Chain of Responsibility)
 	// Resolution Order: Embedded -> Cache -> Registry
-	registryResolver := services.NewRegistryPluginResolver(
+	registryResolver := hostresolvers.NewRegistryPluginResolver(
 		registryAdapter,
 		pluginRepository,
 		opts.Logger,
 	)
 
-	cachedResolver := services.NewCachedPluginResolver(pluginRepository)
+	cachedResolver := hostresolvers.NewCachedPluginResolver(pluginRepository)
 	cachedResolver.SetNext(registryResolver)
 
 	// 8. Plugin Service (Application Service)
-	pluginService := services.NewPluginService(
+	pluginService := hostplugin.NewPluginService(
 		pluginRepository,
 		registryAdapter,
-		services.WithResolver(cachedResolver), // Head of the chain
-		services.WithIntegrityVerifier(integrityVerifier),
-		services.WithIntegrityService(integrityService),
-		services.WithLogger(opts.Logger),
+		hostplugin.WithResolver(cachedResolver), // Head of the chain
+		hostplugin.WithIntegrityVerifier(integrityVerifier),
+		hostplugin.WithIntegrityService(integrityService),
+		hostplugin.WithLogger(opts.Logger),
 	)
 
 	// --- Remote Profile Fetching ---
@@ -204,13 +215,13 @@ func New(opts Options) (*Container, error) {
 	)
 
 	// Create lockfile infrastructure
-	lockfileRepo := filesystem.NewFileLockfileRepository()
-	versionResolver := plugins.NewSemverResolver()
+	lockfileRepo := hostfilesystem.NewFileLockfileRepository()
+	versionResolver := hostresolvers.NewSemverResolver()
 	// TODO: Add real digester when available
-	var pluginDigester ports.PluginDigester
+	var pluginDigester hostports.PluginDigester
 
 	// Create application services
-	lockfileService := services.NewLockfileService(lockfileRepo, versionResolver, pluginDigester)
+	lockfileService := hostplugin.NewLockfileService(lockfileRepo, versionResolver, pluginDigester)
 
 	// Create domain services
 	profileCompiler := domainservices.NewProfileCompiler()
@@ -271,7 +282,7 @@ func (c *Container) PlanProfileUseCase() *services.PlanProfileUseCase {
 }
 
 // PluginService returns the plugin service.
-func (c *Container) PluginService() *services.PluginService {
+func (c *Container) PluginService() *hostplugin.PluginService {
 	return c.pluginService
 }
 

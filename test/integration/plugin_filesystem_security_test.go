@@ -46,7 +46,7 @@ func TestPluginFilesystemIsolation(t *testing.T) {
 	defer runtime.Close(ctx)
 
 	// Load file plugin
-	pluginWASM, err := os.ReadFile("../../plugins/file/file.wasm")
+	pluginWASM, err := os.ReadFile("../../../reglet-plugins/plugins/file/file.wasm")
 	if os.IsNotExist(err) {
 		t.Skip("file.wasm not built - run 'cd plugins/file && make build' first")
 	}
@@ -99,7 +99,7 @@ func TestPluginNoCapabilitiesNoAccess(t *testing.T) {
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
-	pluginWASM, err := os.ReadFile("../../plugins/file/file.wasm")
+	pluginWASM, err := os.ReadFile("../../../reglet-plugins/plugins/file/file.wasm")
 	if os.IsNotExist(err) {
 		t.Skip("file.wasm not built - run 'cd plugins/file && make build' first")
 	}
@@ -157,7 +157,7 @@ func TestPluginSpecificFileAccess(t *testing.T) {
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
-	pluginWASM, err := os.ReadFile("../../plugins/file/file.wasm")
+	pluginWASM, err := os.ReadFile("../../../reglet-plugins/plugins/file/file.wasm")
 	if os.IsNotExist(err) {
 		t.Skip("file.wasm not built - run 'cd plugins/file && make build' first")
 	}
@@ -211,7 +211,7 @@ func TestPluginRootAccess(t *testing.T) {
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
-	pluginWASM, err := os.ReadFile("../../plugins/file/file.wasm")
+	pluginWASM, err := os.ReadFile("../../../reglet-plugins/plugins/file/file.wasm")
 	if os.IsNotExist(err) {
 		t.Skip("file.wasm not built - run 'cd plugins/file && make build' first")
 	}
@@ -258,7 +258,7 @@ func TestPluginReadOnlyVsReadWrite(t *testing.T) {
 	require.NoError(t, err)
 	defer runtime.Close(ctx)
 
-	pluginWASM, err := os.ReadFile("../../plugins/file/file.wasm")
+	pluginWASM, err := os.ReadFile("../../../reglet-plugins/plugins/file/file.wasm")
 	if os.IsNotExist(err) {
 		t.Skip("file.wasm not built - run 'cd plugins/file && make build' first")
 	}

@@ -1,6 +1,8 @@
 // OWNERSHIP: REGLET RUNTIME (should NOT be in SDK)
 // STATUS: Needs migration to reglet/internal/infrastructure/capabilities/grantstore/
 
+// DEPRECATED: This file is superseded by reglet-host-sdk/capability/grantstore/file_store.go
+// It will be removed in Phase 04 (consolidate-cleanup).
 package grantstore
 
 import (

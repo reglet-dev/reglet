@@ -150,7 +150,7 @@ func TestRuntime_ConcurrentLoadDifferentPlugins(t *testing.T) {
 	}()
 
 	// Load a real WASM plugin file for testing
-	pluginPath := filepath.Join("..", "..", "..", "plugins", "file", "file.wasm")
+	pluginPath := filepath.Join("..", "..", "..", "..", "reglet-plugins", "plugins", "file", "file.wasm")
 	wasmBytes, err := os.ReadFile(pluginPath)
 	require.NoError(t, err, "Failed to read file plugin. Run 'cd plugins/file && make build' first")
 

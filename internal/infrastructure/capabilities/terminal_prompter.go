@@ -1,3 +1,5 @@
+// DEPRECATED: This file is partially superseded by reglet-host-sdk/capability/gatekeeper/terminal_prompter.go
+// It will be cleaned up in Phase 04 (consolidate-cleanup).
 package capabilities
 
 import (

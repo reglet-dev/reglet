@@ -302,12 +302,21 @@ func (a *PluginDirectoryAdapter) ResolvePluginDir(_ context.Context) (string, er
 		return "", err
 	}
 
+	// 1. Try local ./plugins
 	pluginDir := filepath.Join(cwd, "plugins")
 	if _, err := os.Stat(pluginDir); err == nil {
 		return pluginDir, nil
 	}
 
-	// Fallback to executable directory
+	// 2. Try sibling reglet-plugins/plugins (new structure)
+	// Walk up to find go.mod, then look for sibling
+	projectRoot := findProjectRoot()
+	siblingPlugins := filepath.Join(filepath.Dir(projectRoot), "reglet-plugins", "plugins")
+	if _, err := os.Stat(siblingPlugins); err == nil {
+		return siblingPlugins, nil
+	}
+
+	// 3. Fallback to executable directory
 	exePath, err := os.Executable()
 	if err != nil {
 		return "", err
@@ -447,4 +456,26 @@ func (m *staticCapabilityManager) GrantCapabilities(
 ) (map[string]capability.GrantSet, error) {
 	// Return what was already granted
 	return m.granted, nil
+}
+
+// findProjectRoot attempts to find the project root by looking for the go.mod file.
+func findProjectRoot() string {
+	workingDir, err := os.Getwd()
+	if err != nil {
+		return "."
+	}
+
+	currentDir := workingDir
+	for i := 0; i < 5; i++ {
+		if _, err := os.Stat(filepath.Join(currentDir, "go.mod")); err == nil {
+			return currentDir
+		}
+		parentDir := filepath.Dir(currentDir)
+		if parentDir == currentDir {
+			break
+		}
+		currentDir = parentDir
+	}
+
+	return workingDir
 }

@@ -45,3 +45,19 @@ reglet.lock
 
 # OS specific
 Thumbs.db
+
+# AI
+docs/old/*
+specs/*
+.agent/*
+.claude/*
+.gemini/*
+.specify/*
+docs/design/*
+docs/phases/*
+
+CLAUDE.md
+GEMINI.md
+SPECIFY.md
+
+

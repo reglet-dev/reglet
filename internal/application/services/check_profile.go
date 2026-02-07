@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/expr-lang/expr"
+	"github.com/reglet-dev/reglet-host-sdk/plugin"
+	hostdto "github.com/reglet-dev/reglet-host-sdk/plugin/dto"
 	"github.com/reglet-dev/reglet/internal/application/dto"
 	apperrors "github.com/reglet-dev/reglet/internal/application/errors"
 	"github.com/reglet-dev/reglet/internal/application/ports"
@@ -29,8 +31,8 @@ type CheckProfileUseCase struct {
 	systemConfig     ports.SystemConfigProvider
 	pluginResolver   ports.PluginDirectoryResolver
 	capOrchestrator  *CapabilityOrchestrator
-	lockfileService  *LockfileService
-	pluginService    *PluginService
+	lockfileService  *plugin.LockfileService
+	pluginService    *plugin.PluginService
 	engineFactory    ports.EngineFactory
 	logger           *slog.Logger
 }
@@ -77,12 +79,12 @@ func WithCapabilityOrchestrator(o *CapabilityOrchestrator) CheckProfileUseCaseOp
 }
 
 // WithLockfileService sets the lockfile service.
-func WithLockfileService(s *LockfileService) CheckProfileUseCaseOption {
+func WithLockfileService(s *plugin.LockfileService) CheckProfileUseCaseOption {
 	return func(uc *CheckProfileUseCase) { uc.lockfileService = s }
 }
 
 // WithPluginService sets the plugin service.
-func WithPluginService(s *PluginService) CheckProfileUseCaseOption {
+func WithPluginService(s *plugin.PluginService) CheckProfileUseCaseOption {
 	return func(uc *CheckProfileUseCase) { uc.pluginService = s }
 }
 
@@ -190,7 +192,7 @@ func (uc *CheckProfileUseCase) resolveAndLockPlugins(
 	profilePath string,
 ) error {
 	lockfilePath := filepath.Join(filepath.Dir(profilePath), "reglet.lock")
-	lockfile, err := uc.lockfileService.ResolvePlugins(ctx, profile.Profile, lockfilePath)
+	lockfile, err := uc.lockfileService.ResolvePlugins(ctx, profile.Plugins, lockfilePath)
 	if err != nil {
 		return apperrors.NewConfigurationError("lockfile", "failed to resolve plugins", err)
 	}
@@ -556,7 +558,7 @@ func (uc *CheckProfileUseCase) prepareSinglePlugin(
 	}
 
 	// 3. Try OCI
-	spec := &dto.PluginSpecDTO{Name: decl}
+	spec := &hostdto.PluginSpecDTO{Name: decl}
 	if ref, err := spec.ToPluginReference(); err == nil && ref.Registry() != "" {
 		uc.logger.Debug("resolving OCI plugin", "ref", decl)
 		path, err := uc.pluginService.LoadPlugin(ctx, spec)
