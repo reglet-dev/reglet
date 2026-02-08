@@ -10,8 +10,8 @@ require (
 	github.com/goccy/go-yaml v1.19.2
 	github.com/google/uuid v1.6.0
 	github.com/owenrumney/go-sarif/v3 v3.3.0
-	github.com/reglet-dev/reglet-abi v0.0.0
-	github.com/reglet-dev/reglet-host-sdk v0.0.0
+	github.com/reglet-dev/reglet-abi v0.1.0
+	github.com/reglet-dev/reglet-host-sdk v0.1.0
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
 	github.com/spf13/cast v1.10.0
 	github.com/spf13/cobra v1.10.2
@@ -198,9 +198,3 @@ require (
 	google.golang.org/protobuf v1.36.11 // indirect
 	oras.land/oras-go/v2 v2.6.0 // indirect
 )
-
-replace github.com/reglet-dev/reglet-abi => ../reglet-abi
-
-replace github.com/reglet-dev/reglet-host-sdk => ../reglet-host-sdk
-
-replace github.com/reglet-dev/reglet-plugin-sdk => ../reglet-plugin-sdk
