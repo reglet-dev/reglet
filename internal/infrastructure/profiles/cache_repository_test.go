@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	hostValues "github.com/reglet-dev/reglet-host-sdk/plugin/values"
 	"github.com/reglet-dev/reglet/internal/domain/entities"
 	"github.com/reglet-dev/reglet/internal/domain/values"
 	"github.com/reglet-dev/reglet/internal/infrastructure/profiles"
@@ -70,7 +71,7 @@ func Test_FSProfileCacheRepository_StoreAndFind(t *testing.T) {
 
 	// Create test content
 	content := []byte("controls:\n  - id: test-1\n")
-	contentHash, err := values.ComputeDigestSHA256(strings.NewReader(string(content)))
+	contentHash, err := hostValues.ComputeDigestSHA256(strings.NewReader(string(content)))
 	require.NoError(t, err)
 
 	// Create cache entry
@@ -139,7 +140,7 @@ func Test_FSProfileCacheRepository_List(t *testing.T) {
 		} {
 			ref, _ := values.ParseProfileReference(url)
 			content := []byte("# profile " + string(rune('1'+i)))
-			hash, _ := values.ComputeDigestSHA256(strings.NewReader(string(content)))
+			hash, _ := hostValues.ComputeDigestSHA256(strings.NewReader(string(content)))
 			entry, err := entities.NewProfileCacheEntry(ref, content, hash, time.Hour)
 			require.NoError(t, err)
 			require.NoError(t, repo.Store(ctx, entry))
@@ -162,7 +163,7 @@ func Test_FSProfileCacheRepository_Delete(t *testing.T) {
 	// Store an entry
 	ref, _ := values.ParseProfileReference("https://example.com/to-delete.yaml")
 	content := []byte("# delete me")
-	hash, _ := values.ComputeDigestSHA256(strings.NewReader(string(content)))
+	hash, _ := hostValues.ComputeDigestSHA256(strings.NewReader(string(content)))
 	entry, err := entities.NewProfileCacheEntry(ref, content, hash, time.Hour)
 	require.NoError(t, err)
 	require.NoError(t, repo.Store(ctx, entry))
@@ -196,7 +197,7 @@ func Test_FSProfileCacheRepository_Prune(t *testing.T) {
 	// Create fresh entry
 	freshRef, _ := values.ParseProfileReference("https://example.com/fresh.yaml")
 	freshContent := []byte("# fresh")
-	freshHash, _ := values.ComputeDigestSHA256(strings.NewReader(string(freshContent)))
+	freshHash, _ := hostValues.ComputeDigestSHA256(strings.NewReader(string(freshContent)))
 	freshEntry, err := entities.NewProfileCacheEntry(freshRef, freshContent, freshHash, time.Hour)
 	require.NoError(t, err)
 	require.NoError(t, repo.Store(ctx, freshEntry))
@@ -204,7 +205,7 @@ func Test_FSProfileCacheRepository_Prune(t *testing.T) {
 	// Create old entry by storing then manipulating the metadata
 	oldRef, _ := values.ParseProfileReference("https://example.com/old.yaml")
 	oldContent := []byte("# old")
-	oldHash, _ := values.ComputeDigestSHA256(strings.NewReader(string(oldContent)))
+	oldHash, _ := hostValues.ComputeDigestSHA256(strings.NewReader(string(oldContent)))
 	oldEntry, err := entities.NewProfileCacheEntry(oldRef, oldContent, oldHash, time.Hour)
 	require.NoError(t, err)
 	require.NoError(t, repo.Store(ctx, oldEntry))

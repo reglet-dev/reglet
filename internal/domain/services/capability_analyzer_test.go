@@ -3,8 +3,8 @@ package services
 import (
 	"testing"
 
-	"github.com/reglet-dev/reglet/internal/domain/capabilities"
-	"github.com/reglet-dev/reglet/internal/domain/capability"
+	"github.com/reglet-dev/reglet-abi/hostfunc"
+	hostSDK "github.com/reglet-dev/reglet-host-sdk/capability"
 	"github.com/reglet-dev/reglet/internal/domain/entities"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -13,12 +13,12 @@ import (
 // Mock extractors for testing (return GrantSet)
 type testFileExtractor struct{}
 
-func (e *testFileExtractor) Extract(config map[string]interface{}) *capability.GrantSet {
+func (e *testFileExtractor) Extract(config map[string]interface{}) *hostfunc.GrantSet {
 	if pathVal, ok := config["path"]; ok {
 		if path, ok := pathVal.(string); ok && path != "" {
-			return &capability.GrantSet{
-				FS: &capability.FileSystemCapability{
-					Rules: []capability.FileSystemRule{
+			return &hostfunc.GrantSet{
+				FS: &hostfunc.FileSystemCapability{
+					Rules: []hostfunc.FileSystemRule{
 						{Read: []string{path}},
 					},
 				},
@@ -30,11 +30,11 @@ func (e *testFileExtractor) Extract(config map[string]interface{}) *capability.G
 
 type testCommandExtractor struct{}
 
-func (e *testCommandExtractor) Extract(config map[string]interface{}) *capability.GrantSet {
+func (e *testCommandExtractor) Extract(config map[string]interface{}) *hostfunc.GrantSet {
 	if cmdVal, ok := config["command"]; ok {
 		if cmd, ok := cmdVal.(string); ok && cmd != "" {
-			return &capability.GrantSet{
-				Exec: &capability.ExecCapability{
+			return &hostfunc.GrantSet{
+				Exec: &hostfunc.ExecCapability{
 					Commands: []string{cmd},
 				},
 			}
@@ -45,7 +45,7 @@ func (e *testCommandExtractor) Extract(config map[string]interface{}) *capabilit
 
 type testNetworkExtractor struct{}
 
-func (e *testNetworkExtractor) Extract(config map[string]interface{}) *capability.GrantSet {
+func (e *testNetworkExtractor) Extract(config map[string]interface{}) *hostfunc.GrantSet {
 	var hosts []string
 
 	if urlVal, ok := config["url"]; ok {
@@ -63,17 +63,17 @@ func (e *testNetworkExtractor) Extract(config map[string]interface{}) *capabilit
 		return nil
 	}
 
-	return &capability.GrantSet{
-		Network: &capability.NetworkCapability{
-			Rules: []capability.NetworkRule{
+	return &hostfunc.GrantSet{
+		Network: &hostfunc.NetworkCapability{
+			Rules: []hostfunc.NetworkRule{
 				{Hosts: hosts, Ports: []string{"*"}},
 			},
 		},
 	}
 }
 
-func setupTestRegistry() *capabilities.Registry {
-	r := capabilities.NewRegistry()
+func setupTestRegistry() *hostSDK.Registry {
+	r := hostSDK.NewRegistry()
 	r.Register("file", &testFileExtractor{})
 	r.Register("command", &testCommandExtractor{})
 	net := &testNetworkExtractor{}

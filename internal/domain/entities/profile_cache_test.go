@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	hostValues "github.com/reglet-dev/reglet-host-sdk/plugin/values"
 	"github.com/reglet-dev/reglet/internal/domain/entities"
 	"github.com/reglet-dev/reglet/internal/domain/values"
 )
@@ -17,7 +18,7 @@ func Test_NewProfileCacheEntry_Valid(t *testing.T) {
 	require.NoError(t, err)
 
 	content := []byte("name: test-profile\nversion: 1.0.0")
-	hash, err := values.ComputeDigestSHA256(bytesReader(content))
+	hash, err := hostValues.ComputeDigestSHA256(bytesReader(content))
 	require.NoError(t, err)
 
 	entry, err := entities.NewProfileCacheEntry(ref, content, hash, time.Hour)
@@ -36,7 +37,7 @@ func Test_NewProfileCacheEntry_Valid(t *testing.T) {
 func Test_NewProfileCacheEntry_InvalidTTL(t *testing.T) {
 	ref, _ := values.ParseProfileReference("https://example.com/profile.yaml")
 	content := []byte("test")
-	hash, _ := values.ComputeDigestSHA256(bytesReader(content))
+	hash, _ := hostValues.ComputeDigestSHA256(bytesReader(content))
 
 	_, err := entities.NewProfileCacheEntry(ref, content, hash, 0)
 	require.Error(t, err)
@@ -50,7 +51,7 @@ func Test_NewProfileCacheEntry_InvalidTTL(t *testing.T) {
 func Test_ProfileCacheEntry_CacheStates(t *testing.T) {
 	ref, _ := values.ParseProfileReference("https://example.com/profile.yaml")
 	content := []byte("test")
-	hash, _ := values.ComputeDigestSHA256(bytesReader(content))
+	hash, _ := hostValues.ComputeDigestSHA256(bytesReader(content))
 
 	ttl := time.Hour
 	freshTime := time.Now().UTC()
@@ -110,7 +111,7 @@ func Test_ProfileCacheEntry_CacheStates(t *testing.T) {
 func Test_ProfileCacheEntry_Touch(t *testing.T) {
 	ref, _ := values.ParseProfileReference("https://example.com/profile.yaml")
 	content := []byte("test")
-	hash, _ := values.ComputeDigestSHA256(bytesReader(content))
+	hash, _ := hostValues.ComputeDigestSHA256(bytesReader(content))
 
 	entry, err := entities.NewProfileCacheEntry(ref, content, hash, time.Hour)
 	require.NoError(t, err)
@@ -125,7 +126,7 @@ func Test_ProfileCacheEntry_Touch(t *testing.T) {
 func Test_ProfileCacheEntry_ETag(t *testing.T) {
 	ref, _ := values.ParseProfileReference("https://example.com/profile.yaml")
 	content := []byte("test")
-	hash, _ := values.ComputeDigestSHA256(bytesReader(content))
+	hash, _ := hostValues.ComputeDigestSHA256(bytesReader(content))
 
 	entry, err := entities.NewProfileCacheEntry(ref, content, hash, time.Hour)
 	require.NoError(t, err)
@@ -138,7 +139,7 @@ func Test_ProfileCacheEntry_ETag(t *testing.T) {
 func Test_ProfileCacheEntry_ValidateContent(t *testing.T) {
 	ref, _ := values.ParseProfileReference("https://example.com/profile.yaml")
 	content := []byte("test content")
-	hash, _ := values.ComputeDigestSHA256(bytesReader(content))
+	hash, _ := hostValues.ComputeDigestSHA256(bytesReader(content))
 
 	entry, err := entities.NewProfileCacheEntry(ref, content, hash, time.Hour)
 	require.NoError(t, err)
@@ -150,7 +151,7 @@ func Test_ProfileCacheEntry_ValidateContent(t *testing.T) {
 func Test_ProfileCacheEntry_StateString(t *testing.T) {
 	ref, _ := values.ParseProfileReference("https://example.com/profile.yaml")
 	content := []byte("test")
-	hash, _ := values.ComputeDigestSHA256(bytesReader(content))
+	hash, _ := hostValues.ComputeDigestSHA256(bytesReader(content))
 
 	entry, _ := entities.NewProfileCacheEntry(ref, content, hash, time.Hour)
 	assert.Equal(t, "fresh", entry.StateString())
@@ -159,7 +160,7 @@ func Test_ProfileCacheEntry_StateString(t *testing.T) {
 func Test_ProfileCacheEntry_Age(t *testing.T) {
 	ref, _ := values.ParseProfileReference("https://example.com/profile.yaml")
 	content := []byte("test")
-	hash, _ := values.ComputeDigestSHA256(bytesReader(content))
+	hash, _ := hostValues.ComputeDigestSHA256(bytesReader(content))
 
 	// Create an entry that was fetched 30 minutes ago
 	fetchedAt := time.Now().UTC().Add(-30 * time.Minute)

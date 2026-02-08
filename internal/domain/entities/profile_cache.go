@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	hostValues "github.com/reglet-dev/reglet-host-sdk/plugin/values"
 	"github.com/reglet-dev/reglet/internal/domain/values"
 )
 
@@ -19,7 +20,7 @@ type ProfileCacheEntry struct {
 	fetchedAt      time.Time
 	lastAccessedAt time.Time
 	reference      values.ProfileReference
-	contentHash    values.Digest
+	contentHash    hostValues.Digest
 	id             string
 	etag           string
 	content        []byte
@@ -31,7 +32,7 @@ type ProfileCacheEntry struct {
 func NewProfileCacheEntry(
 	ref values.ProfileReference,
 	content []byte,
-	contentHash values.Digest,
+	contentHash hostValues.Digest,
 	ttl time.Duration,
 ) (*ProfileCacheEntry, error) {
 	now := time.Now().UTC()
@@ -60,7 +61,7 @@ func LoadProfileCacheEntry(
 	id string,
 	ref values.ProfileReference,
 	content []byte,
-	contentHash values.Digest,
+	contentHash hostValues.Digest,
 	fetchedAt time.Time,
 	lastAccessedAt time.Time,
 	ttl time.Duration,
@@ -95,7 +96,7 @@ func (e *ProfileCacheEntry) Content() []byte {
 }
 
 // ContentHash returns the content digest.
-func (e *ProfileCacheEntry) ContentHash() values.Digest {
+func (e *ProfileCacheEntry) ContentHash() hostValues.Digest {
 	return e.contentHash
 }
 

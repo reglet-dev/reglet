@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	hostValues "github.com/reglet-dev/reglet-host-sdk/plugin/values"
 	"github.com/reglet-dev/reglet/internal/domain/entities"
 	"github.com/reglet-dev/reglet/internal/domain/values"
 	"github.com/reglet-dev/reglet/internal/infrastructure/profiles"
@@ -25,7 +26,7 @@ func BenchmarkCacheStore(b *testing.B) {
 	// Create a sample entry
 	ref, _ := values.ParseProfileReference("https://example.com/benchmark-profile.yaml")
 	content := []byte("profile:\n  name: benchmark\n  version: 1.0.0\n")
-	hash, _ := values.ComputeDigestSHA256(bytes.NewReader(content))
+	hash, _ := hostValues.ComputeDigestSHA256(bytes.NewReader(content))
 
 	ctx := context.Background()
 
@@ -50,7 +51,7 @@ func BenchmarkCacheFind(b *testing.B) {
 	// Create and store a sample entry
 	ref, _ := values.ParseProfileReference("https://example.com/benchmark-profile.yaml")
 	content := []byte("profile:\n  name: benchmark\n  version: 1.0.0\n")
-	hash, _ := values.ComputeDigestSHA256(bytes.NewReader(content))
+	hash, _ := hostValues.ComputeDigestSHA256(bytes.NewReader(content))
 
 	ctx := context.Background()
 	entry, _ := entities.NewProfileCacheEntry(ref, content, hash, time.Hour)
@@ -78,7 +79,7 @@ func BenchmarkCacheList(b *testing.B) {
 
 	ctx := context.Background()
 	content := []byte("profile:\n  name: benchmark\n  version: 1.0.0\n")
-	hash, _ := values.ComputeDigestSHA256(bytes.NewReader(content))
+	hash, _ := hostValues.ComputeDigestSHA256(bytes.NewReader(content))
 
 	// Create 10 cached entries
 	for i := 0; i < 10; i++ {
@@ -134,7 +135,7 @@ func BenchmarkDigestComputation(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = values.ComputeDigestSHA256(bytes.NewReader(content))
+		_, _ = hostValues.ComputeDigestSHA256(bytes.NewReader(content))
 	}
 }
 

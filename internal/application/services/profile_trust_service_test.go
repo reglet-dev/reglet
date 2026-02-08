@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/reglet-dev/reglet-abi/hostfunc"
 	"github.com/reglet-dev/reglet/internal/application/services"
-	"github.com/reglet-dev/reglet/internal/domain/capability"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -157,10 +157,10 @@ func TestProfileTrustService_FormatNonInteractiveError(t *testing.T) {
 
 	svc := services.NewProfileTrustService()
 
-	caps := map[string]capability.GrantSet{
+	caps := map[string]*hostfunc.GrantSet{
 		"file": {
-			FS: &capability.FileSystemCapability{
-				Rules: []capability.FileSystemRule{{Read: []string{"/etc/passwd"}}},
+			FS: &hostfunc.FileSystemCapability{
+				Rules: []hostfunc.FileSystemRule{{Read: []string{"/etc/passwd"}}},
 			},
 		},
 	}

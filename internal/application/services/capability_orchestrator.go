@@ -10,9 +10,10 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/reglet-dev/reglet-abi/hostfunc"
+	hostSDK "github.com/reglet-dev/reglet-host-sdk/capability"
+	"github.com/reglet-dev/reglet-host-sdk/capability/gatekeeper"
 	"github.com/reglet-dev/reglet/internal/application/ports"
-	"github.com/reglet-dev/reglet/internal/domain/capabilities"
-	"github.com/reglet-dev/reglet/internal/domain/capability"
 	"github.com/reglet-dev/reglet/internal/domain/entities"
 	domainServices "github.com/reglet-dev/reglet/internal/domain/services"
 	"golang.org/x/sync/errgroup"
@@ -43,8 +44,8 @@ func NewCapabilityOrchestrator(
 		runtimeFactory: runtimeFactory,
 		capabilityInfo: make(map[string]ports.CapabilityInfo),
 		// Defaults
-		analyzer:   domainServices.NewCapabilityAnalyzer(capabilities.NewRegistry()),
-		gatekeeper: NewCapabilityGatekeeper("", "standard"),
+		analyzer:   domainServices.NewCapabilityAnalyzer(hostSDK.NewRegistry()),
+		gatekeeper: gatekeeper.NewGatekeeper(gatekeeper.WithSecurityLevel(gatekeeper.SecurityStandard)),
 	}
 	for _, opt := range opts {
 		opt(o)
@@ -63,7 +64,7 @@ func WithGatekeeper(g ports.CapabilityGatekeeperPort) CapabilityOrchestratorOpti
 }
 
 // WithCapabilityRegistry sets a capability registry to use for the analyzer.
-func WithCapabilityRegistry(r *capabilities.Registry) CapabilityOrchestratorOption {
+func WithCapabilityRegistry(r *hostSDK.Registry) CapabilityOrchestratorOption {
 	return func(o *CapabilityOrchestrator) {
 		o.analyzer = domainServices.NewCapabilityAnalyzer(r)
 	}
@@ -72,7 +73,9 @@ func WithCapabilityRegistry(r *capabilities.Registry) CapabilityOrchestratorOpti
 // WithSecurityConfig sets the config path and security level for the gatekeeper.
 func WithSecurityConfig(configPath, securityLevel string) CapabilityOrchestratorOption {
 	return func(o *CapabilityOrchestrator) {
-		o.gatekeeper = NewCapabilityGatekeeper(configPath, securityLevel)
+		o.gatekeeper = gatekeeper.NewGatekeeper(
+			gatekeeper.WithSecurityLevel(gatekeeper.SecurityLevel(securityLevel)),
+		)
 	}
 }
 
@@ -83,7 +86,7 @@ func WithTrustAll(trust bool) CapabilityOrchestratorOption {
 
 // CollectCapabilities creates a temporary runtime and collects required capabilities.
 // Returns the required capabilities and the temporary runtime (caller must close it).
-func (o *CapabilityOrchestrator) CollectCapabilities(ctx context.Context, profile entities.ProfileReader, pluginDir string) (map[string]capability.GrantSet, ports.PluginRuntime, error) {
+func (o *CapabilityOrchestrator) CollectCapabilities(ctx context.Context, profile entities.ProfileReader, pluginDir string) (map[string]*hostfunc.GrantSet, ports.PluginRuntime, error) {
 	// Create temporary runtime for capability collection
 	runtime, err := o.runtimeFactory.NewRuntime(ctx)
 	if err != nil {
@@ -103,7 +106,7 @@ func (o *CapabilityOrchestrator) CollectCapabilities(ctx context.Context, profil
 
 // CollectRequiredCapabilities loads plugins and identifies requirements.
 // It prioritizes specific capabilities extracted from profile configs over plugin metadata.
-func (o *CapabilityOrchestrator) CollectRequiredCapabilities(ctx context.Context, profile entities.ProfileReader, runtime ports.PluginRuntime, pluginDir string) (map[string]capability.GrantSet, error) {
+func (o *CapabilityOrchestrator) CollectRequiredCapabilities(ctx context.Context, profile entities.ProfileReader, runtime ports.PluginRuntime, pluginDir string) (map[string]*hostfunc.GrantSet, error) {
 	// Extract specific capabilities from profile observation configs (returns GrantSet)
 	profileCaps := o.analyzer.ExtractCapabilities(profile)
 
@@ -132,7 +135,7 @@ func extractPluginNames(profile entities.ProfileReader) map[string]bool {
 }
 
 // loadPluginCapabilities loads plugins in parallel and collects their declared capabilities.
-func (o *CapabilityOrchestrator) loadPluginCapabilities(ctx context.Context, runtime ports.PluginRuntime, pluginDir string, pluginNames map[string]bool) (map[string]capability.GrantSet, error) {
+func (o *CapabilityOrchestrator) loadPluginCapabilities(ctx context.Context, runtime ports.PluginRuntime, pluginDir string, pluginNames map[string]bool) (map[string]*hostfunc.GrantSet, error) {
 	// Convert to slice for parallel iteration
 	names := make([]string, 0, len(pluginNames))
 	for name := range pluginNames {
@@ -141,7 +144,7 @@ func (o *CapabilityOrchestrator) loadPluginCapabilities(ctx context.Context, run
 
 	// Thread-safe map for collecting plugin metadata capabilities
 	var mu sync.Mutex
-	pluginMetaCaps := make(map[string]capability.GrantSet)
+	pluginMetaCaps := make(map[string]*hostfunc.GrantSet)
 
 	g, gctx := errgroup.WithContext(ctx)
 	for _, name := range names {
@@ -166,16 +169,16 @@ func (o *CapabilityOrchestrator) loadPluginCapabilities(ctx context.Context, run
 }
 
 // loadSinglePlugin loads a single plugin and returns its declared capabilities as GrantSet.
-func (o *CapabilityOrchestrator) loadSinglePlugin(ctx context.Context, runtime ports.PluginRuntime, pluginDir, name string) (capability.GrantSet, error) {
+func (o *CapabilityOrchestrator) loadSinglePlugin(ctx context.Context, runtime ports.PluginRuntime, pluginDir, name string) (*hostfunc.GrantSet, error) {
 	// Security: Validate plugin name to prevent path traversal
 	if strings.ContainsAny(name, `/\`) || strings.Contains(name, "..") {
-		return capability.GrantSet{}, fmt.Errorf("invalid plugin name %q: contains path separator or traversal", name)
+		return &hostfunc.GrantSet{}, fmt.Errorf("invalid plugin name %q: contains path separator or traversal", name)
 	}
 
 	// SECURITY: Use os.OpenRoot to prevent symlink-based path traversal.
 	rootDir, err := os.OpenRoot(pluginDir)
 	if err != nil {
-		return capability.GrantSet{}, fmt.Errorf("failed to open plugin directory %s: %w", pluginDir, err)
+		return &hostfunc.GrantSet{}, fmt.Errorf("failed to open plugin directory %s: %w", pluginDir, err)
 	}
 	defer func() { _ = rootDir.Close() }()
 
@@ -183,13 +186,13 @@ func (o *CapabilityOrchestrator) loadSinglePlugin(ctx context.Context, runtime p
 	pluginSubpath := filepath.Join(name, name+".wasm")
 	wasmBytes, err := rootDir.ReadFile(pluginSubpath)
 	if err != nil {
-		return capability.GrantSet{}, fmt.Errorf("failed to read plugin %s: %w", name, err)
+		return &hostfunc.GrantSet{}, fmt.Errorf("failed to read plugin %s: %w", name, err)
 	}
 
 	// Load plugin
 	plugin, err := runtime.LoadPlugin(ctx, name, wasmBytes)
 	if err != nil {
-		return capability.GrantSet{}, fmt.Errorf("failed to load plugin %s: %w", name, err)
+		return &hostfunc.GrantSet{}, fmt.Errorf("failed to load plugin %s: %w", name, err)
 	}
 
 	// Get plugin declared capabilities
@@ -198,8 +201,8 @@ func (o *CapabilityOrchestrator) loadSinglePlugin(ctx context.Context, runtime p
 
 // mergeCapabilities merges profile-extracted capabilities with plugin metadata.
 // Profile-extracted capabilities take precedence (more specific).
-func (o *CapabilityOrchestrator) mergeCapabilities(pluginNames map[string]bool, profileCaps, pluginMetaCaps map[string]capability.GrantSet) (map[string]capability.GrantSet, error) {
-	required := make(map[string]capability.GrantSet)
+func (o *CapabilityOrchestrator) mergeCapabilities(pluginNames map[string]bool, profileCaps, pluginMetaCaps map[string]*hostfunc.GrantSet) (map[string]*hostfunc.GrantSet, error) {
+	required := make(map[string]*hostfunc.GrantSet)
 
 	// Clear and rebuild capability info metadata
 	o.capabilityInfo = make(map[string]ports.CapabilityInfo)
@@ -210,13 +213,13 @@ func (o *CapabilityOrchestrator) mergeCapabilities(pluginNames map[string]bool, 
 
 		if !profileGS.IsEmpty() {
 			required[name] = profileGS
-			o.recordCapabilityInfo(name, &profileGS, true)
+			o.recordCapabilityInfo(name, profileGS, true)
 			slog.Debug("using profile-extracted capabilities",
 				"plugin", name,
 				"capabilities", profileGS)
 		} else if !metaGS.IsEmpty() {
 			required[name] = metaGS
-			o.recordCapabilityInfo(name, &metaGS, false)
+			o.recordCapabilityInfo(name, metaGS, false)
 			slog.Debug("using plugin metadata capabilities (fallback)",
 				"plugin", name,
 				"capabilities", metaGS)
@@ -227,7 +230,7 @@ func (o *CapabilityOrchestrator) mergeCapabilities(pluginNames map[string]bool, 
 }
 
 // recordCapabilityInfo records capability metadata for the gatekeeper.
-func (o *CapabilityOrchestrator) recordCapabilityInfo(name string, gs *capability.GrantSet, isProfileBased bool) {
+func (o *CapabilityOrchestrator) recordCapabilityInfo(name string, gs *hostfunc.GrantSet, isProfileBased bool) {
 	// Record network capabilities
 	if gs.Network != nil {
 		for _, rule := range gs.Network.Rules {
@@ -289,11 +292,11 @@ func (o *CapabilityOrchestrator) recordCapabilityInfo(name string, gs *capabilit
 
 // GrantCapabilities resolves permissions via the gatekeeper.
 // Delegates the complete granting workflow to CapabilityGatekeeper.
-func (o *CapabilityOrchestrator) GrantCapabilities(required map[string]capability.GrantSet, trustAll bool) (map[string]capability.GrantSet, error) {
+func (o *CapabilityOrchestrator) GrantCapabilities(required map[string]*hostfunc.GrantSet, trustAll bool) (map[string]*hostfunc.GrantSet, error) {
 	// Flatten all required capabilities into a single GrantSet
-	flatRequired := capability.GrantSet{}
+	flatRequired := &hostfunc.GrantSet{}
 	for _, gs := range required {
-		flatRequired.Merge(&gs)
+		flatRequired.Merge(gs)
 	}
 
 	// Delegate granting decision to the gatekeeper

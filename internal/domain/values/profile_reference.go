@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+
+	hostValues "github.com/reglet-dev/reglet-host-sdk/plugin/values"
 )
 
 // ProfileReference is an immutable value object representing a remote profile location.
@@ -29,7 +31,7 @@ type ProfileReference struct {
 	host    string  // "example.com" or "ghcr.io"
 	path    string  // "/org/profiles/baseline.yaml"
 	version string  // "v1.2.0" (from #fragment)
-	digest  *Digest // sha256:abc123 (from @suffix)
+	digest  *hostValues.Digest // sha256:abc123 (from @suffix)
 	rawURL  string  // Original URL for display (credentials stripped)
 }
 
@@ -80,9 +82,9 @@ func ParseProfileReference(rawURL string) (ProfileReference, error) {
 	version := parsed.Fragment
 
 	// Parse digest if present
-	var digest *Digest
+	var digest *hostValues.Digest
 	if digestStr != "" {
-		d, err := ParseDigest(digestStr)
+		d, err := hostValues.ParseDigest(digestStr)
 		if err != nil {
 			return ProfileReference{}, fmt.Errorf("invalid digest in URL: %w", err)
 		}
@@ -157,7 +159,7 @@ func (r ProfileReference) Version() string {
 }
 
 // Digest returns the digest from the URL suffix, or nil.
-func (r ProfileReference) Digest() *Digest {
+func (r ProfileReference) Digest() *hostValues.Digest {
 	return r.digest
 }
 
@@ -201,7 +203,7 @@ func (r ProfileReference) WithVersion(version string) ProfileReference {
 
 // WithDigest returns a new ProfileReference with the specified digest.
 // Clears any existing version.
-func (r ProfileReference) WithDigest(digest Digest) ProfileReference {
+func (r ProfileReference) WithDigest(digest hostValues.Digest) ProfileReference {
 	return ProfileReference{
 		scheme:  r.scheme,
 		host:    r.host,

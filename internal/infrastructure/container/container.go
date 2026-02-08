@@ -8,6 +8,9 @@ import (
 	"os"
 	"path/filepath"
 
+	hostSDK "github.com/reglet-dev/reglet-host-sdk/capability"
+	"github.com/reglet-dev/reglet-host-sdk/capability/gatekeeper"
+	hostextractor "github.com/reglet-dev/reglet-host-sdk/extractor"
 	hostplugin "github.com/reglet-dev/reglet-host-sdk/plugin"
 	hostfilesystem "github.com/reglet-dev/reglet-host-sdk/plugin/filesystem"
 	hostoci "github.com/reglet-dev/reglet-host-sdk/plugin/oci"
@@ -19,7 +22,6 @@ import (
 
 	"github.com/reglet-dev/reglet/internal/application/ports"
 	"github.com/reglet-dev/reglet/internal/application/services"
-	"github.com/reglet-dev/reglet/internal/domain/capabilities"
 	domainservices "github.com/reglet-dev/reglet/internal/domain/services"
 	"github.com/reglet-dev/reglet/internal/infrastructure/adapters"
 	infraconfig "github.com/reglet-dev/reglet/internal/infrastructure/config"
@@ -105,15 +107,8 @@ func New(opts Options) (*Container, error) {
 	}
 
 	// Create capability registry and register default extractors (OCP)
-	capRegistry := capabilities.NewRegistry()
-	// Extraction logic for plugins stays in reglet for now as it's profile-related
-	// plugins.RegisterDefaultExtractors(capRegistry)
-	// Wait, I need to check where RegisterDefaultExtractors went.
-	// Actually Step 13.12 says infrastructure/plugins/extractors.go stays.
-	// But I might have deleted it if I did rm -rf reglet/internal/infrastructure/plugins/
-	// Oh, I did rm reglet/internal/infrastructure/plugins/oci/ etc. but not the parent if not empty.
-	// I should check if extractors.go still exists.
-	// For now, I'll keep it commented out or fix it after checking.
+	capRegistry := hostSDK.NewRegistry()
+	hostextractor.RegisterDefaultExtractors(capRegistry)
 
 	// Resolve config path for capability orchestrator
 	// This follows 12-Factor App principles by passing config from cmd layer
@@ -131,8 +126,10 @@ func New(opts Options) (*Container, error) {
 	// Create capability analyzer (domain service)
 	capAnalyzer := domainservices.NewCapabilityAnalyzer(capRegistry)
 
-	// Create capability gatekeeper (application service)
-	capGatekeeper := services.NewCapabilityGatekeeper(configPath, securityLevel)
+	// Create capability gatekeeper (host-sdk)
+	capGatekeeper := gatekeeper.NewGatekeeper(
+		gatekeeper.WithSecurityLevel(gatekeeper.SecurityLevel(securityLevel)),
+	)
 
 	// Create capability orchestrator with all dependencies injected
 	// This makes the full dependency graph visible at the composition root

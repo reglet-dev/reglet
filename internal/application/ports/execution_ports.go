@@ -4,8 +4,8 @@ import (
 	"context"
 	"io"
 
+	"github.com/reglet-dev/reglet-abi/hostfunc"
 	"github.com/reglet-dev/reglet/internal/application/dto"
-	"github.com/reglet-dev/reglet/internal/domain/capability"
 	"github.com/reglet-dev/reglet/internal/domain/entities"
 	"github.com/reglet-dev/reglet/internal/domain/execution"
 )
@@ -18,7 +18,7 @@ type ExecutionEngine interface {
 
 // EngineFactory creates execution engines with capabilities.
 type EngineFactory interface {
-	CreateEngine(ctx context.Context, profile entities.ProfileReader, grantedCaps map[string]capability.GrantSet, pluginDir string, filters dto.FilterOptions, execution dto.ExecutionOptions, skipSchemaValidation bool) (ExecutionEngine, error)
+	CreateEngine(ctx context.Context, profile entities.ProfileReader, grantedCaps map[string]*hostfunc.GrantSet, pluginDir string, filters dto.FilterOptions, execution dto.ExecutionOptions, skipSchemaValidation bool) (ExecutionEngine, error)
 }
 
 // OutputFormatter formats execution results.

@@ -202,14 +202,7 @@ fuzz:  ## Run all fuzz tests (5s each, for CI)
 	@go test -fuzz=^FuzzYAMLLoading$$ -fuzztime=5s ./internal/infrastructure/config/
 	@go test -fuzz=^FuzzVariableSubstitution$$ -fuzztime=5s ./internal/infrastructure/config/
 	@printf "\n$(BOLD)$(BLUE)◆ Host Functions$(RESET)\n"
-	@go test -fuzz=^FuzzHTTPRequestParsing$$ -fuzztime=5s ./internal/infrastructure/wasm/hostfuncs/
-	@go test -fuzz=^FuzzDNSRequestParsing$$ -fuzztime=5s ./internal/infrastructure/wasm/hostfuncs/
-	@go test -fuzz=^FuzzTCPRequestParsing$$ -fuzztime=5s ./internal/infrastructure/wasm/hostfuncs/
-	@go test -fuzz=^FuzzSMTPRequestParsing$$ -fuzztime=5s ./internal/infrastructure/wasm/hostfuncs/
-	@go test -fuzz=^FuzzPackedPtrLen$$ -fuzztime=5s ./internal/infrastructure/wasm/hostfuncs/
-	@go test -fuzz=^FuzzSSRFProtection$$ -fuzztime=5s ./internal/infrastructure/wasm/hostfuncs/
-	@go test -fuzz=^FuzzExecRequestParsing$$ -fuzztime=5s ./internal/infrastructure/wasm/hostfuncs/
-	@go test -fuzz=^FuzzExecutionTypeDetection$$ -fuzztime=5s ./internal/infrastructure/wasm/hostfuncs/
+	@printf "  (Host function fuzz tests moved to reglet-host-sdk)\n"
 	@printf "\n$(BOLD)$(BLUE)◆ Validation$(RESET)\n"
 	@go test -fuzz=^FuzzPluginNameValidation$$ -fuzztime=5s ./internal/infrastructure/validation/
 	@go test -fuzz=^FuzzVersionValidation$$ -fuzztime=5s ./internal/infrastructure/validation/
@@ -235,14 +228,7 @@ fuzz-extended:  ## Run extended fuzz tests (30m each)
 	@go test -fuzz=^FuzzYAMLLoading$$ -fuzztime=30m ./internal/infrastructure/config/
 	@go test -fuzz=^FuzzVariableSubstitution$$ -fuzztime=30m ./internal/infrastructure/config/
 	@printf "\n$(BOLD)$(BLUE)◆ Host Functions$(RESET)\n"
-	@go test -fuzz=^FuzzHTTPRequestParsing$$ -fuzztime=30m ./internal/infrastructure/wasm/hostfuncs/
-	@go test -fuzz=^FuzzDNSRequestParsing$$ -fuzztime=30m ./internal/infrastructure/wasm/hostfuncs/
-	@go test -fuzz=^FuzzTCPRequestParsing$$ -fuzztime=30m ./internal/infrastructure/wasm/hostfuncs/
-	@go test -fuzz=^FuzzSMTPRequestParsing$$ -fuzztime=30m ./internal/infrastructure/wasm/hostfuncs/
-	@go test -fuzz=^FuzzPackedPtrLen$$ -fuzztime=30m ./internal/infrastructure/wasm/hostfuncs/
-	@go test -fuzz=^FuzzSSRFProtection$$ -fuzztime=30m ./internal/infrastructure/wasm/hostfuncs/
-	@go test -fuzz=^FuzzExecRequestParsing$$ -fuzztime=30m ./internal/infrastructure/wasm/hostfuncs/
-	@go test -fuzz=^FuzzExecutionTypeDetection$$ -fuzztime=30m ./internal/infrastructure/wasm/hostfuncs/
+	@printf "  (Host function fuzz tests moved to reglet-host-sdk)\n"
 	@printf "\n$(BOLD)$(BLUE)◆ Validation$(RESET)\n"
 	@go test -fuzz=^FuzzPluginNameValidation$$ -fuzztime=30m ./internal/infrastructure/validation/
 	@go test -fuzz=^FuzzVersionValidation$$ -fuzztime=30m ./internal/infrastructure/validation/
@@ -267,14 +253,7 @@ fuzz-nightly:  ## Run fuzz tests for nightly CI (1m each)
 	@go test -fuzz=^FuzzYAMLLoading$$ -fuzztime=1m ./internal/infrastructure/config/
 	@go test -fuzz=^FuzzVariableSubstitution$$ -fuzztime=1m ./internal/infrastructure/config/
 	@printf "\n$(BOLD)$(BLUE)◆ Host Functions$(RESET)\n"
-	@go test -fuzz=^FuzzHTTPRequestParsing$$ -fuzztime=1m ./internal/infrastructure/wasm/hostfuncs/
-	@go test -fuzz=^FuzzDNSRequestParsing$$ -fuzztime=1m ./internal/infrastructure/wasm/hostfuncs/
-	@go test -fuzz=^FuzzTCPRequestParsing$$ -fuzztime=1m ./internal/infrastructure/wasm/hostfuncs/
-	@go test -fuzz=^FuzzSMTPRequestParsing$$ -fuzztime=1m ./internal/infrastructure/wasm/hostfuncs/
-	@go test -fuzz=^FuzzPackedPtrLen$$ -fuzztime=1m ./internal/infrastructure/wasm/hostfuncs/
-	@go test -fuzz=^FuzzSSRFProtection$$ -fuzztime=1m ./internal/infrastructure/wasm/hostfuncs/
-	@go test -fuzz=^FuzzExecRequestParsing$$ -fuzztime=1m ./internal/infrastructure/wasm/hostfuncs/
-	@go test -fuzz=^FuzzExecutionTypeDetection$$ -fuzztime=1m ./internal/infrastructure/wasm/hostfuncs/
+	@printf "  (Host function fuzz tests moved to reglet-host-sdk)\n"
 	@printf "\n$(BOLD)$(BLUE)◆ Validation$(RESET)\n"
 	@go test -fuzz=^FuzzPluginNameValidation$$ -fuzztime=1m ./internal/infrastructure/validation/
 	@go test -fuzz=^FuzzVersionValidation$$ -fuzztime=1m ./internal/infrastructure/validation/

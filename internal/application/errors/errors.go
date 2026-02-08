@@ -4,7 +4,7 @@ package apperrors
 import (
 	"fmt"
 
-	"github.com/reglet-dev/reglet/internal/domain/capability"
+	"github.com/reglet-dev/reglet-abi/hostfunc"
 )
 
 // ValidationError indicates profile or filter validation failed.
@@ -36,7 +36,7 @@ func NewValidationError(field, message string, details ...string) *ValidationErr
 
 // CapabilityError indicates capability permission issue.
 type CapabilityError struct {
-	Required *capability.GrantSet
+	Required *hostfunc.GrantSet
 	Reason   string
 }
 
@@ -45,7 +45,7 @@ func (e *CapabilityError) Error() string {
 }
 
 // NewCapabilityError creates a new capability error.
-func NewCapabilityError(reason string, required *capability.GrantSet) *CapabilityError {
+func NewCapabilityError(reason string, required *hostfunc.GrantSet) *CapabilityError {
 	return &CapabilityError{
 		Required: required,
 		Reason:   reason,

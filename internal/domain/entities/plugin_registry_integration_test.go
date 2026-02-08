@@ -1,8 +1,9 @@
-package entities
+package entities_test
 
 import (
 	"testing"
 
+	hostEntities "github.com/reglet-dev/reglet-host-sdk/plugin/entities"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -13,10 +14,10 @@ func TestPluginRegistry_AliasResolution(t *testing.T) {
 
 	t.Run("resolves alias to versioned built-in", func(t *testing.T) {
 		t.Parallel()
-		registry := NewPluginRegistry()
+		registry := hostEntities.NewPluginRegistry()
 
 		// Register an alias for a versioned built-in
-		err := registry.Register(&PluginSpec{
+		err := registry.Register(&hostEntities.PluginSpec{
 			Name:    "file-v1",
 			Source:  "file@1.0.0",
 			Version: "1.0.0",
@@ -32,10 +33,10 @@ func TestPluginRegistry_AliasResolution(t *testing.T) {
 
 	t.Run("resolves alias to OCI reference", func(t *testing.T) {
 		t.Parallel()
-		registry := NewPluginRegistry()
+		registry := hostEntities.NewPluginRegistry()
 
 		// Register an alias for an OCI reference
-		err := registry.Register(&PluginSpec{
+		err := registry.Register(&hostEntities.PluginSpec{
 			Name:    "enterprise-scanner",
 			Source:  "ghcr.io/acme-corp/scanner:2.1.0",
 			Version: "2.1.0",
@@ -51,9 +52,9 @@ func TestPluginRegistry_AliasResolution(t *testing.T) {
 
 	t.Run("resolves alias with digest pinning", func(t *testing.T) {
 		t.Parallel()
-		registry := NewPluginRegistry()
+		registry := hostEntities.NewPluginRegistry()
 
-		err := registry.Register(&PluginSpec{
+		err := registry.Register(&hostEntities.PluginSpec{
 			Name:   "pinned-file",
 			Source: "ghcr.io/reglet-dev/reglet-plugins/file@sha256:abc123def456",
 			Digest: "sha256:abc123def456",
@@ -68,7 +69,7 @@ func TestPluginRegistry_AliasResolution(t *testing.T) {
 
 	t.Run("unregistered alias returns self-reference", func(t *testing.T) {
 		t.Parallel()
-		registry := NewPluginRegistry()
+		registry := hostEntities.NewPluginRegistry()
 
 		spec := registry.Resolve("unregistered-plugin")
 		assert.Equal(t, "unregistered-plugin", spec.Name)
@@ -77,16 +78,16 @@ func TestPluginRegistry_AliasResolution(t *testing.T) {
 
 	t.Run("multiple aliases for same source", func(t *testing.T) {
 		t.Parallel()
-		registry := NewPluginRegistry()
+		registry := hostEntities.NewPluginRegistry()
 
 		// Same source with different aliases (e.g., for different environments)
-		err := registry.Register(&PluginSpec{
+		err := registry.Register(&hostEntities.PluginSpec{
 			Name:   "file-prod",
 			Source: "ghcr.io/reglet-dev/reglet-plugins/file:stable",
 		})
 		require.NoError(t, err)
 
-		err = registry.Register(&PluginSpec{
+		err = registry.Register(&hostEntities.PluginSpec{
 			Name:   "file-dev",
 			Source: "ghcr.io/reglet-dev/reglet-plugins/file:latest",
 		})
@@ -107,7 +108,7 @@ func TestPluginDeclaration_EdgeCases(t *testing.T) {
 
 	t.Run("version with pre-release tag", func(t *testing.T) {
 		t.Parallel()
-		spec, err := ParsePluginDeclaration("file@1.0.0-alpha.1")
+		spec, err := hostEntities.ParsePluginDeclaration("file@1.0.0-alpha.1")
 		require.NoError(t, err)
 		assert.Equal(t, "file", spec.Name)
 		assert.Equal(t, "1.0.0-alpha.1", spec.Version)
@@ -115,7 +116,7 @@ func TestPluginDeclaration_EdgeCases(t *testing.T) {
 
 	t.Run("OCI reference with org containing dots", func(t *testing.T) {
 		t.Parallel()
-		spec, err := ParsePluginDeclaration("registry.corp.com/security/scanner:1.0.0")
+		spec, err := hostEntities.ParsePluginDeclaration("registry.corp.com/security/scanner:1.0.0")
 		require.NoError(t, err)
 		assert.Equal(t, "scanner", spec.Name)
 	})
@@ -123,7 +124,7 @@ func TestPluginDeclaration_EdgeCases(t *testing.T) {
 	t.Run("digest with full sha256", func(t *testing.T) {
 		t.Parallel()
 		fullDigest := "ghcr.io/org/repo/plugin@sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-		spec, err := ParsePluginDeclaration(fullDigest)
+		spec, err := hostEntities.ParsePluginDeclaration(fullDigest)
 		require.NoError(t, err)
 		assert.Equal(t, "plugin", spec.Name)
 		assert.Equal(t, "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", spec.Digest)
@@ -144,9 +145,9 @@ func TestPluginSpec_IntegrationWithRegistry(t *testing.T) {
 			"ghcr.io/reglet-dev/reglet-plugins/custom:1.0.0",
 		}
 
-		registry := NewPluginRegistry()
+		registry := hostEntities.NewPluginRegistry()
 		for _, decl := range pluginDeclarations {
-			spec, err := ParsePluginDeclaration(decl)
+			spec, err := hostEntities.ParsePluginDeclaration(decl)
 			require.NoError(t, err)
 			err = registry.Register(spec)
 			require.NoError(t, err)

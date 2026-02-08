@@ -7,16 +7,16 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/reglet-dev/reglet-abi/hostfunc"
+	hostsdk "github.com/reglet-dev/reglet-host-sdk/capability/gatekeeper"
 	"github.com/reglet-dev/reglet/internal/application/ports"
-	"github.com/reglet-dev/reglet/internal/domain/capability"
-	infraCapabilities "github.com/reglet-dev/reglet/internal/infrastructure/capabilities"
 )
 
 // ProfileTrustService handles trust decisions for remote profiles.
 // It determines whether a remote profile source is trusted and manages
 // user prompts for untrusted sources.
 type ProfileTrustService struct {
-	prompter       *infraCapabilities.TerminalPrompter
+	prompter       *hostsdk.TerminalPrompter
 	logger         *slog.Logger
 	trustedSources []string // Glob patterns for trusted sources
 }
@@ -27,7 +27,7 @@ type ProfileTrustServiceOption func(*ProfileTrustService)
 // NewProfileTrustService creates a new profile trust service.
 func NewProfileTrustService(opts ...ProfileTrustServiceOption) *ProfileTrustService {
 	s := &ProfileTrustService{
-		prompter:       infraCapabilities.NewTerminalPrompter(),
+		prompter:       hostsdk.NewTerminalPrompter(),
 		trustedSources: nil,
 		logger:         slog.Default(),
 	}
@@ -162,7 +162,7 @@ func indexOf(s, substr string) int {
 func (s *ProfileTrustService) PromptForTrust(
 	ctx context.Context,
 	url string,
-	requiredCaps map[string]capability.GrantSet,
+	requiredCaps map[string]*hostfunc.GrantSet,
 	trustFlag bool,
 ) (bool, error) {
 	// If trust flag is set, auto-trust
@@ -189,7 +189,7 @@ func (s *ProfileTrustService) PromptForTrust(
 // FormatNonInteractiveError creates a helpful error message for non-interactive mode.
 func (s *ProfileTrustService) FormatNonInteractiveError(
 	url string,
-	requiredCaps map[string]capability.GrantSet,
+	requiredCaps map[string]*hostfunc.GrantSet,
 ) error {
 	var msg strings.Builder
 	msg.WriteString(fmt.Sprintf("Remote profile requires trust approval: %s\n\n", url))

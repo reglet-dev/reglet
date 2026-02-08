@@ -3,7 +3,7 @@ package dto
 import (
 	"time"
 
-	"github.com/reglet-dev/reglet/internal/domain/capability"
+	"github.com/reglet-dev/reglet-abi/hostfunc"
 )
 
 // CheckProfileRequest encapsulates all inputs needed to check a profile.
@@ -87,7 +87,7 @@ type CollectCapabilitiesRequest struct {
 
 // ExecuteProfileRequest encapsulates inputs for profile execution.
 type ExecuteProfileRequest struct {
-	GrantedCapabilities  map[string]capability.GrantSet
+	GrantedCapabilities  map[string]*hostfunc.GrantSet
 	ProfilePath          string
 	Filters              FilterOptions
 	Execution            ExecutionOptions

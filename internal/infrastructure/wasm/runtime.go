@@ -9,12 +9,13 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/reglet-dev/reglet/internal/domain/capability"
+	"github.com/reglet-dev/reglet-abi/hostfunc"
+	hostlib "github.com/reglet-dev/reglet-host-sdk"
+	hostwazero "github.com/reglet-dev/reglet-host-sdk/wazero"
 	"github.com/reglet-dev/reglet/internal/infrastructure/build"
-	"github.com/reglet-dev/reglet/internal/infrastructure/capabilities"
 	"github.com/reglet-dev/reglet/internal/infrastructure/sensitivedata"
-	"github.com/reglet-dev/reglet/internal/infrastructure/wasm/hostfuncs"
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 )
 
@@ -51,7 +52,7 @@ type Runtime struct {
 	runtime             wazero.Runtime
 	plugins             map[string]*Plugin
 	redactor            *sensitivedata.Redactor
-	grantedCapabilities map[string]capability.GrantSet
+	grantedCapabilities map[string]*hostfunc.GrantSet
 	version             build.Info
 	frozenEnv           []string
 	mu                  sync.RWMutex
@@ -63,13 +64,13 @@ type RuntimeOption func(*runtimeConfig)
 // runtimeConfig holds configuration for runtime creation.
 type runtimeConfig struct {
 	cache         wazero.CompilationCache
-	caps          map[string]capability.GrantSet
+	caps          map[string]*hostfunc.GrantSet
 	redactor      *sensitivedata.Redactor
 	memoryLimitMB int
 }
 
 // WithCapabilities sets the granted capabilities using the internal GrantSet format.
-func WithCapabilities(caps map[string]capability.GrantSet) RuntimeOption {
+func WithCapabilities(caps map[string]*hostfunc.GrantSet) RuntimeOption {
 	return func(c *runtimeConfig) {
 		c.caps = caps
 	}
@@ -165,28 +166,66 @@ func NewRuntime(ctx context.Context, version build.Info, opts ...RuntimeOption) 
 		config = config.WithMemoryLimitPages(pages)
 	}
 
-	r := wazero.NewRuntimeWithConfig(ctx, config)
+	runtime := wazero.NewRuntimeWithConfig(ctx, config)
 
 	// Instantiate WASI for system calls (clock, random, etc.).
-	if _, err := wasi_snapshot_preview1.Instantiate(ctx, r); err != nil {
-		_ = r.Close(ctx)
+	if _, err := wasi_snapshot_preview1.Instantiate(ctx, runtime); err != nil {
+		_ = runtime.Close(ctx)
 		return nil, fmt.Errorf("failed to instantiate WASI: %w", err)
 	}
 
-	// Register host functions with capability enforcement.
-	if err := hostfuncs.RegisterHostFunctions(ctx, r, version, cfg.caps); err != nil {
-		_ = r.Close(ctx)
+	// Create dummy Runtime instance to call registerHostFunctions (or just call it as a function)
+	// Actually, let's just do it directly here for simplicity until the struct is fully built.
+	r := &Runtime{}
+	if err := r.registerHostFunctions(ctx, runtime, version, cfg.caps); err != nil {
+		_ = runtime.Close(ctx)
 		return nil, fmt.Errorf("failed to register host functions: %w", err)
 	}
 
 	return &Runtime{
-		runtime:             r,
+		runtime:             runtime,
 		plugins:             make(map[string]*Plugin),
 		version:             version,
 		redactor:            cfg.redactor,
 		grantedCapabilities: cfg.caps,
 		frozenEnv:           os.Environ(), // Freeze environment at startup for security
 	}, nil
+}
+
+// registerHostFunctions configures and registers the host function registry with the runtime.
+func (r *Runtime) registerHostFunctions(ctx context.Context, runtime wazero.Runtime, version build.Info, caps map[string]*hostfunc.GrantSet) error {
+	// Create capability checker with custom denial handler for Reglet
+	checker := hostlib.NewCapabilityChecker(caps,
+		hostlib.WithCapabilityDenialHandler(func(ctx context.Context, pluginName, kind, pattern, message string) {
+			slog.WarnContext(ctx, "capability denied",
+				"plugin", pluginName,
+				"kind", kind,
+				"pattern", pattern,
+				"message", message)
+		}),
+	)
+
+	// Create registry with all built-in host functions
+	registry, err := hostlib.NewRegistry(
+		hostlib.WithBundle(hostlib.AllBundles()),
+		hostlib.WithMiddleware(
+			hostlib.CapabilityMiddleware(checker),
+			hostlib.UserAgentMiddleware(fmt.Sprintf("Reglet/%s", version.Version)),
+		),
+	)
+	if err != nil {
+		return err
+	}
+
+	// Register with wazero runtime using the SDK adapter
+	return hostwazero.RegisterWithRuntime(ctx, runtime, registry,
+		hostwazero.WithCustomHandler(hostwazero.CustomHandler{
+			Name:        "log_message",
+			Handler:     hostwazero.LogMessage,
+			ParamTypes:  []api.ValueType{api.ValueTypeI64},
+			ResultTypes: []api.ValueType{},
+		}),
+	)
 }
 
 // LoadPlugin compiles and caches a plugin, and is safe for concurrent use.
@@ -229,8 +268,8 @@ func (r *Runtime) LoadPlugin(ctx context.Context, name string, wasmBytes []byte)
 		runtime:      r.runtime,
 		stdout:       stdout,
 		stderr:       stderr,
-		capabilities: capabilities.ToABI(r.grantedCapabilities[name]), // Extract plugin-specific capabilities
-		frozenEnv:    r.frozenEnv,                                     // Pass frozen environment snapshot (prevents runtime env leakage)
+		capabilities: r.grantedCapabilities[name], // Extract plugin-specific capabilities
+		frozenEnv:    r.frozenEnv,                 // Pass frozen environment snapshot (prevents runtime env leakage)
 	}
 
 	// Cache the plugin

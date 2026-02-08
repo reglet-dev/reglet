@@ -15,10 +15,10 @@ import (
 
 	abi "github.com/reglet-dev/reglet-abi"
 	"github.com/reglet-dev/reglet-abi/hostfunc"
-	"github.com/reglet-dev/reglet/internal/domain/capability"
+	hostlib "github.com/reglet-dev/reglet-host-sdk"
+	hostloader "github.com/reglet-dev/reglet-host-sdk/host"
+	"github.com/reglet-dev/reglet-host-sdk/parser"
 	"github.com/reglet-dev/reglet/internal/domain/execution"
-	"github.com/reglet-dev/reglet/internal/infrastructure/capabilities"
-	"github.com/reglet-dev/reglet/internal/infrastructure/wasm/hostfuncs"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 )
@@ -407,7 +407,7 @@ func (p *Plugin) newInstance(ctx context.Context) (api.Module, error) {
 // Manifest retrieves the plugin's metadata including capabilities and config schema.
 func (p *Plugin) Manifest(ctx context.Context) (*abi.Manifest, error) {
 	// Wrap context with plugin name for host functions
-	ctx = hostfuncs.WithPluginName(ctx, p.name)
+	ctx = hostlib.WithCapabilityPluginName(ctx, p.name)
 
 	p.mu.Lock()
 	if p.manifest != nil {
@@ -450,13 +450,13 @@ func (p *Plugin) Manifest(ctx context.Context) (*abi.Manifest, error) {
 		return nil, fmt.Errorf("failed to read _manifest() result: %w", err)
 	}
 
-	manifest := &abi.Manifest{}
-	if err := json.Unmarshal(data, manifest); err != nil {
-		return nil, fmt.Errorf("failed to parse manifest JSON: %w", err)
+	loader := hostloader.NewLoader(
+		hostloader.WithParser(parser.NewJSONManifestParser()),
+	)
+	manifest, err := loader.LoadManifest(data, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load manifest for plugin %s: %w", p.name, err)
 	}
-
-	// Extract capabilities into GrantSet for runtime configuration
-	// Manifest now directly contains GrantSet (no conversion needed)
 
 	p.mu.Lock()
 	p.manifest = manifest
@@ -466,20 +466,19 @@ func (p *Plugin) Manifest(ctx context.Context) (*abi.Manifest, error) {
 	return manifest, nil
 }
 
-// RequiredCapabilities returns the capabilities declared in the plugin manifest
-// converted to internal domain types.
-func (p *Plugin) RequiredCapabilities(ctx context.Context) (capability.GrantSet, error) {
+// RequiredCapabilities returns the capabilities declared in the plugin manifest.
+func (p *Plugin) RequiredCapabilities(ctx context.Context) (*hostfunc.GrantSet, error) {
 	manifest, err := p.Manifest(ctx)
 	if err != nil {
-		return capability.GrantSet{}, err
+		return &hostfunc.GrantSet{}, err
 	}
-	return capabilities.FromABI(&manifest.Capabilities), nil
+	return &manifest.Capabilities, nil
 }
 
 // Observe executes the main validation logic of the plugin.
 func (p *Plugin) Observe(ctx context.Context, cfg Config) (*PluginObservationResult, error) {
 	// Wrap context with plugin name so host functions can access it
-	ctx = hostfuncs.WithPluginName(ctx, p.name)
+	ctx = hostlib.WithCapabilityPluginName(ctx, p.name)
 
 	// Acquire instance from pool (or create new one)
 	instance, err := p.acquireInstance(ctx)

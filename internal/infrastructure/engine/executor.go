@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"time"
 
+	hostEntities "github.com/reglet-dev/reglet-host-sdk/plugin/entities"
+	hostValues "github.com/reglet-dev/reglet-host-sdk/plugin/values"
 	"github.com/reglet-dev/reglet/internal/domain/entities"
 	"github.com/reglet-dev/reglet/internal/domain/execution"
 	"github.com/reglet-dev/reglet/internal/domain/services"
@@ -19,7 +21,7 @@ import (
 type ObservationExecutor struct {
 	runtime        *wasm.Runtime
 	redactor       *sensitivedata.Redactor
-	pluginRegistry *entities.PluginRegistry
+	pluginRegistry *hostEntities.PluginRegistry
 	pluginDir      string
 }
 
@@ -76,7 +78,7 @@ func WithExecutorRedactor(redactor *sensitivedata.Redactor) ExecutorOption {
 }
 
 // WithPluginRegistry enables plugin alias resolution.
-func WithPluginRegistry(registry *entities.PluginRegistry) ExecutorOption {
+func WithPluginRegistry(registry *hostEntities.PluginRegistry) ExecutorOption {
 	return func(e *ObservationExecutor) {
 		e.pluginRegistry = registry
 	}
@@ -99,7 +101,7 @@ func autoDetectPluginDir() string {
 }
 
 // SetPluginRegistry sets the plugin registry for alias resolution.
-func (e *ObservationExecutor) SetPluginRegistry(registry *entities.PluginRegistry) {
+func (e *ObservationExecutor) SetPluginRegistry(registry *hostEntities.PluginRegistry) {
 	e.pluginRegistry = registry
 }
 
@@ -241,7 +243,7 @@ func (e *ObservationExecutor) LoadPlugin(ctx context.Context, pluginName string)
 
 	// Validate plugin name to prevent path traversal
 	// NewPluginName enforces strict character set (alphanumeric, _, -) and no paths
-	validName, err := values.NewPluginName(resolvedName)
+	validName, err := hostValues.NewPluginName(resolvedName)
 	if err != nil {
 		return nil, fmt.Errorf("invalid plugin name %q (resolved from %q): %w", resolvedName, pluginName, err)
 	}

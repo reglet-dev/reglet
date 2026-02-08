@@ -3,7 +3,8 @@ package services
 import (
 	"testing"
 
-	"github.com/reglet-dev/reglet/internal/domain/capability"
+	"github.com/reglet-dev/reglet-abi/hostfunc"
+	"github.com/reglet-dev/reglet-host-sdk/capability"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -12,41 +13,41 @@ import (
 func TestRiskAssessor_ExecWildcards(t *testing.T) {
 	tests := []struct {
 		name        string
-		grantSet    capability.GrantSet
+		grantSet    *hostfunc.GrantSet
 		expectLevel capability.RiskLevel
 	}{
 		{
 			name: "exec:** is critical risk (arbitrary command execution)",
-			grantSet: capability.GrantSet{
-				Exec: &capability.ExecCapability{Commands: []string{"**"}},
+			grantSet: &hostfunc.GrantSet{
+				Exec: &hostfunc.ExecCapability{Commands: []string{"**"}},
 			},
 			expectLevel: capability.RiskCritical,
 		},
 		{
 			name: "exec:* is critical risk",
-			grantSet: capability.GrantSet{
-				Exec: &capability.ExecCapability{Commands: []string{"*"}},
+			grantSet: &hostfunc.GrantSet{
+				Exec: &hostfunc.ExecCapability{Commands: []string{"*"}},
 			},
 			expectLevel: capability.RiskCritical,
 		},
 		{
 			name: "specific binary is also critical",
-			grantSet: capability.GrantSet{
-				Exec: &capability.ExecCapability{Commands: []string{"/usr/bin/ls"}},
+			grantSet: &hostfunc.GrantSet{
+				Exec: &hostfunc.ExecCapability{Commands: []string{"/usr/bin/ls"}},
 			},
 			expectLevel: capability.RiskCritical,
 		},
 		{
 			name: "shells are critical risk (allows arbitrary commands)",
-			grantSet: capability.GrantSet{
-				Exec: &capability.ExecCapability{Commands: []string{"/bin/sh"}},
+			grantSet: &hostfunc.GrantSet{
+				Exec: &hostfunc.ExecCapability{Commands: []string{"/bin/sh"}},
 			},
 			expectLevel: capability.RiskCritical,
 		},
 		{
 			name: "interpreters are critical risk (allows code execution via -c)",
-			grantSet: capability.GrantSet{
-				Exec: &capability.ExecCapability{Commands: []string{"python"}},
+			grantSet: &hostfunc.GrantSet{
+				Exec: &hostfunc.ExecCapability{Commands: []string{"python"}},
 			},
 			expectLevel: capability.RiskCritical,
 		},
@@ -65,68 +66,68 @@ func TestRiskAssessor_ExecWildcards(t *testing.T) {
 func TestRiskAssessor_FilesystemWildcards(t *testing.T) {
 	tests := []struct {
 		name        string
-		grantSet    capability.GrantSet
+		grantSet    *hostfunc.GrantSet
 		expectLevel capability.RiskLevel
 	}{
 		{
 			name: "fs:read:** is medium risk",
-			grantSet: capability.GrantSet{
-				FS: &capability.FileSystemCapability{
-					Rules: []capability.FileSystemRule{{Read: []string{"**"}}},
+			grantSet: &hostfunc.GrantSet{
+				FS: &hostfunc.FileSystemCapability{
+					Rules: []hostfunc.FileSystemRule{{Read: []string{"**"}}},
 				},
 			},
 			expectLevel: capability.RiskMedium,
 		},
 		{
 			name: "fs:write:** is high risk",
-			grantSet: capability.GrantSet{
-				FS: &capability.FileSystemCapability{
-					Rules: []capability.FileSystemRule{{Write: []string{"**"}}},
+			grantSet: &hostfunc.GrantSet{
+				FS: &hostfunc.FileSystemCapability{
+					Rules: []hostfunc.FileSystemRule{{Write: []string{"**"}}},
 				},
 			},
 			expectLevel: capability.RiskHigh,
 		},
 		{
 			name: "root filesystem is medium risk (read)",
-			grantSet: capability.GrantSet{
-				FS: &capability.FileSystemCapability{
-					Rules: []capability.FileSystemRule{{Read: []string{"/**"}}},
+			grantSet: &hostfunc.GrantSet{
+				FS: &hostfunc.FileSystemCapability{
+					Rules: []hostfunc.FileSystemRule{{Read: []string{"/**"}}},
 				},
 			},
 			expectLevel: capability.RiskMedium,
 		},
 		{
 			name: "specific file is medium risk (read)",
-			grantSet: capability.GrantSet{
-				FS: &capability.FileSystemCapability{
-					Rules: []capability.FileSystemRule{{Read: []string{"/etc/passwd"}}},
+			grantSet: &hostfunc.GrantSet{
+				FS: &hostfunc.FileSystemCapability{
+					Rules: []hostfunc.FileSystemRule{{Read: []string{"/etc/passwd"}}},
 				},
 			},
 			expectLevel: capability.RiskMedium,
 		},
 		{
 			name: "directory tree with ** is medium risk (read)",
-			grantSet: capability.GrantSet{
-				FS: &capability.FileSystemCapability{
-					Rules: []capability.FileSystemRule{{Read: []string{"/var/log/**"}}},
+			grantSet: &hostfunc.GrantSet{
+				FS: &hostfunc.FileSystemCapability{
+					Rules: []hostfunc.FileSystemRule{{Read: []string{"/var/log/**"}}},
 				},
 			},
 			expectLevel: capability.RiskMedium,
 		},
 		{
 			name: "/etc/** is medium risk (read - sensitive system config)",
-			grantSet: capability.GrantSet{
-				FS: &capability.FileSystemCapability{
-					Rules: []capability.FileSystemRule{{Read: []string{"/etc/**"}}},
+			grantSet: &hostfunc.GrantSet{
+				FS: &hostfunc.FileSystemCapability{
+					Rules: []hostfunc.FileSystemRule{{Read: []string{"/etc/**"}}},
 				},
 			},
 			expectLevel: capability.RiskMedium,
 		},
 		{
 			name: "/home/** is medium risk (read - all user data)",
-			grantSet: capability.GrantSet{
-				FS: &capability.FileSystemCapability{
-					Rules: []capability.FileSystemRule{{Read: []string{"/home/**"}}},
+			grantSet: &hostfunc.GrantSet{
+				FS: &hostfunc.FileSystemCapability{
+					Rules: []hostfunc.FileSystemRule{{Read: []string{"/home/**"}}},
 				},
 			},
 			expectLevel: capability.RiskMedium,
@@ -146,27 +147,27 @@ func TestRiskAssessor_FilesystemWildcards(t *testing.T) {
 func TestRiskAssessor_EnvironmentWildcards(t *testing.T) {
 	tests := []struct {
 		name        string
-		grantSet    capability.GrantSet
+		grantSet    *hostfunc.GrantSet
 		expectLevel capability.RiskLevel
 	}{
 		{
 			name: "env:* is low risk",
-			grantSet: capability.GrantSet{
-				Env: &capability.EnvironmentCapability{Variables: []string{"*"}},
+			grantSet: &hostfunc.GrantSet{
+				Env: &hostfunc.EnvironmentCapability{Variables: []string{"*"}},
 			},
 			expectLevel: capability.RiskLow,
 		},
 		{
 			name: "AWS_* is low risk",
-			grantSet: capability.GrantSet{
-				Env: &capability.EnvironmentCapability{Variables: []string{"AWS_*"}},
+			grantSet: &hostfunc.GrantSet{
+				Env: &hostfunc.EnvironmentCapability{Variables: []string{"AWS_*"}},
 			},
 			expectLevel: capability.RiskLow,
 		},
 		{
 			name: "specific variable is low risk",
-			grantSet: capability.GrantSet{
-				Env: &capability.EnvironmentCapability{Variables: []string{"AWS_REGION"}},
+			grantSet: &hostfunc.GrantSet{
+				Env: &hostfunc.EnvironmentCapability{Variables: []string{"AWS_REGION"}},
 			},
 			expectLevel: capability.RiskLow,
 		},
@@ -185,23 +186,23 @@ func TestRiskAssessor_EnvironmentWildcards(t *testing.T) {
 func TestRiskAssessor_NetworkWildcards(t *testing.T) {
 	tests := []struct {
 		name        string
-		grantSet    capability.GrantSet
+		grantSet    *hostfunc.GrantSet
 		expectLevel capability.RiskLevel
 	}{
 		{
 			name: "network:* host is critical risk",
-			grantSet: capability.GrantSet{
-				Network: &capability.NetworkCapability{
-					Rules: []capability.NetworkRule{{Hosts: []string{"*"}, Ports: []string{"443"}}},
+			grantSet: &hostfunc.GrantSet{
+				Network: &hostfunc.NetworkCapability{
+					Rules: []hostfunc.NetworkRule{{Hosts: []string{"*"}, Ports: []string{"443"}}},
 				},
 			},
 			expectLevel: capability.RiskCritical,
 		},
 		{
 			name: "specific host is medium risk",
-			grantSet: capability.GrantSet{
-				Network: &capability.NetworkCapability{
-					Rules: []capability.NetworkRule{{Hosts: []string{"api.example.com"}, Ports: []string{"443"}}},
+			grantSet: &hostfunc.GrantSet{
+				Network: &hostfunc.NetworkCapability{
+					Rules: []hostfunc.NetworkRule{{Hosts: []string{"api.example.com"}, Ports: []string{"443"}}},
 				},
 			},
 			expectLevel: capability.RiskMedium,
@@ -221,65 +222,65 @@ func TestRiskAssessor_NetworkWildcards(t *testing.T) {
 func TestRiskAssessor_VersionedInterpreters(t *testing.T) {
 	tests := []struct {
 		name     string
-		grantSet capability.GrantSet
+		grantSet *hostfunc.GrantSet
 	}{
 		// Python versions
 		{
 			name: "python (base) is critical risk",
-			grantSet: capability.GrantSet{
-				Exec: &capability.ExecCapability{Commands: []string{"python"}},
+			grantSet: &hostfunc.GrantSet{
+				Exec: &hostfunc.ExecCapability{Commands: []string{"python"}},
 			},
 		},
 		{
 			name: "python3 is critical risk",
-			grantSet: capability.GrantSet{
-				Exec: &capability.ExecCapability{Commands: []string{"python3"}},
+			grantSet: &hostfunc.GrantSet{
+				Exec: &hostfunc.ExecCapability{Commands: []string{"python3"}},
 			},
 		},
 		{
 			name: "python3.11 is critical risk (versioned)",
-			grantSet: capability.GrantSet{
-				Exec: &capability.ExecCapability{Commands: []string{"python3.11"}},
+			grantSet: &hostfunc.GrantSet{
+				Exec: &hostfunc.ExecCapability{Commands: []string{"python3.11"}},
 			},
 		},
 		// Node.js versions
 		{
 			name: "node is critical risk",
-			grantSet: capability.GrantSet{
-				Exec: &capability.ExecCapability{Commands: []string{"node"}},
+			grantSet: &hostfunc.GrantSet{
+				Exec: &hostfunc.ExecCapability{Commands: []string{"node"}},
 			},
 		},
 		{
 			name: "node18 is critical risk (versioned)",
-			grantSet: capability.GrantSet{
-				Exec: &capability.ExecCapability{Commands: []string{"node18"}},
+			grantSet: &hostfunc.GrantSet{
+				Exec: &hostfunc.ExecCapability{Commands: []string{"node18"}},
 			},
 		},
 		// Ruby versions
 		{
 			name: "ruby is critical risk",
-			grantSet: capability.GrantSet{
-				Exec: &capability.ExecCapability{Commands: []string{"ruby"}},
+			grantSet: &hostfunc.GrantSet{
+				Exec: &hostfunc.ExecCapability{Commands: []string{"ruby"}},
 			},
 		},
 		// AWK variants
 		{
 			name: "awk is critical risk",
-			grantSet: capability.GrantSet{
-				Exec: &capability.ExecCapability{Commands: []string{"awk"}},
+			grantSet: &hostfunc.GrantSet{
+				Exec: &hostfunc.ExecCapability{Commands: []string{"awk"}},
 			},
 		},
 		{
 			name: "gawk is critical risk",
-			grantSet: capability.GrantSet{
-				Exec: &capability.ExecCapability{Commands: []string{"gawk"}},
+			grantSet: &hostfunc.GrantSet{
+				Exec: &hostfunc.ExecCapability{Commands: []string{"gawk"}},
 			},
 		},
 		// Note: All exec commands are critical risk
 		{
 			name: "specific command is also critical",
-			grantSet: capability.GrantSet{
-				Exec: &capability.ExecCapability{Commands: []string{"systemctl"}},
+			grantSet: &hostfunc.GrantSet{
+				Exec: &hostfunc.ExecCapability{Commands: []string{"systemctl"}},
 			},
 		},
 	}

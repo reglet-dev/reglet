@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	hostValues "github.com/reglet-dev/reglet-host-sdk/plugin/values"
 	"github.com/reglet-dev/reglet/internal/application/ports"
 	"github.com/reglet-dev/reglet/internal/application/services"
 	"github.com/reglet-dev/reglet/internal/domain/entities"
@@ -19,7 +20,7 @@ import (
 // mockProfileFetcher implements ports.ProfileFetcher for testing.
 type mockProfileFetcher struct {
 	content     []byte
-	contentHash values.Digest
+	contentHash hostValues.Digest
 	etag        string
 	fetchCount  int
 	fetchErr    error
@@ -110,7 +111,7 @@ func Test_RemoteProfileService_Fetch(t *testing.T) {
 	ctx := context.Background()
 
 	profileContent := []byte("profile:\n  name: test\n  version: 1.0.0\n")
-	contentHash, _ := values.ComputeDigestSHA256(strings.NewReader(string(profileContent)))
+	contentHash, _ := hostValues.ComputeDigestSHA256(strings.NewReader(string(profileContent)))
 
 	t.Run("fetches from network when no cache", func(t *testing.T) {
 		fetcher := &mockProfileFetcher{
@@ -245,7 +246,7 @@ func Test_RemoteProfileService_FetchAsReader(t *testing.T) {
 	ctx := context.Background()
 
 	profileContent := []byte("profile:\n  name: test\n  version: 1.0.0\n")
-	contentHash, _ := values.ComputeDigestSHA256(strings.NewReader(string(profileContent)))
+	contentHash, _ := hostValues.ComputeDigestSHA256(strings.NewReader(string(profileContent)))
 
 	fetcher := &mockProfileFetcher{
 		content:     profileContent,

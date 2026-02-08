@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/reglet-dev/reglet/internal/domain/capability"
+	"github.com/reglet-dev/reglet-abi/hostfunc"
 	"github.com/reglet-dev/reglet/internal/domain/entities"
 	"github.com/reglet-dev/reglet/internal/domain/execution"
 	"github.com/reglet-dev/reglet/internal/domain/repositories"
@@ -28,7 +28,7 @@ type EngineOption func(*engineOptions)
 // engineOptions holds all configurable engine parameters.
 type engineOptions struct {
 	capabilityManager CapabilityManager
-	capabilities      map[string]capability.GrantSet
+	capabilities      map[string]*hostfunc.GrantSet
 	profile           entities.ProfileReader
 	repository        repositories.ExecutionResultRepository
 	truncator         execution.TruncationStrategy
@@ -56,7 +56,7 @@ func WithExecutionConfig(cfg ExecutionConfig) EngineOption {
 }
 
 // WithCapabilities sets the pre-granted capabilities for the engine.
-func WithCapabilities(caps map[string]capability.GrantSet) EngineOption {
+func WithCapabilities(caps map[string]*hostfunc.GrantSet) EngineOption {
 	return func(o *engineOptions) {
 		o.capabilities = caps
 	}
@@ -128,12 +128,12 @@ type Engine struct {
 
 // CapabilityCollector collects required capabilities from plugins.
 type CapabilityCollector interface {
-	CollectRequiredCapabilities(ctx context.Context, profile entities.ProfileReader, runtime *wasm.Runtime, pluginDir string) (map[string]capability.GrantSet, error)
+	CollectRequiredCapabilities(ctx context.Context, profile entities.ProfileReader, runtime *wasm.Runtime, pluginDir string) (map[string]*hostfunc.GrantSet, error)
 }
 
 // CapabilityGranter grants capabilities (interactively or automatically).
 type CapabilityGranter interface {
-	GrantCapabilities(required map[string]capability.GrantSet) (map[string]capability.GrantSet, error)
+	GrantCapabilities(required map[string]*hostfunc.GrantSet) (map[string]*hostfunc.GrantSet, error)
 }
 
 // CapabilityManager combines collection and granting for convenience.

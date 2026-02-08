@@ -4,7 +4,7 @@ import (
 	"context"
 
 	abi "github.com/reglet-dev/reglet-abi"
-	"github.com/reglet-dev/reglet/internal/domain/capability"
+	"github.com/reglet-dev/reglet-abi/hostfunc"
 )
 
 // Plugin represents a loaded WASM plugin that can be inspected and executed.
@@ -15,7 +15,7 @@ type Plugin interface {
 
 	// RequiredCapabilities returns the capabilities declared in the plugin manifest
 	// converted to internal domain types.
-	RequiredCapabilities(ctx context.Context) (capability.GrantSet, error)
+	RequiredCapabilities(ctx context.Context) (*hostfunc.GrantSet, error)
 }
 
 // PluginRuntime abstracts the WASM runtime for plugin loading and management.

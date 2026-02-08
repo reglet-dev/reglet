@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	hostValues "github.com/reglet-dev/reglet-host-sdk/plugin/values"
 	"github.com/reglet-dev/reglet/internal/domain/values"
 )
 
@@ -42,7 +43,7 @@ type FetchOptions struct {
 // FetchResult contains the result of a profile fetch operation.
 type FetchResult struct {
 	// ContentHash is the SHA256 digest of the content.
-	ContentHash values.Digest
+	ContentHash hostValues.Digest
 
 	// ETag is the HTTP ETag header value for cache validation.
 	ETag string

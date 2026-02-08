@@ -12,10 +12,11 @@ import (
 	"strings"
 	"time"
 
+	hostValues "github.com/reglet-dev/reglet-host-sdk/plugin/values"
 	"github.com/reglet-dev/reglet/internal/application/ports"
 	"github.com/reglet-dev/reglet/internal/domain/values"
 	"github.com/reglet-dev/reglet/internal/infrastructure/sensitivedata"
-	"github.com/reglet-dev/reglet/internal/pkg/netutil"
+	"github.com/reglet-dev/reglet-host-sdk/netutil"
 )
 
 // HTTPProfileFetcher fetches profiles over HTTPS using secure defaults.
@@ -68,7 +69,7 @@ func (f *HTTPProfileFetcher) Fetch(ctx context.Context, ref values.ProfileRefere
 
 	resp, err := client.Do(req)
 	if err != nil {
-		if netutil.IsPrivateIPError(err) {
+		if netutil.IsSSRFBlockedError(err) {
 			return nil, err
 		}
 		return nil, fmt.Errorf("request failed: %w", err)
@@ -95,9 +96,9 @@ func (f *HTTPProfileFetcher) createClient(opts ports.FetchOptions) *http.Client 
 	dialer := &netutil.SecureDialer{
 		AllowPrivateNetwork: opts.AllowPrivateNetwork,
 		Timeout:             opts.Timeout,
-		OnPrivateIPBlocked: func(ip net.IP) {
+		OnBlocked: func(addr, reason string) {
 			if f.OnPrivateIPWarning != nil {
-				f.OnPrivateIPWarning(ip.String())
+				f.OnPrivateIPWarning(addr)
 			}
 		},
 		OnDNSPinning: func(host string, ip net.IP) {
@@ -210,7 +211,7 @@ func (f *HTTPProfileFetcher) handleResponse(resp *http.Response, reqURL string, 
 	}
 
 	// Compute content hash
-	contentHash, err := values.ComputeDigestSHA256(strings.NewReader(string(content)))
+	contentHash, err := hostValues.ComputeDigestSHA256(strings.NewReader(string(content)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to compute content hash: %w", err)
 	}

@@ -11,8 +11,8 @@ import (
 	"strings"
 	"sync"
 
+	hostValues "github.com/reglet-dev/reglet-host-sdk/plugin/values"
 	"github.com/reglet-dev/reglet/internal/domain/entities"
-	"github.com/reglet-dev/reglet/internal/domain/values"
 	"github.com/santhosh-tekuri/jsonschema/v5"
 )
 
@@ -244,7 +244,7 @@ func validateControl(ctrl entities.Control) error {
 // EXPORTED for use by other packages that need to validate plugin names.
 func ValidatePluginName(name string) error {
 	// Delegate to domain value object for single source of truth
-	_, err := values.NewPluginName(name)
+	_, err := hostValues.NewPluginName(name)
 	return err
 }
 

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
+	hostValues "github.com/reglet-dev/reglet-host-sdk/plugin/values"
 	"github.com/reglet-dev/reglet/internal/domain/entities"
 	"github.com/reglet-dev/reglet/internal/domain/values"
 )
@@ -72,7 +73,7 @@ func (r *FSProfileCacheRepository) Find(ctx context.Context, ref values.ProfileR
 	}
 
 	// Parse digest
-	contentHash, err := values.ParseDigest(metadata.Digest)
+	contentHash, err := hostValues.ParseDigest(metadata.Digest)
 	if err != nil {
 		return nil, fmt.Errorf("invalid cached digest: %w", err)
 	}
@@ -190,7 +191,7 @@ func (r *FSProfileCacheRepository) List(ctx context.Context) ([]*entities.Profil
 			continue // Skip invalid entries
 		}
 
-		contentHash, err := values.ParseDigest(metadata.Digest)
+		contentHash, err := hostValues.ParseDigest(metadata.Digest)
 		if err != nil {
 			continue // Skip invalid entries
 		}

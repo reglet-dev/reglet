@@ -3,6 +3,7 @@ package values_test
 import (
 	"testing"
 
+	hostValues "github.com/reglet-dev/reglet-host-sdk/plugin/values"
 	"github.com/reglet-dev/reglet/internal/domain/values"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -241,7 +242,7 @@ func Test_ProfileReference_WithVersion(t *testing.T) {
 func Test_ProfileReference_WithDigest(t *testing.T) {
 	ref, _ := values.ParseProfileReference("https://example.com/profile.yaml#v1.0.0")
 
-	digest, _ := values.NewDigest("sha256", "abc123def456")
+	digest, _ := hostValues.NewDigest("sha256", "abc123def456")
 	withDigest := ref.WithDigest(digest)
 
 	assert.True(t, withDigest.HasDigest())

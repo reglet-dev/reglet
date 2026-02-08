@@ -3,7 +3,7 @@ package dto
 import (
 	"time"
 
-	"github.com/reglet-dev/reglet/internal/domain/capability"
+	"github.com/reglet-dev/reglet-abi/hostfunc"
 	"github.com/reglet-dev/reglet/internal/domain/entities"
 	"github.com/reglet-dev/reglet/internal/domain/execution"
 )
@@ -31,10 +31,10 @@ type Diagnostics struct {
 // CapabilityDiagnostics contains capability-related diagnostics.
 type CapabilityDiagnostics struct {
 	// Required capabilities by plugin
-	Required map[string]capability.GrantSet
+	Required map[string]*hostfunc.GrantSet
 
 	// Granted capabilities by plugin
-	Granted map[string]capability.GrantSet
+	Granted map[string]*hostfunc.GrantSet
 }
 
 // LoadProfileResponse contains the result of loading a profile.
@@ -50,10 +50,10 @@ type LoadProfileResponse struct {
 // CollectCapabilitiesResponse contains the result of capability collection.
 type CollectCapabilitiesResponse struct {
 	// Required capabilities by plugin name
-	Required map[string]capability.GrantSet
+	Required map[string]*hostfunc.GrantSet
 
 	// Granted capabilities by plugin name
-	Granted map[string]capability.GrantSet
+	Granted map[string]*hostfunc.GrantSet
 }
 
 // ExecuteProfileResponse contains the result of profile execution.

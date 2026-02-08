@@ -11,12 +11,13 @@ import (
 	"time"
 
 	"github.com/expr-lang/expr"
+	"github.com/reglet-dev/reglet-abi/hostfunc"
 	"github.com/reglet-dev/reglet-host-sdk/plugin"
 	hostdto "github.com/reglet-dev/reglet-host-sdk/plugin/dto"
+	hostEntities "github.com/reglet-dev/reglet-host-sdk/plugin/entities"
 	"github.com/reglet-dev/reglet/internal/application/dto"
 	apperrors "github.com/reglet-dev/reglet/internal/application/errors"
 	"github.com/reglet-dev/reglet/internal/application/ports"
-	"github.com/reglet-dev/reglet/internal/domain/capability"
 	"github.com/reglet-dev/reglet/internal/domain/entities"
 	"github.com/reglet-dev/reglet/internal/domain/execution"
 	"github.com/reglet-dev/reglet/internal/domain/services"
@@ -199,7 +200,7 @@ func (uc *CheckProfileUseCase) resolveAndLockPlugins(
 
 	var strictPlugins []string
 	for _, p := range profile.Plugins {
-		spec, _ := entities.ParsePluginDeclaration(p) // Error checked in ResolvePlugins
+		spec, _ := hostEntities.ParsePluginDeclaration(p) // Error checked in ResolvePlugins
 		if locked := lockfile.GetPlugin(spec.Name); locked != nil {
 			// Using simplified strict declaration: currently appending @resolved
 			strictDecl := fmt.Sprintf("%s@%s", spec.Name, locked.Resolved)
@@ -231,8 +232,8 @@ func (uc *CheckProfileUseCase) prepareEngine(
 	req dto.CheckProfileRequest,
 ) (
 	ports.ExecutionEngine,
-	map[string]capability.GrantSet,
-	map[string]capability.GrantSet,
+	map[string]*hostfunc.GrantSet,
+	map[string]*hostfunc.GrantSet,
 	error,
 ) {
 	requiredCaps, tempRuntime, err := uc.capOrchestrator.CollectCapabilities(ctx, profile, pluginDir)
@@ -289,7 +290,7 @@ func (uc *CheckProfileUseCase) buildResponse(
 	req dto.CheckProfileRequest,
 	startTime time.Time,
 	result *execution.ExecutionResult,
-	reqCaps, grantedCaps map[string]capability.GrantSet,
+	reqCaps, grantedCaps map[string]*hostfunc.GrantSet,
 ) *dto.CheckProfileResponse {
 	return &dto.CheckProfileResponse{
 		ExecutionResult: result,
@@ -463,10 +464,10 @@ func extractPluginName(declared string) string {
 }
 
 // mergeGrantSets merges all GrantSets into a single GrantSet.
-func mergeGrantSets(caps map[string]capability.GrantSet) *capability.GrantSet {
-	merged := &capability.GrantSet{}
+func mergeGrantSets(caps map[string]*hostfunc.GrantSet) *hostfunc.GrantSet {
+	merged := &hostfunc.GrantSet{}
 	for _, gs := range caps {
-		merged.Merge(&gs)
+		merged.Merge(gs)
 	}
 	return merged
 }

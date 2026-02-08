@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	hostValues "github.com/reglet-dev/reglet-host-sdk/plugin/values"
 	"github.com/reglet-dev/reglet/internal/application/ports"
 	"github.com/reglet-dev/reglet/internal/domain/entities"
 	"github.com/reglet-dev/reglet/internal/domain/values"
@@ -92,7 +93,10 @@ type RemoteFetchResult struct {
 	Reference values.ProfileReference
 
 	// ContentHash is the SHA256 digest of the content.
-	ContentHash values.Digest
+	ContentHash hostValues.Digest
+
+	// ETag is the ETag header value from the HTTP response.
+	ETag string
 
 	// Content is the raw profile YAML content.
 	Content []byte
@@ -148,6 +152,7 @@ func (s *RemoteProfileService) Fetch(
 					Reference:   ref,
 					FromCache:   true,
 					FetchedAt:   entry.FetchedAt(),
+					ETag:        entry.ETag(),
 				}, nil
 			}
 			// Entry exists but is stale/expired
@@ -195,6 +200,7 @@ func (s *RemoteProfileService) Fetch(
 				Reference:   ref,
 				FromCache:   true,
 				FetchedAt:   staleEntry.FetchedAt(),
+				ETag:        staleEntry.ETag(),
 			}, nil
 		}
 		return nil, fmt.Errorf("failed to fetch profile: %w", err)
@@ -218,6 +224,7 @@ func (s *RemoteProfileService) Fetch(
 		Reference:   ref,
 		FromCache:   false,
 		FetchedAt:   time.Now(),
+		ETag:        result.ETag,
 	}, nil
 }
 

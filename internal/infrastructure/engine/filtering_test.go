@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/reglet-dev/reglet/internal/domain/capability"
+	"github.com/reglet-dev/reglet-abi/hostfunc"
 	"github.com/reglet-dev/reglet/internal/domain/entities"
 	"github.com/reglet-dev/reglet/internal/domain/execution"
 	"github.com/reglet-dev/reglet/internal/domain/values"
@@ -22,12 +22,12 @@ type testCapabilityManager struct {
 	trustAll bool
 }
 
-func (m *testCapabilityManager) CollectRequiredCapabilities(ctx context.Context, profile entities.ProfileReader, runtime *wasm.Runtime, pluginDir string) (map[string]capability.GrantSet, error) {
+func (m *testCapabilityManager) CollectRequiredCapabilities(ctx context.Context, profile entities.ProfileReader, runtime *wasm.Runtime, pluginDir string) (map[string]*hostfunc.GrantSet, error) {
 	// For tests, grant file plugin root filesystem access
-	return map[string]capability.GrantSet{
+	return map[string]*hostfunc.GrantSet{
 		"file": {
-			FS: &capability.FileSystemCapability{
-				Rules: []capability.FileSystemRule{
+			FS: &hostfunc.FileSystemCapability{
+				Rules: []hostfunc.FileSystemRule{
 					{Read: []string{"/**"}},
 				},
 			},
@@ -35,11 +35,11 @@ func (m *testCapabilityManager) CollectRequiredCapabilities(ctx context.Context,
 	}, nil
 }
 
-func (m *testCapabilityManager) GrantCapabilities(required map[string]capability.GrantSet) (map[string]capability.GrantSet, error) {
+func (m *testCapabilityManager) GrantCapabilities(required map[string]*hostfunc.GrantSet) (map[string]*hostfunc.GrantSet, error) {
 	if m.trustAll {
 		return required, nil
 	}
-	return make(map[string]capability.GrantSet), nil
+	return make(map[string]*hostfunc.GrantSet), nil
 }
 
 // TestFiltering_EndToEnd simulates a full run with 20 controls and filtering.

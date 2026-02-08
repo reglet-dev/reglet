@@ -8,8 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/reglet-dev/reglet/internal/domain/entities"
-	"github.com/reglet-dev/reglet/internal/domain/values"
+	hostEntities "github.com/reglet-dev/reglet-host-sdk/plugin/entities"
+	hostValues "github.com/reglet-dev/reglet-host-sdk/plugin/values"
 	"github.com/spf13/cobra"
 )
 
@@ -62,7 +62,7 @@ func newPluginsPushCmd() *cobra.Command {
 			h.Write(wasmBytes)
 			digestStr := fmt.Sprintf("sha256:%x", h.Sum(nil))
 
-			digest, err := values.ParseDigest(digestStr)
+			digest, err := hostValues.ParseDigest(digestStr)
 			if err != nil {
 				return fmt.Errorf("invalid digest: %w", err)
 			}
@@ -82,16 +82,16 @@ func newPluginsPushCmd() *cobra.Command {
 			if err := json.Unmarshal(metaBytes, &metaDto); err != nil {
 				return fmt.Errorf("parse metadata: %w", err)
 			}
-			metadata := values.NewPluginMetadata(metaDto.Name, metaDto.Version, metaDto.Description, metaDto.Capabilities)
+			metadata := hostValues.NewPluginMetadata(metaDto.Name, metaDto.Version, metaDto.Description, metaDto.Capabilities)
 
 			// Create Reference
-			ref, err := values.ParsePluginReference(refStr)
+			ref, err := hostValues.ParsePluginReference(refStr)
 			if err != nil {
 				return fmt.Errorf("invalid reference: %w", err)
 			}
 
 			// Create Plugin Entity
-			plugin := entities.NewPlugin(ref, digest, metadata)
+			plugin := hostEntities.NewPlugin(ref, digest, metadata)
 
 			// Publish
 			ctx.Logger.Info("pushing plugin", "ref", ref.String(), "digest", digest.String())

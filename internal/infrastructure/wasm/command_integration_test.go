@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/reglet-dev/reglet/internal/domain/capability"
+	"github.com/reglet-dev/reglet-abi/hostfunc"
 	"github.com/reglet-dev/reglet/internal/infrastructure/build"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,9 +19,9 @@ func TestCommandPlugin_Integration(t *testing.T) {
 	ctx := context.Background()
 
 	// Grant exec capabilities for testing
-	grantedCaps := map[string]capability.GrantSet{
+	grantedCaps := map[string]*hostfunc.GrantSet{
 		"command": {
-			Exec: &capability.ExecCapability{
+			Exec: &hostfunc.ExecCapability{
 				Commands: []string{"/bin/echo", "/bin/sh", "/usr/bin/env"},
 			},
 		},

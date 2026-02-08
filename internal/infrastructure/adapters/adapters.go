@@ -14,9 +14,9 @@ import (
 
 	"github.com/expr-lang/expr"
 	abi "github.com/reglet-dev/reglet-abi"
+	"github.com/reglet-dev/reglet-abi/hostfunc"
 	"github.com/reglet-dev/reglet/internal/application/dto"
 	"github.com/reglet-dev/reglet/internal/application/ports"
-	"github.com/reglet-dev/reglet/internal/domain/capability"
 	"github.com/reglet-dev/reglet/internal/domain/entities"
 	"github.com/reglet-dev/reglet/internal/domain/execution"
 	"github.com/reglet-dev/reglet/internal/infrastructure/build"
@@ -115,7 +115,7 @@ func (p *PluginAdapter) Manifest(ctx context.Context) (*abi.Manifest, error) {
 }
 
 // RequiredCapabilities returns plugin declared capabilities.
-func (p *PluginAdapter) RequiredCapabilities(ctx context.Context) (capability.GrantSet, error) {
+func (p *PluginAdapter) RequiredCapabilities(ctx context.Context) (*hostfunc.GrantSet, error) {
 	return p.plugin.RequiredCapabilities(ctx)
 }
 
@@ -364,7 +364,7 @@ func NewEngineFactoryAdapter(redactor *sensitivedata.Redactor, runtime *infracon
 func (a *EngineFactoryAdapter) CreateEngine(
 	ctx context.Context,
 	profile entities.ProfileReader,
-	grantedCaps map[string]capability.GrantSet,
+	grantedCaps map[string]*hostfunc.GrantSet,
 	pluginDir string,
 	filters dto.FilterOptions,
 	exec dto.ExecutionOptions,
@@ -438,7 +438,7 @@ func (a *EngineFactoryAdapter) buildExecutionConfig(filters dto.FilterOptions, e
 
 // staticCapabilityManager provides pre-granted capabilities.
 type staticCapabilityManager struct {
-	granted map[string]capability.GrantSet
+	granted map[string]*hostfunc.GrantSet
 }
 
 func (m *staticCapabilityManager) CollectRequiredCapabilities(
@@ -446,14 +446,14 @@ func (m *staticCapabilityManager) CollectRequiredCapabilities(
 	_ entities.ProfileReader,
 	_ *wasm.Runtime,
 	_ string,
-) (map[string]capability.GrantSet, error) {
+) (map[string]*hostfunc.GrantSet, error) {
 	// Return the pre-granted capabilities
 	return m.granted, nil
 }
 
 func (m *staticCapabilityManager) GrantCapabilities(
-	_ map[string]capability.GrantSet,
-) (map[string]capability.GrantSet, error) {
+	_ map[string]*hostfunc.GrantSet,
+) (map[string]*hostfunc.GrantSet, error) {
 	// Return what was already granted
 	return m.granted, nil
 }
