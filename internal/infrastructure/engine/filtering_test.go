@@ -23,15 +23,9 @@ type testCapabilityManager struct {
 }
 
 func (m *testCapabilityManager) CollectRequiredCapabilities(ctx context.Context, profile entities.ProfileReader, runtime *wasm.Runtime, pluginDir string) (map[string]*hostfunc.GrantSet, error) {
-	// For tests, grant file plugin root filesystem access
+	// For tests, grant fixture plugin minimal capabilities
 	return map[string]*hostfunc.GrantSet{
-		"file": {
-			FS: &hostfunc.FileSystemCapability{
-				Rules: []hostfunc.FileSystemRule{
-					{Read: []string{"/**"}},
-				},
-			},
-		},
+		"fixture": {},
 	}, nil
 }
 
@@ -51,34 +45,16 @@ func TestFiltering_EndToEnd(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Locate plugins directory
-	cwd, err := os.Getwd()
-	require.NoError(t, err)
+	// Use the test fixture WASM plugin (self-contained, no external deps)
+	fixtureWasm := filepath.Join("..", "wasm", "testdata", "fixture.wasm")
+	wasmBytes, err := os.ReadFile(fixtureWasm)
+	require.NoError(t, err, "Failed to read fixture plugin")
 
-	// Walk up to find project root containing go.mod
-	projectRoot := cwd
-	for {
-		if _, err := os.Stat(filepath.Join(projectRoot, "go.mod")); err == nil {
-			break
-		}
-		parent := filepath.Dir(projectRoot)
-		if parent == projectRoot {
-			t.Fatal("could not find project root")
-		}
-		projectRoot = parent
-	}
-	// Try the new structure where plugins are in a sibling module
-	pluginDir := filepath.Join(projectRoot, "..", "reglet-plugins", "plugins")
-	if _, err := os.Stat(pluginDir); err != nil {
-		// Fallback to old structure just in case
-		pluginDir = filepath.Join(projectRoot, "plugins")
-	}
-
-	// Create a temporary file that definitely exists and is accessible
-	tempDir := t.TempDir()
-	targetFile := filepath.Join(tempDir, "target.txt")
-	err = os.WriteFile(targetFile, []byte("content"), 0o644)
-	require.NoError(t, err)
+	// Create a plugin directory with the expected layout: <dir>/fixture/fixture.wasm
+	pluginDir := t.TempDir()
+	fixtureDir := filepath.Join(pluginDir, "fixture")
+	require.NoError(t, os.MkdirAll(fixtureDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(fixtureDir, "fixture.wasm"), wasmBytes, 0o644))
 
 	// 1. Define a profile with 20 controls
 	// 5 controls: tag "target", severity "high"
@@ -99,10 +75,10 @@ func TestFiltering_EndToEnd(t *testing.T) {
 			Tags:     []string{tag},
 			ObservationDefinitions: []entities.ObservationDefinition{
 				{
-					Plugin: "file",
+					Plugin: "fixture",
 					Config: map[string]interface{}{
-						"path": "/", // Root should always exist if FS is mounted correctly
-						"mode": "exists",
+						"action": "fs_sim",
+						"input":  "test",
 					},
 				},
 			},

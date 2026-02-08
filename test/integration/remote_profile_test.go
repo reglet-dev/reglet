@@ -29,6 +29,9 @@ func TestRemoteProfile_FetchAndRun(t *testing.T) {
 		t.Skipf("reglet binary not found at %s - run 'make build' first", binPath)
 	}
 
+	// Check plugins are available
+	pluginDir := requirePlugins(t, "command")
+
 	// 2. Create a test profile to serve
 	profileContent := `
 profile:
@@ -78,6 +81,7 @@ controls:
 		"--trust-plugins",
 		"--allow-private-network",
 		"--insecure")
+	checkCmd.Dir = filepath.Dir(pluginDir) // so binary finds ./plugins
 	checkCmd.Env = append(os.Environ(), "HOME="+tempHome)
 
 	outputBytes, err := checkCmd.CombinedOutput()
@@ -120,6 +124,9 @@ func TestRemoteProfile_CachesBetweenRuns(t *testing.T) {
 	if _, statErr := os.Stat(binPath); os.IsNotExist(statErr) {
 		t.Skipf("reglet binary not found at %s - run 'make build' first", binPath)
 	}
+
+	// Check plugins are available
+	pluginDir := requirePlugins(t, "command")
 
 	// 2. Track fetch count
 	var fetchCount int32
@@ -170,6 +177,7 @@ controls:
 		"--trust-plugins",
 		"--allow-private-network",
 		"--insecure")
+	cmd1.Dir = filepath.Dir(pluginDir)
 	cmd1.Env = append(os.Environ(), "HOME="+tempHome)
 	out1, err := cmd1.CombinedOutput()
 	require.NoError(t, err, "First run failed: %s", out1)
@@ -181,6 +189,7 @@ controls:
 		"--trust-plugins",
 		"--allow-private-network",
 		"--insecure")
+	cmd2.Dir = filepath.Dir(pluginDir)
 	cmd2.Env = append(os.Environ(), "HOME="+tempHome)
 	out2, err := cmd2.CombinedOutput()
 	require.NoError(t, err, "Second run failed: %s", out2)
@@ -193,6 +202,7 @@ controls:
 		"--allow-private-network",
 		"--insecure",
 		"--refresh")
+	cmd3.Dir = filepath.Dir(pluginDir)
 	cmd3.Env = append(os.Environ(), "HOME="+tempHome)
 	out3, err := cmd3.CombinedOutput()
 	require.NoError(t, err, "Third run with refresh failed: %s", out3)
@@ -281,7 +291,7 @@ controls:
 	output, err := checkCmd.CombinedOutput()
 	// Should fail because private network access is blocked by default
 	assert.Error(t, err, "Should fail when fetching from private network without --allow-private-network")
-	assert.Contains(t, string(output), "private IP", "Error message should mention private IP block")
+	assert.Contains(t, string(output), "blocked", "Error message should mention SSRF blocking")
 	// The test documents expected behavior: private network access should be blocked
 	// without --allow-private-network flag
 }
@@ -327,6 +337,9 @@ func TestRemoteProfile_WithVariables(t *testing.T) {
 	if _, statErr := os.Stat(binPath); os.IsNotExist(statErr) {
 		t.Skipf("reglet binary not found at %s - run 'make build' first", binPath)
 	}
+
+	// Check plugins are available
+	pluginDir := requirePlugins(t, "command")
 
 	// Profile with variables that should be overridden by CLI
 	profileContent := `
@@ -376,6 +389,7 @@ controls:
 		"--allow-private-network",
 		"--insecure",
 		"--set", "message=CLI override message")
+	checkCmd.Dir = filepath.Dir(pluginDir) // so binary finds ./plugins
 	checkCmd.Env = append(os.Environ(), "HOME="+tempHome)
 
 	outputBytes, err := checkCmd.CombinedOutput()

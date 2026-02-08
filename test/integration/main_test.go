@@ -78,3 +78,47 @@ func findRootDir() (string, error) {
 		dir = parent
 	}
 }
+
+// findPluginDir locates the plugin directory containing built WASM plugins.
+// It mirrors the adapter's resolution logic: sibling reglet-plugins/plugins,
+// then ./plugins relative to project root.
+// Returns "" if no plugin directory is found.
+func findPluginDir(t *testing.T) string {
+	t.Helper()
+
+	rootDir := findProjectRoot(t)
+
+	// 1. Try sibling reglet-plugins/plugins (workspace layout)
+	sibling := filepath.Join(filepath.Dir(rootDir), "reglet-plugins", "plugins")
+	if _, err := os.Stat(sibling); err == nil {
+		return sibling
+	}
+
+	// 2. Try ./plugins relative to project root
+	local := filepath.Join(rootDir, "plugins")
+	if _, err := os.Stat(local); err == nil {
+		return local
+	}
+
+	return ""
+}
+
+// requirePlugins skips the test if the plugin directory with required WASM
+// files is not available (e.g., standalone checkout without built plugins).
+func requirePlugins(t *testing.T, plugins ...string) string {
+	t.Helper()
+
+	pluginDir := findPluginDir(t)
+	if pluginDir == "" {
+		t.Skipf("plugin directory not found - run 'make build-plugins' or use workspace with reglet-plugins")
+	}
+
+	for _, name := range plugins {
+		wasmPath := filepath.Join(pluginDir, name, name+".wasm")
+		if _, err := os.Stat(wasmPath); os.IsNotExist(err) {
+			t.Skipf("plugin %s not built at %s", name, wasmPath)
+		}
+	}
+
+	return pluginDir
+}

@@ -26,6 +26,9 @@ func TestRedaction_EndToEnd(t *testing.T) {
 		t.Skipf("reglet binary not found at %s - run 'make build' first", binPath)
 	}
 
+	// Check plugins are available
+	pluginDir := requirePlugins(t, "command")
+
 	// 2. Create a temporary home directory for config
 	tempHome := t.TempDir()
 	configDir := filepath.Join(tempHome, ".reglet")
@@ -74,6 +77,7 @@ controls:
 	// 5. Run reglet check
 	// We need to set HOME to point to our temp dir so it picks up the config
 	checkCmd := exec.Command(binPath, "check", profilePath, "--format", "json", "--trust-plugins")
+	checkCmd.Dir = filepath.Dir(pluginDir) // so binary finds ./plugins
 	checkCmd.Env = append(os.Environ(), "HOME="+tempHome)
 
 	outputBytes, err := checkCmd.CombinedOutput()

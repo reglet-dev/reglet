@@ -149,10 +149,10 @@ func TestRuntime_ConcurrentLoadDifferentPlugins(t *testing.T) {
 		_ = runtime.Close(ctx)
 	}()
 
-	// Load a real WASM plugin file for testing
-	pluginPath := filepath.Join("..", "..", "..", "..", "reglet-plugins", "plugins", "file", "file.wasm")
+	// Load the test fixture WASM plugin
+	pluginPath := filepath.Join("testdata", "fixture.wasm")
 	wasmBytes, err := os.ReadFile(pluginPath)
-	require.NoError(t, err, "Failed to read file plugin. Run 'cd plugins/file && make build' first")
+	require.NoError(t, err, "Failed to read fixture plugin. Run 'make -C internal/infrastructure/wasm/testdata/fixture' first")
 
 	const numPlugins = 10
 

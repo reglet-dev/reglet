@@ -815,17 +815,13 @@ func TestWorkerPool_ContextCancellation(t *testing.T) {
 		Controls: entities.ControlsSection{Items: controls},
 	}
 
-	// Create cancellable context
+	// Create an already-canceled context so cancellation is guaranteed
+	// regardless of how fast controls execute
 	ctx, cancel := context.WithCancel(context.Background())
-
-	// Cancel after short delay
-	go func() {
-		time.Sleep(10 * time.Millisecond)
-		cancel()
-	}()
+	cancel()
 
 	// Execute should return context error
 	_, err = engine.Execute(ctx, profile)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "context canceled")
 }
