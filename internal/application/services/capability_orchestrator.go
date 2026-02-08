@@ -15,7 +15,6 @@ import (
 	"github.com/reglet-dev/reglet-host-sdk/capability/gatekeeper"
 	"github.com/reglet-dev/reglet/internal/application/ports"
 	"github.com/reglet-dev/reglet/internal/domain/entities"
-	domainServices "github.com/reglet-dev/reglet/internal/domain/services"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -44,7 +43,7 @@ func NewCapabilityOrchestrator(
 		runtimeFactory: runtimeFactory,
 		capabilityInfo: make(map[string]ports.CapabilityInfo),
 		// Defaults
-		analyzer:   domainServices.NewCapabilityAnalyzer(hostSDK.NewRegistry()),
+		analyzer:   NewCapabilityAnalyzer(hostSDK.NewRegistry()),
 		gatekeeper: gatekeeper.NewGatekeeper(gatekeeper.WithSecurityLevel(gatekeeper.SecurityStandard)),
 	}
 	for _, opt := range opts {
@@ -66,7 +65,7 @@ func WithGatekeeper(g ports.CapabilityGatekeeperPort) CapabilityOrchestratorOpti
 // WithCapabilityRegistry sets a capability registry to use for the analyzer.
 func WithCapabilityRegistry(r *hostSDK.Registry) CapabilityOrchestratorOption {
 	return func(o *CapabilityOrchestrator) {
-		o.analyzer = domainServices.NewCapabilityAnalyzer(r)
+		o.analyzer = NewCapabilityAnalyzer(r)
 	}
 }
 

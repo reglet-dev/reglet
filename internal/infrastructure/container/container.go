@@ -110,21 +110,11 @@ func New(opts Options) (*Container, error) {
 	capRegistry := hostSDK.NewRegistry()
 	hostextractor.RegisterDefaultExtractors(capRegistry)
 
-	// Resolve config path for capability orchestrator
-	// This follows 12-Factor App principles by passing config from cmd layer
-	configPath := opts.SystemConfigPath
-	if configPath == "" {
-		homeDir, err := os.UserHomeDir()
-		if err == nil {
-			configPath = filepath.Join(homeDir, ".reglet", "config.yaml")
-		}
-	}
-
 	// Create plugin runtime factory (decouples application from wasm infrastructure)
 	runtimeFactory := adapters.NewPluginRuntimeFactoryAdapter(redactor)
 
-	// Create capability analyzer (domain service)
-	capAnalyzer := domainservices.NewCapabilityAnalyzer(capRegistry)
+	// Create capability analyzer (application service)
+	capAnalyzer := services.NewCapabilityAnalyzer(capRegistry)
 
 	// Create capability gatekeeper (host-sdk)
 	capGatekeeper := gatekeeper.NewGatekeeper(

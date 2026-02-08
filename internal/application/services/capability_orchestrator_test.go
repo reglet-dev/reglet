@@ -10,7 +10,6 @@ import (
 	"github.com/reglet-dev/reglet-host-sdk/capability/gatekeeper"
 	"github.com/reglet-dev/reglet/internal/application/ports"
 	"github.com/reglet-dev/reglet/internal/domain/entities"
-	domainServices "github.com/reglet-dev/reglet/internal/domain/services"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -58,7 +57,7 @@ func TestCapabilityOrchestrator_UsesAnalyzer(t *testing.T) {
 
 	// Verify analyzer is injected
 	require.NotNil(t, orchestrator.analyzer)
-	assert.IsType(t, &domainServices.CapabilityAnalyzer{}, orchestrator.analyzer)
+	assert.IsType(t, &CapabilityAnalyzer{}, orchestrator.analyzer)
 }
 
 // TestCapabilityOrchestrator_UsesGatekeeper verifies that the orchestrator
@@ -100,7 +99,7 @@ func (m *mockCapabilityGatekeeper) GrantCapabilities(
 // correctly delegates to the injected gatekeeper.
 func TestCapabilityOrchestrator_WithMockGatekeeper(t *testing.T) {
 	// Create mock analyzer (domain service implements the interface)
-	analyzer := domainServices.NewCapabilityAnalyzer(hostSDK.NewRegistry())
+	analyzer := NewCapabilityAnalyzer(hostSDK.NewRegistry())
 
 	// Create mock gatekeeper
 	mockGK := &mockCapabilityGatekeeper{
@@ -141,7 +140,7 @@ func TestCapabilityOrchestrator_WithMockGatekeeper(t *testing.T) {
 // TestCapabilityOrchestrator_ErrorPropagation verifies that errors from the
 // gatekeeper are correctly propagated to the caller.
 func TestCapabilityOrchestrator_ErrorPropagation(t *testing.T) {
-	analyzer := domainServices.NewCapabilityAnalyzer(hostSDK.NewRegistry())
+	analyzer := NewCapabilityAnalyzer(hostSDK.NewRegistry())
 
 	// Create mock gatekeeper that returns an error
 	mockGK := &mockCapabilityGatekeeper{
@@ -207,7 +206,7 @@ func TestCapabilityOrchestrator_TrustAllFlagPropagation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			analyzer := domainServices.NewCapabilityAnalyzer(hostSDK.NewRegistry())
+			analyzer := NewCapabilityAnalyzer(hostSDK.NewRegistry())
 			mockGK := &mockCapabilityGatekeeper{
 				hasResult:   true,
 				grantResult: &hostfunc.GrantSet{},
