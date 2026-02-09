@@ -11,7 +11,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/owenrumney/go-sarif/v3 v3.3.0
 	github.com/reglet-dev/reglet-abi v0.1.0
-	github.com/reglet-dev/reglet-host-sdk v0.1.0
+	github.com/reglet-dev/reglet-host-sdk v0.1.1
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
 	github.com/spf13/cast v1.10.0
 	github.com/spf13/cobra v1.10.2
