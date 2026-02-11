@@ -1,6 +1,6 @@
 module fixture
 
-go 1.25.5
+go 1.25.7
 
 require github.com/reglet-dev/reglet-plugin-sdk v0.6.0
 
