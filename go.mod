@@ -4,7 +4,7 @@ go 1.25.7
 
 require (
 	github.com/BobuSumisu/aho-corasick v1.0.3
-	github.com/charmbracelet/huh v0.8.0
+	github.com/charmbracelet/huh v1.0.0
 	github.com/expr-lang/expr v1.17.8
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/goccy/go-yaml v1.19.2
